@@ -19,8 +19,8 @@ psycopg-pool>=3.2
 
 # ===== 数据库 / 检索 =====
 neo4j>=5.23                # 作用域子查询语法需 5.23+/2025.x
-pymysql>=1.1
 chromadb>=0.5
+# 实体映射表与对话记忆共用同一个 PostgreSQL（psycopg 上方 LangGraph 段已声明）
 
 # ===== 嵌入 / 离线数据管道 =====
 sentence-transformers>=3.0

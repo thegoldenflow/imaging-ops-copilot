@@ -14,14 +14,11 @@ def _get_bool(key: str, default: bool) -> bool:
 
 
 # --------- 数据库配置（全部走环境变量，禁止硬编码密码） ---------
-MYSQL_CONFIG = {
-    "host": os.getenv("MYSQL_HOST", "localhost"),
-    "port": int(os.getenv("MYSQL_PORT", "3306")),
-    "user": os.getenv("MYSQL_USER", "root"),
-    "password": os.getenv("MYSQL_PASSWORD", ""),
-    "database": os.getenv("MYSQL_DATABASE", "smart_medical"),
-    "charset": "utf8mb4",  # 中文实体，避免 mojibake
-}
+# 单一 PostgreSQL：同时承载实体映射表(entity_mapping) 与 LangGraph 对话记忆(checkpointer)，
+# 二者是不同表、共用一个库。留空则记忆回退 InMemory，但实体对齐仍需要可用的 Postgres。
+POSTGRES_URI = os.getenv(
+    "POSTGRES_URI", "postgresql://postgres:postgres@localhost:5432/smart_medical"
+)
 
 NEO4J_URI = os.getenv("NEO4J_URI", "neo4j://localhost")
 NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "neo4j")
@@ -41,9 +38,9 @@ NEO4J_READONLY_CONFIG = {
     ),
 }
 
-# 对话记忆：PostgreSQL checkpointer 连接串，如 postgresql://user:pass@localhost:5432/smart_medical
-# 留空则回退到进程内 InMemorySaver（重启丢失、不跨 worker，仅供本地调试）
-POSTGRES_URI = os.getenv("POSTGRES_URI", "")
+# --------- LLM 模型（DeepSeek，可配置）---------
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+CYPHER_CHECKER_MODEL = os.getenv("CYPHER_CHECKER_MODEL", DEEPSEEK_MODEL)
 
 # --------- 会话/安全 ---------
 SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "")

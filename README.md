@@ -2,11 +2,13 @@
 
 基于「知识图谱 + LangGraph Agent」的医疗问答 demo。FastAPI 暴露 `/chat` 流式接口，Agent（DeepSeek）通过工具查询 Neo4j 医疗知识图谱：
 
-- `entity_alignment`：把用户提到的实体对齐到图谱标准实体（MySQL 同义词表 + Chroma 向量检索）
+- `entity_alignment`：把用户提到的实体对齐到图谱标准实体（PostgreSQL 同义词表 + Chroma 向量检索）
 - `check_syntax_error`：用 LLM 校验生成的 Cypher
 - `neo4j_query`：**只读**执行 Cypher 查询
 
-离线管道 `src/datasync` 负责清洗数据、导入 Neo4j、DBSCAN 实体对齐并写入 MySQL / Chroma。
+离线管道 `src/datasync` 负责清洗数据、导入 Neo4j、DBSCAN 实体对齐并写入 PostgreSQL / Chroma。
+
+**数据存储**：Neo4j（知识图谱）+ 单个 PostgreSQL（实体映射表 `entity_mapping` **与** LangGraph 对话记忆，不同表共库）+ Chroma（本地文件向量库）。
 
 > ⚠️ 本项目为 demo。上线前仍有安全/合规待办，见 `.claude/plans/bug-shimmering-lobster.md`（B/C 部分：完整鉴权、HTTPS 反代、医疗合规备案、评测等）。
 
@@ -22,45 +24,55 @@ pretrained/       嵌入模型权重（需自行下载，见下）
 ```
 
 ## 依赖服务
-- Python 3.12
-- Neo4j 5.23+（作用域子查询语法要求）
-- MySQL 8（实体映射表）
-- PostgreSQL（对话记忆 checkpointer；可选，留空则用进程内内存）
+- Python 3.12（**无需 GPU**，CPU 即可）
+- Neo4j 5.26（Docker）— 作用域子查询语法要求 5.23+
+- PostgreSQL 16（Docker）— 实体映射表 + 对话记忆
 - DeepSeek API Key
-- 嵌入模型 `BAAI/bge-base-zh-v1.5`
+- 嵌入模型 `BAAI/bge-base-zh-v1.5`（本地 CPU 运行）
 
-## 安装
+## 1. 起后端组件（Docker）
+```bash
+cp .env.example .env      # 先填好 .env（见下方「配置」）
+docker compose up -d
+docker compose ps         # 等 neo4j / postgres 变 healthy（首启约 30-60s）
+```
+compose 会自动创建 Postgres 库 `smart_medical`，无需手动建库。
+
+## 2. 安装 Python 依赖 + 模型
 ```bash
 python -m venv .venv
 # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-# GPU 用户：按 https://pytorch.org 安装对应 CUDA 版 torch
+# 无 GPU：Windows 上 `pip install torch` 默认即 CPU 版；
+# Linux/容器请用 CPU 版：pip install torch --index-url https://download.pytorch.org/whl/cpu
 
 # 下载嵌入模型到 pretrained/bge-base-zh-v1.5
 pip install -U "huggingface_hub[cli]"
 huggingface-cli download BAAI/bge-base-zh-v1.5 --local-dir pretrained/bge-base-zh-v1.5
 ```
 
-## 配置
+## 配置（.env）
 ```bash
-cp .env.example .env      # 填入真实值
 python -c "import secrets;print(secrets.token_urlsafe(48))"   # 生成 SESSION_SECRET_KEY
 ```
+关键项：`DEEPSEEK_API_KEY`、`DEEPSEEK_MODEL`(默认 deepseek-chat)、`NEO4J_PASSWORD`、`POSTGRES_URI`/`POSTGRES_PASSWORD`、`SESSION_SECRET_KEY`。
+`POSTGRES_URI` 与 compose 的 `POSTGRES_*` 必须一致；`NEO4J_URI` 指向 `neo4j://localhost:7687`。
 
-Neo4j 建议单独创建只读账号供在线查询使用（防止提示注入写库）：
-```cypher
-CREATE USER readonly SET PASSWORD 'your-readonly-pass' CHANGE NOT REQUIRED;
-GRANT ROLE reader TO readonly;
+Neo4j 建议单独创建只读账号供在线查询使用（纵深防御；`routing_=READ` 已能在服务端挡写）：
+```bash
+docker exec -it sm_neo4j cypher-shell -u neo4j -p "<你的NEO4J_PASSWORD>" \
+  "CREATE USER readonly SET PASSWORD 'your-readonly-pass' CHANGE NOT REQUIRED; GRANT ROLE reader TO readonly;"
 ```
+并在 `.env` 设 `NEO4J_READONLY_USER=readonly` / `NEO4J_READONLY_PASSWORD=...`（不设则回退主账号）。
 
-## 离线：构建图谱与索引（首次/更新数据时）
+## 3. 离线：构建图谱与索引（首次/更新数据时）
 ```bash
 cd src
 python -m datasync.data_prepare
 ```
-会建 MySQL 表、清空并导入 Neo4j、创建 Chroma 向量索引（余弦距离）。
+会建 PostgreSQL 表、清空并导入 Neo4j、创建 Chroma 向量索引（余弦距离）。CPU 下全量建库约几分钟。
 
-## 运行后端
+## 4. 运行后端
 ```bash
 cd src
 uvicorn backend.app:app --host 127.0.0.1 --port 8000

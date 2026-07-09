@@ -48,7 +48,7 @@ def get_agent(neo4j_schema, checkpointer=None):
     from langchain_deepseek import ChatDeepSeek
     from langchain.tools import tool
 
-    llm = ChatDeepSeek(model="deepseek-chat")
+    llm = ChatDeepSeek(model=config.DEEPSEEK_MODEL)
 
     neo4j_query_tool = tool(neo4j_query, args_schema=Neo4jQueryParams)
     check_syntax_tool = tool(check_syntax_error, args_schema=CheckSyntaxError)

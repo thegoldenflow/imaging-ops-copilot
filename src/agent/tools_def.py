@@ -40,9 +40,9 @@ def _get_cypher_checker_llm():
     if _cypher_checker_llm is None:
         from langchain_deepseek import ChatDeepSeek
 
-        _cypher_checker_llm = ChatDeepSeek(model="deepseek-chat").with_structured_output(
-            CypherCheckerResponse
-        )
+        _cypher_checker_llm = ChatDeepSeek(
+            model=config.CYPHER_CHECKER_MODEL
+        ).with_structured_output(CypherCheckerResponse)
     return _cypher_checker_llm
 
 

@@ -1,0 +1,44 @@
+# 后端组件：Neo4j（知识图谱）+ PostgreSQL（实体映射表 + 对话记忆）。
+# 应用本身跑在宿主机（需本地 Python + bge 模型）。
+# 变量取自同目录 .env（compose 自动读取），未设置时用下方默认值。
+# 启动：docker compose up -d ；查看：docker compose ps
+
+services:
+  neo4j:
+    image: neo4j:5.26            # 5.23+ 才支持 CALL (var){} 作用域子查询
+    container_name: sm_neo4j
+    ports:
+      - "7474:7474"              # HTTP / 浏览器
+      - "7687:7687"              # Bolt
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-change-me}
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"${NEO4J_PASSWORD:-change-me}\" 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 40s
+
+  postgres:
+    image: postgres:16
+    container_name: sm_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-smart_medical}     # 自动建库，免去 mysql CLI 那套
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-smart_medical}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+volumes:
+  neo4j_data:
+  postgres_data:

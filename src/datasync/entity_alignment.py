@@ -1,8 +1,8 @@
 from configuration import config
-import pymysql
 import hashlib
 import chromadb
-import subprocess
+import psycopg
+from psycopg.rows import dict_row
 from tqdm import tqdm
 from sklearn.cluster import DBSCAN
 from collections import defaultdict
@@ -12,76 +12,36 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 _embedding_model = None
 
-# 控制台标记
-tag = {
-    "processing": "[*]",
-    "success": "[+]",
-    "error": "[!]",
-}
 
-# --------- 创建 MySQL 数据库与建表 ---------
+def _connect():
+    """打开一个 PostgreSQL 连接（dict 行工厂）。"""
+    return psycopg.connect(config.POSTGRES_URI, row_factory=dict_row)
 
 
-def create_mysql_db(host, user, password, database, charset="utf8mb4", port=3306):
-    """创建数据库（仅冷启动、目标库不存在时调用）"""
-    # MySQL 命令前缀，包括 host、port、user、password
-    mysql_cmd_prefix = [
-        "mysql",
-        "-h",
-        host,
-        "-P",
-        str(port),
-        "-u",
-        user,
-        f"-p{password}",
-        f"--default-character-set={charset}",
-    ]
+# --------- 建表 ---------
 
-    # 创建数据库（不删除已有库，避免误伤）
-    print(f"{tag['processing']} 创建 {database}")
-    cmd = mysql_cmd_prefix + [
-        "-e",
-        f"CREATE DATABASE IF NOT EXISTS {database};",
-    ]
-    result = subprocess.run(cmd, stderr=subprocess.PIPE, text=True)
-    if result.returncode != 0:
-        err = result.stderr.strip() or "mysql 命令执行失败"
-        print(f"{tag['error']} {err}")
-        return
-    print(f"{tag['success']} {database} 创建成功")
-
-
-# collate utf8mb4_bin 设置字段大小写敏感
+# entity_mapping：同义词 → 标准词映射表（PostgreSQL）。
+# synonym 采用精确匹配（Postgres `=` 默认即大小写/字节精确，等价于原 MySQL utf8mb4_bin）。
 sql_content = """
-create table if not exists
-    entity_mapping (
-        id varchar(255) not null comment '实体 ID',
-        synonym varchar(255) not null collate utf8mb4_bin comment '同义词',
-        std_name varchar(255) not null comment '标准词',
-        entity_schema varchar(255) not null comment '实体类型',
-        is_reviewed int default 0 not null comment '是否已审核',
-        create_time timestamp default current_timestamp comment '创建时间',
-        update_time timestamp default null on update current_timestamp comment '更新时间',
-        primary key (synonym, entity_schema)
-    ) comment '实体映射表';
+create table if not exists entity_mapping (
+    id varchar(255) not null,
+    synonym varchar(255) not null,
+    std_name varchar(255) not null,
+    entity_schema varchar(255) not null,
+    is_reviewed integer not null default 0,
+    create_time timestamptz not null default now(),
+    update_time timestamptz,
+    primary key (synonym, entity_schema)
+);
 """
+
+
 def init_db():
-    """建库 + 建表。仅离线管道显式调用，不在 import 时执行副作用。"""
-    try:
-        with pymysql.connect(**config.MYSQL_CONFIG) as mysql_conn:
-            with mysql_conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                cursor.execute(sql_content)
-            mysql_conn.commit()
-    except pymysql.err.OperationalError as e:
-        # 如果目标数据库不存在
-        if e.args[0] == 1049:
-            create_mysql_db(**config.MYSQL_CONFIG)
-            with pymysql.connect(**config.MYSQL_CONFIG) as mysql_conn:
-                with mysql_conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                    cursor.execute(sql_content)
-                mysql_conn.commit()
-        else:
-            raise
+    """建表。仅离线管道显式调用，不在 import 时执行副作用。数据库本身由 docker-compose 自动创建。"""
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql_content)
+        conn.commit()
 
 
 def get_embedding_model():
@@ -125,14 +85,14 @@ def entity_alignment(datas, entity_schema, embed_batch_size=128):
     }
     embedding_model = get_embedding_model()
 
-    # 加载 MySQL 中同义词到标准词的映射
-    with pymysql.connect(**config.MYSQL_CONFIG) as mysql_conn:
-        with mysql_conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute(
+    # 加载已对齐的同义词到标准词的映射
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
                 "select id, synonym, std_name from entity_mapping where entity_schema=%s and is_reviewed=1",
                 (field_type_mapping[entity_schema],),
             )
-            old_entity_mapping = cursor.fetchall()
+            old_entity_mapping = cur.fetchall()
     old_entities = []
     if old_entity_mapping:
         print(
@@ -235,13 +195,14 @@ def entity_alignment(datas, entity_schema, embed_batch_size=128):
                     for entity in temp_std_to_cluster[temp_std]:
                         new_entity_mapping[entity] = temp_std
 
-        # 将新增实体的映射存储到 MySQL
+        # 将新增实体的映射存储到 PostgreSQL
         insert_count = 0
-        with pymysql.connect(**config.MYSQL_CONFIG) as mysql_conn:
-            with mysql_conn.cursor(pymysql.cursors.DictCursor) as cursor:
+        with _connect() as conn:
+            with conn.cursor() as cur:
                 for entity in new_entity_mapping:
-                    result = cursor.execute(
-                        "insert ignore into smart_medical.entity_mapping (id, synonym, std_name, entity_schema, is_reviewed) value(%s, %s, %s, %s, 1)",
+                    cur.execute(
+                        "insert into entity_mapping (id, synonym, std_name, entity_schema, is_reviewed) "
+                        "values (%s, %s, %s, %s, 1) on conflict (synonym, entity_schema) do nothing",
                         (
                             f"{field_type_mapping[entity_schema]}_{hashlib.md5(new_entity_mapping[entity].encode()).hexdigest()[:16]}",
                             entity,
@@ -249,10 +210,9 @@ def entity_alignment(datas, entity_schema, embed_batch_size=128):
                             field_type_mapping[entity_schema],
                         ),
                     )
-                    insert_count += result
-                mysql_conn.commit()
+                    insert_count += cur.rowcount
+                conn.commit()
                 print(
-                    
                     f"添加 {insert_count} 条 {field_type_mapping[entity_schema]} 实体到数据库",
                 )
 
@@ -376,13 +336,14 @@ def vector_indexing(datas, embed_batch_size=128, add_batch_size=256):
         )
     print( f"添加 {len(new_items)} 条数据到向量数据库")
 
-    # 存储到 MySQL
+    # 存储到 PostgreSQL
     insert_count = 0
-    with pymysql.connect(**config.MYSQL_CONFIG) as mysql_conn:
-        with mysql_conn.cursor(pymysql.cursors.DictCursor) as cursor:
+    with _connect() as conn:
+        with conn.cursor() as cur:
             for entity in new_items:
-                result = cursor.execute(
-                    "insert into smart_medical.entity_mapping (id, synonym, std_name, entity_schema, is_reviewed) value(%s, %s, %s, %s, 1)",
+                cur.execute(
+                    "insert into entity_mapping (id, synonym, std_name, entity_schema, is_reviewed) "
+                    "values (%s, %s, %s, %s, 1) on conflict (synonym, entity_schema) do nothing",
                     (
                         entity[0],  # id
                         entity[2],  # document
@@ -390,8 +351,8 @@ def vector_indexing(datas, embed_batch_size=128, add_batch_size=256):
                         entity[1]["type"],  # metadata[type]
                     ),
                 )
-                insert_count += result
-            mysql_conn.commit()
+                insert_count += cur.rowcount
+            conn.commit()
             print( f"添加 {insert_count} 条实体到数据库")
 
 
@@ -404,15 +365,16 @@ class EntityAlignment:
 
     def entity_mapping(self, text, entity_schema):
         """标准词映射"""
-        with pymysql.connect(**config.MYSQL_CONFIG) as mysql_conn:
-            with mysql_conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                cursor.execute(
+        res = None
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
                     "select std_name from entity_mapping where is_reviewed=1 and synonym=%s and entity_schema=%s",
                     (text, entity_schema),
                 )
-                res = cursor.fetchone()
-                if res:
-                    res = res["std_name"]
+                row = cur.fetchone()
+                if row:
+                    res = row["std_name"]
         return res
 
     def vector_retrieve(self, text, where=None, n_results=1, threshold=None):
@@ -437,15 +399,16 @@ class EntityAlignment:
         if not res:
             res = self.vector_retrieve(text, where={"type": entity_schema})
             if res:
-                # 将文本和检索出来的标准词写入 MySQL 缓存（补齐 NOT NULL 的 id 列）
+                # 将文本和检索出来的标准词写入缓存（补齐 NOT NULL 的 id 列）
                 entity_id = f"{entity_schema}_{hashlib.md5(res.encode()).hexdigest()[:16]}"
-                with pymysql.connect(**config.MYSQL_CONFIG) as mysql_conn:
-                    with mysql_conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                        cursor.execute(
-                            "insert ignore into entity_mapping (id, synonym, std_name, entity_schema, is_reviewed) values (%s, %s, %s, %s, 1)",
+                with _connect() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "insert into entity_mapping (id, synonym, std_name, entity_schema, is_reviewed) "
+                            "values (%s, %s, %s, %s, 1) on conflict (synonym, entity_schema) do nothing",
                             (entity_id, text, res, entity_schema),
                         )
-                    mysql_conn.commit()
+                    conn.commit()
         return res
 
 
