@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# 环境变量 / 密钥
+.env
+*.lock
+
+# 生成物 / 大文件（勿入库）
+data/vectorstore/
+pretrained/
+
+# 日志 / 编辑器
+*.log
+.idea/
+.vscode/
