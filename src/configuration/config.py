@@ -54,6 +54,33 @@ NEO4J_QUERY_TIMEOUT = float(os.getenv("NEO4J_QUERY_TIMEOUT", "15"))
 NEO4J_MAX_ROWS = int(os.getenv("NEO4J_MAX_ROWS", "50"))
 # 在线实体对齐：Chroma 余弦距离阈值（distance = 1 - cos_sim），超过则判为不匹配返回 None
 ENTITY_ALIGN_MAX_DISTANCE = float(os.getenv("ENTITY_ALIGN_MAX_DISTANCE", "0.35"))
+# 英文实体仅在独立多语种索引中做语义回退；留空时仍支持 PostgreSQL 中的确定性英文别名，
+# 未知英文术语直接判为未匹配，绝不送入中文 BGE 模型。
+_multilingual_model_path = os.getenv("MULTILINGUAL_EMBEDDING_MODEL_PATH", "").strip()
+MULTILINGUAL_EMBEDDING_MODEL_PATH = (
+    Path(_multilingual_model_path).expanduser() if _multilingual_model_path else None
+)
+CHINESE_VECTOR_COLLECTION = "smart_medical"
+MULTILINGUAL_VECTOR_COLLECTION = os.getenv(
+    "MULTILINGUAL_VECTOR_COLLECTION", "smart_medical_multilingual_v1"
+)
+MULTILINGUAL_ENTITY_ALIGN_MAX_DISTANCE = float(
+    os.getenv("MULTILINGUAL_ENTITY_ALIGN_MAX_DISTANCE", "0.25")
+)
+MULTILINGUAL_ENTITY_ALIGN_MIN_MARGIN = float(
+    os.getenv("MULTILINGUAL_ENTITY_ALIGN_MIN_MARGIN", "0.05")
+)
+
+
+def validate_vector_collection_isolation() -> None:
+    if MULTILINGUAL_VECTOR_COLLECTION == CHINESE_VECTOR_COLLECTION:
+        raise ValueError(
+            "MULTILINGUAL_VECTOR_COLLECTION 必须与中文 BGE collection "
+            f"{CHINESE_VECTOR_COLLECTION!r} 不同"
+        )
+
+
+validate_vector_collection_isolation()
 AGENT_RECURSION_LIMIT = int(os.getenv("AGENT_RECURSION_LIMIT", "25"))
 
 # --------- 路径配置 ---------

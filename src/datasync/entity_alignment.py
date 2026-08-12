@@ -1,7 +1,11 @@
-from configuration import config
 import hashlib
+import logging
+import re
+import unicodedata
+
 import chromadb
 import psycopg
+from psycopg import sql
 from psycopg.rows import dict_row
 from tqdm import tqdm
 from sklearn.cluster import DBSCAN
@@ -9,8 +13,15 @@ from collections import defaultdict
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
+from configuration import config
+
 
 _embedding_model = None
+_multilingual_embedding_model = None
+logger = logging.getLogger(__name__)
+
+LANGUAGE_ZH = "zh"
+LANGUAGE_EN = "en"
 
 
 def _connect():
@@ -25,23 +36,137 @@ def _connect():
 sql_content = """
 create table if not exists entity_mapping (
     id varchar(255) not null,
-    synonym varchar(255) not null,
-    std_name varchar(255) not null,
+    synonym text not null,
+    std_name text not null,
     entity_schema varchar(255) not null,
     is_reviewed integer not null default 0,
     create_time timestamptz not null default now(),
     update_time timestamptz,
-    primary key (synonym, entity_schema)
+    language varchar(8) not null default 'zh',
+    normalized_synonym text,
+    source varchar(64) not null default 'legacy',
+    match_confidence double precision,
+    -- synonym/std_name 可能是长文本（如 cause 描述，最长 >1200 字），故用 text；
+    -- 唯一性走 md5(synonym) 生成列，避免 btree 对超长文本的 2704 字节索引上限。
+    synonym_key text generated always as (md5(synonym)) stored,
+    primary key (synonym_key, entity_schema)
 );
 """
 
+# `create table if not exists` 不会更新旧表。以下迁移全部是 ADD/ALTER/INDEX，
+# 可在已有中文数据上重复执行，不删除或重写任何映射。
+schema_migration_statements = (
+    "alter table entity_mapping add column if not exists language varchar(8) not null default 'zh'",
+    "alter table entity_mapping add column if not exists normalized_synonym text",
+    "alter table entity_mapping add column if not exists source varchar(64) not null default 'legacy'",
+    "alter table entity_mapping add column if not exists match_confidence double precision",
+    "alter table entity_mapping add column if not exists synonym_key text generated always as (md5(synonym)) stored",
+)
+
+
+def _backfill_alias_metadata(cur):
+    """Backfill legacy rows with the same normalization used by online lookup."""
+    cur.execute(
+        "select synonym, entity_schema, language, normalized_synonym, source "
+        "from entity_mapping where normalized_synonym is null"
+    )
+    for row in cur.fetchall():
+        language = row["language"]
+        if row["source"] == "legacy":
+            language = detect_alias_language(row["synonym"])
+        cur.execute(
+            "update entity_mapping set language=%s, normalized_synonym=%s "
+            "where synonym=%s and entity_schema=%s",
+            (
+                language,
+                normalize_alias(row["synonym"], language),
+                row["synonym"],
+                row["entity_schema"],
+            ),
+        )
+
+
+def _migrate_synonym_key_primary_key(cur):
+    """Move legacy `(synonym, entity_schema)` identity to the text-safe hash key."""
+    cur.execute(
+        """
+        select con.conname,
+               array_agg(att.attname order by key_column.ordinality) as columns
+        from pg_constraint con
+        cross join lateral unnest(con.conkey) with ordinality
+            as key_column(attnum, ordinality)
+        join pg_attribute att
+          on att.attrelid=con.conrelid and att.attnum=key_column.attnum
+        where con.conrelid='entity_mapping'::regclass and con.contype='p'
+        group by con.conname
+        """
+    )
+    primary_key = cur.fetchone()
+    current_columns = list(primary_key["columns"]) if primary_key else []
+    target_columns = ["synonym_key", "entity_schema"]
+    if current_columns == target_columns:
+        return
+    if current_columns and current_columns != ["synonym", "entity_schema"]:
+        raise RuntimeError(
+            f"entity_mapping 存在无法自动迁移的主键列: {current_columns}"
+        )
+
+    cur.execute(
+        "create unique index if not exists entity_mapping_synonym_key_schema_idx "
+        "on entity_mapping (synonym_key, entity_schema)"
+    )
+    if primary_key:
+        cur.execute(
+            sql.SQL("alter table entity_mapping drop constraint {}").format(
+                sql.Identifier(primary_key["conname"])
+            )
+        )
+    cur.execute(
+        "alter table entity_mapping add constraint entity_mapping_pkey "
+        "primary key using index entity_mapping_synonym_key_schema_idx"
+    )
+
 
 def init_db():
-    """建表。仅离线管道显式调用，不在 import 时执行副作用。数据库本身由 docker-compose 自动创建。"""
+    """创建/增量迁移映射表；幂等且不会删除已有中文数据。"""
     with _connect() as conn:
         with conn.cursor() as cur:
             cur.execute(sql_content)
+            # 只在旧安装仍为 varchar 时改为 text。新表已有依赖 synonym 的生成列，
+            # 对同类型重复执行 ALTER TYPE 反而可能触发 PostgreSQL 依赖检查。
+            for column_name in ("synonym", "std_name"):
+                cur.execute(
+                    "select data_type from information_schema.columns "
+                    "where table_schema=current_schema() and table_name='entity_mapping' "
+                    "and column_name=%s",
+                    (column_name,),
+                )
+                column = cur.fetchone()
+                if column and column["data_type"] != "text":
+                    cur.execute(
+                        f"alter table entity_mapping alter column {column_name} type text"
+                    )
+            for statement in schema_migration_statements:
+                cur.execute(statement)
+            _backfill_alias_metadata(cur)
+            _migrate_synonym_key_primary_key(cur)
         conn.commit()
+
+
+def detect_alias_language(text: str) -> str:
+    """Phase 1 仅区分中文与英文术语；包含汉字的实体按中文处理。"""
+    if re.search(r"[\u3400-\u4dbf\u4e00-\u9fff]", text or ""):
+        return LANGUAGE_ZH
+    return LANGUAGE_EN
+
+
+def normalize_alias(text: str, language: str | None = None) -> str:
+    """生成用于确定性别名匹配的稳定形式，不改变存储/展示用原文。"""
+    normalized = unicodedata.normalize("NFKC", text or "")
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    if (language or detect_alias_language(normalized)) == LANGUAGE_EN:
+        normalized = normalized.casefold()
+    return normalized
 
 
 def get_embedding_model():
@@ -54,6 +179,23 @@ def get_embedding_model():
         )
         print( "加载嵌入模型")
     return _embedding_model
+
+
+def get_multilingual_embedding_model():
+    """按需加载独立的多语种模型；不复用或替换现有中文 BGE 模型。"""
+    global _multilingual_embedding_model
+    model_path = config.MULTILINGUAL_EMBEDDING_MODEL_PATH
+    if not model_path:
+        raise RuntimeError("MULTILINGUAL_EMBEDDING_MODEL_PATH 未配置")
+    if not model_path.exists():
+        raise FileNotFoundError(f"多语种嵌入模型目录不存在: {model_path}")
+    if _multilingual_embedding_model is None:
+        _multilingual_embedding_model = SentenceTransformer(
+            str(model_path),
+            device=config.resolve_device(),
+        )
+        print("加载多语种嵌入模型")
+    return _multilingual_embedding_model
 
 
 def entity_alignment(datas, entity_schema, embed_batch_size=128):
@@ -75,6 +217,7 @@ def entity_alignment(datas, entity_schema, embed_batch_size=128):
     """
     field_type_mapping = {
         "name": "disease",
+        "department": "department",
         "symptom": "symptom",
         "cause": "cause",
         "drug": "drug",
@@ -202,7 +345,7 @@ def entity_alignment(datas, entity_schema, embed_batch_size=128):
                 for entity in new_entity_mapping:
                     cur.execute(
                         "insert into entity_mapping (id, synonym, std_name, entity_schema, is_reviewed) "
-                        "values (%s, %s, %s, %s, 1) on conflict (synonym, entity_schema) do nothing",
+                        "values (%s, %s, %s, %s, 1) on conflict do nothing",
                         (
                             f"{field_type_mapping[entity_schema]}_{hashlib.md5(new_entity_mapping[entity].encode()).hexdigest()[:16]}",
                             entity,
@@ -241,6 +384,7 @@ def vector_indexing(datas, embed_batch_size=128, add_batch_size=256):
     # 疾病:str,症状:list,诱因:str,药物:list,食物:list,人群类别:str,医学检查:list
     field_type_mapping = {
         "name": "disease",
+        "department": "department",
         "symptom": "symptom",
         "cause": "cause",
         "drug": "drug",
@@ -281,6 +425,7 @@ def vector_indexing(datas, embed_batch_size=128, add_batch_size=256):
     # 合并结果
     all_vector_items = (
         vector_items["disease"]
+        + vector_items["department"]
         + vector_items["symptom"]
         + vector_items["cause"]
         + vector_items["drug"]
@@ -293,7 +438,7 @@ def vector_indexing(datas, embed_batch_size=128, add_batch_size=256):
     # 创建或加载向量数据库（显式使用余弦距离，与离线聚类/在线阈值语义一致）
     client = chromadb.PersistentClient(path=str(config.VECTOR_STORE_DIR))
     collection = client.get_or_create_collection(
-        "smart_medical", metadata={"hnsw:space": "cosine"}
+        config.CHINESE_VECTOR_COLLECTION, metadata={"hnsw:space": "cosine"}
     )
 
     # 删数据库中与新增数据 ID 重复的数据，以及过滤新增数据中重复数据
@@ -343,7 +488,7 @@ def vector_indexing(datas, embed_batch_size=128, add_batch_size=256):
             for entity in new_items:
                 cur.execute(
                     "insert into entity_mapping (id, synonym, std_name, entity_schema, is_reviewed) "
-                    "values (%s, %s, %s, %s, 1) on conflict (synonym, entity_schema) do nothing",
+                    "values (%s, %s, %s, %s, 1) on conflict do nothing",
                     (
                         entity[0],  # id
                         entity[2],  # document
@@ -360,12 +505,10 @@ class EntityAlignment:
     """实体对齐"""
 
     def __init__(self):
-        self.embedding_model = get_embedding_model()
         self.chroma_client = chromadb.PersistentClient(path=str(config.VECTOR_STORE_DIR))
 
     def entity_mapping(self, text, entity_schema):
-        """标准词映射"""
-        res = None
+        """先做原有精确匹配，再做带语言元数据的规范化精确匹配。"""
         with _connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -374,15 +517,45 @@ class EntityAlignment:
                 )
                 row = cur.fetchone()
                 if row:
-                    res = row["std_name"]
-        return res
+                    return row["std_name"]
+
+        language = detect_alias_language(text)
+        normalized = normalize_alias(text, language)
+        try:
+            with _connect() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "select distinct std_name from entity_mapping "
+                        "where is_reviewed=1 and normalized_synonym=%s "
+                        "and entity_schema=%s and language=%s",
+                        (normalized, entity_schema, language),
+                    )
+                    rows = cur.fetchall()
+        except psycopg.errors.UndefinedColumn:
+            # 允许应用在执行 Phase 1 增量迁移前继续使用原有中文精确/向量路径。
+            logger.warning("entity_mapping 尚未执行多语种增量迁移，跳过规范化别名查询")
+            return None
+
+        canonical_names = {row["std_name"] for row in rows}
+        if len(canonical_names) == 1:
+            return canonical_names.pop()
+        if len(canonical_names) > 1:
+            logger.warning(
+                "规范化别名存在歧义，拒绝自动对齐: text=%s schema=%s candidates=%s",
+                text,
+                entity_schema,
+                sorted(canonical_names),
+            )
+        return None
 
     def vector_retrieve(self, text, where=None, n_results=1, threshold=None):
-        """向量检索（余弦距离 distance = 1 - cos_sim，越小越相似；超过阈值判为不匹配）"""
+        """保留原有中文 BGE/Chroma 检索路径。"""
         if threshold is None:
             threshold = config.ENTITY_ALIGN_MAX_DISTANCE
-        embedding = self.embedding_model.encode(text, normalize_embeddings=True)
-        collection = self.chroma_client.get_collection("smart_medical")
+        embedding = get_embedding_model().encode(text, normalize_embeddings=True)
+        collection = self.chroma_client.get_collection(
+            config.CHINESE_VECTOR_COLLECTION
+        )
         res = collection.query(query_embeddings=embedding, n_results=n_results, where=where)
         # 按阈值过滤，返回标准词文本
         hits = [
@@ -392,23 +565,110 @@ class EntityAlignment:
         ]
         return hits[0] if hits else None
 
+    def multilingual_vector_retrieve(self, text, entity_schema):
+        """在独立多语种索引中检索，返回其中记录的中文 canonical_name。"""
+        if not config.MULTILINGUAL_EMBEDDING_MODEL_PATH:
+            return None
+        try:
+            config.validate_vector_collection_isolation()
+            collection = self.chroma_client.get_collection(
+                config.MULTILINGUAL_VECTOR_COLLECTION
+            )
+            collection_count = collection.count()
+            if not collection_count:
+                return None
+            embedding = get_multilingual_embedding_model().encode(
+                text, normalize_embeddings=True
+            )
+            if hasattr(embedding, "tolist"):
+                embedding = embedding.tolist()
+            result = collection.query(
+                query_embeddings=[embedding],
+                n_results=min(2, collection_count),
+                where={"$and": [{"type": entity_schema}, {"reviewed": True}]},
+            )
+        except Exception:
+            logger.exception("多语种实体向量检索不可用，英文实体按未匹配处理")
+            return None
+
+        distances = (result.get("distances") or [[]])[0]
+        metadatas = (result.get("metadatas") or [[]])[0]
+        candidates = []
+        for distance, metadata in zip(distances, metadatas):
+            canonical_name = (metadata or {}).get("canonical_name")
+            if canonical_name:
+                candidates.append((float(distance), canonical_name))
+        if not candidates:
+            return None
+
+        best_distance, best_name = candidates[0]
+        if best_distance >= config.MULTILINGUAL_ENTITY_ALIGN_MAX_DISTANCE:
+            return None
+        if len(candidates) > 1:
+            second_distance, second_name = candidates[1]
+            if (
+                second_name != best_name
+                and second_distance - best_distance
+                < config.MULTILINGUAL_ENTITY_ALIGN_MIN_MARGIN
+            ):
+                logger.info(
+                    "多语种实体候选过于接近，拒绝自动对齐: text=%s candidates=%s",
+                    text,
+                    candidates,
+                )
+                return None
+        return best_name
+
+    def _cache_vector_candidate(self, text, entity_schema, std_name, language):
+        """缓存推断结果，但明确标记为未审核，不能成为后续确定性命中。"""
+        entity_id = (
+            f"{entity_schema}_{hashlib.md5(std_name.encode()).hexdigest()[:16]}"
+        )
+        normalized = normalize_alias(text, language)
+        try:
+            with _connect() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "insert into entity_mapping "
+                        "(id, synonym, std_name, entity_schema, is_reviewed, language, "
+                        "normalized_synonym, source) "
+                        "values (%s, %s, %s, %s, 0, %s, %s, 'vector_candidate') "
+                        "on conflict do nothing",
+                        (
+                            entity_id,
+                            text,
+                            std_name,
+                            entity_schema,
+                            language,
+                            normalized,
+                        ),
+                    )
+                conn.commit()
+        except psycopg.errors.UndefinedColumn:
+            # 旧表兼容：仍不把向量推断结果标为 reviewed。
+            with _connect() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "insert into entity_mapping "
+                        "(id, synonym, std_name, entity_schema, is_reviewed) "
+                        "values (%s, %s, %s, %s, 0) on conflict do nothing",
+                        (entity_id, text, std_name, entity_schema),
+                    )
+                conn.commit()
+
     def __call__(self, text, entity_schema):
-        # 先从同义词-标准词中匹配
+        language = detect_alias_language(text)
+        # 中英文都先使用经过审核的确定性别名映射。
         res = self.entity_mapping(text, entity_schema)
-        # 如果没有匹配成功，嵌入并检索（vector_retrieve 已按阈值过滤，不匹配返回 None）
         if not res:
-            res = self.vector_retrieve(text, where={"type": entity_schema})
+            if language == LANGUAGE_ZH:
+                # 中文继续走原有 bge-base-zh-v1.5 索引，避免质量回退。
+                res = self.vector_retrieve(text, where={"type": entity_schema})
+            else:
+                # 英文绝不送入中文模型；仅使用独立、显式配置的多语种索引。
+                res = self.multilingual_vector_retrieve(text, entity_schema)
             if res:
-                # 将文本和检索出来的标准词写入缓存（补齐 NOT NULL 的 id 列）
-                entity_id = f"{entity_schema}_{hashlib.md5(res.encode()).hexdigest()[:16]}"
-                with _connect() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            "insert into entity_mapping (id, synonym, std_name, entity_schema, is_reviewed) "
-                            "values (%s, %s, %s, %s, 1) on conflict (synonym, entity_schema) do nothing",
-                            (entity_id, text, res, entity_schema),
-                        )
-                    conn.commit()
+                self._cache_vector_candidate(text, entity_schema, res, language)
         return res
 
 

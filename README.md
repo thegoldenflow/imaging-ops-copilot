@@ -20,6 +20,7 @@ src/
   configuration/  配置与连接（config.py 读环境变量 / dependency.py 惰性连接）
   datasync/       离线数据管道（data_prepare.py / entity_alignment.py）
 data/             知识图谱与标注数据
+  terminology/   小规模、可审核的中英文术语 fixture
 pretrained/       嵌入模型权重（需自行下载，见下）
 ```
 
@@ -89,6 +90,41 @@ python -m compileall -q backend agent configuration datasync   # 语法检查
 curl http://127.0.0.1:8000/healthz                              # 期望 {"status":"ok",...}
 ```
 在页面提问「糖尿病可以吃什么药」验证：实体对齐 → Cypher 校验 → 只读查询 → 自然语言回答；尝试诱导删库的输入应被拒绝。
+
+## Phase 1 中英文实体支持（增量、非破坏性）
+
+Neo4j 仍以现有中文实体和事实为唯一知识图谱。英文支持发生在实体对齐层：
+
+```
+英文术语 → PostgreSQL 审核过的英文别名 → 中文标准实体 → 原有 Neo4j 查询 → 英文回答
+```
+
+仓库只附带 6 个用于验证架构的小规模术语样例：头痛、恶心、高血压、糖尿病、偏头痛、神经内科。它们位于 `data/terminology/bilingual_medical_sample.json`，不代表完整或已经完成临床术语治理的数据集。
+
+先执行仅 PostgreSQL 的确定性别名迁移：
+
+```bash
+cd src
+python -m datasync.bilingual_terminology --skip-vector
+```
+
+该命令只增量迁移 `entity_mapping` 并导入 fixture，不连接、不清空、不重建 Neo4j；可以安全重复执行。不要为了添加英文别名运行 `datasync.data_prepare`，因为后者是首次建库用的破坏性全量流程。
+
+确定性映射是英文检索的第一优先级。若要让 fixture 之外的英文表达使用语义回退，应先在离线评测中选定一个 SentenceTransformer 兼容的多语种模型，将其下载到本地，然后配置：
+
+```dotenv
+MULTILINGUAL_EMBEDDING_MODEL_PATH=/absolute/path/to/local-multilingual-model
+MULTILINGUAL_VECTOR_COLLECTION=smart_medical_multilingual_v1
+```
+
+再幂等执行：
+
+```bash
+cd src
+python -m datasync.bilingual_terminology
+```
+
+多语种向量使用独立、带版本号的 Chroma collection，不会替换现有 `bge-base-zh-v1.5` 或中文 `smart_medical` collection。中文查询继续走原来的中文模型；英文查询只在审核过的别名未命中时才查询多语种索引。向量推断产生的缓存会标为 `is_reviewed=0`，不能自动升级为权威术语。
 
 ## 安全默认值
 - 所有密钥/凭证走环境变量，代码无硬编码

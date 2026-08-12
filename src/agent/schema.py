@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Any, Dict
 
 from pydantic import BaseModel,Field
 
@@ -17,9 +17,19 @@ class CheckSyntaxError(BaseModel):
 
 class Neo4jQueryParams(BaseModel):
     cypher:str = Field(description="需要执行的Cypher查询语句")
-    params:dict[str,str]=Field(
-        default=None,
-        description="cypher查询语句当中的参数，字典形式。没有参数，使用默认值{}")
+    params:dict[str,Any]=Field(
+        default_factory=dict,
+        description=(
+            "Cypher 查询参数。值可以是字符串、数字、布尔值、null 或列表；"
+            "没有参数时使用空字典。"
+        ),
+    )
 
 class EntityAlignmentList(BaseModel):
-    entitys_to_alignment:list[Dict[str,str]] = Field(description="当前所需要对齐的所有实体的列表，每个需要对齐的实体为一个字典，key包含entity和label，entity为需要对齐的实体，label为实体对应的在知识图谱当中的label名称")
+    entitys_to_alignment:list[Dict[str,str]] = Field(
+        description=(
+            "需要对齐的中英文医疗实体列表。每项包含 entity 和 label；"
+            "entity 保留用户原始术语，label 使用 Neo4j 标签名称，例如 Disease、"
+            "Symptom、Department 或 Drug。工具返回的 entity 是图谱使用的中文标准词。"
+        )
+    )

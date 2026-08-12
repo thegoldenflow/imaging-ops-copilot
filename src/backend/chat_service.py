@@ -1,4 +1,5 @@
 import logging
+import re
 
 from langchain_core.messages import AIMessageChunk
 
@@ -6,6 +7,28 @@ from agent import get_agent, build_checkpointer
 from configuration import config, dependency
 
 logger = logging.getLogger(__name__)
+
+
+def response_language_for_query(user_query: str) -> str:
+    """用于本地错误文案；成功回答的语言约束由 agent system prompt 执行。"""
+    text = user_query or ""
+    han_count = len(re.findall(r"[\u3400-\u4dbf\u4e00-\u9fff]", text))
+    latin_count = len(re.findall(r"[A-Za-z]", text))
+    return "en" if latin_count > han_count else "zh"
+
+
+def _localized_message(language: str, key: str) -> str:
+    messages = {
+        "not_ready": {
+            "zh": "服务尚未就绪，请稍后再试。",
+            "en": "The service is not ready yet. Please try again shortly.",
+        },
+        "temporary_failure": {
+            "zh": "系统暂时无法响应，请稍后再试。",
+            "en": "The system is temporarily unable to respond. Please try again later.",
+        },
+    }
+    return messages[key][language]
 
 
 def _chunk_text(msg) -> str:
@@ -61,8 +84,9 @@ class ChatService:
         """
         聊天入口，根据配置决定是否流式输出。
         """
+        response_language = response_language_for_query(user_query)
         if self.agent is None:
-            yield "服务尚未就绪，请稍后再试。"
+            yield _localized_message(response_language, "not_ready")
             return
 
         agent_config = {
@@ -86,7 +110,7 @@ class ChatService:
                 yield result["messages"][-1].content
         except Exception:
             logger.exception("chat 处理失败")
-            yield "系统暂时无法响应，请稍后再试。"
+            yield _localized_message(response_language, "temporary_failure")
 
 
 if __name__ == '__main__':

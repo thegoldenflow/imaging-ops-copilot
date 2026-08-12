@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 label_to_schema = {
     "Disease": "disease",
     "Symptom": "symptom",
+    "Department": "department",
     "Cause": "cause",
     "Drug": "drug",
     "Food": "food",

@@ -267,12 +267,12 @@
 </head>
 
 <body>
-    <div class="disclaimer">
+    <div id="disclaimer" class="disclaimer">
         ⚠️ 本助手内容由 AI 基于医学知识图谱生成，仅供健康科普参考，<strong>不能替代执业医师的诊断、处方或急救建议</strong>。如有不适请及时就医。
     </div>
     <div id="dialog-area">
         <div class="bot-message message-bubble">
-            <div class="markdown-content">您好！我是医疗助手，请问有什么需要我帮忙的？</div>
+            <div id="welcome-message" class="markdown-content">您好！我是医疗助手，请问有什么需要我帮忙的？</div>
         </div>
     </div>
     <div class="input-box">
@@ -284,6 +284,30 @@
         const dialogArea = document.getElementById('dialog-area');
         const input = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
+        const uiLanguage = navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+        const uiText = {
+            zh: {
+                disclaimer: '⚠️ 本助手内容由 AI 基于医学知识图谱生成，仅供健康科普参考，不能替代执业医师的诊断、处方或急救建议。如有不适请及时就医。',
+                welcome: '您好！我是医疗助手，请问有什么需要我帮忙的？',
+                placeholder: '需要我做什么？',
+                send: '发送',
+                thinking: '正在思索中...',
+                failure: '系统暂时无法响应，请稍后再试😥'
+            },
+            en: {
+                disclaimer: '⚠️ This AI assistant uses a medical knowledge graph for general health information only. It cannot replace diagnosis, prescriptions, or emergency advice from a licensed clinician. Seek medical care when needed.',
+                welcome: 'Hello! I am the medical assistant. How can I help?',
+                placeholder: 'Ask a medical question...',
+                send: 'Send',
+                thinking: 'Thinking...',
+                failure: 'The system is temporarily unable to respond. Please try again later. 😥'
+            }
+        }[uiLanguage];
+        document.documentElement.lang = uiLanguage === 'zh' ? 'zh-CN' : 'en';
+        document.getElementById('disclaimer').textContent = uiText.disclaimer;
+        document.getElementById('welcome-message').textContent = uiText.welcome;
+        input.placeholder = uiText.placeholder;
+        sendBtn.textContent = uiText.send;
 
 
         // 配置 marked（注意：highlight 需要 hljs 存在）
@@ -341,7 +365,7 @@
             const loader = document.createElement('div');
             loader.className = 'loader';
             loadingContainer.appendChild(loader);
-            loadingContainer.appendChild(document.createTextNode('正在思索中...'));
+            loadingContainer.appendChild(document.createTextNode(uiText.thinking));
             bubble.appendChild(loadingContainer);
             return bubble;
         }
@@ -390,7 +414,7 @@
                 }
             } catch (error) {
                 console.error('流式请求出错:', error);
-                updateMarkdownContent(markdownContainer, '系统暂时无法响应，请稍后再试😥');
+                updateMarkdownContent(markdownContainer, uiText.failure);
             } finally {
                 sendBtn.disabled = false;
             }
