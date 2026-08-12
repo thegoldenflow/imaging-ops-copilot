@@ -17,5 +17,7 @@ pretrained/
 
 # 日志 / 编辑器
 *.log
+# MuMuPlayer 磁盘压缩日志，与本项目无关（*.log 匹配不到 .txt 结尾）
+compact_log.txt
 .idea/
 .vscode/
