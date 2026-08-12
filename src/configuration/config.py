@@ -50,6 +50,8 @@ SESSION_HTTPS_ONLY = _get_bool("SESSION_HTTPS_ONLY", False)  # 生产（反代 H
 EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "auto")  # auto / cpu / cuda
 MAX_MESSAGE_LENGTH = int(os.getenv("MAX_MESSAGE_LENGTH", "2000"))
 CHAT_RATE_LIMIT = os.getenv("CHAT_RATE_LIMIT", "20/minute")
+# "新建对话"会删除 checkpointer 中的历史（落到数据库），单独限流避免被刷
+SESSION_RESET_RATE_LIMIT = os.getenv("SESSION_RESET_RATE_LIMIT", "10/minute")
 NEO4J_QUERY_TIMEOUT = float(os.getenv("NEO4J_QUERY_TIMEOUT", "15"))
 NEO4J_MAX_ROWS = int(os.getenv("NEO4J_MAX_ROWS", "50"))
 # 在线实体对齐：Chroma 余弦距离阈值（distance = 1 - cos_sim），超过则判为不匹配返回 None

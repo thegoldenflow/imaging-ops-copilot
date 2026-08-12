@@ -60,6 +60,33 @@ def read_root():
     return RedirectResponse("/static/index.html")
 
 
+@app.get("/ui-config")
+def ui_config():
+    """前端启动时拉取的界面参数，避免把上限之类的值在 JS 里写死。只暴露非敏感项。"""
+    return {"max_message_length": config.MAX_MESSAGE_LENGTH}
+
+
+@app.post("/session/reset")
+@limiter.limit(config.SESSION_RESET_RATE_LIMIT)
+def reset_session(request: Request):
+    """
+    开始新对话：轮换 session_id 并清掉旧 thread 的历史。
+
+    轮换（而不是复用同一个 id）保证即使历史清理失败，新对话也不会带上旧上下文。
+    仅接受 POST，配合 SessionMiddleware 的 same_site="lax" 防跨站触发。
+    """
+    session = request.session
+    previous_id = session.get("session_id")
+    session["session_id"] = str(uuid.uuid4())
+
+    history_cleared = service.reset_thread(previous_id)
+    # 未启用记忆时本就没有历史可清，不该报警（否则每次点击都刷一条误导性 WARNING）
+    if previous_id and not history_cleared and service.checkpointer is not None:
+        logger.warning("会话 %s 的历史未能清理，已切换到新 thread", previous_id)
+
+    return {"ok": True, "history_cleared": history_cleared}
+
+
 @app.post("/chat")
 @limiter.limit(config.CHAT_RATE_LIMIT)
 def read_item(question: Question, request: Request):
@@ -70,7 +97,11 @@ def read_item(question: Question, request: Request):
     current_session_id = session["session_id"]
 
     return StreamingResponse(
-        service.chat(question.message, session_id=current_session_id),
+        service.chat(
+            question.message,
+            session_id=current_session_id,
+            language=question.language,
+        ),
         media_type="text/plain; charset=utf-8",
     )
 

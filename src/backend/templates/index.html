@@ -1,66 +1,491 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>医疗助手</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f4f8fa" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0b1418" media="(prefers-color-scheme: dark)">
+    <title>Medical Assistant</title>
     <script src="/static/marked.min.js"></script>
     <script src="/static/purify.min.js"></script>
-    <!-- 注意：如果你使用代码高亮，请确保也引入 highlight.js -->
-    <!-- <script src="/static/highlight.min.js"></script> -->
     <style>
+        /* ============================================================
+           Design tokens
+           调色板：医疗领域常用的冷静青绿色系（cyan + health green）。
+           浅色/深色两套语义变量，组件只引用语义名，不写死 hex。
+           对比度均按 WCAG AA（正文 4.5:1）校验过。
+           ============================================================ */
         :root {
-            --border-radius: 16px;
-            --primary-color: #3b82f6;
-            --background-color: #f8f7f6;
-            --shadow-color: #00000056;
-            --input-box-bg-color: #ffffffcb;
+            color-scheme: light;
+
+            --bg: #f4f8fa;
+            --surface: #ffffff;
+            --surface-2: #eaf2f5;
+            --surface-3: #dfeaef;
+
+            --text: #0f2c36;
+            --text-muted: #4e6b76;
+            --border: #d3e3e9;
+            --border-strong: #b9d2db;
+
+            /* brand: fill 用于填充按钮（白字 5.36:1），text 用于正文级文字/链接 */
+            --brand-fill: #0e7490;
+            --brand-fill-hover: #155e75;
+            --brand-on-fill: #ffffff;
+            --brand-text: #0e7490;
+            --brand-ring: #0891b2;
+            --brand-soft: #e0f4f9;
+
+            --bubble-user-bg: #0e7490;
+            --bubble-user-text: #ffffff;
+
+            --warn-bg: #fef3c7;
+            --warn-text: #7c3f06;
+            --warn-border: #f0c76a;
+
+            --danger: #b91c1c;
+            --danger-bg: #fef2f2;
+            --danger-border: #fca5a5;
+            --danger-fill: #b91c1c;
+            --danger-fill-hover: #911515;
+            --danger-on-fill: #ffffff;
+
+            --shadow-sm: 0 1px 2px rgba(15, 44, 54, .06), 0 1px 3px rgba(15, 44, 54, .08);
+            --shadow-md: 0 4px 12px rgba(15, 44, 54, .08), 0 1px 3px rgba(15, 44, 54, .06);
+            --shadow-lg: 0 12px 32px rgba(15, 44, 54, .12);
+
+            /* 4px 基准间距 */
+            --sp-1: 4px;
+            --sp-2: 8px;
+            --sp-3: 12px;
+            --sp-4: 16px;
+            --sp-5: 20px;
+            --sp-6: 24px;
+            --sp-8: 32px;
+
+            --r-sm: 8px;
+            --r-md: 12px;
+            --r-lg: 16px;
+            --r-xl: 20px;
+            --r-full: 999px;
+
+            --z-base: 0;
+            --z-sticky: 20;
+            --z-float: 40;
+
+            --dur: 200ms;
+            --ease: cubic-bezier(.2, .8, .3, 1);
+
+            --content-w: 780px;
+
+            /* 无 CDN / 离线可用：系统字体栈，含中英文回退 */
+            --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+                "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+            --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
         }
 
-        * {
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                color-scheme: dark;
+
+                --bg: #0b1418;
+                --surface: #121e24;
+                --surface-2: #18272e;
+                --surface-3: #1f333c;
+
+                --text: #e4eff3;
+                --text-muted: #9ab3bd;
+                --border: #24373f;
+                --border-strong: #334c56;
+
+                --brand-fill: #22d3ee;
+                --brand-fill-hover: #67e8f9;
+                --brand-on-fill: #06232b;
+                --brand-text: #67e8f9;
+                --brand-ring: #22d3ee;
+                --brand-soft: #10333d;
+
+                --bubble-user-bg: #0e7490;
+                --bubble-user-text: #eafaff;
+
+                --warn-bg: #2a2110;
+                --warn-text: #fcd34d;
+                --warn-border: #5c4713;
+
+                --danger: #fca5a5;
+                --danger-bg: #2b1517;
+                --danger-border: #7f2d2d;
+                --danger-fill: #dc2626;
+                --danger-on-fill: #ffffff;
+
+                --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+                --shadow-md: 0 4px 12px rgba(0, 0, 0, .45);
+                --shadow-lg: 0 12px 32px rgba(0, 0, 0, .5);
+            }
+        }
+
+        [data-theme="dark"] {
+            color-scheme: dark;
+
+            --bg: #0b1418;
+            --surface: #121e24;
+            --surface-2: #18272e;
+            --surface-3: #1f333c;
+
+            --text: #e4eff3;
+            --text-muted: #9ab3bd;
+            --border: #24373f;
+            --border-strong: #334c56;
+
+            --brand-fill: #22d3ee;
+            --brand-fill-hover: #67e8f9;
+            --brand-on-fill: #06232b;
+            --brand-text: #67e8f9;
+            --brand-ring: #22d3ee;
+            --brand-soft: #10333d;
+
+            --bubble-user-bg: #0e7490;
+            --bubble-user-text: #eafaff;
+
+            --warn-bg: #2a2110;
+            --warn-text: #fcd34d;
+            --warn-border: #5c4713;
+
+            --danger: #fca5a5;
+            --danger-bg: #2b1517;
+            --danger-border: #7f2d2d;
+            --danger-fill: #dc2626;
+            --danger-fill-hover: #b91c1c;
+            --danger-on-fill: #ffffff;
+
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, .45);
+            --shadow-lg: 0 12px 32px rgba(0, 0, 0, .5);
+        }
+
+        /* ============================================================
+           Base
+           ============================================================ */
+        *,
+        *::before,
+        *::after {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: "Consolas", "微软雅黑", sans-serif;
+        }
+
+        /* 切换主题时临时关闭所有过渡：
+           1) 颜色来自 var() 时，浏览器的过渡可能停留在旧主题的值上（颜色不跟着换）；
+           2) 整页颜色渐变本身也不好看。切换瞬间直接取新值。 */
+        [data-theme-switching],
+        [data-theme-switching] *,
+        [data-theme-switching] *::before,
+        [data-theme-switching] *::after {
+            transition: none !important;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        /* 组件上的 display:flex/grid 优先级高于 UA 的 [hidden]{display:none}，
+           这里统一兜底，保证 el.hidden = true 一定隐藏 */
+        [hidden] {
+            display: none !important;
         }
 
         body {
-            min-height: 100vh;
-            background-color: var(--background-color);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            overflow-y: auto;
-        }
-
-        #dialog-area {
-            flex: 1;
-            width: 100%;
-            max-width: 900px;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .message-bubble {
-            display: inline-flex;
-            margin-bottom: 16px;
-            padding: 12px;
-            border-radius: var(--border-radius);
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: var(--font-ui);
             font-size: 16px;
-            line-height: 1.5;
-            word-break: break-word;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
         }
 
-        .new-message {
-            animation: messageAppear 0.3s ease;
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+            border: 0;
         }
 
-        @keyframes messageAppear {
+        :focus-visible {
+            outline: 3px solid var(--brand-ring);
+            outline-offset: 2px;
+            border-radius: var(--r-sm);
+        }
+
+        svg {
+            display: block;
+            flex: none;
+        }
+
+        /* ============================================================
+           App shell: header / scrollable transcript / docked composer
+           用 grid 三段式，滚动容器是 transcript 而不是 body —— 输入框永远不会被内容顶走
+           ============================================================ */
+        .app {
+            height: 100dvh;
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr) auto;
+        }
+
+        .topbar {
+            position: relative;
+            z-index: var(--z-sticky);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--sp-3);
+            padding: var(--sp-3) var(--sp-4);
+            padding-top: max(var(--sp-3), env(safe-area-inset-top));
+            background-color: color-mix(in srgb, var(--surface) 82%, transparent);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: var(--sp-3);
+            min-width: 0;
+        }
+
+        .brand-mark {
+            width: 36px;
+            height: 36px;
+            display: grid;
+            place-items: center;
+            border-radius: var(--r-md);
+            background: linear-gradient(140deg, var(--brand-ring), var(--brand-fill));
+            color: #ffffff;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .brand-text {
+            min-width: 0;
+        }
+
+        #app-title {
+            font-size: 16px;
+            font-weight: 650;
+            letter-spacing: -.01em;
+            line-height: 1.25;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #app-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: var(--sp-2);
+        }
+
+        /* 分段控件：语言切换 */
+        .segmented {
+            display: flex;
+            padding: 3px;
+            gap: 2px;
+            background-color: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--r-full);
+        }
+
+        .seg-btn {
+            min-height: 32px;
+            padding: 0 var(--sp-3);
+            font: inherit;
+            font-size: 13px;
+            font-weight: 550;
+            color: var(--text-muted);
+            background-color: transparent;
+            border: none;
+            border-radius: var(--r-full);
+            cursor: pointer;
+            transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+        }
+
+        .seg-btn:hover {
+            color: var(--text);
+        }
+
+        .seg-btn[aria-pressed="true"] {
+            color: var(--brand-on-fill);
+            background-color: var(--brand-fill);
+            box-shadow: var(--shadow-sm);
+        }
+
+
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            display: grid;
+            place-items: center;
+            color: var(--text-muted);
+            background-color: transparent;
+            border: 1px solid transparent;
+            border-radius: var(--r-md);
+            cursor: pointer;
+            transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease),
+                border-color var(--dur) var(--ease);
+        }
+
+        .icon-btn:hover {
+            color: var(--text);
+            background-color: var(--surface-2);
+            border-color: var(--border);
+        }
+
+        /* 主题图标：按当前主题只显示一个 */
+        .icon-moon {
+            display: none;
+        }
+
+        [data-theme="dark"] .icon-sun {
+            display: none;
+        }
+
+        [data-theme="dark"] .icon-moon {
+            display: block;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) .icon-sun {
+                display: none;
+            }
+
+            :root:not([data-theme="light"]) .icon-moon {
+                display: block;
+            }
+        }
+
+        /* ============================================================
+           Transcript
+           ============================================================ */
+        .transcript {
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scroll-behavior: smooth;
+        }
+
+        .transcript-inner {
+            width: 100%;
+            max-width: var(--content-w);
+            margin: 0 auto;
+            padding: var(--sp-4) var(--sp-4) var(--sp-6);
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-4);
+        }
+
+        .disclaimer {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--sp-2);
+            padding: var(--sp-3) var(--sp-4);
+            font-size: 13px;
+            line-height: 1.55;
+            color: var(--warn-text);
+            background-color: var(--warn-bg);
+            border: 1px solid var(--warn-border);
+            border-radius: var(--r-md);
+        }
+
+        .disclaimer svg {
+            margin-top: 2px;
+        }
+
+        /* 空状态：欢迎语 + 建议问题 */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-4);
+            padding: var(--sp-6) 0 var(--sp-2);
+        }
+
+        .empty-title {
+            font-size: 22px;
+            font-weight: 650;
+            letter-spacing: -.015em;
+            line-height: 1.3;
+        }
+
+        .empty-sub {
+            font-size: 15px;
+            color: var(--text-muted);
+            max-width: 56ch;
+        }
+
+        .suggestions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: var(--sp-2);
+        }
+
+        .suggestion {
+            display: flex;
+            align-items: center;
+            gap: var(--sp-3);
+            min-height: 48px;
+            padding: var(--sp-3) var(--sp-4);
+            text-align: left;
+            font: inherit;
+            font-size: 14px;
+            color: var(--text);
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--r-md);
+            cursor: pointer;
+            transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease),
+                box-shadow var(--dur) var(--ease);
+        }
+
+        .suggestion:hover {
+            background-color: var(--surface);
+            border-color: var(--brand-ring);
+            box-shadow: var(--shadow-md);
+        }
+
+        .suggestion svg {
+            color: var(--brand-text);
+        }
+
+        /* ---------- 消息 ---------- */
+        #dialog-area {
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-5);
+        }
+
+        .msg {
+            display: flex;
+            gap: var(--sp-3);
+            animation: msgIn 260ms var(--ease) both;
+        }
+
+        @keyframes msgIn {
             from {
                 opacity: 0;
-                transform: translateY(10px);
+                transform: translateY(8px);
             }
 
             to {
@@ -69,370 +494,1401 @@
             }
         }
 
-        .user-message {
-            background-color: var(--primary-color);
-            align-self: flex-end;
-            color: white;
-            box-shadow: 0 2px 4px var(--shadow-color);
+        .msg-user {
+            justify-content: flex-end;
         }
 
-        .bot-message {
-            align-self: flex-start;
-            color: black;
-        }
-
-        .input-box {
-            width: 100%;
-            max-width: 900px;
-            padding: 16px;
-            border-radius: var(--border-radius);
-            box-shadow: 0 4px 8px var(--shadow-color);
-            position: sticky;
-            bottom: 16px;
-            transition: all 0.3s ease;
-            background-color: var(--input-box-bg-color);
-            border: 2px solid transparent;
-        }
-
-        .input-box:hover {
-            box-shadow: 0 4px 8px var(--primary-color);
-        }
-
-        .input-box:focus-within {
-            border: 2px solid var(--primary-color);
-        }
-
-        #user-input {
-            width: 100%;
-            padding: 8px;
-            font-size: 16px;
-            max-height: 200px;
-            overflow-y: auto;
-            resize: none;
-            border: none;
-            outline: none;
-            background-color: #ffffff00;
-        }
-
-        #send-btn {
-            padding: 8px 16px;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-left: auto;
-            display: block;
-            background-color: var(--primary-color);
-        }
-
-        #send-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px var(--shadow-color);
-        }
-
-        #send-btn:active {
-            transform: translateY(0);
-        }
-
-        #send-btn:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-            transform: none !important;
-            box-shadow: none !important;
-        }
-
-        .request-btn {
-            display: block;
-            min-width: 300px;
-            max-width: 360px;
-            margin: 2px 0;
-            padding: 10px;
-            text-align: center;
-            color: black;
-            border: none;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            font-size: 16px;
-            border: 2px solid #ffffff00;
-            background-color: rgba(255, 255, 255, 0.2);
-            box-shadow: 0 2px 4px var(--shadow-color);
-            transition: all 0.3s ease;
-        }
-
-        .request-btn:hover {
-            transform: translateY(-2px);
-            border: 2px solid var(--primary-color);
-            box-shadow: 0 4px 8px var(--primary-color);
-        }
-
-        .request-btn:active {
-            transform: translateY(0);
-            border: 2px solid #ffffff00;
-        }
-
-        .button-container {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            width: 100%;
-        }
-
-        .loading-container {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .loader {
+        .avatar {
             width: 30px;
             height: 30px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--primary-color);
+            display: grid;
+            place-items: center;
+            border-radius: var(--r-full);
+            color: var(--brand-on-fill);
+            background: linear-gradient(140deg, var(--brand-ring), var(--brand-fill));
+        }
+
+        .msg-body {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .bubble {
+            padding: var(--sp-3) var(--sp-4);
+            border-radius: var(--r-lg);
+            font-size: 15.5px;
+            line-height: 1.65;
+            overflow-wrap: anywhere;
+        }
+
+        .msg-user .bubble {
+            max-width: min(85%, 60ch);
+            color: var(--bubble-user-text);
+            background-color: var(--bubble-user-bg);
+            border-radius: var(--r-lg) var(--r-lg) var(--r-sm) var(--r-lg);
+            box-shadow: var(--shadow-sm);
+            white-space: pre-wrap;
+        }
+
+        .msg-bot .bubble {
+            padding: 0;
+            color: var(--text);
+        }
+
+        .msg-error .bubble {
+            padding: var(--sp-3) var(--sp-4);
+            color: var(--danger);
+            background-color: var(--danger-bg);
+            border: 1px solid var(--danger-border);
+            border-radius: var(--r-md);
+        }
+
+        .msg-actions {
+            display: flex;
+            gap: var(--sp-2);
+            margin-top: var(--sp-2);
+            opacity: 0;
+            transition: opacity var(--dur) var(--ease);
+        }
+
+        .msg:hover .msg-actions,
+        .msg-actions:focus-within {
+            opacity: 1;
+        }
+
+        .ghost-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 32px;
+            padding: 0 var(--sp-3);
+            font: inherit;
+            font-size: 13px;
+            color: var(--text-muted);
+            background-color: transparent;
+            border: 1px solid var(--border);
+            border-radius: var(--r-sm);
+            cursor: pointer;
+            transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease),
+                border-color var(--dur) var(--ease);
+        }
+
+        .ghost-btn:hover {
+            color: var(--text);
+            background-color: var(--surface-2);
+            border-color: var(--border-strong);
+        }
+
+        /* 打字指示器：三点脉冲，比转圈更贴合“正在生成文字” */
+        .typing {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--sp-3);
+            padding: var(--sp-2) 0;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .typing-dots {
+            display: inline-flex;
+            gap: 5px;
+        }
+
+        .typing-dots i {
+            width: 7px;
+            height: 7px;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            background-color: var(--brand-ring);
+            animation: typingPulse 1.2s var(--ease) infinite;
         }
 
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
+        .typing-dots i:nth-child(2) {
+            animation-delay: .16s;
+        }
 
+        .typing-dots i:nth-child(3) {
+            animation-delay: .32s;
+        }
+
+        @keyframes typingPulse {
+
+            0%,
+            60%,
             100% {
-                transform: rotate(360deg);
+                opacity: .3;
+                transform: scale(.8);
+            }
+
+            30% {
+                opacity: 1;
+                transform: scale(1);
             }
         }
 
+        /* ============================================================
+           Markdown
+           ============================================================ */
         .markdown-content {
             max-width: 100%;
-            overflow-x: auto;
         }
 
-        .markdown-content br {
-            display: none;
+        .markdown-content> :first-child {
+            margin-top: 0;
+        }
+
+        .markdown-content> :last-child {
+            margin-bottom: 0;
         }
 
         .markdown-content h1,
         .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4 {
+            margin: 1.4em 0 .5em;
+            line-height: 1.35;
+            letter-spacing: -.01em;
+            color: var(--text);
+        }
+
+        .markdown-content h1 {
+            font-size: 1.3em;
+        }
+
+        .markdown-content h2 {
+            font-size: 1.18em;
+        }
+
         .markdown-content h3 {
-            margin: 1em 0 0.5em;
-            color: var(--primary-color);
+            font-size: 1.06em;
+        }
+
+        .markdown-content h4 {
+            font-size: 1em;
         }
 
         .markdown-content p {
-            margin: 0.5em 0;
-            line-height: 1.6;
+            margin: .7em 0;
         }
 
         .markdown-content ul,
         .markdown-content ol {
-            margin: 0.5em 0;
-            padding-left: 2em;
+            margin: .7em 0;
+            padding-left: 1.5em;
+        }
+
+        .markdown-content li {
+            margin: .3em 0;
+        }
+
+        .markdown-content li::marker {
+            color: var(--brand-text);
+        }
+
+        .markdown-content a {
+            color: var(--brand-text);
+            text-underline-offset: 3px;
+        }
+
+        .markdown-content strong {
+            font-weight: 650;
+        }
+
+        .markdown-content blockquote {
+            margin: .9em 0;
+            padding: var(--sp-2) var(--sp-4);
+            color: var(--text-muted);
+            border-left: 3px solid var(--brand-ring);
+            background-color: var(--surface-2);
+            border-radius: 0 var(--r-sm) var(--r-sm) 0;
         }
 
         .markdown-content code {
-            background-color: rgba(192, 192, 192, 0.2);
-            padding: 0.2em 0.4em;
-            border-radius: 4px;
-            font-family: Consolas, monospace;
+            padding: .15em .4em;
+            font-family: var(--font-mono);
+            font-size: .9em;
+            background-color: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 5px;
         }
 
         .markdown-content pre {
-            background-color: #f6f8fa;
-            padding: 1em;
-            border-radius: var(--border-radius);
+            margin: .9em 0;
+            padding: var(--sp-4);
             overflow-x: auto;
-            margin: 1em 0;
+            background-color: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--r-md);
         }
 
         .markdown-content pre code {
-            background: none;
             padding: 0;
+            background: none;
+            border: none;
+            font-size: .88em;
         }
 
-        .disclaimer {
+        /* 医学回答常带表格：横向可滚动，不撑破布局 */
+        .table-scroll {
+            margin: .9em 0;
+            overflow-x: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--r-md);
+        }
+
+        .markdown-content table {
             width: 100%;
-            max-width: 900px;
-            margin: 12px auto 0;
-            padding: 10px 16px;
+            border-collapse: collapse;
+            font-size: .93em;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .markdown-content th,
+        .markdown-content td {
+            padding: var(--sp-2) var(--sp-3);
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .markdown-content thead th {
+            background-color: var(--surface-2);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .markdown-content tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .markdown-content hr {
+            margin: 1.4em 0;
+            border: none;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ============================================================
+           Scroll-to-bottom
+           ============================================================ */
+        .scroll-bottom {
+            position: absolute;
+            left: 50%;
+            bottom: var(--sp-3);
+            transform: translateX(-50%);
+            z-index: var(--z-float);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 36px;
+            padding: 0 var(--sp-3);
+            font: inherit;
             font-size: 13px;
-            line-height: 1.5;
-            color: #92400e;
-            background-color: #fef3c7;
-            border: 1px solid #fcd34d;
-            border-radius: 10px;
+            color: var(--text);
+            background-color: var(--surface);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--r-full);
+            box-shadow: var(--shadow-lg);
+            cursor: pointer;
+        }
+
+        /* ============================================================
+           Composer
+           ============================================================ */
+        .composer-wrap {
+            position: relative;
+            padding: var(--sp-3) var(--sp-4);
+            padding-bottom: max(var(--sp-3), env(safe-area-inset-bottom));
+            background-color: var(--bg);
+            border-top: 1px solid var(--border);
+        }
+
+        .composer {
+            width: 100%;
+            max-width: var(--content-w);
+            margin: 0 auto;
+            padding: var(--sp-3);
+            background-color: var(--surface);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--r-xl);
+            box-shadow: var(--shadow-md);
+            transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+        }
+
+        .composer:focus-within {
+            border-color: var(--brand-ring);
+            box-shadow: var(--shadow-md), 0 0 0 3px color-mix(in srgb, var(--brand-ring) 22%, transparent);
+        }
+
+        #user-input {
+            display: block;
+            width: 100%;
+            max-height: 200px;
+            padding: var(--sp-1) var(--sp-2);
+            font: inherit;
+            font-size: 16px;
+            /* 16px 防止 iOS 聚焦时自动放大 */
+            line-height: 1.55;
+            color: var(--text);
+            background: none;
+            border: none;
+            outline: none;
+            resize: none;
+            overflow-y: auto;
+        }
+
+        #user-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .composer-bar {
+            display: flex;
+            align-items: center;
+            gap: var(--sp-2);
+            margin-top: var(--sp-2);
+        }
+
+        .char-count {
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-muted);
+            margin-right: auto;
+        }
+
+        .char-count.is-near {
+            color: var(--warn-text);
+        }
+
+        .char-count.is-over {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-height: 40px;
+            padding: 0 var(--sp-4);
+            font: inherit;
+            font-size: 14px;
+            font-weight: 550;
+            border: 1px solid transparent;
+            border-radius: var(--r-md);
+            cursor: pointer;
+            transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease),
+                border-color var(--dur) var(--ease), opacity var(--dur) var(--ease);
+        }
+
+        .btn-primary {
+            color: var(--brand-on-fill);
+            background-color: var(--brand-fill);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--brand-fill-hover);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            transform: scale(.98);
+        }
+
+        .btn:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            color: var(--text);
+            background-color: var(--surface-2);
+            border-color: var(--border-strong);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--surface-3);
+        }
+
+        .btn-danger {
+            color: var(--danger-on-fill);
+            background-color: var(--danger-fill);
+        }
+
+        /* 用加深而不是 brightness()：提亮红色会把白字对比度压到 4.5:1 以下 */
+        .btn-danger:hover {
+            background-color: var(--danger-fill-hover);
+        }
+
+        /* ============================================================
+           确认对话框（原生 <dialog>：自带焦点陷阱与 Esc 关闭）
+           ============================================================ */
+        /* 作者样式里的 display 会盖掉 UA 的 dialog:not([open]){display:none}，
+           所以这里显式兜底，避免关闭状态下的弹窗仍然占位（同 [hidden] 的坑） */
+        dialog:not([open]) {
+            display: none !important;
+        }
+
+        .dialog {
+            max-width: min(420px, calc(100vw - 32px));
+            padding: 0;
+            color: var(--text);
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--r-lg);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .dialog::backdrop {
+            background-color: rgba(6, 20, 26, .55);
+            backdrop-filter: blur(2px);
+        }
+
+        .dialog[open] {
+            animation: dialogIn 180ms var(--ease);
+        }
+
+        @keyframes dialogIn {
+            from {
+                opacity: 0;
+                transform: scale(.96);
+            }
+
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        .dialog-inner {
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-3);
+            padding: var(--sp-5);
+        }
+
+        .dialog-title {
+            font-size: 17px;
+            font-weight: 650;
+            line-height: 1.35;
+        }
+
+        .dialog-body {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-muted);
+        }
+
+        .dialog-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--sp-2);
+            margin-top: var(--sp-2);
+        }
+
+        .composer-hint {
+            max-width: var(--content-w);
+            margin: var(--sp-2) auto 0;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        /* ============================================================
+           触屏设备：点按区域放大到 44px（鼠标设备保持紧凑）
+           必须放在各组件规则之后，否则同优先级会被前面的基础规则覆盖
+           ============================================================ */
+        @media (pointer: coarse) {
+
+            .seg-btn,
+            .ghost-btn,
+            .btn {
+                min-height: 44px;
+                padding: 0 var(--sp-4);
+            }
+
+            .icon-btn {
+                width: 44px;
+                height: 44px;
+            }
+
+            /* 触屏没有 hover，复制/重试按钮必须常驻可见 */
+            .msg-actions {
+                opacity: 1;
+            }
+
+            .scroll-bottom {
+                min-height: 44px;
+            }
+        }
+
+        /* ============================================================
+           Responsive
+           ============================================================ */
+        @media (max-width: 640px) {
+            .transcript-inner {
+                padding: var(--sp-3) var(--sp-3) var(--sp-5);
+            }
+
+            .composer-wrap {
+                padding-left: var(--sp-3);
+                padding-right: var(--sp-3);
+            }
+
+            .empty-title {
+                font-size: 19px;
+            }
+
+            #app-subtitle {
+                display: none;
+            }
+
+            .composer-hint {
+                display: none;
+            }
+
+            .suggestions {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ============================================================
+           Reduced motion
+           ============================================================ */
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: .001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .001ms !important;
+            }
+
+            .transcript {
+                scroll-behavior: auto;
+            }
+
+            .typing-dots i {
+                opacity: .7;
+            }
         }
     </style>
 </head>
 
 <body>
-    <div id="disclaimer" class="disclaimer">
-        ⚠️ 本助手内容由 AI 基于医学知识图谱生成，仅供健康科普参考，<strong>不能替代执业医师的诊断、处方或急救建议</strong>。如有不适请及时就医。
+    <!-- SVG 图标精灵（Lucide 风格线性图标，统一 1.75 描边）；不用 emoji 当图标 -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <defs>
+            <g id="i-stethoscope" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M4.8 3v4.2a4.2 4.2 0 0 0 8.4 0V3" />
+                <path d="M3.2 3h3.2M11.6 3h3.2" />
+                <path d="M9 11.4v2.4a4.8 4.8 0 0 0 9.6 0v-1.2" />
+                <circle cx="18.6" cy="10.2" r="2.1" />
+            </g>
+            <g id="i-alert" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M10.3 3.6 1.9 18a2 2 0 0 0 1.7 3h16.8a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z" />
+                <path d="M12 9v4M12 17h.01" />
+            </g>
+            <g id="i-sun" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                stroke-linejoin="round">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+            </g>
+            <g id="i-moon" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" />
+            </g>
+            <g id="i-send" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M12 19V5M5 12l7-7 7 7" />
+            </g>
+            <g id="i-stop" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                stroke-linejoin="round">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+            </g>
+            <g id="i-copy" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                stroke-linejoin="round">
+                <rect x="9" y="9" width="11" height="11" rx="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </g>
+            <g id="i-check" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M20 6 9 17l-5-5" />
+            </g>
+            <g id="i-retry" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M21 12a9 9 0 1 1-2.6-6.4" />
+                <path d="M21 3v6h-6" />
+            </g>
+            <g id="i-chevron-down" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="m6 9 6 6 6-6" />
+            </g>
+            <g id="i-spark" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" />
+            </g>
+            <g id="i-new-chat" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M20.5 12.4V18a2 2 0 0 1-2 2h-3.1L12 22.5 8.6 20H5.5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6.2" />
+                <path d="M18 2.5v6M15 5.5h6" />
+            </g>
+        </defs>
+    </svg>
+
+    <div class="app">
+        <header class="topbar">
+            <div class="brand">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                        <use href="#i-stethoscope" />
+                    </svg>
+                </span>
+                <div class="brand-text">
+                    <h1 id="app-title">Medical Assistant</h1>
+                    <p id="app-subtitle">Grounded in a medical knowledge graph</p>
+                </div>
+            </div>
+            <div class="topbar-actions">
+                <button type="button" id="new-chat-btn" class="icon-btn" aria-label="New conversation">
+                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                        <use href="#i-new-chat" />
+                    </svg>
+                </button>
+                <div class="segmented" role="group" id="lang-group" aria-label="Language">
+                    <button type="button" id="lang-en" class="seg-btn" aria-pressed="true">EN</button>
+                    <button type="button" id="lang-zh" class="seg-btn" aria-pressed="false">中文</button>
+                </div>
+                <button type="button" id="theme-toggle" class="icon-btn" aria-label="Switch theme">
+                    <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                        <use href="#i-sun" />
+                    </svg>
+                    <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                        <use href="#i-moon" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <main class="transcript" id="transcript" tabindex="-1">
+            <div class="transcript-inner">
+                <div class="disclaimer" role="note">
+                    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+                        <use href="#i-alert" />
+                    </svg>
+                    <span id="disclaimer-text"></span>
+                </div>
+
+                <section class="empty-state" id="empty-state">
+                    <div>
+                        <h2 class="empty-title" id="welcome-title"></h2>
+                        <p class="empty-sub" id="welcome-sub"></p>
+                    </div>
+                    <div class="suggestions" id="suggestions"></div>
+                </section>
+
+                <!-- aria-relevant 只留 additions：流式渲染会反复重写节点内文本，
+                     若含 text 会被逐帧播报。生成期间整个 log 置 aria-busy，结束后一次性播报 -->
+                <div id="dialog-area" role="log" aria-live="polite" aria-relevant="additions"
+                    aria-busy="false"></div>
+            </div>
+        </main>
+
+        <button type="button" class="scroll-bottom" id="scroll-bottom" hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                <use href="#i-chevron-down" />
+            </svg>
+            <span id="scroll-bottom-label"></span>
+        </button>
+
+        <footer class="composer-wrap">
+            <form class="composer" id="composer">
+                <label class="sr-only" for="user-input" id="input-label">Message</label>
+                <textarea id="user-input" rows="1" maxlength="2000" autocomplete="off"
+                    aria-describedby="char-count"></textarea>
+                <div class="composer-bar">
+                    <span class="char-count" id="char-count" aria-live="off">0 / 2000</span>
+                    <button type="button" class="btn btn-secondary" id="stop-btn" hidden>
+                        <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+                            <use href="#i-stop" />
+                        </svg>
+                        <span id="stop-label">Stop</span>
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="send-btn">
+                        <span id="send-label">Send</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                            <use href="#i-send" />
+                        </svg>
+                    </button>
+                </div>
+            </form>
+            <p class="composer-hint" id="composer-hint"></p>
+        </footer>
     </div>
-    <div id="dialog-area">
-        <div class="bot-message message-bubble">
-            <div id="welcome-message" class="markdown-content">您好！我是医疗助手，请问有什么需要我帮忙的？</div>
+
+    <dialog class="dialog" id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-body">
+        <div class="dialog-inner">
+            <h2 class="dialog-title" id="confirm-title"></h2>
+            <p class="dialog-body" id="confirm-body"></p>
+            <div class="dialog-actions">
+                <button type="button" class="btn btn-secondary" id="confirm-cancel"></button>
+                <button type="button" class="btn btn-danger" id="confirm-ok"></button>
+            </div>
         </div>
-    </div>
-    <div class="input-box">
-        <textarea id="user-input" placeholder="需要我做什么？"></textarea>
-        <button id="send-btn" onclick="sendMessage()">发送</button>
-    </div>
+    </dialog>
+
+    <p class="sr-only" id="sr-status" role="status" aria-live="polite"></p>
 
     <script>
+        'use strict';
+
+        // 兜底默认值，与后端 config.MAX_MESSAGE_LENGTH 的默认值一致；
+        // 启动后由 /ui-config 下发真实值覆盖，避免两边写死后不同步
+        let MAX_LEN = 2000;
+
+        // "第 {max} 字"这类带变量的文案
+        const fmt = (template, vars) =>
+            template.replace(/\{(\w+)\}/g, (whole, key) => (key in vars ? vars[key] : whole));
+
+        const transcript = document.getElementById('transcript');
         const dialogArea = document.getElementById('dialog-area');
+        const emptyState = document.getElementById('empty-state');
+        const suggestionsEl = document.getElementById('suggestions');
+        const composer = document.getElementById('composer');
         const input = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
-        const uiLanguage = navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
-        const uiText = {
+        const stopBtn = document.getElementById('stop-btn');
+        const charCount = document.getElementById('char-count');
+        const scrollBtn = document.getElementById('scroll-bottom');
+        const srStatus = document.getElementById('sr-status');
+
+        /* ============================================================
+           i18n
+           ============================================================ */
+        const I18N = {
             zh: {
-                disclaimer: '⚠️ 本助手内容由 AI 基于医学知识图谱生成，仅供健康科普参考，不能替代执业医师的诊断、处方或急救建议。如有不适请及时就医。',
-                welcome: '您好！我是医疗助手，请问有什么需要我帮忙的？',
-                placeholder: '需要我做什么？',
+                title: '医疗助手',
+                subtitle: '基于医学知识图谱',
+                disclaimer: '本助手内容由 AI 基于医学知识图谱生成，仅供健康科普参考，<strong>不能替代执业医师的诊断、处方或急救建议</strong>。如有不适请及时就医。',
+                welcomeTitle: '您好，我是医疗助手',
+                welcomeSub: '可以向我咨询疾病、症状、检查或用药方面的科普问题。回答基于医学知识图谱，仅供参考。',
+                placeholder: '描述症状或输入想了解的疾病…',
+                inputLabel: '输入你的问题',
                 send: '发送',
-                thinking: '正在思索中...',
-                failure: '系统暂时无法响应，请稍后再试😥'
+                stop: '停止',
+                thinking: '正在思索中…',
+                hint: 'Enter 发送 · Shift + Enter 换行',
+                copy: '复制',
+                copied: '已复制',
+                retry: '重试',
+                scrollBottom: '回到底部',
+                themeLabel: '切换深色 / 浅色主题',
+                langLabel: '界面语言',
+                newChat: '新建对话',
+                confirmTitle: '开始新对话？',
+                confirmBody: '当前对话记录会被清空，助手也会忘记此前的上下文。此操作无法撤销。',
+                confirmOk: '清空并新建',
+                cancel: '取消',
+                srSending: '正在生成回答',
+                srDone: '回答完成',
+                srStopped: '已停止生成',
+                srNewChat: '已开始新对话',
+                errGeneric: '系统暂时无法响应，请稍后再试。',
+                errNetwork: '网络连接中断，请检查网络后重试。',
+                errRate: '提问过于频繁，请稍等一会儿再试。',
+                errTooLong: '问题过长，请精简到 {max} 字以内。',
+                errReset: '新建对话失败，当前记录已保留。请稍后再试。',
+                suggestions: [
+                    '感冒和流感有什么区别？',
+                    '高血压平时需要注意什么？',
+                    '持续头痛可能是什么原因？',
+                    '糖尿病患者的饮食建议'
+                ]
             },
             en: {
-                disclaimer: '⚠️ This AI assistant uses a medical knowledge graph for general health information only. It cannot replace diagnosis, prescriptions, or emergency advice from a licensed clinician. Seek medical care when needed.',
-                welcome: 'Hello! I am the medical assistant. How can I help?',
-                placeholder: 'Ask a medical question...',
+                title: 'Medical Assistant',
+                subtitle: 'Grounded in a medical knowledge graph',
+                disclaimer: 'This AI assistant uses a medical knowledge graph for general health information only. <strong>It cannot replace diagnosis, prescriptions, or emergency advice from a licensed clinician.</strong> Seek medical care when needed.',
+                welcomeTitle: 'Hello, I am the medical assistant',
+                welcomeSub: 'Ask me about conditions, symptoms, tests, or medications. Answers are drawn from a medical knowledge graph and are for general information only.',
+                placeholder: 'Describe a symptom or ask about a condition…',
+                inputLabel: 'Type your question',
                 send: 'Send',
-                thinking: 'Thinking...',
-                failure: 'The system is temporarily unable to respond. Please try again later. 😥'
+                stop: 'Stop',
+                thinking: 'Thinking…',
+                hint: 'Enter to send · Shift + Enter for a new line',
+                copy: 'Copy',
+                copied: 'Copied',
+                retry: 'Retry',
+                scrollBottom: 'Jump to latest',
+                themeLabel: 'Switch light / dark theme',
+                langLabel: 'Interface language',
+                newChat: 'New conversation',
+                confirmTitle: 'Start a new conversation?',
+                confirmBody: 'This clears the current transcript, and the assistant will forget the earlier context. This cannot be undone.',
+                confirmOk: 'Clear and start',
+                cancel: 'Cancel',
+                srSending: 'Generating a response',
+                srDone: 'Response complete',
+                srStopped: 'Generation stopped',
+                srNewChat: 'Started a new conversation',
+                errGeneric: 'The system is temporarily unable to respond. Please try again later.',
+                errNetwork: 'The connection was interrupted. Check your network and try again.',
+                errRate: 'Too many questions in a short time. Please wait a moment and try again.',
+                errTooLong: 'That question is too long. Please keep it under {max} characters.',
+                errReset: 'Could not start a new conversation. Your transcript has been kept. Please try again.',
+                suggestions: [
+                    'What is the difference between a cold and the flu?',
+                    'How should I manage high blood pressure day to day?',
+                    'What can cause a persistent headache?',
+                    'Dietary advice for someone with diabetes'
+                ]
             }
-        }[uiLanguage];
-        document.documentElement.lang = uiLanguage === 'zh' ? 'zh-CN' : 'en';
-        document.getElementById('disclaimer').textContent = uiText.disclaimer;
-        document.getElementById('welcome-message').textContent = uiText.welcome;
-        input.placeholder = uiText.placeholder;
-        sendBtn.textContent = uiText.send;
+        };
 
+        // 默认英文；只认 localStorage 里明确保存过的选择
+        let uiLanguage = localStorage.getItem('uiLanguage');
+        if (uiLanguage !== 'zh' && uiLanguage !== 'en') uiLanguage = 'en';
+        const t = (key) => I18N[uiLanguage][key];
 
-        // 配置 marked（注意：highlight 需要 hljs 存在）
-        marked.setOptions({
-            breaks: false,
-            highlight: function (code, lang) {
-                // 如果你没有引入 highlight.js，可以注释掉 highlight 选项
-                if (typeof hljs !== 'undefined') {
-                    const highlighted = hljs.highlight(code, { language: lang }).value;
-                    return highlighted;
-                }
-                return code;
+        function applyLanguage(lang) {
+            uiLanguage = lang;
+            localStorage.setItem('uiLanguage', lang);
+            document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+
+            document.title = t('title');
+            document.getElementById('app-title').textContent = t('title');
+            document.getElementById('app-subtitle').textContent = t('subtitle');
+            // 文案为开发者常量（非用户输入），innerHTML 用于保留 <strong> 强调
+            document.getElementById('disclaimer-text').innerHTML = t('disclaimer');
+            document.getElementById('welcome-title').textContent = t('welcomeTitle');
+            document.getElementById('welcome-sub').textContent = t('welcomeSub');
+            document.getElementById('input-label').textContent = t('inputLabel');
+            document.getElementById('send-label').textContent = t('send');
+            document.getElementById('stop-label').textContent = t('stop');
+            document.getElementById('composer-hint').textContent = t('hint');
+            document.getElementById('scroll-bottom-label').textContent = t('scrollBottom');
+            document.getElementById('lang-group').setAttribute('aria-label', t('langLabel'));
+            document.getElementById('theme-toggle').setAttribute('aria-label', t('themeLabel'));
+            document.getElementById('confirm-title').textContent = t('confirmTitle');
+            document.getElementById('confirm-body').textContent = t('confirmBody');
+            document.getElementById('confirm-ok').textContent = t('confirmOk');
+            document.getElementById('confirm-cancel').textContent = t('cancel');
+            input.placeholder = t('placeholder');
+
+            const newChatBtn = document.getElementById('new-chat-btn');
+            newChatBtn.setAttribute('aria-label', t('newChat'));
+            newChatBtn.title = t('newChat');
+
+            document.getElementById('lang-en').setAttribute('aria-pressed', String(lang === 'en'));
+            document.getElementById('lang-zh').setAttribute('aria-pressed', String(lang === 'zh'));
+
+            renderSuggestions();
+            updateCharCount();
+        }
+
+        document.getElementById('lang-en').addEventListener('click', () => applyLanguage('en'));
+        document.getElementById('lang-zh').addEventListener('click', () => applyLanguage('zh'));
+
+        /* ============================================================
+           主题：默认跟随系统，用户点击后固化选择
+           ============================================================ */
+        const THEME_KEY = 'uiTheme';
+        const savedTheme = localStorage.getItem(THEME_KEY);
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+        // 关闭过渡 -> 换主题 -> 两帧后恢复（一帧用于让新样式生效）
+        function setTheme(next) {
+            const root = document.documentElement;
+            root.setAttribute('data-theme-switching', '');
+            root.setAttribute('data-theme', next);
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                root.removeAttribute('data-theme-switching');
+            }));
+        }
+
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+                (!document.documentElement.hasAttribute('data-theme') && prefersDark.matches);
+            const next = isDark ? 'light' : 'dark';
+            setTheme(next);
+            localStorage.setItem(THEME_KEY, next);
+        });
+
+        // 用户在系统层面切换深浅色时同样需要抑制过渡（此时未固化选择才跟随系统）
+        prefersDark.addEventListener('change', () => {
+            if (localStorage.getItem(THEME_KEY)) return;
+            const root = document.documentElement;
+            root.setAttribute('data-theme-switching', '');
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                root.removeAttribute('data-theme-switching');
+            }));
+        });
+
+        /* ============================================================
+           Markdown 渲染（安全 + 流式友好）
+           ============================================================ */
+        marked.setOptions({ breaks: false, gfm: true });
+
+        // 外链一律新窗口打开并断开 opener 引用
+        DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+            if (node.tagName === 'A' && node.hasAttribute('href')) {
+                node.setAttribute('target', '_blank');
+                node.setAttribute('rel', 'noopener noreferrer nofollow');
             }
         });
 
-        // 安全地更新 Markdown 内容（防 XSS）
         function updateMarkdownContent(container, content) {
             try {
-                const dirty = marked.parse(content.toString());
-                // 使用 DOMPurify 默认白名单，不再放开 iframe/src（防 HTML 注入/钓鱼）
+                const dirty = marked.parse(String(content));
+                // 使用 DOMPurify 默认白名单，不放开 iframe/src（防 HTML 注入/钓鱼）
                 container.innerHTML = DOMPurify.sanitize(dirty);
+                // 表格套一层可横向滚动的容器，避免宽表撑破布局
+                container.querySelectorAll('table').forEach((table) => {
+                    if (table.parentElement && table.parentElement.classList.contains('table-scroll')) return;
+                    const wrap = document.createElement('div');
+                    wrap.className = 'table-scroll';
+                    table.replaceWith(wrap);
+                    wrap.appendChild(table);
+                });
             } catch (e) {
                 console.warn('Markdown 渲染出错:', e);
                 container.textContent = content; // 降级为纯文本
             }
         }
 
-        // 添加消息气泡
-        function addMessage(content, isUser) {
-            const bubble = document.createElement('div');
-            bubble.classList.add('message-bubble', isUser ? 'user-message' : 'bot-message');
+        /* ============================================================
+           滚动：只在用户已经贴底时自动跟随，避免打断向上翻阅
+           ============================================================ */
+        let pinnedToBottom = true;
 
-            if (isUser) {
-                bubble.textContent = content;
-            } else {
-                const markdownContainer = document.createElement('div');
-                markdownContainer.className = 'markdown-content';
-                if (content) {
-                    updateMarkdownContent(markdownContainer, content);
+        function atBottom() {
+            return transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 80;
+        }
+
+        function scrollToBottom(smooth) {
+            transcript.scrollTo({ top: transcript.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+        }
+
+        function followIfPinned() {
+            if (pinnedToBottom) scrollToBottom(false);
+        }
+
+        transcript.addEventListener('scroll', () => {
+            pinnedToBottom = atBottom();
+            scrollBtn.hidden = pinnedToBottom;
+        }, { passive: true });
+
+        scrollBtn.addEventListener('click', () => {
+            pinnedToBottom = true;
+            scrollBtn.hidden = true;
+            scrollToBottom(true);
+        });
+
+        /* ============================================================
+           消息
+           ============================================================ */
+        function icon(id, size) {
+            return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><use href="#${id}"/></svg>`;
+        }
+
+        function addUserMessage(text) {
+            const msg = document.createElement('div');
+            msg.className = 'msg msg-user';
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.textContent = text;
+            msg.appendChild(bubble);
+            dialogArea.appendChild(msg);
+            return msg;
+        }
+
+        // 机器人消息：头像 + 气泡 + 操作区；先显示打字指示器，首个 token 到达后替换
+        function addBotMessage() {
+            const msg = document.createElement('div');
+            msg.className = 'msg msg-bot';
+
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.setAttribute('aria-hidden', 'true');
+            avatar.innerHTML = icon('i-stethoscope', 17);
+
+            const body = document.createElement('div');
+            body.className = 'msg-body';
+
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.setAttribute('aria-busy', 'true');
+
+            const typing = document.createElement('div');
+            typing.className = 'typing';
+            typing.innerHTML = '<span class="typing-dots"><i></i><i></i><i></i></span>';
+            typing.appendChild(document.createTextNode(t('thinking')));
+            bubble.appendChild(typing);
+
+            const actions = document.createElement('div');
+            actions.className = 'msg-actions';
+
+            body.appendChild(bubble);
+            body.appendChild(actions);
+            msg.appendChild(avatar);
+            msg.appendChild(body);
+            dialogArea.appendChild(msg);
+
+            return { msg, bubble, actions, typing };
+        }
+
+        function makeCopyButton(getText) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'ghost-btn';
+            const render = (labelKey, iconId) => {
+                btn.innerHTML = icon(iconId, 14);
+                btn.appendChild(document.createTextNode(t(labelKey)));
+            };
+            render('copy', 'i-copy');
+            btn.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(getText());
+                    render('copied', 'i-check');
+                    srStatus.textContent = t('copied');
+                    setTimeout(() => render('copy', 'i-copy'), 1800);
+                } catch (e) {
+                    console.warn('复制失败:', e);
                 }
-                bubble.appendChild(markdownContainer);
+            });
+            return btn;
+        }
+
+        // message 传入已解析好的文案（部分错误需要插值），retryText 非空时给出重试按钮
+        function showError(message, retryText) {
+            const msg = document.createElement('div');
+            msg.className = 'msg msg-bot msg-error';
+
+            const body = document.createElement('div');
+            body.className = 'msg-body';
+
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.textContent = message;
+
+            const actions = document.createElement('div');
+            actions.className = 'msg-actions';
+            actions.style.opacity = '1';
+
+            if (retryText) {
+                const retry = document.createElement('button');
+                retry.type = 'button';
+                retry.className = 'ghost-btn';
+                retry.innerHTML = icon('i-retry', 14);
+                retry.appendChild(document.createTextNode(t('retry')));
+                retry.addEventListener('click', () => {
+                    if (controller || resetting) return; // 正在生成/重置时忽略，避免并发
+                    msg.remove();
+                    send(retryText, { isRetry: true });
+                });
+                actions.appendChild(retry);
             }
 
-            dialogArea.appendChild(bubble);
-            window.scrollTo(0, document.body.scrollHeight);
-            return bubble; // 返回 DOM 元素，用于流式更新
+            body.appendChild(bubble);
+            body.appendChild(actions);
+            msg.appendChild(body);
+            dialogArea.appendChild(msg);
+            srStatus.textContent = message;
+            followIfPinned();
         }
 
-        // 创建加载气泡
-        function createLoadingBubble() {
-            const bubble = document.createElement('div');
-            bubble.classList.add('message-bubble', 'bot-message', 'new-message');
-            const loadingContainer = document.createElement('div');
-            loadingContainer.className = 'loading-container';
-            const loader = document.createElement('div');
-            loader.className = 'loader';
-            loadingContainer.appendChild(loader);
-            loadingContainer.appendChild(document.createTextNode(uiText.thinking));
-            bubble.appendChild(loadingContainer);
-            return bubble;
+        const tooLongMessage = () => fmt(t('errTooLong'), { max: MAX_LEN });
+
+        /* ============================================================
+           建议问题
+           ============================================================ */
+        function renderSuggestions() {
+            suggestionsEl.replaceChildren();
+            t('suggestions').forEach((question) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'suggestion';
+                btn.innerHTML = icon('i-spark', 16);
+                btn.appendChild(document.createTextNode(question));
+                btn.addEventListener('click', () => send(question));
+                suggestionsEl.appendChild(btn);
+            });
         }
 
-        // 发送消息（支持流式）
-        async function sendMessage() {
-            const message = input.value.trim();
-            if (!message) return;
+        /* ============================================================
+           发送 / 流式接收
+           ============================================================ */
+        let controller = null;
+        let resetting = false; // /session/reset 在途：期间禁止发送，否则消息会被随后清空
 
-            sendBtn.disabled = true;
-            addMessage(message, true);
-            input.value = '';
-            input.style.height = 'auto';
+        function setBusy(busy) {
+            sendBtn.disabled = busy;
+            stopBtn.hidden = !busy;
+        }
 
-            // 创建空 AI 消息气泡，并获取其 Markdown 容器引用
-            const aiBubble = addMessage('', false);
-            const markdownContainer = aiBubble.querySelector('.markdown-content');
+        // options.isRetry: 重试同一条问题时不再重复插入用户气泡（原气泡还在上面）
+        async function send(rawMessage, options) {
+            const opts = options || {};
+            const message = (rawMessage !== undefined ? rawMessage : input.value).trim();
+            if (!message || controller || resetting) return;
 
-            const loadingBubble = createLoadingBubble();
-            dialogArea.appendChild(loadingBubble);
-            window.scrollTo(0, document.body.scrollHeight);
+            if (message.length > MAX_LEN) {
+                showError(tooLongMessage(), null);
+                return;
+            }
+
+            emptyState.hidden = true;
+            if (!opts.isRetry) addUserMessage(message);
+            if (rawMessage === undefined) {
+                input.value = '';
+                autoGrow();
+                updateCharCount();
+            }
+
+            const bot = addBotMessage();
+            pinnedToBottom = true;
+            scrollBtn.hidden = true;
+            followIfPinned();
+
+            setBusy(true);
+            dialogArea.setAttribute('aria-busy', 'true'); // 生成期间挂起 live region 播报
+            srStatus.textContent = t('srSending');
+
+            controller = new AbortController();
+            let markdownContainer = null;
+            let accumulated = '';
+            let rafId = null;
+
+            // 用 rAF 合并渲染：流式时不必每个分片都重排整棵 Markdown 树
+            const scheduleRender = () => {
+                if (rafId) return;
+                rafId = requestAnimationFrame(() => {
+                    rafId = null;
+                    updateMarkdownContent(markdownContainer, accumulated);
+                    followIfPinned();
+                });
+            };
 
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message })
+                    body: JSON.stringify({ message, language: uiLanguage }),
+                    signal: controller.signal
                 });
 
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                if (!response.ok) {
+                    bot.msg.remove();
+                    if (response.status === 429) showError(t('errRate'), message);
+                    else if (response.status === 422) showError(tooLongMessage(), null);
+                    else showError(t('errGeneric'), message);
+                    return;
+                }
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder('utf-8');
-                let accumulatedText = '';
-
-                loadingBubble.remove(); // 移除 loading
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    const chunk = decoder.decode(value, { stream: true });
-                    accumulatedText += chunk;
-                    updateMarkdownContent(markdownContainer, accumulatedText);
-                    window.scrollTo(0, document.body.scrollHeight);
+                    if (!markdownContainer) {
+                        // 首个分片到达才移除打字指示器
+                        bot.typing.remove();
+                        markdownContainer = document.createElement('div');
+                        markdownContainer.className = 'markdown-content';
+                        bot.bubble.appendChild(markdownContainer);
+                    }
+
+                    accumulated += decoder.decode(value, { stream: true });
+                    scheduleRender();
                 }
+
+                srStatus.textContent = t('srDone');
             } catch (error) {
-                console.error('流式请求出错:', error);
-                updateMarkdownContent(markdownContainer, uiText.failure);
+                if (error && error.name === 'AbortError') {
+                    // 用户主动停止：保留已收到的部分内容
+                    srStatus.textContent = t('srStopped');
+                } else {
+                    console.error('流式请求出错:', error);
+                    if (!accumulated) {
+                        bot.msg.remove();
+                        showError(t('errNetwork'), message);
+                    } else {
+                        srStatus.textContent = t('errNetwork');
+                    }
+                }
             } finally {
-                sendBtn.disabled = false;
+                // 无论正常结束、报错还是用户中止，都补一次最终渲染，
+                // 否则挂起的 rAF 被取消会丢掉最后一个分片
+                if (rafId) cancelAnimationFrame(rafId);
+                if (markdownContainer) updateMarkdownContent(markdownContainer, accumulated);
+
+                controller = null;
+                setBusy(false);
+                bot.bubble.setAttribute('aria-busy', 'false');
+                dialogArea.setAttribute('aria-busy', 'false'); // 此时才播报完整回答
+                if (bot.typing.isConnected) bot.typing.remove();
+
+                if (accumulated) {
+                    bot.actions.appendChild(makeCopyButton(() => accumulated));
+                } else if (bot.msg.isConnected) {
+                    bot.msg.remove();
+                }
+                followIfPinned();
+                input.focus();
             }
         }
 
-        // 自动调整输入框高度
-        input.addEventListener('input', () => {
-            input.style.height = 'auto';
-            input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+        stopBtn.addEventListener('click', () => {
+            if (controller) controller.abort();
         });
 
-        // 回车发送（Shift+Enter 换行）
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+        /* ============================================================
+           新建对话
+           ============================================================ */
+        const confirmDialog = document.getElementById('confirm-dialog');
+        const newChatBtn = document.getElementById('new-chat-btn');
+
+        // 原生 <dialog> 不会因点击遮罩而关闭，这里补上：点在 dialog 本体（即内容区之外）即取消
+        confirmDialog.addEventListener('click', (e) => {
+            if (e.target === confirmDialog) confirmDialog.close();
+        });
+
+        // 用原生 <dialog>：自带焦点陷阱、Esc 关闭、关闭后焦点归还触发元素
+        function askConfirm() {
+            // 弹窗已打开时再次 showModal() 会抛 InvalidStateError（连点两次按钮就会触发）
+            if (confirmDialog.open) return Promise.resolve(false);
+            return new Promise((resolve) => {
+                const done = (ok) => {
+                    confirmDialog.removeEventListener('close', onClose);
+                    okBtn.removeEventListener('click', onOk);
+                    cancelBtn.removeEventListener('click', onCancel);
+                    resolve(ok);
+                };
+                const onOk = () => { confirmDialog.close(); done(true); };
+                const onCancel = () => { confirmDialog.close(); done(false); };
+                const onClose = () => done(false); // Esc 或点击遮罩
+
+                const okBtn = document.getElementById('confirm-ok');
+                const cancelBtn = document.getElementById('confirm-cancel');
+                okBtn.addEventListener('click', onOk);
+                cancelBtn.addEventListener('click', onCancel);
+                confirmDialog.addEventListener('close', onClose);
+                try {
+                    confirmDialog.showModal();
+                } catch (error) {
+                    console.warn('打开确认弹窗失败:', error);
+                    done(false); // 摘掉监听器，不留悬挂的 Promise
+                    return;
+                }
+                cancelBtn.focus(); // 默认落在安全选项上
+            });
+        }
+
+        async function newConversation() {
+            if (resetting) return;
+
+            // 始终确认：页面刷新后本地记录为空，但服务端 thread 仍留着历史，
+            // 界面无从判断"是否真的没东西可清"，而清除又不可撤销。
+            if (!(await askConfirm())) return;
+
+            if (controller) controller.abort(); // 先中止在途请求，避免写回旧 thread
+
+            resetting = true;
+            newChatBtn.disabled = true;
+            sendBtn.disabled = true;
+            try {
+                const response = await fetch('/session/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+            } catch (error) {
+                // 后端没换成功就不清空，否则界面显示新对话、服务端还带着旧上下文
+                console.error('新建对话失败:', error);
+                showError(t('errReset'), null);
+                input.focus(); // 按钮曾被 disable，焦点会掉到 body
+                return;
+            } finally {
+                resetting = false;
+                newChatBtn.disabled = false;
+                sendBtn.disabled = false;
+            }
+
+            dialogArea.replaceChildren();
+            emptyState.hidden = false;
+            input.value = '';
+            autoGrow();
+            updateCharCount();
+            pinnedToBottom = true;
+            scrollBtn.hidden = true;
+            srStatus.textContent = t('srNewChat');
+            input.focus();
+        }
+
+        newChatBtn.addEventListener('click', newConversation);
+
+        /* ============================================================
+           启动时拉取后端下发的界面参数
+           ============================================================ */
+        async function loadUiConfig() {
+            try {
+                const response = await fetch('/ui-config');
+                if (!response.ok) return;
+                const cfg = await response.json();
+                const limit = Number(cfg.max_message_length);
+                if (Number.isFinite(limit) && limit > 0) {
+                    MAX_LEN = limit;
+                    input.maxLength = limit;
+                    updateCharCount();
+                }
+            } catch (error) {
+                console.warn('获取界面配置失败，沿用默认上限:', error); // 保持兜底值即可
+            }
+        }
+
+        composer.addEventListener('submit', (e) => {
+            e.preventDefault();
+            send();
+        });
+
+        /* ============================================================
+           输入框：自适应高度 / 字数 / 回车发送（兼容中文输入法）
+           ============================================================ */
+        function autoGrow() {
+            input.style.height = 'auto';
+            input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+        }
+
+        function updateCharCount() {
+            const len = input.value.length;
+            charCount.textContent = len + ' / ' + MAX_LEN;
+            charCount.classList.toggle('is-near', len > MAX_LEN * 0.9 && len <= MAX_LEN);
+            charCount.classList.toggle('is-over', len > MAX_LEN);
+        }
+
+        input.addEventListener('input', () => {
+            autoGrow();
+            updateCharCount();
+        });
+
+        // keydown + isComposing：中文/日文输入法选词时按回车不会误发送
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
                 e.preventDefault();
-                sendMessage();
+                send();
             }
         });
+
+        applyLanguage(uiLanguage);
+        autoGrow();
+        input.focus();
+        loadUiConfig();
     </script>
 </body>
 
