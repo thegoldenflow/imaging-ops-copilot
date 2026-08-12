@@ -117,7 +117,8 @@ def neo4j_query(cypher, params=None):
 
     # 只读强制（应用层早拦截；数据库层由只读账号 + READ 路由兜底）
     if _looks_like_write(cypher):
-        msg = "拒绝执行：本助手仅支持只读查询，检测到写/危险操作关键字。"
+        # 英文文案：system prompt 要求模型将工具信息翻译为最终回答语言后再呈现
+        msg = "Refused: this assistant only supports read-only queries; a write/dangerous keyword was detected."
         logger.warning(f"{msg} cypher={cypher}")
         return msg
 
@@ -134,7 +135,7 @@ def neo4j_query(cypher, params=None):
         )
     except Exception as e:
         logger.exception("neo4j_query 执行失败")
-        return f"查询执行失败：{e}"
+        return f"Query execution failed: {e}"
 
     records = [
         _strip_embeddings(r.data()) for r in result.records[: config.NEO4J_MAX_ROWS]

@@ -175,6 +175,9 @@ class EntityAlignmentMultilingualTests(unittest.TestCase):
     def test_prompt_requires_response_language_and_bilingual_alignment(self):
         self.assertIn("英文问题用英文回答，中文问题用中文回答", major_agent_system_prompt)
         self.assertIn("不要把“先翻译整个问题”当作实体对齐的替代方案", major_agent_system_prompt)
+        # 界面语言标记优先于问题语言（详见 chat_service._agent_message）
+        self.assertIn("Answer-Language", major_agent_system_prompt)
+        self.assertIn("工具返回的任何提示或错误信息，必须先翻译成最终回答语言", major_agent_system_prompt)
 
 
 if __name__ == "__main__":

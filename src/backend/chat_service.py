@@ -17,6 +17,42 @@ def response_language_for_query(user_query: str) -> str:
     return "en" if latin_count > han_count else "zh"
 
 
+def _agent_message(user_query: str, language: str | None) -> str:
+    """界面指定了回答语言时，在用户消息末尾附加机读标记；未指定则原样透传（兼容老客户端）。"""
+    if language in ("zh", "en"):
+        return f"{user_query}\n\n(Answer-Language: {language})"
+    return user_query
+
+
+_MARKER_RE = re.compile(r"\(\s*Answer-Language\s*:\s*(?:zh|en)\s*\)", re.IGNORECASE)
+_MARKER_PREFIX = "(answer-language: "
+
+
+def _could_be_marker(tail: str) -> bool:
+    lowered = tail.lower()
+    return _MARKER_PREFIX.startswith(lowered) or lowered.startswith(_MARKER_PREFIX)
+
+
+def _strip_answer_language_marker(chunks):
+    """
+    从流式输出中剥除语言标记：提示词已要求模型不要复述它，这里是兜底。
+
+    标记会被切分到多个 token 块，故对可能是标记开头的尾部做缓冲，凑齐后再判断。
+    """
+    buffer = ""
+    for chunk in chunks:
+        buffer = _MARKER_RE.sub("", buffer + chunk)
+        hold_at = buffer.rfind("(")
+        if hold_at != -1 and _could_be_marker(buffer[hold_at:]):
+            emit, buffer = buffer[:hold_at], buffer[hold_at:]
+        else:
+            emit, buffer = buffer, ""
+        if emit:
+            yield emit
+    if buffer:
+        yield buffer
+
+
 def _localized_message(language: str, key: str) -> str:
     messages = {
         "not_ready": {
@@ -80,37 +116,49 @@ class ChatService:
                 logger.exception("关闭 checkpointer 失败")
         dependency.close()
 
-    def chat(self, user_query, session_id):
+    def chat(self, user_query, session_id, language=None):
         """
         聊天入口，根据配置决定是否流式输出。
+
+        language: 界面所选回答语言（"zh"/"en"）；None 时回落到按问题语言检测。
         """
-        response_language = response_language_for_query(user_query)
+        if language in ("zh", "en"):
+            response_language = language
+        else:
+            response_language = response_language_for_query(user_query)
         if self.agent is None:
             yield _localized_message(response_language, "not_ready")
             return
 
+        agent_message = _agent_message(user_query, language)
         agent_config = {
             "configurable": {"thread_id": session_id},
             "recursion_limit": config.AGENT_RECURSION_LIMIT,
         }
         try:
-            if config.AGENT_STREAM_OUTPUT:
-                for msg, _metadata in self.agent.stream(
-                    {"messages": [("user", user_query)]},
-                    config=agent_config,
-                    stream_mode="messages",
-                ):
-                    text = _chunk_text(msg)
-                    if text:
-                        yield text
-            else:
-                result = self.agent.invoke(
-                    {"messages": [("user", user_query)]}, config=agent_config
-                )
-                yield result["messages"][-1].content
+            yield from _strip_answer_language_marker(
+                self._run_agent(agent_message, agent_config)
+            )
         except Exception:
             logger.exception("chat 处理失败")
             yield _localized_message(response_language, "temporary_failure")
+
+    def _run_agent(self, agent_message, agent_config):
+        """按配置以流式或一次性方式产出 agent 文本。"""
+        if config.AGENT_STREAM_OUTPUT:
+            for msg, _metadata in self.agent.stream(
+                {"messages": [("user", agent_message)]},
+                config=agent_config,
+                stream_mode="messages",
+            ):
+                text = _chunk_text(msg)
+                if text:
+                    yield text
+        else:
+            result = self.agent.invoke(
+                {"messages": [("user", agent_message)]}, config=agent_config
+            )
+            yield result["messages"][-1].content
 
 
 if __name__ == '__main__':

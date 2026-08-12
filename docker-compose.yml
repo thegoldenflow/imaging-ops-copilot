@@ -12,6 +12,9 @@ services:
       - "7687:7687"              # Bolt
     environment:
       NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-change-me}
+      # 在线 /chat 用 langchain_neo4j 读 schema，依赖 APOC 的 apoc.meta.data()；首启自动下载安装
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
     volumes:
       - neo4j_data:/data
     healthcheck:
@@ -25,7 +28,8 @@ services:
     image: postgres:16
     container_name: sm_postgres
     ports:
-      - "5432:5432"
+      # 宿主端口可用 POSTGRES_HOST_PORT 覆盖（本机已有本地 PostgreSQL 占用 5432 时改 5433）；容器内仍是 5432
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
