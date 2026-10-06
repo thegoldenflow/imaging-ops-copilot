@@ -74,7 +74,8 @@ def is_unread(store: Store, study: ImagingStudy) -> bool:
 
 
 def unread(store: Store) -> list[ImagingStudy]:
-    return [s for s in store.studies.values() if is_unread(store, s)]
+    # Snapshot: the worker thread may add studies (imported priors) while a request iterates.
+    return [s for s in list(store.studies.values()) if is_unread(store, s)]
 
 
 def queue_minutes(store: Store, studies: list[ImagingStudy] | None = None) -> dict[str, int]:
@@ -147,7 +148,7 @@ def turnaround(store: Store, now: datetime, days: int = 7) -> dict:
     """Turnaround of reports signed in the last `days` days, by priority and per day."""
     since = now - timedelta(days=days)
     rows = []  # (signed_at, priority, hours, within)
-    for study in store.studies.values():
+    for study in list(store.studies.values()):
         report = report_for_study(store, study.id)
         if report is None or report.status != "signed" or report.signed_at is None or report.signed_at < since:
             continue
@@ -173,7 +174,7 @@ def turnaround(store: Store, now: datetime, days: int = 7) -> dict:
 # ---------- Rebalancing ----------
 
 
-def suggestions(store: Store, now: datetime, limit: int = 40) -> list[dict]:
+def suggestions(store: Store, now: datetime, limit: int = 60) -> list[dict]:
     """Greedy rebalancing: move the most urgent studies off readers who are off
     shift or well above the team average, to the least-loaded credentialed
     reader on shift, as long as the move narrows the gap."""

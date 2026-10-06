@@ -116,7 +116,7 @@ def run_sampling(store: Store, *, now: datetime, trigger: str, by: str, rng: ran
     st = state(store)
     since = st.get("last_run_at") or now - timedelta(days=1)
     sampled_reports = {r.report_id for r in reviews(store).values()}
-    candidates = [r for r in reports(store).values() if r.status == "signed" and r.signed_by_id and r.signed_at
+    candidates = [r for r in list(reports(store).values()) if r.status == "signed" and r.signed_by_id and r.signed_at
                   and since < r.signed_at <= now and r.id not in sampled_reports]
     candidates.sort(key=lambda r: r.id)
     k = min(len(candidates), max(1, round(len(candidates) * (rate or config(store).sample_rate)))) if candidates else 0

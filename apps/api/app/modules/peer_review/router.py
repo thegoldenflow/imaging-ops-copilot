@@ -46,7 +46,9 @@ def review_view(store: Store, review: service.PeerReview, *, blinded: bool) -> d
 def my_reviews(request: Request, user: StaffUser = Depends(RADIOLOGIST)):
     store = get_store()
     mine = [r for r in service.reviews(store).values() if r.reviewer_id == user.id]
-    mine.sort(key=lambda r: (r.status == "completed", r.assigned_at))
+    # Open reviews oldest first, then completed ones newest first.
+    mine = (sorted((r for r in mine if r.status != "completed"), key=lambda r: r.assigned_at)
+            + sorted((r for r in mine if r.status == "completed"), key=lambda r: r.completed_at, reverse=True))
     audit_phi(request, user, action="read", resource_type="peer_review_list", resource_id=user.id)
     return {"reviews": [review_view(store, r, blinded=True) for r in mine[:60]],
             "open": sum(r.status == "assigned" for r in mine),

@@ -30,7 +30,7 @@ def _row(store: Store, study, now: datetime) -> dict:
     return {
         "id": study.id, "patient_id": patient.id, "patient_name": patient.full_name,
         "exam_code": study.exam_code, "exam_name": store.exams[study.exam_code].name,
-        "modality": service.modality(store, study), "site_id": study.site_id, "site_name": site.name if site else None,
+        "modality": service.modality(store, study), "site_id": study.site_id, "site_name": site.name if site else "Uploaded (no site)",
         "priority": study.priority, "performed_at": study.performed_at.isoformat(timespec="minutes"),
         "minutes": service.read_minutes(store, study), **service.study_state(store, study, now),
         "assigned_to": {"id": reader.id, "name": reader.name} if reader else None,
@@ -58,7 +58,7 @@ def board(request: Request, user: StaffUser = Depends(VIEWERS)):
         r["age_bucket"] = next(label for limit, label in service.AGE_BUCKETS if r["age_h"] < limit)
     load = service.queue_minutes(store, studies)
     signed_today: dict[str, int] = {}
-    for s in store.studies.values():
+    for s in list(store.studies.values()):
         rep = report_for_study(store, s.id)
         if rep and rep.status == "signed" and rep.signed_at and rep.signed_at.date() == now.date() and rep.signed_by_id:
             signed_today[rep.signed_by_id] = signed_today.get(rep.signed_by_id, 0) + 1
