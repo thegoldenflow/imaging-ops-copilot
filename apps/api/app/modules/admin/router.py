@@ -25,7 +25,7 @@ def health():
 @router.get("/auth/users")
 def demo_users():
     return {
-        "users": [u.model_dump() for u in get_store().staff.values()],
+        "users": [u.model_dump() for u in get_store().staff.values() if u.demo_login],
         "passcode_required": settings.demo_passcode is not None,
     }
 

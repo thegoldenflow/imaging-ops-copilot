@@ -51,7 +51,8 @@ def _can_view_report(user: StaffUser, report: service.Report) -> bool:
 @router.get("/worklist")
 def worklist(request: Request, user: StaffUser = Depends(READERS)):
     store = get_store()
-    studies = sorted(store.studies.values(), key=lambda s: s.performed_at)
+    # Studies with an image to draft from; other studies are read from the backlog board.
+    studies = sorted((s for s in store.studies.values() if s.image_key in store.images), key=lambda s: s.performed_at)
     audit_phi(request, user, action="read", resource_type="reading_worklist", resource_id=None)
     return {"studies": [study_view(store, s) for s in studies]}
 
@@ -188,7 +189,7 @@ def sign_report(report_id: str, body: SignRequest, request: Request, user: Staff
         raise HTTPException(422, f"Review every section before signing: {', '.join(pending)}")
     if not any(s.final_text.strip() for s in report.sections if s.key == "impression"):
         raise HTTPException(422, "Impression is required")
-    created = service.sign(store, report, user.name, body.confirmed_urgent)
+    created = service.sign(store, report, user.name, body.confirmed_urgent, user.id)
     audit_phi(request, user, action="sign", resource_type="report", resource_id=report_id)
     return {"report": report_view(store, report), "critical_results": [c.model_dump(mode="json") for c in created]}
 

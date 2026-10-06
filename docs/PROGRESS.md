@@ -125,7 +125,46 @@ Demo-scope notes: requisitions are synthetic text generated with ground-truth la
 
 - [ ] Run the evals with a real `ANTHROPIC_API_KEY` and record Claude's numbers
 
-## Phases 3–4
+## Phase 3 — Radiology operations (Systems 11–14)
+
+Status: in progress, branch `feat/phase-3-radiology-ops`
+
+Shared groundwork: a technologist marks an exam done → the appointment becomes completed, an `ImagingStudy` is created, and completion hooks run (assign a reader, record CT dose). The seed adds studies and signed reports for the last 14 days of completed exams, CT dose records for 90 days, and four more synthetic radiologists with reading credentials (demo login stays one user per role). Long-running flows (critical-result escalation, nightly peer-review sampling) run in the in-process worker loop, like prior retrieval in phase 2, instead of Temporal.
+
+### Shared step · Exam completion and reading roster
+
+- [ ] Technologist marks an exam done; study created; completion hooks for later systems
+- [ ] `Report` covers dictated (non-AI) reports as well as AI drafts; signer id recorded
+- [ ] Synthetic radiologists with credentialed modalities; shift roster
+- [ ] 14 days of synthetic studies and signed reports; unread studies form the starting backlog
+
+### System 11 · Reporting Backlog & Turnaround Tracker
+
+- [ ] Unreported studies grouped by site, exam type, priority and age
+- [ ] Turnaround = signed − completed; targets per priority (configurable); at-risk and overdue flags
+- [ ] Per-radiologist queue; reassignment suggestions to on-shift, credentialed readers
+- [ ] Board refreshes live with new studies and sign-offs; reassignment is audited
+
+### System 12 · Critical Results Tracker
+
+- [ ] Case opened from a confirmed finding (report sign-off or dictation): finding, level, ordering physician, deadline
+- [ ] Worker notifies the ordering physician (mock phone/fax), re-notifies, then escalates to the medical director per configurable policy
+- [ ] Acknowledgement records who, when and how (staff entry or referrer portal); a case cannot close without one
+- [ ] Full timeline for every case; unacknowledged demo case escalates on its own
+
+### System 13 · Peer Review / QA
+
+- [ ] Scheduled sampling at a configurable rate; blind assignment, never to the original reader
+- [ ] Graded review (concur / minor / significant) with discrepancy type
+- [ ] QA report by radiologist and exam type, QA lead (medical director) only; CSV export
+
+### System 14 · CT Dose Monitoring
+
+- [ ] Every completed CT has a dose record (CTDIvol, DLP) shaped like a DICOM RDSR
+- [ ] Reference levels per protocol (medical director); exceedances listed and reviewable
+- [ ] Trends by scanner and protocol
+
+## Phase 4
 
 Status: not started
 

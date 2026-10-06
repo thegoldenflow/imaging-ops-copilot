@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.store import get_store
 from app.integrations.mocks import dispatch_due
 from app.modules.admin.router import router as admin_router
+from app.modules.backlog.router import router as backlog_router
 from app.modules.contrast.router import router as contrast_router
 from app.modules.evals.router import router as evals_router
 from app.modules.frontdesk.router import router as frontdesk_router
@@ -78,3 +79,4 @@ app.include_router(mri_router)
 app.include_router(prep_router)
 app.include_router(priors_router)
 app.include_router(evals_router)
+app.include_router(backlog_router)

@@ -8,7 +8,9 @@ from typing import Callable
 
 from pydantic import BaseModel, Field
 
-from app.core.models import ACTIVE_STATUSES, Appointment, AppointmentStatus, Modality, WaitlistEntry
+import random
+
+from app.core.models import ACTIVE_STATUSES, Appointment, AppointmentStatus, ImagingStudy, Modality, WaitlistEntry
 from app.core.store import Store, get_store
 from app.core.templates import format_when, render
 from app.integrations.mocks import queue_message
@@ -23,6 +25,9 @@ BOOKING_HOOKS: list[Callable[[Appointment], None]] = []
 CANCEL_HOOKS: list[Callable[[Appointment], None]] = []
 # Each guard returns a reason the appointment may not be confirmed yet, or None.
 CONFIRM_GUARDS: list[Callable[[Store, Appointment], str | None]] = []
+# Called with (store, appointment, study) when an exam is completed. Phase 3
+# systems assign a reader (11) and record CT dose (14) here.
+COMPLETION_HOOKS: list[Callable[[Store, Appointment, ImagingStudy], None]] = []
 
 
 def confirm_blockers(store: Store, appt: Appointment) -> list[str]:
@@ -244,6 +249,39 @@ def cancel(store: Store, appt: Appointment, reason: str, now: datetime | None = 
         cases(store)[case.id] = case
     store.touch()
     return case
+
+
+def study_for(store: Store, appt: Appointment, performed_at: datetime, indication: str = "") -> ImagingStudy:
+    """The study record a completed appointment produces (no pixel data in the demo)."""
+    return ImagingStudy(
+        id=store.next_id("ST"), appointment_id=appt.id, patient_id=appt.patient_id, referrer_id=appt.referrer_id,
+        exam_code=appt.exam_code, performed_at=performed_at, image_key="",
+        study_uid=f"2.25.{random.getrandbits(100)}", indication=indication, site_id=appt.site_id,
+        scanner_id=appt.scanner_id, priority=appt.urgency, protocol_id=appt.protocol_id,
+    )
+
+
+def complete(store: Store, appt: Appointment, now: datetime | None = None) -> ImagingStudy:
+    """Technologist marks the exam done: the study is created and phase 3 hooks run."""
+    from app.phantom import chest_phantom
+
+    now = now or datetime.now()
+    appt.status = AppointmentStatus.COMPLETED
+    indication = ""
+    if appt.requisition_id and (req := store.requisitions.get(appt.requisition_id)):
+        indication = f"See requisition {req.id}"
+    study = study_for(store, appt, now, indication)
+    if appt.exam_code == "XR_CHEST":
+        # Chest X-rays get a synthetic image so the reading room can draft them (system 3).
+        key = store.next_id("IMG-EX")
+        store.images[key] = (chest_phantom("normal", seed=random.randint(0, 999)), "image/png")
+        store.modules.setdefault("phantom_variants", {})[key] = "normal"
+        study.image_key = key
+    store.studies[study.id] = study
+    for hook in COMPLETION_HOOKS:
+        hook(store, appt, study)
+    store.touch()
+    return study
 
 
 def send_offers(store: Store, case: BackfillCase, waitlist_ids: list[str]) -> list[Offer]:
