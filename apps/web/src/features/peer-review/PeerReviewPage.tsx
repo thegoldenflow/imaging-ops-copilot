@@ -13,14 +13,17 @@ interface Mine { reviews: PeerReviewItem[]; open: number; scores: Record<string,
 const SCORE_TONE = { concur: "green", minor: "amber", significant: "red" } as const;
 const FLAG_RATE = 0.08; // highlight significant-discrepancy rates above this
 
-function ReviewForm({ review, scores, types }: { review: PeerReviewItem; scores: Record<string, string>; types: Record<string, string> }) {
+function ReviewForm({ review, scores, types, onSubmitted }: { review: PeerReviewItem; scores: Record<string, string>; types: Record<string, string>; onSubmitted: () => void }) {
   const queryClient = useQueryClient();
   const [score, setScore] = useState("concur");
   const [dtype, setDtype] = useState("");
   const [comment, setComment] = useState("");
   const submit = useMutation({
     mutationFn: () => post(`/api/peer-review/${review.id}/submit`, { score, discrepancy_type: score === "concur" ? null : dtype || null, comment }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["peer-review"] }),
+    onSuccess: () => {
+      onSubmitted();
+      queryClient.invalidateQueries({ queryKey: ["peer-review"] });
+    },
   });
   return (
     <div className="mt-4 space-y-3 rounded-lg border border-slate-200 p-3">
@@ -85,7 +88,7 @@ function MyReviews() {
             </div>
           ))}
         </div>
-        {current.status === "assigned" ? <ReviewForm key={current.id} review={current} scores={q.data!.scores} types={q.data!.discrepancy_types} /> : (
+        {current.status === "assigned" ? <ReviewForm key={current.id} review={current} scores={q.data!.scores} types={q.data!.discrepancy_types} onSubmitted={() => setSelected(current.id)} /> : (
           <p className="mt-3 text-sm text-slate-600">
             Submitted {dateTime(current.completed_at!)}: <Badge tone={SCORE_TONE[current.score!]}>{current.score}</Badge>
             {current.discrepancy_type && ` · ${q.data!.discrepancy_types[current.discrepancy_type]}`}{current.comment && ` · ${current.comment}`}

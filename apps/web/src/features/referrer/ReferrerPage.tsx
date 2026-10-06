@@ -21,7 +21,7 @@ function CriticalAlerts() {
           <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5" data-testid={`my-critical-${c.id}`}>
             <div className="text-sm">
               <p className="font-medium text-slate-900">{c.finding}</p>
-              <p className="text-xs text-slate-500">{c.patient_name} · {c.exam_name} · {c.level_label} · reported {dateTime(c.created_at)}</p>
+              <p className="text-xs text-slate-500">{c.patient_name}, {c.exam_name} ({c.level_label}), reported {dateTime(c.created_at)}</p>
             </div>
             {c.acknowledgement ? (
               <Badge tone="green">Acknowledged {dateTime(c.acknowledgement.at)}</Badge>

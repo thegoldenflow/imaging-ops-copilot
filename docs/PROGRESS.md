@@ -8,7 +8,7 @@ Time is short and the goal is a working demo, so the first batch deviates from t
 | --- | --- | --- |
 | PostgreSQL + SQLAlchemy + Alembic | In-memory store (`app/core/store.py`) rebuilt from a seeded generator on start and on "Reset demo" | All reads and writes go through the store object; a database repository can replace it later |
 | Field-level PHI encryption | Not implemented (nothing is persisted) | Needed once a database is added |
-| Temporal workflows | In-process scheduler loop that sends due messages every 5 s | Replace with Temporal when long-running flows (systems 10, 12) arrive |
+| Temporal workflows | In-process loops: message dispatch every 5 s; a worker every 2 s for requisitions, prior retrieval (10), critical-result escalation (12) and nightly peer-review sampling (13) | State lives in the store, so a restart loses in-flight steps; move these to Temporal with the database |
 | Orthanc + DICOM | Synthetic PNG "phantom" chest images; PNG/JPEG upload | Real DICOM support and de-identification of DICOM tags later |
 | STT/TTS services, Twilio | Browser Web Speech API (Chrome) plus typed input | Pluggable STT/TTS later; latency target must be measured locally |
 | shadcn/ui, OpenAPI type generation | Small hand-written component set, hand-written types | Fine for demo size |
@@ -127,42 +127,53 @@ Demo-scope notes: requisitions are synthetic text generated with ground-truth la
 
 ## Phase 3 — Radiology operations (Systems 11–14)
 
-Status: in progress, branch `feat/phase-3-radiology-ops`
+Status: done (demo scope), branch `feat/phase-3-radiology-ops`
 
-Shared groundwork: a technologist marks an exam done → the appointment becomes completed, an `ImagingStudy` is created, and completion hooks run (assign a reader, record CT dose). The seed adds studies and signed reports for the last 14 days of completed exams, CT dose records for 90 days, and four more synthetic radiologists with reading credentials (demo login stays one user per role). Long-running flows (critical-result escalation, nightly peer-review sampling) run in the in-process worker loop, like prior retrieval in phase 2, instead of Temporal.
+Shared groundwork: a technologist marks an exam done → the appointment becomes completed, an `ImagingStudy` is created, and completion hooks run (assign a reader, record CT dose). The seed adds studies and signed reports for the last 14 days of completed exams, CT dose records for 90 days, and four more synthetic radiologists with reading credentials (demo login stays one user per role). Long-running flows (critical-result escalation, nightly peer-review sampling) run in the in-process worker loop, like prior retrieval in phase 2, instead of Temporal. Phase 3 makes no Claude calls.
 
-### Shared step · Exam completion and reading roster
+Demo-scope notes:
 
-- [ ] Technologist marks an exam done; study created; completion hooks for later systems
-- [ ] `Report` covers dictated (non-AI) reports as well as AI drafts; signer id recorded
-- [ ] Synthetic radiologists with credentialed modalities; shift roster
-- [ ] 14 days of synthetic studies and signed reports; unread studies form the starting backlog
+- Data model: fields added, nothing removed. `ImagingStudy` gained `site_id`, `scanner_id`, `priority`, `protocol_id`; `StaffUser` gained `reading_modalities` (credentials) and `demo_login`; `Report` gained `source` (AI draft or dictated) and `signed_by_id`, and its AI fields now have defaults so dictated reports fit the same entity. The phase 1 `CriticalResult` stub moved into the critical module as `CriticalCase`.
+- Studies other than chest X-rays have no images in the demo; they are read from the backlog with a fixed normal-report template (not AI text) that the radiologist edits.
+- "Mark done" also works on upcoming exams so the demo runs at any hour; such an exam is recorded as performed now.
+- Critical-result timings are compressed to seconds (critical: re-notify 20 s, escalate 45 s) and labelled as demo values; the typical clinic policy is shown next to them.
+- Peer-review history is seeded as a 20% audit sample so the QA report shows a pattern (Dr. Webb's MRI reads); the live default rate is 5%. The QA lead is the medical director; admins are refused.
+- CT dose values are synthetic; reference levels are placeholders set by the medical director. One scanner (EVW-CT1) drifts upward over the last three weeks for the trend demo.
 
-### System 11 · Reporting Backlog & Turnaround Tracker
+### Shared step · Exam completion and reading roster — done
 
-- [ ] Unreported studies grouped by site, exam type, priority and age
-- [ ] Turnaround = signed − completed; targets per priority (configurable); at-risk and overdue flags
-- [ ] Per-radiologist queue; reassignment suggestions to on-shift, credentialed readers
-- [ ] Board refreshes live with new studies and sign-offs; reassignment is audited
+- [x] Technologist marks an exam done; study created; completion hooks for later systems
+- [x] `Report` covers dictated (non-AI) reports as well as AI drafts; signer id recorded
+- [x] Synthetic radiologists with credentialed modalities; shift roster
+- [x] 14 days of synthetic studies and signed reports; unread studies form the starting backlog
 
-### System 12 · Critical Results Tracker
+### System 11 · Reporting Backlog & Turnaround Tracker — done
 
-- [ ] Case opened from a confirmed finding (report sign-off or dictation): finding, level, ordering physician, deadline
-- [ ] Worker notifies the ordering physician (mock phone/fax), re-notifies, then escalates to the medical director per configurable policy
-- [ ] Acknowledgement records who, when and how (staff entry or referrer portal); a case cannot close without one
-- [ ] Full timeline for every case; unacknowledged demo case escalates on its own
+- [x] Unreported studies grouped by site, exam type, priority and age
+- [x] Turnaround = signed − completed; targets per priority (configurable); at-risk and overdue flags
+- [x] Per-radiologist queue; reassignment suggestions to on-shift, credentialed readers
+- [x] Board refreshes live (polling every 3 s) with new studies and sign-offs; reassignment is audited
 
-### System 13 · Peer Review / QA
+### System 12 · Critical Results Tracker — done
 
-- [ ] Scheduled sampling at a configurable rate; blind assignment, never to the original reader
-- [ ] Graded review (concur / minor / significant) with discrepancy type
-- [ ] QA report by radiologist and exam type, QA lead (medical director) only; CSV export
+- [x] Case opened from a confirmed finding (report sign-off or dictation): finding, level, ordering physician, deadline
+- [x] Worker notifies the ordering physician (mock phone/fax), re-notifies, then escalates to the medical director per configurable policy
+- [x] Acknowledgement records who, when and how (staff entry or referrer portal); a case cannot close without one
+- [x] Full timeline for every case; the unacknowledged demo case escalates on its own
 
-### System 14 · CT Dose Monitoring
+### System 13 · Peer Review / QA — done
 
-- [ ] Every completed CT has a dose record (CTDIvol, DLP) shaped like a DICOM RDSR
-- [ ] Reference levels per protocol (medical director); exceedances listed and reviewable
-- [ ] Trends by scanner and protocol
+- [x] Scheduled sampling at a configurable rate and hour; blind assignment, never to the original reader
+- [x] Graded review (concur / minor / significant) with discrepancy type
+- [x] QA report by radiologist and exam type, QA lead (medical director) only; CSV export (audited)
+
+### System 14 · CT Dose Monitoring — done
+
+- [x] Every completed CT has a dose record (CTDIvol, DLP) shaped like a DICOM RDSR (TID 10011)
+- [x] Reference levels per protocol (medical director); exceedances listed and reviewable; changes recompute immediately
+- [x] Weekly trends by scanner and protocol
+
+Tests: `tests/test_phase3.py` (29 backend tests) and `e2e/radiology-ops.spec.ts` (technologist → backlog balancing → dictation → live escalation and close → blind peer review → QA export → CT dose).
 
 ## Phase 4
 

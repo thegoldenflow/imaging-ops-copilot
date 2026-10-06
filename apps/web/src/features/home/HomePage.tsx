@@ -20,8 +20,8 @@ const STORY: Step[] = [
     role: "radiologist", userId: "U-RAD", to: "/reading", system: "Report Generator",
   },
   {
-    title: "Referring physician sees the signed report",
-    detail: "Dr. Helen Park can read the report only after it is signed. Drafts return 403.",
+    title: "Referring physician sees the report and acknowledges the finding",
+    detail: "Dr. Helen Park can read the report only after it is signed (drafts return 403). The confirmed nodule opened a critical-result case; she acknowledges it in the portal.",
     role: "referrer", userId: "U-REF", to: "/my-reports", system: "Report Generator",
   },
   {
@@ -79,6 +79,39 @@ const PIPELINE: Step[] = [
   },
 ];
 
+const OPERATIONS: Step[] = [
+  {
+    title: "An exam finishes and lands in the reading backlog",
+    detail: "Mark one of today's or tomorrow's exams done. A study is created and assigned to a credentialed radiologist; CT exams also get a dose record from the scanner.",
+    role: "technologist", userId: "U-TECH", to: "/scheduling?tab=appointments", system: "Backlog · CT dose",
+  },
+  {
+    title: "Balance the reading backlog",
+    detail: "Dr. Liu is off shift and Dr. Webb's MRI queue is long. Review turnaround against target and apply the suggested reassignments; each one is audited.",
+    role: "operations_manager", userId: "U-OPS", to: "/backlog", system: "Reporting backlog",
+  },
+  {
+    title: "Read and sign from your queue",
+    detail: "Open a study from your queue, edit the normal template and sign. Add a finding that needs communication to open a critical-result case.",
+    role: "radiologist", userId: "U-RAD", to: "/backlog", system: "Reporting backlog",
+  },
+  {
+    title: "A critical result nobody acknowledges",
+    detail: "A pulmonary embolism case opened when the demo started. Nobody answers, so it is re-notified and escalated to you within a minute. Record who acknowledged, how and when, then close it.",
+    role: "medical_director", userId: "U-MD", to: "/critical", system: "Critical results",
+  },
+  {
+    title: "Blind peer review",
+    detail: "Sampled reports from colleagues wait for your second read. The original reader is hidden and your own reports are never assigned to you.",
+    role: "radiologist", userId: "U-RAD", to: "/peer-review", system: "Peer review",
+  },
+  {
+    title: "QA report and CT dose",
+    detail: "As QA lead, see discrepancy rates by radiologist and exam type and export them. Then open CT dose: EVW-CT1 has drifted above its usual level over the last three weeks.",
+    role: "medical_director", userId: "U-MD", to: "/peer-review", system: "QA · CT dose",
+  },
+];
+
 function StoryCard({ title, steps, onGo, userId }: { title: string; steps: Step[]; onGo: (s: Step) => void; userId: string }) {
   return (
     <Card title={title} className="mb-4">
@@ -122,6 +155,7 @@ export function HomePage() {
       />
       <StoryCard title="Storyline 1 · one patient through scheduling, reporting and the front desk" steps={STORY} onGo={go} userId={user.id} />
       <StoryCard title="Storyline 2 · the requisition intake pipeline" steps={PIPELINE} onGo={go} userId={user.id} />
+      <StoryCard title="Storyline 3 · radiology operations" steps={OPERATIONS} onGo={go} userId={user.id} />
       <p className="flex items-center gap-1.5 text-xs text-slate-500">
         <CheckCircle2 className="size-3.5" /> Use “Reset demo” in the header to start over.
       </p>

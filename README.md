@@ -1,6 +1,6 @@
 # Imaging Ops Copilot
 
-A demo AI toolkit for an outpatient medical imaging center: scheduling, chest X-ray report drafting, front desk automation, requisition triage, radiology operations and compliance. The full scope is 21 systems delivered in 5 phases; phases 0–2 (systems 1–10) are built.
+A demo AI toolkit for an outpatient medical imaging center: scheduling, chest X-ray report drafting, front desk automation, requisition triage, radiology operations and compliance. The full scope is 21 systems delivered in 5 phases; phases 0–3 (systems 1–14) are built.
 
 > All data is synthetic. No real patient information is used anywhere. AI output is always a draft or a suggestion that a person must confirm. Nothing in this repository is a medical device or gives diagnostic advice.
 
@@ -25,9 +25,20 @@ A demo AI toolkit for an outpatient medical imaging center: scheduling, chest X-
 | 9 | Patient Prep Instructions | AI-drafted translations need approval; only approved text is sent, at booking and 48 h before |
 | 10 | Prior Imaging Retrieval | Outside priors requested after booking, retried with backoff against flaky mock archives, imported and linked to the exam |
 
+### Phase 3: radiology operations
+
+| # | System | What you can demo |
+| --- | --- | --- |
+| 11 | Reporting Backlog & Turnaround | Unreported studies by site, exam type, priority and age; turnaround (signed − completed) against per-priority targets with at-risk and overdue flags; each radiologist's queue; reassignment suggestions to on-shift, credentialed readers (audited); dictate and sign from the queue |
+| 12 | Critical Results Tracker | Confirmed findings open a case; the ordering physician is called, re-notified by phone and fax, then the case escalates to the medical director; acknowledgement records who, how and when (staff or referrer portal); no closing without it; full timeline |
+| 13 | Peer Review / QA | Nightly sampling at a set rate, blind assignment never back to the original reader, concur / minor / significant grading with discrepancy type, QA report by radiologist and exam type for the QA lead only, CSV export |
+| 14 | CT Dose Monitoring | Dose record per CT shaped like a DICOM dose SR (CTDIvol, DLP per irradiation event), reference levels per protocol, exceedance review list, weekly trends by scanner and protocol |
+
+Phase 3 uses no AI; it is about data, workflow and an audit trail. Exams finish when a technologist marks them done (Scheduling → Appointments), which creates the study, assigns a reader and records CT dose.
+
 Each AI feature has an eval set in `evals/` (`cd apps/api && uv run python -m app.modules.evals.run`), shown on the AI evaluations page.
 
-The home page walks through two storylines. The first: a chest X-ray flags a possible nodule, the report is signed, another patient phones to cancel a CT, and the freed slot is backfilled with the first patient, who gets her messages in Chinese.
+The home page walks through three storylines. The first: a chest X-ray flags a possible nodule, the report is signed, another patient phones to cancel a CT, and the freed slot is backfilled with the first patient, who gets her messages in Chinese.
 
 ## Run it
 
@@ -52,8 +63,8 @@ Without an API key every AI feature runs on built-in mock outputs, so the whole 
 ### Tests
 
 ```bash
-cd apps/api && uv run pytest -q          # 41 backend tests
-cd apps/web && npx playwright test       # 2 storyline end-to-end specs (starts both servers if needed)
+cd apps/api && uv run pytest -q          # 70 backend tests
+cd apps/web && npx playwright test       # 3 end-to-end specs, one per phase storyline (starts both servers if needed)
 ```
 
 ## Tech stack
