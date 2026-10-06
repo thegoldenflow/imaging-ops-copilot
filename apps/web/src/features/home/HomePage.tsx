@@ -46,6 +46,64 @@ const STORY: Step[] = [
   },
 ];
 
+const PIPELINE: Step[] = [
+  {
+    title: "Requisitions arrive and the AI pipeline runs",
+    detail: "Three faxed requisitions were just received. Each is extracted once, triaged and given a protocol suggestion within seconds. Submit another from the queue.",
+    role: "front_desk", userId: "U-FD", to: "/requisitions", system: "Requisition intake",
+  },
+  {
+    title: "Radiologist reviews the MRI with a cochlear implant",
+    detail: "Open the MRI brain requisition: highlighted source text, AI priority with red flags, protocol options. Confirm the priority and approve the protocol.",
+    role: "radiologist", userId: "U-RAD", to: "/requisitions", system: "Triage · Protocol",
+  },
+  {
+    title: "Book it; the safety questionnaire goes out in Punjabi",
+    detail: "Book next available. The patient gets the MRI questionnaire link in Punjabi; prep falls back to English because that translation is not approved yet.",
+    role: "front_desk", userId: "U-FD", to: "/requisitions", system: "MRI safety · Prep",
+  },
+  {
+    title: "Patient answers, technologist reviews",
+    detail: "Answer the questionnaire from the link. The flag blocks confirmation until a technologist clears it on the MRI safety page.",
+    role: "technologist", userId: "U-TECH", to: "/mri-safety", system: "MRI safety",
+  },
+  {
+    title: "Medical director: thresholds and translations",
+    detail: "Change the eGFR threshold and watch every contrast check recompute. Approve the Punjabi MRI translation so future messages use it.",
+    role: "medical_director", userId: "U-MD", to: "/contrast", system: "Contrast · Prep",
+  },
+  {
+    title: "Prior imaging retrieval with retries",
+    detail: "Book the CT abdomen requisition; its outside ultrasound is requested automatically. Switch the archive to “Outage” to watch retries and a final failure.",
+    role: "front_desk", userId: "U-FD", to: "/priors", system: "Prior imaging",
+  },
+];
+
+function StoryCard({ title, steps, onGo, userId }: { title: string; steps: Step[]; onGo: (s: Step) => void; userId: string }) {
+  return (
+    <Card title={title} className="mb-4">
+      <ol className="space-y-3">
+        {steps.map((step, i) => (
+          <li key={step.title} className="flex gap-3 rounded-lg border border-slate-100 p-3 hover:border-slate-200">
+            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-700">{i + 1}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-slate-900">{step.title}</p>
+                <Badge tone="brand">{step.system}</Badge>
+              </div>
+              <p className="mt-1 text-sm text-slate-600">{step.detail}</p>
+            </div>
+            <button onClick={() => onGo(step)} className="flex shrink-0 items-center gap-1 self-center rounded-lg px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50">
+              {userId === step.userId ? "Open" : `As ${ROLE_LABEL[step.role].toLowerCase()}`}
+              <ArrowRight className="size-3.5" />
+            </button>
+          </li>
+        ))}
+      </ol>
+    </Card>
+  );
+}
+
 export function HomePage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
@@ -62,34 +120,11 @@ export function HomePage() {
         title={`Welcome, ${user.name.split(" ").slice(-2).join(" ")}`}
         subtitle="Follow the demo storyline below, or use the menu to explore your role's tools."
       />
-      <Card title="Demo storyline · one patient through three systems">
-        <ol className="space-y-3">
-          {STORY.map((step, i) => (
-            <li key={step.title} className="flex gap-3 rounded-lg border border-slate-100 p-3 hover:border-slate-200">
-              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-700">
-                {i + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-semibold text-slate-900">{step.title}</p>
-                  <Badge tone="brand">{step.system}</Badge>
-                </div>
-                <p className="mt-1 text-sm text-slate-600">{step.detail}</p>
-              </div>
-              <button
-                onClick={() => go(step)}
-                className="flex shrink-0 items-center gap-1 self-center rounded-lg px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50"
-              >
-                {user.id === step.userId ? "Open" : `As ${ROLE_LABEL[step.role].toLowerCase()}`}
-                <ArrowRight className="size-3.5" />
-              </button>
-            </li>
-          ))}
-        </ol>
-        <p className="mt-4 flex items-center gap-1.5 text-xs text-slate-500">
-          <CheckCircle2 className="size-3.5" /> Use “Reset demo” in the header to start over.
-        </p>
-      </Card>
+      <StoryCard title="Storyline 1 · one patient through scheduling, reporting and the front desk" steps={STORY} onGo={go} userId={user.id} />
+      <StoryCard title="Storyline 2 · the requisition intake pipeline" steps={PIPELINE} onGo={go} userId={user.id} />
+      <p className="flex items-center gap-1.5 text-xs text-slate-500">
+        <CheckCircle2 className="size-3.5" /> Use “Reset demo” in the header to start over.
+      </p>
     </div>
   );
 }
