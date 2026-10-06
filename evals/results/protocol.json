@@ -1,0 +1,36 @@
+{
+ "task": "protocol",
+ "run_at": "2026-10-06T22:35:05",
+ "mode": "mock",
+ "model": "rule-based baseline",
+ "n": 40,
+ "metrics": {
+  "top1": 0.95,
+  "top3": 1.0,
+  "failed_calls": 0
+ },
+ "errors": [
+  {
+   "id": "pro-03",
+   "expected": "CT-AP-CONTRAST",
+   "got": [
+    "CT-CH-CONTRAST",
+    "CT-AP-CONTRAST",
+    "CT-CH-ROUTINE"
+   ],
+   "clinical": "Weight loss and change in bowel habit, rule out malignancy."
+  },
+  {
+   "id": "pro-22",
+   "expected": "CT-CH-LDCT",
+   "got": [
+    "CT-CH-CONTRAST",
+    "CT-CH-LDCT",
+    "CT-CH-ROUTINE"
+   ],
+   "clinical": "Known 6 mm left lower lobe nodule, 12-month follow-up."
+  }
+ ],
+ "seconds": 0.0,
+ "notes": "Top-1 and top-3 hit rate over retrieval candidates from the synthetic protocol library."
+}

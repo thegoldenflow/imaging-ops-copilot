@@ -1,0 +1,938 @@
+[
+ {
+  "id": "req-00",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ben Rossi    DOB: 1977-09-21    Health card: 9986987973 ZZ\nPhone: +1-416-555-0128\nExam requested: CT chest with contrast\nClinical information: New 1.5 cm right upper lobe nodule on chest X-ray. Former smoker, 20 pack-years.\nRelevant history: None\nAllergies: Penicillin (rash)\nPrevious imaging: None known\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "CT_CHEST_C",
+   "protocol_id": "CT-CH-CONTRAST",
+   "priority": "P2",
+   "red_flags": [
+    "nodule"
+   ],
+   "contrast": true,
+   "modality": "CT",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-01",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Farah Petrov    DOB: 1970-05-12    Health card: 8151884472 ZZ\nPhone: +1-416-555-0148\nExam requested: Low-dose CT chest\nClinical information: Known 6 mm left lower lobe nodule, 12-month follow-up.\nRelevant history: Asthma\nAllergies: Penicillin (rash)\nPrevious imaging: CT chest at Lakeview Diagnostics, 2023\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "CT_CHEST",
+   "protocol_id": "CT-CH-LDCT",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "CT",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": "Lakeview Diagnostics",
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-02",
+  "text": "Dear colleague, please arrange a CT chest non-contrast for Jia Tan (DOB 1970-09-09, HCN 7880932081). Progressive dyspnea, query fibrosis. PMH: Hypertension. He is allergic to iodinated contrast (hives). Routine booking is fine. Thanks, Dr. Test Referrer, Eval Clinic",
+  "labels": {
+   "exam_code": "CT_CHEST",
+   "protocol_id": "CT-CH-ROUTINE",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "CT",
+   "renal_risk": false,
+   "contrast_allergy": "moderate",
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "letter"
+  }
+ },
+ {
+  "id": "req-03",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Hira Quinn    DOB: 1980-07-22    Health card: 8766344002 ZZ\nPhone: +1-416-555-0170\nExam requested: CT A/P with IV contrast\nClinical information: Weight loss and change in bowel habit, rule out malignancy.\nRelevant history: Asthma; Pacemaker inserted 2019\nAllergies: NKDA\nPrevious imaging: None known\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "CT_ABD_PEL",
+   "protocol_id": "CT-AP-CONTRAST",
+   "priority": "P2",
+   "red_flags": [
+    "weight loss"
+   ],
+   "contrast": true,
+   "modality": "CT",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": "cardiac pacemaker",
+   "prior_facility": null,
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-04",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Gus Lopez    DOB: 1998-05-11    Health card: 7847267147 ZZ\nPhone: +1-416-555-0112\nExam requested: CT abdomen for renal stone\nClinical information: Left flank pain radiating to groin with microscopic hematuria, query kidney stone.\nRelevant history: Hypertension\nAllergies: Gadolinium (nausea)\nPrevious imaging: CT abdomen at Northview General Hospital, March 2025\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "CT_ABD_PEL",
+   "protocol_id": "CT-AP-RENAL",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "CT",
+   "renal_risk": false,
+   "contrast_allergy": "mild",
+   "implant": null,
+   "prior_facility": "Northview General Hospital",
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-05",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ben Petrov    DOB: 1960-02-20    Health card: 8452059972 ZZ\nPhone: +1-416-555-0196\nExam requested: CT head\nClinical information: Fall two weeks ago with persistent mild headache, on no anticoagulants.\nRelevant history: Chronic kidney disease stage 3\nAllergies: NKDA\nPrevious imaging: None known\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "CT_HEAD",
+   "protocol_id": "CT-HD-ROUTINE",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "CT",
+   "renal_risk": true,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-06",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Chen Okoye    DOB: 1995-10-10    Health card: 2836016105 ZZ\nPhone: +1-416-555-0149\nExam requested: MRI head with gadolinium\nClinical information: Known breast cancer, new morning headaches, rule out brain metastases.\nRelevant history: Pacemaker inserted 2019\nAllergies: Iodinated contrast (anaphylaxis)\nPrevious imaging: MRI brain at Riverside Health Centre, 2023\nPriority: URGENT - please expedite\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_BRAIN",
+   "protocol_id": "MR-BR-TUMOUR",
+   "priority": "P2",
+   "red_flags": [
+    "metastases"
+   ],
+   "contrast": true,
+   "modality": "MRI",
+   "renal_risk": false,
+   "contrast_allergy": "severe",
+   "implant": "cardiac pacemaker",
+   "prior_facility": "Riverside Health Centre",
+   "stated_urgency": "urgent",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-07",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Hira Okoye    DOB: 1954-10-17    Health card: 9579318603 ZZ\nPhone: +1-416-555-0155\nExam requested: MRI brain\nClinical information: First unprovoked seizure last week, normal CT in emergency.\nRelevant history: Chronic kidney disease stage 3; Pacemaker inserted 2019\nAllergies: NKDA\nPrevious imaging: None known\nPriority: URGENT - please expedite\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_BRAIN",
+   "protocol_id": "MR-BR-EPILEPSY",
+   "priority": "P2",
+   "red_flags": [
+    "seizure"
+   ],
+   "contrast": false,
+   "modality": "MRI",
+   "renal_risk": true,
+   "contrast_allergy": null,
+   "implant": "cardiac pacemaker",
+   "prior_facility": null,
+   "stated_urgency": "urgent",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-08",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ana Okoye    DOB: 1986-09-07    Health card: 2646861642 ZZ\nPhone: +1-416-555-0120\nExam requested: MRI brain and orbits\nClinical information: Optic neuritis last month and intermittent leg numbness, query multiple sclerosis.\nRelevant history: Asthma; Pacemaker inserted 2019\nAllergies: Iodinated contrast (hives)\nPrevious imaging: None known\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_BRAIN",
+   "protocol_id": "MR-BR-MS",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": true,
+   "modality": "MRI",
+   "renal_risk": false,
+   "contrast_allergy": "moderate",
+   "implant": "cardiac pacemaker",
+   "prior_facility": null,
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-09",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Chen Rossi    DOB: 1978-08-15    Health card: 8413301756 ZZ\nPhone: +1-416-555-0167\nExam requested: MRI brain\nClinical information: Gradual memory decline over 12 months, query dementia.\nRelevant history: Asthma\nAllergies: NKDA\nPrevious imaging: None known\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_BRAIN",
+   "protocol_id": "MR-BR-ROUTINE",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "MRI",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-10",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ben Quinn    DOB: 1980-10-24    Health card: 4948214162 ZZ\nPhone: +1-416-555-0172\nExam requested: MRI lumbar spine\nClinical information: Chronic low back pain with right sciatica for 6 months, no red flags.\nRelevant history: Asthma; Right total hip replacement\nAllergies: Gadolinium (nausea)\nPrevious imaging: MRI lumbar spine at Lakeview Diagnostics, March 2025\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_LSPINE",
+   "protocol_id": "MR-LS-ROUTINE",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "MRI",
+   "renal_risk": false,
+   "contrast_allergy": "mild",
+   "implant": "joint replacement",
+   "prior_facility": "Lakeview Diagnostics",
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-11",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ben Quinn    DOB: 1965-03-09    Health card: 0646001304 ZZ\nPhone: +1-416-555-0108\nExam requested: MRI lumbar spine urgent\nClinical information: New urinary retention and saddle numbness, query cauda equina.\nRelevant history: Chronic kidney disease stage 3; Right total hip replacement\nAllergies: Iodinated contrast (anaphylaxis)\nPrevious imaging: None known\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_LSPINE",
+   "protocol_id": "MR-LS-ROUTINE",
+   "priority": "P1",
+   "red_flags": [
+    "cauda equina"
+   ],
+   "contrast": false,
+   "modality": "MRI",
+   "renal_risk": true,
+   "contrast_allergy": "severe",
+   "implant": "joint replacement",
+   "prior_facility": null,
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-12",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Jia Lopez    DOB: 1970-06-20    Health card: 7615846450 ZZ\nPhone: +1-416-555-0176\nExam requested: MRI L-spine with gadolinium\nClinical information: Recurrent left leg pain after L4-5 discectomy in 2023.\nRelevant history: Asthma\nAllergies: Gadolinium (nausea)\nPrevious imaging: MRI lumbar spine at Northview General Hospital, January 2026\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_LSPINE",
+   "protocol_id": "MR-LS-POSTOP",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": true,
+   "modality": "MRI",
+   "renal_risk": false,
+   "contrast_allergy": "mild",
+   "implant": null,
+   "prior_facility": "Northview General Hospital",
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-13",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ana Rossi    DOB: 1957-09-02    Health card: 9110285940 ZZ\nPhone: +1-416-555-0120\nExam requested: MRI left knee\nClinical information: Locking and medial joint line pain after twisting injury, query meniscal tear.\nRelevant history: Asthma; Pacemaker inserted 2019\nAllergies: Iodinated contrast (hives)\nPrevious imaging: None known\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_KNEE",
+   "protocol_id": "MR-KN-ROUTINE",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "MRI",
+   "renal_risk": false,
+   "contrast_allergy": "moderate",
+   "implant": "cardiac pacemaker",
+   "prior_facility": null,
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-14",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Chen Okoye    DOB: 1979-01-22    Health card: 2300487645 ZZ\nPhone: +1-416-555-0132\nExam requested: Ultrasound abdomen\nClinical information: Right upper quadrant pain after fatty meals, query gallstones.\nRelevant history: Hypertension; Right total hip replacement\nAllergies: Iodinated contrast (anaphylaxis)\nPrevious imaging: None known\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "US_ABD",
+   "protocol_id": "US-ABD-COMPLETE",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "US",
+   "renal_risk": false,
+   "contrast_allergy": "severe",
+   "implant": "joint replacement",
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-15",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ivan Rossi    DOB: 1948-11-27    Health card: 3703826538 ZZ\nPhone: +1-416-555-0180\nExam requested: Pelvic ultrasound\nClinical information: Postmenopausal bleeding, endometrial thickness assessment.\nRelevant history: Hypertension\nAllergies: Penicillin (rash)\nPrevious imaging: None known\nPriority: URGENT - please expedite\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "US_PELVIS",
+   "protocol_id": "US-PEL-TV",
+   "priority": "P2",
+   "red_flags": [
+    "postmenopausal bleeding"
+   ],
+   "contrast": false,
+   "modality": "US",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "urgent",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-16",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Jia Quinn    DOB: 1957-03-21    Health card: 7058602145 ZZ\nPhone: +1-416-555-0119\nExam requested: US neck/thyroid\nClinical information: Palpable 2 cm thyroid nodule.\nRelevant history: None\nAllergies: NKDA\nPrevious imaging: None known\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "US_THYROID",
+   "protocol_id": "US-THY",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "US",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-17",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ana Sato    DOB: 1969-09-17    Health card: 1126584409 ZZ\nPhone: +1-416-555-0165\nExam requested: Venous Doppler left leg\nClinical information: Swollen painful left calf for 2 days, query DVT.\nRelevant history: Asthma\nAllergies: Penicillin (rash)\nPrevious imaging: None known\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "US_VENOUS",
+   "protocol_id": "US-VEN-LE",
+   "priority": "P1",
+   "red_flags": [
+    "dvt"
+   ],
+   "contrast": false,
+   "modality": "US",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-18",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ana Tan    DOB: 1972-06-26    Health card: 8025822018 ZZ\nPhone: +1-416-555-0192\nExam requested: Chest X-ray\nClinical information: Shortness of breath and productive cough, query pneumonia.\nRelevant history: None\nAllergies: Penicillin (rash)\nPrevious imaging: None known\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "XR_CHEST",
+   "protocol_id": "XR-CH-PALAT",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "XR",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-19",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ben Rossi    DOB: 1976-02-28    Health card: 4941577188 ZZ\nPhone: +1-416-555-0148\nExam requested: X-ray knee\nClinical information: Bilateral knee pain worse on stairs.\nRelevant history: Type 2 diabetes on metformin\nAllergies: Iodinated contrast (anaphylaxis)\nPrevious imaging: X-ray knee at Northview General Hospital, 2023\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "XR_KNEE",
+   "protocol_id": "XR-KN-3V",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "XR",
+   "renal_risk": true,
+   "contrast_allergy": "severe",
+   "implant": null,
+   "prior_facility": "Northview General Hospital",
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-20",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Dana Okoye    DOB: 1965-07-17    Health card: 7652373556 ZZ\nPhone: +1-416-555-0141\nExam requested: Lumbar spine X-ray\nClinical information: Mechanical back pain after lifting a box.\nRelevant history: Hypertension\nAllergies: Iodinated contrast (hives)\nPrevious imaging: None known\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "XR_LSPINE",
+   "protocol_id": "XR-LS-2V",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "XR",
+   "renal_risk": false,
+   "contrast_allergy": "moderate",
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-21",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ben Rossi    DOB: 1962-08-09    Health card: 4352814497 ZZ\nPhone: +1-416-555-0169\nExam requested: CT thorax with IV contrast\nClinical information: Spiculated lung nodule seen on recent chest X-ray, rule out malignancy.\nRelevant history: None\nAllergies: Iodinated contrast (anaphylaxis)\nPrevious imaging: None known\nPriority: URGENT - please expedite\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "CT_CHEST_C",
+   "protocol_id": "CT-CH-CONTRAST",
+   "priority": "P2",
+   "red_flags": [
+    "nodule"
+   ],
+   "contrast": true,
+   "modality": "CT",
+   "renal_risk": false,
+   "contrast_allergy": "severe",
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "urgent",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-22",
+  "text": "Dear colleague, please arrange a Low-dose CT chest for Hira Petrov (DOB 1972-06-21, HCN 6204842599). Surveillance of known small pulmonary nodule, follow-up as per guidelines. PMH: Type 2 diabetes on metformin, Right total hip replacement. He is allergic to penicillin (rash). He had a CT chest at Northview General Hospital, January 2026. Routine booking is fine. Thanks, Dr. Test Referrer, Eval Clinic",
+  "labels": {
+   "exam_code": "CT_CHEST",
+   "protocol_id": "CT-CH-LDCT",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "CT",
+   "renal_risk": true,
+   "contrast_allergy": null,
+   "implant": "joint replacement",
+   "prior_facility": "Northview General Hospital",
+   "stated_urgency": "routine",
+   "style": "letter"
+  }
+ },
+ {
+  "id": "req-23",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Hira Quinn    DOB: 1984-11-12    Health card: 3801253739 ZZ\nPhone: +1-416-555-0171\nExam requested: CT chest without contrast\nClinical information: Progressive dyspnea, query fibrosis.\nRelevant history: None\nAllergies: Iodinated contrast (anaphylaxis)\nPrevious imaging: None known\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "CT_CHEST",
+   "protocol_id": "CT-CH-ROUTINE",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "CT",
+   "renal_risk": false,
+   "contrast_allergy": "severe",
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-24",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ana Quinn    DOB: 1971-01-06    Health card: 5555974754 ZZ\nPhone: +1-416-555-0160\nExam requested: CT abdomen and pelvis with contrast\nClinical information: Weight loss and change in bowel habit, rule out malignancy.\nRelevant history: Hypertension\nAllergies: NKDA\nPrevious imaging: None known\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "CT_ABD_PEL",
+   "protocol_id": "CT-AP-CONTRAST",
+   "priority": "P2",
+   "red_flags": [
+    "weight loss"
+   ],
+   "contrast": true,
+   "modality": "CT",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-25",
+  "text": "Dear colleague, please arrange a CT abdomen for renal stone for Farah Quinn (DOB 1977-12-13, HCN 9061884791). Recurrent renal colic, known kidney stone history. PMH: Asthma. He is allergic to gadolinium (nausea). He had a CT abdomen at Lakeview Diagnostics, June 2024. Thanks, Dr. Test Referrer, Eval Clinic",
+  "labels": {
+   "exam_code": "CT_ABD_PEL",
+   "protocol_id": "CT-AP-RENAL",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "CT",
+   "renal_risk": false,
+   "contrast_allergy": "mild",
+   "implant": null,
+   "prior_facility": "Lakeview Diagnostics",
+   "stated_urgency": "unspecified",
+   "style": "letter"
+  }
+ },
+ {
+  "id": "req-26",
+  "text": "Dear colleague, please arrange a CT head without contrast for Ivan Sato (DOB 1985-02-20, HCN 7336882834). Chronic tension-type headaches, normal neurological exam, patient anxious. PMH: Chronic kidney disease stage 3. She is allergic to gadolinium (nausea). She had a CT head at Lakeview Diagnostics, 2023. Routine booking is fine. Thanks, Dr. Test Referrer, Eval Clinic",
+  "labels": {
+   "exam_code": "CT_HEAD",
+   "protocol_id": "CT-HD-ROUTINE",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "CT",
+   "renal_risk": true,
+   "contrast_allergy": "mild",
+   "implant": null,
+   "prior_facility": "Lakeview Diagnostics",
+   "stated_urgency": "routine",
+   "style": "letter"
+  }
+ },
+ {
+  "id": "req-27",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Dana Okoye    DOB: 1983-09-23    Health card: 2290044224 ZZ\nPhone: +1-416-555-0193\nExam requested: MRI head with gadolinium\nClinical information: Known breast cancer, new morning headaches, rule out brain metastases.\nRelevant history: Type 2 diabetes on metformin\nAllergies: NKDA\nPrevious imaging: None known\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_BRAIN",
+   "protocol_id": "MR-BR-TUMOUR",
+   "priority": "P2",
+   "red_flags": [
+    "metastases"
+   ],
+   "contrast": true,
+   "modality": "MRI",
+   "renal_risk": true,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-28",
+  "text": "Dear colleague, please arrange a MRI head for Gus Tan (DOB 1979-01-10, HCN 5817625280). First unprovoked seizure last week, normal CT in emergency. Thanks, Dr. Test Referrer, Eval Clinic",
+  "labels": {
+   "exam_code": "MR_BRAIN",
+   "protocol_id": "MR-BR-EPILEPSY",
+   "priority": "P2",
+   "red_flags": [
+    "seizure"
+   ],
+   "contrast": false,
+   "modality": "MRI",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "unspecified",
+   "style": "letter"
+  }
+ },
+ {
+  "id": "req-29",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Eli Rossi    DOB: 1993-01-06    Health card: 6632337352 ZZ\nPhone: +1-416-555-0111\nExam requested: MRI brain and orbits\nClinical information: Episodes of numbness and blurred vision, query demyelination.\nRelevant history: Type 2 diabetes on metformin; Cerebral aneurysm clip (2010)\nAllergies: Penicillin (rash)\nPrevious imaging: MRI brain at Riverside Health Centre, 2023\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_BRAIN",
+   "protocol_id": "MR-BR-MS",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": true,
+   "modality": "MRI",
+   "renal_risk": true,
+   "contrast_allergy": null,
+   "implant": "aneurysm clip",
+   "prior_facility": "Riverside Health Centre",
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-30",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Hira Nguyen    DOB: 1958-12-07    Health card: 1592123636 ZZ\nPhone: +1-416-555-0196\nExam requested: MRI brain\nClinical information: Gradual memory decline over 12 months, query dementia.\nRelevant history: Asthma; Cerebral aneurysm clip (2010)\nAllergies: Penicillin (rash)\nPrevious imaging: None known\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_BRAIN",
+   "protocol_id": "MR-BR-ROUTINE",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "MRI",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": "aneurysm clip",
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-31",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Eli Rossi    DOB: 1976-03-04    Health card: 3576990854 ZZ\nPhone: +1-416-555-0171\nExam requested: MRI lumbar spine\nClinical information: Lumbar radiculopathy L5, failed physiotherapy.\nRelevant history: Type 2 diabetes on metformin; Cochlear implant, right ear\nAllergies: Penicillin (rash)\nPrevious imaging: None known\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_LSPINE",
+   "protocol_id": "MR-LS-ROUTINE",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "MRI",
+   "renal_risk": true,
+   "contrast_allergy": null,
+   "implant": "cochlear implant",
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-32",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ben Quinn    DOB: 1963-01-03    Health card: 8791697978 ZZ\nPhone: +1-416-555-0108\nExam requested: MRI lumbar spine urgent\nClinical information: New urinary retention and saddle numbness, query cauda equina.\nRelevant history: Asthma\nAllergies: NKDA\nPrevious imaging: MRI lumbar spine at Northview General Hospital, June 2024\nPriority: URGENT - please expedite\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_LSPINE",
+   "protocol_id": "MR-LS-ROUTINE",
+   "priority": "P1",
+   "red_flags": [
+    "cauda equina"
+   ],
+   "contrast": false,
+   "modality": "MRI",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": "Northview General Hospital",
+   "stated_urgency": "urgent",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-33",
+  "text": "Dear colleague, please arrange a MRI L-spine with gadolinium for Ana Nguyen (DOB 1993-10-17, HCN 5247357363). Previous laminectomy, recurrent symptoms, query recurrent disc. She is allergic to iodinated contrast (hives). Routine booking is fine. Thanks, Dr. Test Referrer, Eval Clinic",
+  "labels": {
+   "exam_code": "MR_LSPINE",
+   "protocol_id": "MR-LS-POSTOP",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": true,
+   "modality": "MRI",
+   "renal_risk": false,
+   "contrast_allergy": "moderate",
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "letter"
+  }
+ },
+ {
+  "id": "req-34",
+  "text": "Dear colleague, please arrange a MRI left knee for Jia Tan (DOB 1982-07-16, HCN 3608724385). Knee instability after sports injury, query ACL tear. PMH: Chronic kidney disease stage 3. Routine booking is fine. Thanks, Dr. Test Referrer, Eval Clinic",
+  "labels": {
+   "exam_code": "MR_KNEE",
+   "protocol_id": "MR-KN-ROUTINE",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "MRI",
+   "renal_risk": true,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "letter"
+  }
+ },
+ {
+  "id": "req-35",
+  "text": "Dear colleague, please arrange a Ultrasound abdomen for Ben Rossi (DOB 1996-04-19, HCN 2761166033). Elevated liver enzymes, query fatty liver. PMH: Hypertension. She is allergic to iodinated contrast (anaphylaxis). She had a ultrasound abdomen at Northview General Hospital, March 2025. Routine booking is fine. Thanks, Dr. Test Referrer, Eval Clinic",
+  "labels": {
+   "exam_code": "US_ABD",
+   "protocol_id": "US-ABD-COMPLETE",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "US",
+   "renal_risk": false,
+   "contrast_allergy": "severe",
+   "implant": null,
+   "prior_facility": "Northview General Hospital",
+   "stated_urgency": "routine",
+   "style": "letter"
+  }
+ },
+ {
+  "id": "req-36",
+  "text": "Dear colleague, please arrange a Pelvic ultrasound for Ivan Nguyen (DOB 1973-09-22, HCN 7803704121). Postmenopausal bleeding for 3 weeks. She is allergic to penicillin (rash). She had a ultrasound pelvis at Riverside Health Centre, March 2025. Thanks, Dr. Test Referrer, Eval Clinic",
+  "labels": {
+   "exam_code": "US_PELVIS",
+   "protocol_id": "US-PEL-TV",
+   "priority": "P2",
+   "red_flags": [
+    "postmenopausal bleeding"
+   ],
+   "contrast": false,
+   "modality": "US",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": "Riverside Health Centre",
+   "stated_urgency": "unspecified",
+   "style": "letter"
+  }
+ },
+ {
+  "id": "req-37",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Chen Petrov    DOB: 1976-01-18    Health card: 8671300668 ZZ\nPhone: +1-416-555-0129\nExam requested: Ultrasound thyroid\nClinical information: Enlarging goitre, query nodules.\nRelevant history: Chronic kidney disease stage 3\nAllergies: NKDA\nPrevious imaging: None known\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "US_THYROID",
+   "protocol_id": "US-THY",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "US",
+   "renal_risk": true,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-38",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Eli Okoye    DOB: 1974-02-01    Health card: 2983725278 ZZ\nPhone: +1-416-555-0109\nExam requested: Venous Doppler left leg\nClinical information: Swollen painful left calf for 2 days, query DVT.\nRelevant history: Cerebral aneurysm clip (2010)\nAllergies: Iodinated contrast (hives)\nPrevious imaging: None known\nPriority: URGENT - please expedite\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "US_VENOUS",
+   "protocol_id": "US-VEN-LE",
+   "priority": "P1",
+   "red_flags": [
+    "dvt"
+   ],
+   "contrast": false,
+   "modality": "US",
+   "renal_risk": false,
+   "contrast_allergy": "moderate",
+   "implant": "aneurysm clip",
+   "prior_facility": null,
+   "stated_urgency": "urgent",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-39",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ivan Rossi    DOB: 1950-12-22    Health card: 4316349992 ZZ\nPhone: +1-416-555-0183\nExam requested: CXR PA and lateral\nClinical information: Cough for 3 weeks with fever.\nRelevant history: None\nAllergies: Penicillin (rash)\nPrevious imaging: X-ray chest at Riverside Health Centre, March 2025\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "XR_CHEST",
+   "protocol_id": "XR-CH-PALAT",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "XR",
+   "renal_risk": false,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": "Riverside Health Centre",
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-40",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Chen Tan    DOB: 1952-02-05    Health card: 8426407942 ZZ\nPhone: +1-416-555-0178\nExam requested: Knee X-ray\nClinical information: Chronic knee pain, query osteoarthritis.\nRelevant history: Type 2 diabetes on metformin\nAllergies: Iodinated contrast (anaphylaxis)\nPrevious imaging: None known\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "XR_KNEE",
+   "protocol_id": "XR-KN-3V",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "XR",
+   "renal_risk": true,
+   "contrast_allergy": "severe",
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-41",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Gus Quinn    DOB: 1973-08-24    Health card: 7967452198 ZZ\nPhone: +1-416-555-0132\nExam requested: X-ray lumbar spine\nClinical information: Mechanical back pain after lifting a box.\nRelevant history: Hypertension; Right total hip replacement\nAllergies: Gadolinium (nausea)\nPrevious imaging: None known\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "XR_LSPINE",
+   "protocol_id": "XR-LS-2V",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "XR",
+   "renal_risk": false,
+   "contrast_allergy": "mild",
+   "implant": "joint replacement",
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-42",
+  "text": "Dear colleague, please arrange a CT thorax with IV contrast for Farah Okoye (DOB 1996-02-08, HCN 9586398488). Spiculated lung nodule seen on recent chest X-ray, rule out malignancy. PMH: Asthma, Cochlear implant, right ear. He is allergic to iodinated contrast (hives). He had a CT chest at Lakeview Diagnostics, June 2024. This is urgent, please book as soon as possible. Thanks, Dr. Test Referrer, Eval Clinic",
+  "labels": {
+   "exam_code": "CT_CHEST_C",
+   "protocol_id": "CT-CH-CONTRAST",
+   "priority": "P2",
+   "red_flags": [
+    "nodule"
+   ],
+   "contrast": true,
+   "modality": "CT",
+   "renal_risk": false,
+   "contrast_allergy": "moderate",
+   "implant": "cochlear implant",
+   "prior_facility": "Lakeview Diagnostics",
+   "stated_urgency": "urgent",
+   "style": "letter"
+  }
+ },
+ {
+  "id": "req-43",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Jia Okoye    DOB: 1973-07-21    Health card: 0940985846 ZZ\nPhone: +1-416-555-0187\nExam requested: CT chest low dose\nClinical information: Surveillance of known small pulmonary nodule, follow-up as per guidelines.\nRelevant history: Chronic kidney disease stage 3\nAllergies: Iodinated contrast (anaphylaxis)\nPrevious imaging: None known\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "CT_CHEST",
+   "protocol_id": "CT-CH-LDCT",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "CT",
+   "renal_risk": true,
+   "contrast_allergy": "severe",
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-44",
+  "text": "Dear colleague, please arrange a CT chest non-contrast for Ana Sato (DOB 1978-07-13, HCN 8965013327). Progressive dyspnea, query fibrosis. PMH: Hypertension. He is allergic to iodinated contrast (hives). Routine booking is fine. Thanks, Dr. Test Referrer, Eval Clinic",
+  "labels": {
+   "exam_code": "CT_CHEST",
+   "protocol_id": "CT-CH-ROUTINE",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "CT",
+   "renal_risk": false,
+   "contrast_allergy": "moderate",
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "letter"
+  }
+ },
+ {
+  "id": "req-45",
+  "text": "Dear colleague, please arrange a CT abdomen and pelvis with contrast for Ben Petrov (DOB 1970-02-15, HCN 8163540115). Weight loss and change in bowel habit, rule out malignancy. PMH: Type 2 diabetes on metformin. This is urgent, please book as soon as possible. Thanks, Dr. Test Referrer, Eval Clinic",
+  "labels": {
+   "exam_code": "CT_ABD_PEL",
+   "protocol_id": "CT-AP-CONTRAST",
+   "priority": "P2",
+   "red_flags": [
+    "weight loss"
+   ],
+   "contrast": true,
+   "modality": "CT",
+   "renal_risk": true,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "urgent",
+   "style": "letter"
+  }
+ },
+ {
+  "id": "req-46",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Hira Rossi    DOB: 1983-03-04    Health card: 3277186210 ZZ\nPhone: +1-416-555-0144\nExam requested: CT abdomen for renal stone\nClinical information: Recurrent renal colic, known kidney stone history.\nRelevant history: None\nAllergies: Iodinated contrast (hives)\nPrevious imaging: None known\nPriority: Routine\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "CT_ABD_PEL",
+   "protocol_id": "CT-AP-RENAL",
+   "priority": "P3",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "CT",
+   "renal_risk": false,
+   "contrast_allergy": "moderate",
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "routine",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-47",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Ana Sato    DOB: 1956-07-21    Health card: 8836152029 ZZ\nPhone: +1-416-555-0132\nExam requested: CT head without contrast\nClinical information: Fall two weeks ago with persistent mild headache, on no anticoagulants.\nRelevant history: Type 2 diabetes on metformin\nAllergies: NKDA\nPrevious imaging: None known\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "CT_HEAD",
+   "protocol_id": "CT-HD-ROUTINE",
+   "priority": "P4",
+   "red_flags": [],
+   "contrast": false,
+   "modality": "CT",
+   "renal_risk": true,
+   "contrast_allergy": null,
+   "implant": null,
+   "prior_facility": null,
+   "stated_urgency": "unspecified",
+   "style": "form"
+  }
+ },
+ {
+  "id": "req-48",
+  "text": "Dear colleague, please arrange a MRI head with gadolinium for Ben Quinn (DOB 1965-07-28, HCN 9828640894). History of melanoma, new focal weakness, query metastasis. PMH: Type 2 diabetes on metformin, Right total hip replacement. He is allergic to gadolinium (nausea). This is urgent, please book as soon as possible. Thanks, Dr. Test Referrer, Eval Clinic",
+  "labels": {
+   "exam_code": "MR_BRAIN",
+   "protocol_id": "MR-BR-TUMOUR",
+   "priority": "P2",
+   "red_flags": [
+    "metastases"
+   ],
+   "contrast": true,
+   "modality": "MRI",
+   "renal_risk": true,
+   "contrast_allergy": "mild",
+   "implant": "joint replacement",
+   "prior_facility": null,
+   "stated_urgency": "urgent",
+   "style": "letter"
+  }
+ },
+ {
+  "id": "req-49",
+  "text": "REQUISITION FOR DIAGNOSTIC IMAGING\nPatient: Jia Tan    DOB: 1955-06-27    Health card: 4193039955 ZZ\nPhone: +1-416-555-0133\nExam requested: MRI brain\nClinical information: New-onset seizure, query epilepsy.\nRelevant history: Type 2 diabetes on metformin; Pacemaker inserted 2019\nAllergies: Gadolinium (nausea)\nPrevious imaging: None known\nPriority: URGENT - please expedite\nReferring physician: Dr. Test Referrer, Eval Clinic. Fax +1-416-555-0101",
+  "labels": {
+   "exam_code": "MR_BRAIN",
+   "protocol_id": "MR-BR-EPILEPSY",
+   "priority": "P2",
+   "red_flags": [
+    "seizure"
+   ],
+   "contrast": false,
+   "modality": "MRI",
+   "renal_risk": true,
+   "contrast_allergy": "mild",
+   "implant": "cardiac pacemaker",
+   "prior_facility": null,
+   "stated_urgency": "urgent",
+   "style": "form"
+  }
+ }
+]

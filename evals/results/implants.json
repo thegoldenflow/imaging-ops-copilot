@@ -1,0 +1,28 @@
+{
+ "task": "implants",
+ "run_at": "2026-10-06T22:35:05",
+ "mode": "mock",
+ "model": "rule-based baseline",
+ "n": 30,
+ "metrics": {
+  "device_accuracy": 0.967,
+  "failed_calls": 0,
+  "accuracy_en": 0.917,
+  "accuracy_fr": 1.0,
+  "accuracy_pa": 1.0,
+  "accuracy_zh": 1.0
+ },
+ "errors": [
+  {
+   "id": "imp-03",
+   "language": "en",
+   "text": "They put a clip on an aneurysm in my brain in 2010",
+   "expected": [
+    "neuro_clip"
+   ],
+   "got": []
+  }
+ ],
+ "seconds": 0.0,
+ "notes": "Exact match of device categories per answer, across English, French, Chinese and Punjabi."
+}

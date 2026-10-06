@@ -10,13 +10,16 @@ import random
 from datetime import date, datetime, timedelta
 
 from app.core.models import (
+    Allergy,
     Appointment,
     AppointmentStatus,
     Exam,
     ImagingStudy,
+    LabResult,
     Modality,
     Patient,
     Referrer,
+    Requisition,
     Role,
     Scanner,
     Site,
@@ -55,9 +58,11 @@ EXAMS = [
     Exam(code="CT_CHEST_C", name="CT Chest with Contrast", modality=Modality.CT, minutes=30, value=4, prep_hours=4, contrast=True),
     Exam(code="CT_ABD_PEL", name="CT Abdomen/Pelvis", modality=Modality.CT, minutes=30, value=4, prep_hours=4, contrast=True),
     Exam(code="CT_HEAD", name="CT Head", modality=Modality.CT, minutes=30, value=3, prep_hours=0),
+    Exam(code="CT_CHEST", name="CT Chest without Contrast", modality=Modality.CT, minutes=30, value=3, prep_hours=0),
     Exam(code="US_ABD", name="Ultrasound Abdomen", modality=Modality.US, minutes=30, value=2, prep_hours=8),
     Exam(code="US_PELVIS", name="Ultrasound Pelvis", modality=Modality.US, minutes=30, value=2, prep_hours=2),
     Exam(code="US_THYROID", name="Ultrasound Thyroid", modality=Modality.US, minutes=30, value=2, prep_hours=0),
+    Exam(code="US_VENOUS", name="Ultrasound Venous Doppler", modality=Modality.US, minutes=30, value=2, prep_hours=0),
     Exam(code="XR_CHEST", name="X-ray Chest", modality=Modality.XR, minutes=20, value=1, prep_hours=0),
     Exam(code="XR_KNEE", name="X-ray Knee", modality=Modality.XR, minutes=20, value=1, prep_hours=0),
     Exam(code="XR_LSPINE", name="X-ray Lumbar Spine", modality=Modality.XR, minutes=20, value=1, prep_hours=0),
@@ -238,6 +243,8 @@ def build_store(seed: int | None = None) -> Store:
     _add_staff(s)
     _add_demo_storyline(s, rng, now)
     _add_reading_worklist(s, rng, now)
+    _add_clinical_records(s, rng, now)
+    _add_requisitions(s, rng, now)
     return s
 
 
@@ -337,3 +344,121 @@ def _add_reading_worklist(s: Store, rng: random.Random, now: datetime) -> None:
             indication=rng.choice(["Cough and fever", "Shortness of breath", "Pre-operative assessment", "Chest pain"]),
         )
     s.modules["phantom_variants"] = {f"IMG-{i + 1:03d}": v for i, v in enumerate(variants)} | {"IMG-DEMO1": "nodule"}
+
+
+def _add_clinical_records(s: Store, rng: random.Random, now: datetime) -> None:
+    """eGFR results and allergies used by the contrast checker."""
+    for pid, patient in s.patients.items():
+        age = (now.date() - patient.dob).days // 365
+        if age >= 45 and rng.random() < 0.55:
+            lid = s.next_id("LAB")
+            s.labs[lid] = LabResult(id=lid, patient_id=pid, code="egfr", unit="mL/min/1.73m2",
+                                    value=round(min(120, max(15, rng.gauss(78, 20))), 0),
+                                    taken_at=now - timedelta(days=rng.randint(3, 220)))
+        roll = rng.random()
+        if roll < 0.03:
+            severity = rng.choice(["mild", "moderate", "severe"])
+            aid = s.next_id("ALG")
+            s.allergies[aid] = Allergy(id=aid, patient_id=pid, substance="Iodinated contrast", contrast=True,
+                                       reaction={"mild": "nausea", "moderate": "hives", "severe": "anaphylaxis"}[severity],
+                                       severity=severity)
+        elif roll < 0.11:
+            aid = s.next_id("ALG")
+            s.allergies[aid] = Allergy(id=aid, patient_id=pid, substance="Penicillin", reaction="rash",
+                                       severity="mild", contrast=False)
+    # Storyline patient: recent normal kidney function.
+    for lid in [lid for lid, lab in s.labs.items() if lab.patient_id == "PT-DEMO1"]:
+        del s.labs[lid]
+    s.labs["LAB-DEMO1"] = LabResult(id="LAB-DEMO1", patient_id="PT-DEMO1", code="egfr", value=72, unit="mL/min/1.73m2",
+                                    taken_at=now - timedelta(days=20))
+
+
+def _form(patient, referrer, exam, info, history, allergies, prior, priority) -> str:
+    lines = [
+        "REQUISITION FOR DIAGNOSTIC IMAGING",
+        f"Patient: {patient.full_name}    DOB: {patient.dob:%Y-%m-%d}    Health card: {patient.health_card} {patient.health_card_version}",
+        f"Phone: {patient.phone}",
+        f"Exam requested: {exam}",
+        f"Clinical information: {info}",
+        f"Relevant history: {history}",
+        f"Allergies: {allergies}",
+        f"Previous imaging: {prior}",
+    ]
+    if priority:
+        lines.append(f"Priority: {priority}")
+    lines.append(f"Referring physician: {referrer.name}, {referrer.clinic}. Fax {referrer.fax}")
+    return "\n".join(lines)
+
+
+# How long seeded requisitions have been waiting, by tier (some end up past target).
+MAX_AGE_DAYS = {"P1": 2.5, "P2": 9, "P3": 34, "P4": 65}
+
+
+def _add_requisitions(s: Store, rng: random.Random, now: datetime) -> None:
+    from app.modules.priors.service import archive_index
+    from app.modules.requisitions.generator import generate
+    from app.modules.requisitions.service import seed_processed
+
+    archive = archive_index(s)
+    patient_ids = [p for p in s.patients if not p.startswith("PT-DEMO")]
+    referrer_ids = [r for r in s.referrers if r != "R-DEMO"]
+    reviewer = s.staff["U-RAD"].name
+    for i in range(32):
+        patient = s.patients[rng.choice(patient_ids)]
+        referrer = s.referrers[rng.choice(referrer_ids)]
+        text, labels = generate(rng, patient, referrer)
+        rid = s.next_id("REQ")
+        req = Requisition(id=rid, patient_id=patient.id, referrer_id=referrer.id,
+                          received_at=now - timedelta(days=rng.uniform(0.2, MAX_AGE_DAYS[labels.priority])),
+                          channel=rng.choice(["fax", "fax", "portal"]),
+                          text=text)
+        s.requisitions[rid] = req
+        seed_processed(s, req, labels.to_dict(), reviewed=i < 24, reviewer=reviewer)
+        if labels.prior_facility and rng.random() < 0.8:
+            archive.setdefault(patient.id, []).append(
+                {"facility": labels.prior_facility, "description": f"{labels.modality} {labels.exam_code}", "date": "2025-03-14"})
+
+    # Storyline: Dr. Park's contrast CT for Mei Chen, already approved and on the waitlist.
+    mei, park = s.patients["PT-DEMO1"], s.referrers["R-DEMO"]
+    text = _form(mei, park, "CT chest with contrast",
+                 "New 1.5 cm right upper lobe nodule on chest X-ray. Former smoker, 20 pack-years.",
+                 "Type 2 diabetes on metformin", "NKDA", "CT chest at Northview General Hospital, March 2025",
+                 "URGENT - please expedite")
+    req = Requisition(id="REQ-DEMO1", patient_id=mei.id, referrer_id=park.id, received_at=now - timedelta(days=6),
+                      channel="portal", text=text)
+    s.requisitions[req.id] = req
+    seed_processed(s, req, {"priority": "P2", "protocol_id": "CT-CH-CONTRAST"}, reviewed=True, reviewer=reviewer)
+    req.status, req.waitlist_id = "waitlisted", "WL-DEMO1"
+    wl = s.waitlist["WL-DEMO1"]
+    wl.requisition_id, wl.protocol_id, wl.duration_minutes = req.id, "CT-CH-CONTRAST", 20
+    archive.setdefault(mei.id, []).append({"facility": "Northview General Hospital", "description": "CT chest without contrast", "date": "2025-03-11"})
+
+    # Three requisitions that arrive unprocessed; the intake worker runs them through the AI pipeline.
+    punjabi = next(p for p in patient_ids if s.patients[p].preferred_language == "pa")
+    english = next(p for p in patient_ids if s.patients[p].preferred_language == "en" and (now.date() - s.patients[p].dob).days > 365 * 55)
+    third = rng.choice(patient_ids)
+    ref = s.referrers[referrer_ids[0]]
+    incoming = [
+        (punjabi, _form(s.patients[punjabi], ref, "MRI brain with and without contrast",
+                        "Known breast cancer, new morning headaches, rule out brain metastases.",
+                        "Cochlear implant, right ear", "NKDA", "None known", "URGENT - please expedite")),
+        (english, _form(s.patients[english], ref, "CT abdomen and pelvis with contrast",
+                        "Unintentional weight loss of 8 kg over 3 months with iron deficiency anemia.",
+                        "Type 2 diabetes on metformin; Hypertension", "Iodinated contrast (hives)",
+                        "Ultrasound abdomen at Lakeview Diagnostics, January 2026", None)),
+        (third, f"Dear colleague, please arrange a venous Doppler left leg for {s.patients[third].full_name} "
+                f"(DOB {s.patients[third].dob:%Y-%m-%d}, HCN {s.patients[third].health_card}). Swollen painful left calf "
+                f"for 2 days, query DVT. This is urgent, please book as soon as possible. Thanks, {ref.name}, {ref.clinic}"),
+    ]
+    for i, (pid, body) in enumerate(incoming, start=1):
+        rid = f"REQ-NEW{i}"
+        s.requisitions[rid] = Requisition(id=rid, patient_id=pid, referrer_id=ref.id,
+                                          received_at=now - timedelta(minutes=12 - i * 3), channel="fax", text=body)
+    # The diabetic patient's eGFR is too old to rely on.
+    for lid in [lid for lid, lab in s.labs.items() if lab.patient_id == english]:
+        del s.labs[lid]
+    for aid in [aid for aid, a in s.allergies.items() if a.patient_id in (english, punjabi, third)]:
+        del s.allergies[aid]
+    s.labs["LAB-DEMO2"] = LabResult(id="LAB-DEMO2", patient_id=english, code="egfr", value=58, unit="mL/min/1.73m2",
+                                    taken_at=now - timedelta(days=150))
+    archive.setdefault(english, []).append({"facility": "Lakeview Diagnostics", "description": "Ultrasound abdomen", "date": "2026-01-20"})

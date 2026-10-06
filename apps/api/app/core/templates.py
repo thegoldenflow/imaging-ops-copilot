@@ -34,6 +34,12 @@ TEMPLATES: dict[str, dict[str, str]] = {
         "zh": "预约成功：{when}在{site}（{address}）做{exam}。请填写网上预登记：{link}",
         "pa": "ਬੁੱਕ ਹੋ ਗਿਆ: {exam} {when} ਨੂੰ {site}, {address} ਵਿਖੇ। ਕਿਰਪਾ ਕਰਕੇ ਪ੍ਰੀ-ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਪੂਰੀ ਕਰੋ: {link}",
     },
+    "mri_screening": {
+        "en": "Before your MRI, please complete the safety questionnaire: {link}",
+        "fr": "Avant votre IRM, veuillez remplir le questionnaire de sécurité : {link}",
+        "zh": "做核磁共振（MRI）前，请填写安全问卷：{link}",
+        "pa": "ਤੁਹਾਡੇ MRI ਤੋਂ ਪਹਿਲਾਂ, ਕਿਰਪਾ ਕਰਕੇ ਸੁਰੱਖਿਆ ਪ੍ਰਸ਼ਨਾਵਲੀ ਭਰੋ: {link}",
+    },
     "cancel_confirmation": {
         "en": "Your {exam} on {when} has been cancelled. Call us to rebook.",
         "fr": "Votre {exam} du {when} a été annulé. Appelez-nous pour reprendre rendez-vous.",

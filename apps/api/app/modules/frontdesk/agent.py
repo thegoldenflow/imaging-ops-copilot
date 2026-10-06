@@ -24,6 +24,7 @@ from app.modules.frontdesk.tools import (
     parse_dob,
     run_tool,
 )
+from app.modules.scheduling import service as scheduling
 
 GREETING = ("Thank you for calling Lakeshore Imaging. I'm the automated assistant. "
             "To get started, please tell me your full name and date of birth.")
@@ -146,6 +147,9 @@ class ScriptedAgent:
             return f"{info['site']} is at {info['address']}, open {info['hours']}. {info['parking']}"
         if CONFIRM_APPT.search(text):
             appt = store.appointments[current["appointment_id"]]
+            if scheduling.confirm_blockers(store, appt):
+                return ("I can't confirm this appointment yet because a safety screening still needs staff review. "
+                        "Our team will call you. Anything else?")
             appt.reminder_confirmed = True
             session.actions.append({"tool": "confirm", "appointment": appt.id})
             session.outcome = "resolved"

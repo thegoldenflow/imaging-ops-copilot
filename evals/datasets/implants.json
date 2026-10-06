@@ -1,0 +1,236 @@
+[
+ {
+  "id": "imp-00",
+  "language": "en",
+  "text": "I have a pacemaker since 2019",
+  "categories": [
+   "cardiac_device"
+  ]
+ },
+ {
+  "id": "imp-01",
+  "language": "en",
+  "text": "Defibrillator in my chest (ICD)",
+  "categories": [
+   "cardiac_device"
+  ]
+ },
+ {
+  "id": "imp-02",
+  "language": "en",
+  "text": "Cochlear implant in my right ear",
+  "categories": [
+   "ear_implant"
+  ]
+ },
+ {
+  "id": "imp-03",
+  "language": "en",
+  "text": "They put a clip on an aneurysm in my brain in 2010",
+  "categories": [
+   "neuro_clip"
+  ]
+ },
+ {
+  "id": "imp-04",
+  "language": "en",
+  "text": "spinal cord stimulator for back pain",
+  "categories": [
+   "neurostimulator"
+  ]
+ },
+ {
+  "id": "imp-05",
+  "language": "en",
+  "text": "I wear an insulin pump",
+  "categories": [
+   "drug_pump"
+  ]
+ },
+ {
+  "id": "imp-06",
+  "language": "en",
+  "text": "I used to be a welder and got metal in my eye once",
+  "categories": [
+   "foreign_body"
+  ]
+ },
+ {
+  "id": "imp-07",
+  "language": "en",
+  "text": "Left hip replacement and a stent in my heart",
+  "categories": [
+   "orthopedic",
+   "stent"
+  ]
+ },
+ {
+  "id": "imp-08",
+  "language": "en",
+  "text": "I had bypass surgery, they closed my chest with wires",
+  "categories": [
+   "surgical_hardware"
+  ]
+ },
+ {
+  "id": "imp-09",
+  "language": "en",
+  "text": "VP shunt since childhood",
+  "categories": [
+   "shunt"
+  ]
+ },
+ {
+  "id": "imp-10",
+  "language": "en",
+  "text": "Copper IUD",
+  "categories": [
+   "gynecologic"
+  ]
+ },
+ {
+  "id": "imp-11",
+  "language": "en",
+  "text": "Nothing metal, just fillings in my teeth",
+  "categories": []
+ },
+ {
+  "id": "imp-12",
+  "language": "fr",
+  "text": "J'ai un stimulateur cardiaque",
+  "categories": [
+   "cardiac_device"
+  ]
+ },
+ {
+  "id": "imp-13",
+  "language": "fr",
+  "text": "Implant cochléaire à gauche",
+  "categories": [
+   "ear_implant"
+  ]
+ },
+ {
+  "id": "imp-14",
+  "language": "fr",
+  "text": "Prothèse de hanche droite",
+  "categories": [
+   "orthopedic"
+  ]
+ },
+ {
+  "id": "imp-15",
+  "language": "fr",
+  "text": "Un stérilet en cuivre",
+  "categories": [
+   "gynecologic"
+  ]
+ },
+ {
+  "id": "imp-16",
+  "language": "fr",
+  "text": "Aucun implant",
+  "categories": []
+ },
+ {
+  "id": "imp-17",
+  "language": "zh",
+  "text": "我装了心脏起搏器",
+  "categories": [
+   "cardiac_device"
+  ]
+ },
+ {
+  "id": "imp-18",
+  "language": "zh",
+  "text": "右耳有人工耳蜗",
+  "categories": [
+   "ear_implant"
+  ]
+ },
+ {
+  "id": "imp-19",
+  "language": "zh",
+  "text": "十年前做过心脏搭桥，胸口有钢丝",
+  "categories": [
+   "surgical_hardware"
+  ]
+ },
+ {
+  "id": "imp-20",
+  "language": "zh",
+  "text": "膝关节置换和一个心脏支架",
+  "categories": [
+   "orthopedic",
+   "stent"
+  ]
+ },
+ {
+  "id": "imp-21",
+  "language": "zh",
+  "text": "以前做焊工，眼睛里进过铁屑",
+  "categories": [
+   "foreign_body"
+  ]
+ },
+ {
+  "id": "imp-22",
+  "language": "zh",
+  "text": "身上用胰岛素泵",
+  "categories": [
+   "drug_pump"
+  ]
+ },
+ {
+  "id": "imp-23",
+  "language": "zh",
+  "text": "没有任何金属",
+  "categories": []
+ },
+ {
+  "id": "imp-24",
+  "language": "pa",
+  "text": "ਮੇਰੇ ਪੇਸਮੇਕਰ ਲੱਗਿਆ ਹੋਇਆ ਹੈ",
+  "categories": [
+   "cardiac_device"
+  ]
+ },
+ {
+  "id": "imp-25",
+  "language": "pa",
+  "text": "ਕੋਕਲੀਅਰ ਇਮਪਲਾਂਟ ਸੱਜੇ ਕੰਨ ਵਿੱਚ",
+  "categories": [
+   "ear_implant"
+  ]
+ },
+ {
+  "id": "imp-26",
+  "language": "pa",
+  "text": "ਕੁੱਲ੍ਹੇ ਦੀ ਬਦਲੀ ਹੋਈ ਹੈ",
+  "categories": [
+   "orthopedic"
+  ]
+ },
+ {
+  "id": "imp-27",
+  "language": "pa",
+  "text": "ਅੱਖ ਵਿੱਚ ਧਾਤ ਦੇ ਟੁਕੜੇ ਗਏ ਸਨ",
+  "categories": [
+   "foreign_body"
+  ]
+ },
+ {
+  "id": "imp-28",
+  "language": "pa",
+  "text": "ਦਿਮਾਗ ਵਿੱਚ ਐਨਿਉਰਿਜ਼ਮ ਕਲਿੱਪ",
+  "categories": [
+   "neuro_clip"
+  ]
+ },
+ {
+  "id": "imp-29",
+  "language": "pa",
+  "text": "ਕੋਈ ਧਾਤ ਨਹੀਂ",
+  "categories": []
+ }
+]

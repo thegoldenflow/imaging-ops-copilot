@@ -61,7 +61,66 @@ Acceptance:
 - [x] Mobile pre-registration in English, French, Chinese and Punjabi with mock OHIP / private insurance check
 - [ ] Measure speech-to-reply latency (≤ 1.5 s target) on a local machine with a real key
 
-## Phases 2–4
+## Phase 2 — Requisition intake pipeline (Systems 5–10)
+
+Status: in progress (branch `feat/phase-2-requisitions`)
+
+Pipeline: requisition arrives → shared extraction (one Claude call) → triage (5) → protocol suggestion (6) → contrast check (7, contrast exams) → MRI screening (8, MRI) → after booking: prep instructions (9) and prior imaging retrieval (10) in parallel.
+
+Demo-scope notes: requisitions are synthetic text generated with ground-truth labels (the same generator writes the eval sets). The mock provider is a rule-based baseline extractor, so the whole pipeline runs without an API key. Seeded requisitions are pre-processed with that baseline; a few arrive unprocessed for live demos. Prior-imaging retrieval runs as an in-process worker with retries instead of Temporal.
+
+### Shared step · Requisition extraction
+
+- [ ] `Requisition`, `LabResult`, `Allergy` entities and a synthetic requisition generator with labels
+- [ ] Extraction schema (requested exam, indication, history, prior imaging, allergies, renal/diabetes, implant hints, stated urgency), each value with its source quote and confidence
+- [ ] Side-by-side view: original text with highlighted sources, low-confidence fields in yellow, staff corrections recorded
+- [ ] Eval set: 50 synthetic requisitions with field labels; field-level accuracy
+
+### System 5 · Priority Triage
+
+- [ ] AI priority P1–P4 with rationale and red flags; target wait days per tier in config
+- [ ] Queue sorted by days left to target; overdue in red
+- [ ] Radiologist override requires a reason, is audited and feeds agreement stats
+- [ ] Acceptance: new requisition triaged and queued within 1 minute; eval script reports model vs radiologist agreement
+
+### System 6 · Protocol Assignment Assistant
+
+- [ ] Synthetic protocol library (indications, contrast, duration)
+- [ ] Retrieval of candidate protocols, then Claude picks primary + 2 alternatives with rationale and contrast flag
+- [ ] One-click approve or change; approved duration sets the booking slot length
+- [ ] Acceptance: every new requisition has a suggestion; adoption rate and common changes on a stats view
+- [ ] Eval set: 40 indications with correct protocol; top-1 / top-3 hit rate
+
+### System 7 · Contrast & Renal Checker
+
+- [ ] Synthetic eGFR results and allergy records
+- [ ] Rule thresholds set by the medical director on a settings page (placeholder values, not hard-coded)
+- [ ] Status pass / needs eGFR / needs review / needs premedication with the basis written out
+- [ ] Acceptance: every contrast booking has a status and basis; changing a threshold recomputes all statuses immediately
+
+### System 8 · MRI Safety Screening Assistant
+
+- [ ] Patient questionnaire in English, French, Chinese and Punjabi, sent by link
+- [ ] Claude extracts devices from free-text answers and matches a synthetic device list
+- [ ] Flags only ever ask for review; technologist or radiologist review records the decision
+- [ ] Acceptance: 4 languages; a flagged appointment cannot be confirmed before review
+- [ ] Eval set: 30 implant descriptions; device recognition accuracy
+
+### System 9 · Patient Prep Instructions
+
+- [ ] English templates per prep type, approved by clinical staff
+- [ ] Claude drafts translations; a person approves them; only approved versions are sent
+- [ ] Sent at booking and 48 hours before, in the patient's preferred language
+- [ ] Acceptance: every new booking gets prep in the preferred language; unapproved translations cannot be sent
+
+### System 10 · Prior Imaging Retrieval
+
+- [ ] Mock outside image archives with configurable latency and failure rate
+- [ ] Retrieval tasks created from the extraction and patient history after booking
+- [ ] Worker with retry, backoff and timeout; states requested / received / not found / failed; received studies linked to the exam
+- [ ] Acceptance: booking creates retrieval tasks shown on a board; forced failures retry by policy and end in a final state
+
+## Phases 3–4
 
 Status: not started
 
