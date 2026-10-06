@@ -1,0 +1,44 @@
+[
+  {
+    "entity_schema": "symptom",
+    "canonical_name": "头痛",
+    "aliases_zh": ["头疼"],
+    "aliases_en": ["headache", "headaches", "head pain"],
+    "source": "phase1_reviewable_sample"
+  },
+  {
+    "entity_schema": "symptom",
+    "canonical_name": "恶心",
+    "aliases_zh": [],
+    "aliases_en": ["nausea", "feeling nauseous"],
+    "source": "phase1_reviewable_sample"
+  },
+  {
+    "entity_schema": "disease",
+    "canonical_name": "高血压",
+    "aliases_zh": [],
+    "aliases_en": ["hypertension", "high blood pressure"],
+    "source": "phase1_reviewable_sample"
+  },
+  {
+    "entity_schema": "disease",
+    "canonical_name": "糖尿病",
+    "aliases_zh": [],
+    "aliases_en": ["diabetes", "diabetes mellitus"],
+    "source": "phase1_reviewable_sample"
+  },
+  {
+    "entity_schema": "disease",
+    "canonical_name": "偏头痛",
+    "aliases_zh": [],
+    "aliases_en": ["migraine", "migraines", "migraine headache"],
+    "source": "phase1_reviewable_sample"
+  },
+  {
+    "entity_schema": "department",
+    "canonical_name": "神经内科",
+    "aliases_zh": [],
+    "aliases_en": ["neurology", "neurology department"],
+    "source": "phase1_reviewable_sample"
+  }
+]

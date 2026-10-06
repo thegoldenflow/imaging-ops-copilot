@@ -1,0 +1,32 @@
+# 版本为最低兼容下限；正式部署请在安装后用 `pip freeze > requirements.lock` 锁定精确版本。
+
+# ===== Web / API =====
+fastapi>=0.115
+uvicorn[standard]>=0.30
+itsdangerous>=2.1          # Starlette SessionMiddleware Cookie 签名
+slowapi>=0.1.9            # /chat 限流
+python-dotenv>=1.0
+
+# ===== LangChain / LangGraph Agent =====
+langchain>=1.0
+langchain-core>=0.3
+langchain-deepseek>=0.1
+langchain-neo4j>=0.4       # 取图数据库 schema
+langgraph>=1.0
+langgraph-checkpoint-postgres>=2.0   # PostgresSaver 对话记忆
+psycopg[binary]>=3.2
+psycopg-pool>=3.2
+
+# ===== 数据库 / 检索 =====
+neo4j>=5.23                # 作用域子查询语法需 5.23+/2025.x
+chromadb>=0.5
+# 实体映射表与对话记忆共用同一个 PostgreSQL（psycopg 上方 LangGraph 段已声明）
+
+# ===== 嵌入 / 离线数据管道 =====
+sentence-transformers>=3.0
+scikit-learn>=1.3
+tqdm>=4.66
+
+# ===== 深度学习框架 =====
+# CPU 版可直接安装；GPU 版请按 https://pytorch.org 官方指引选择对应 CUDA 版本
+torch>=2.1
