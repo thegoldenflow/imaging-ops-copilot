@@ -148,7 +148,8 @@ export interface Report {
   id: string;
   study_id: string;
   status: "draft" | "signed";
-  ai_status: "ok" | "needs_human" | "unavailable";
+  source: "ai_draft" | "dictated";
+  ai_status: "ok" | "needs_human" | "unavailable" | "not_used";
   ai_error: string | null;
   image_quality: { adequate: boolean; notes: string } | null;
   sections: Section[];
@@ -348,4 +349,74 @@ export interface RequisitionDetail {
   waitlist: { id: string; urgency: string; duration_minutes: number | null } | null;
   priors: RetrievalTask[];
   prep: { key: string; language: string; text: string; note: string | null } | null;
+}
+
+// ---------- Phase 3: radiology operations ----------
+
+export type BacklogState = "on_track" | "at_risk" | "overdue";
+
+export interface BacklogStudy {
+  id: string;
+  patient_id: string;
+  patient_name: string;
+  exam_code: string;
+  exam_name: string;
+  modality: string;
+  site_id: string | null;
+  site_name: string | null;
+  priority: string;
+  performed_at: string;
+  minutes: number;
+  age_h: number;
+  target_h: number;
+  due_at: string;
+  remaining_h: number;
+  state: BacklogState;
+  age_bucket: string;
+  assigned_to: { id: string; name: string } | null;
+  has_image: boolean;
+  draft_report_id: string | null;
+}
+
+export interface BacklogGroup { key: string; label: string; count: number; overdue: number; at_risk: number }
+
+export interface Reader {
+  id: string;
+  name: string;
+  modalities: string[];
+  on_shift: boolean;
+  queue_count: number;
+  queue_minutes: number;
+  overdue: number;
+  signed_today: number;
+}
+
+export interface Suggestion { study_id: string; from_id: string; from_name: string; to_id: string; to_name: string; minutes: number; reason: string }
+
+export interface TatSummary { count: number; median_h: number | null; p90_h: number | null; within_target: number | null }
+
+export interface BacklogBoard {
+  version: number;
+  kpis: { unread: number; overdue: number; at_risk: number; oldest_h: number; median_tat_h: number | null; within_target: number | null };
+  studies: BacklogStudy[];
+  groups: Record<"site" | "modality" | "priority" | "age", BacklogGroup[]>;
+  radiologists: Reader[];
+  suggestions: Suggestion[];
+  turnaround: {
+    window_days: number;
+    overall: TatSummary;
+    by_priority: (TatSummary & { priority: string; target_h: number })[];
+    daily: (TatSummary & { date: string })[];
+  };
+  targets: { hours: Record<string, number>; at_risk_fraction: number };
+}
+
+export interface BacklogStudyDetail extends BacklogStudy {
+  patient_age: number;
+  patient_sex: string;
+  indication: string;
+  referrer_name: string;
+  report_status: string;
+  template: { findings: string; impression: string };
+  assignment_history: { ts: string; to: string; from: string | null; by: string; reason: string }[];
 }

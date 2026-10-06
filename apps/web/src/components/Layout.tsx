@@ -8,6 +8,7 @@ import {
   FlaskConical,
   History,
   Home,
+  Inbox,
   Languages,
   LogOut,
   Magnet,
@@ -30,7 +31,7 @@ interface NavItem {
   label: string;
   icon: typeof Home;
   roles: Role[] | "all";
-  section: "" | "Operations" | "Intake pipeline" | "Oversight";
+  section: "" | "Operations" | "Intake pipeline" | "Radiology ops" | "Oversight";
 }
 
 const STAFF: Role[] = ["front_desk", "technologist", "radiologist", "operations_manager", "medical_director", "admin"];
@@ -46,6 +47,7 @@ export const NAV: NavItem[] = [
   { to: "/mri-safety", label: "MRI safety", icon: Magnet, roles: ["technologist", "radiologist", "medical_director", "admin"], section: "Intake pipeline" },
   { to: "/prep", label: "Prep instructions", icon: Languages, roles: ["front_desk", "radiologist", "medical_director", "admin"], section: "Intake pipeline" },
   { to: "/priors", label: "Prior imaging", icon: History, roles: ["front_desk", "technologist", "radiologist", "operations_manager", "admin"], section: "Intake pipeline" },
+  { to: "/backlog", label: "Reading backlog", icon: Inbox, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Radiology ops" },
   { to: "/ai-usage", label: "AI usage", icon: Activity, roles: ["operations_manager", "medical_director", "admin"], section: "Oversight" },
   { to: "/evals", label: "AI evaluations", icon: FlaskConical, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Oversight" },
   { to: "/audit", label: "Audit log", icon: ShieldCheck, roles: ["medical_director", "admin"], section: "Oversight" },

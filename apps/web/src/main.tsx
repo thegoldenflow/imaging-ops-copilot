@@ -6,6 +6,7 @@ import { canSee, Layout, NAV } from "./components/Layout";
 import { EmptyState, Loading } from "./components/ui";
 import { AiUsagePage } from "./features/admin/AiUsagePage";
 import { AuditPage } from "./features/admin/AuditPage";
+import { BacklogPage } from "./features/backlog/BacklogPage";
 import { ContrastPage } from "./features/contrast/ContrastPage";
 import { EvalsPage } from "./features/evals/EvalsPage";
 import { MriSafetyPage } from "./features/mri-safety/MriSafetyPage";
@@ -68,6 +69,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/mri-safety" element={<Guard path="/mri-safety"><MriSafetyPage /></Guard>} />
               <Route path="/prep" element={<Guard path="/prep"><PrepPage /></Guard>} />
               <Route path="/priors" element={<Guard path="/priors"><PriorsPage /></Guard>} />
+              <Route path="/backlog" element={<Guard path="/backlog"><BacklogPage /></Guard>} />
               <Route path="/evals" element={<Guard path="/evals"><EvalsPage /></Guard>} />
               <Route path="/ai-usage" element={<Guard path="/ai-usage"><AiUsagePage /></Guard>} />
               <Route path="/audit" element={<Guard path="/audit"><AuditPage /></Guard>} />

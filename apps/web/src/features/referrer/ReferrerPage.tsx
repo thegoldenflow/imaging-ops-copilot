@@ -26,7 +26,7 @@ export function ReferrerPage() {
                 </div>
               ))}
             </dl>
-            <p className="mt-3 text-xs text-slate-500">Signed by {r.signed_by}. Prepared with AI assistance and reviewed by the radiologist.</p>
+            <p className="mt-3 text-xs text-slate-500">Signed by {r.signed_by}.{r.source === "ai_draft" ? " Prepared with AI assistance and reviewed by the radiologist." : ""}</p>
           </Card>
         ))}
       </div>

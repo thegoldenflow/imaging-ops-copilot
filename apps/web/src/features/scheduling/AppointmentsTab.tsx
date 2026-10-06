@@ -38,7 +38,12 @@ export function AppointmentsTab({ sites, onBackfill }: { sites: Site[]; onBackfi
       if (res.backfill_case) onBackfill(res.backfill_case);
     },
   });
+  const complete = useMutation({
+    mutationFn: (id: string) => post(`/api/scheduling/appointments/${id}/complete`),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
   const canCancel = user && ["front_desk", "operations_manager", "admin"].includes(user.role);
+  const canComplete = user && ["technologist", "operations_manager", "admin"].includes(user.role);
   const allowedSites = user?.site_ids.length ? sites.filter((s) => user.site_ids.includes(s.id)) : sites;
 
   return (
@@ -61,6 +66,7 @@ export function AppointmentsTab({ sites, onBackfill }: { sites: Site[]; onBackfi
       {query.isLoading && <Loading />}
       {query.error && <ErrorState error={query.error} onRetry={() => query.refetch()} />}
       {cancel.error && <p className="px-4 pt-3 text-sm text-rose-600" role="alert">{(cancel.error as Error).message}</p>}
+      {complete.error && <p className="px-4 pt-3 text-sm text-rose-600" role="alert">{(complete.error as Error).message}</p>}
       {query.data && query.data.appointments.length === 0 && <EmptyState title="No appointments" hint="Try another day or site." />}
       {query.data && query.data.appointments.length > 0 && (
         <div className="overflow-x-auto">
@@ -92,7 +98,14 @@ export function AppointmentsTab({ sites, onBackfill }: { sites: Site[]; onBackfi
                     {a.risk_factors.length ? <ul className="list-disc pl-4">{a.risk_factors.map((f) => <li key={f}>{f}</li>)}</ul> : "–"}
                     {a.extra_reminder && <Badge tone="brand" className="mt-1">Extra reminder queued</Badge>}
                   </td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    {canComplete && ["booked", "confirmed"].includes(a.status) && (
+                      <Button size="sm" variant="secondary" loading={complete.isPending && complete.variables === a.id} onClick={() => complete.mutate(a.id)}
+                        title={new Date(a.start) > new Date() ? "Demo: the exam is recorded as performed now" : "Exam finished; send it to the reading backlog"}
+                        data-testid={`complete-${a.id}`}>
+                        Mark done
+                      </Button>
+                    )}
                     {canCancel && ["booked", "confirmed"].includes(a.status) && (
                       <Button size="sm" variant="ghost" loading={cancel.isPending && cancel.variables === a.id} onClick={() => cancel.mutate(a.id)}>
                         Cancel
