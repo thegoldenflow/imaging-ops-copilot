@@ -21,6 +21,12 @@ BOOKED_FOR_UTILIZATION = ACTIVE_STATUSES | {AppointmentStatus.COMPLETED, Appoint
 # registers reminders, pre-registration and prep instructions here.
 BOOKING_HOOKS: list[Callable[[Appointment], None]] = []
 CANCEL_HOOKS: list[Callable[[Appointment], None]] = []
+# Each guard returns a reason the appointment may not be confirmed yet, or None.
+CONFIRM_GUARDS: list[Callable[[Store, Appointment], str | None]] = []
+
+
+def confirm_blockers(store: Store, appt: Appointment) -> list[str]:
+    return [reason for guard in CONFIRM_GUARDS if (reason := guard(store, appt))]
 
 
 class PriorityWeights(BaseModel):
@@ -160,7 +166,7 @@ def rank_waitlist(store: Store, slot: Slot, now: datetime | None = None) -> tupl
     eligible, excluded = [], []
     for entry in store.waitlist.values():
         exam = store.exams[entry.exam_code]
-        if not entry.active or exam.modality != slot.modality or exam.minutes > slot_minutes:
+        if not entry.active or exam.modality != slot.modality or (entry.duration_minutes or exam.minutes) > slot_minutes:
             continue
         patient = store.patients[entry.patient_id]
         referrer = store.referrers.get(entry.referrer_id)
@@ -194,13 +200,16 @@ def rank_waitlist(store: Store, slot: Slot, now: datetime | None = None) -> tupl
 # ---------- Booking, cancellation and backfill ----------
 
 def book(store: Store, *, patient_id: str, referrer_id: str, scanner_id: str, exam_code: str,
-         start: datetime, urgency: str) -> Appointment:
+         start: datetime, urgency: str, duration_minutes: int | None = None, requisition_id: str | None = None,
+         protocol_id: str | None = None) -> Appointment:
     scanner = store.scanners[scanner_id]
     exam = store.exams[exam_code]
     appt = Appointment(
         id=store.next_id("AP"), patient_id=patient_id, referrer_id=referrer_id, site_id=scanner.site_id,
-        scanner_id=scanner_id, exam_code=exam_code, start=start, end=start + timedelta(minutes=exam.minutes),
+        scanner_id=scanner_id, exam_code=exam_code, start=start,
+        end=start + timedelta(minutes=duration_minutes or exam.minutes),
         status=AppointmentStatus.BOOKED, urgency=urgency, booked_at=datetime.now(),
+        requisition_id=requisition_id, protocol_id=protocol_id,
     )
     store.appointments[appt.id] = appt
     nsm = store.modules.get("noshow")
@@ -283,8 +292,13 @@ def accept_offer(store: Store, offer: Offer) -> Appointment:
         raise OfferConflict("Slot already filled by another patient")
     entry: WaitlistEntry = store.waitlist[offer.waitlist_id]
     appt = book(store, patient_id=patient.id, referrer_id=entry.referrer_id, scanner_id=case.slot.scanner_id,
-                exam_code=entry.exam_code, start=case.slot.start, urgency=entry.urgency)
+                exam_code=entry.exam_code, start=case.slot.start, urgency=entry.urgency,
+                duration_minutes=entry.duration_minutes, requisition_id=entry.requisition_id,
+                protocol_id=entry.protocol_id)
     entry.active = False
+    if entry.requisition_id and entry.requisition_id in store.requisitions:
+        req = store.requisitions[entry.requisition_id]
+        req.status, req.appointment_id = "booked", appt.id
     offer.status, offer.responded_at = "accepted", datetime.now()
     case.status, case.new_appointment_id, case.filled_by_patient_id = "filled", appt.id, patient.id
     for other in case.offers:

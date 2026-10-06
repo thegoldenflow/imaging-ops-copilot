@@ -1,6 +1,6 @@
 # Imaging Ops Copilot
 
-A demo AI toolkit for an outpatient medical imaging center: scheduling, chest X-ray report drafting, front desk automation, requisition triage, radiology operations and compliance. The full scope is 21 systems delivered in 5 phases; the first batch (systems 1–4) is built.
+A demo AI toolkit for an outpatient medical imaging center: scheduling, chest X-ray report drafting, front desk automation, requisition triage, radiology operations and compliance. The full scope is 21 systems delivered in 5 phases; phases 0–2 (systems 1–10) are built.
 
 > All data is synthetic. No real patient information is used anywhere. AI output is always a draft or a suggestion that a person must confirm. Nothing in this repository is a medical device or gives diagnostic advice.
 
@@ -13,7 +13,21 @@ A demo AI toolkit for an outpatient medical imaging center: scheduling, chest X-
 | 3 | Report Generator | Chest X-ray worklist, AI draft in a fixed schema, section-by-section accept / edit / delete, sign-off, confirmed urgent findings handed to critical results, drafts never visible to referrers (enforced server side) |
 | 4 | Front Desk Automation | Phone agent in the browser (speech in Chrome, or typed) with identity verification, reschedule, cancel, prep instructions, directions and hand-off to staff; automatic reminders 72 h and 24 h before; SMS replies that confirm or cancel; mobile pre-registration page in 4 languages with mock OHIP check |
 
-The home page walks through a single storyline: a chest X-ray flags a possible nodule, the report is signed, another patient phones to cancel a CT, and the freed slot is backfilled with the first patient, who gets her messages in Chinese.
+### Phase 2: requisition intake pipeline
+
+| # | System | What you can demo |
+| --- | --- | --- |
+| – | Requisition extraction | One Claude call per requisition; every field shows its source quote and confidence, highlighted in the original text; low-confidence fields in yellow; staff corrections are audited |
+| 5 | Priority Triage | P1–P4 with rationale and red flags, queue ordered by days left to target, radiologist confirm or override with a mandatory reason, live AI-vs-radiologist agreement |
+| 6 | Protocol Assignment | Retrieval over a 20-protocol library, Claude picks a primary and two alternatives, one-click approval sets the slot length, adoption stats |
+| 7 | Contrast & Renal Checker | Rules with director-set thresholds decide pass / needs eGFR / needs premedication / needs review with written basis; changing a threshold recomputes everything |
+| 8 | MRI Safety Screening | Patient questionnaire in 4 languages, Claude reads free-text implant descriptions, flags block confirmation until a technologist reviews |
+| 9 | Patient Prep Instructions | AI-drafted translations need approval; only approved text is sent, at booking and 48 h before |
+| 10 | Prior Imaging Retrieval | Outside priors requested after booking, retried with backoff against flaky mock archives, imported and linked to the exam |
+
+Each AI feature has an eval set in `evals/` (`cd apps/api && uv run python -m app.modules.evals.run`), shown on the AI evaluations page.
+
+The home page walks through two storylines. The first: a chest X-ray flags a possible nodule, the report is signed, another patient phones to cancel a CT, and the freed slot is backfilled with the first patient, who gets her messages in Chinese.
 
 ## Run it
 
@@ -38,8 +52,8 @@ Without an API key every AI feature runs on built-in mock outputs, so the whole 
 ### Tests
 
 ```bash
-cd apps/api && uv run pytest -q          # 23 backend tests
-cd apps/web && npx playwright test       # storyline end-to-end (starts both servers if needed)
+cd apps/api && uv run pytest -q          # 41 backend tests
+cd apps/web && npx playwright test       # 2 storyline end-to-end specs (starts both servers if needed)
 ```
 
 ## Tech stack
@@ -55,6 +69,7 @@ apps/
   api/      FastAPI backend: app/core, app/llm, app/modules/<system>, app/integrations
   web/      React frontend: src/features/<system>
   kg-qa/    Sub-project: medical knowledge-graph Q&A
+evals/      Eval datasets and results
 docs/       SPEC.md, PROGRESS.md
 ```
 

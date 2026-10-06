@@ -6,6 +6,14 @@ import { canSee, Layout, NAV } from "./components/Layout";
 import { EmptyState, Loading } from "./components/ui";
 import { AiUsagePage } from "./features/admin/AiUsagePage";
 import { AuditPage } from "./features/admin/AuditPage";
+import { ContrastPage } from "./features/contrast/ContrastPage";
+import { EvalsPage } from "./features/evals/EvalsPage";
+import { MriSafetyPage } from "./features/mri-safety/MriSafetyPage";
+import { MriQuestionnairePage } from "./features/patient/MriQuestionnairePage";
+import { PrepPage } from "./features/prep/PrepPage";
+import { PriorsPage } from "./features/priors/PriorsPage";
+import { RequisitionDetailPage } from "./features/requisitions/RequisitionDetailPage";
+import { RequisitionsPage } from "./features/requisitions/RequisitionsPage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { FrontDeskPage } from "./features/frontdesk/FrontDeskPage";
 import { HomePage } from "./features/home/HomePage";
@@ -46,6 +54,7 @@ createRoot(document.getElementById("root")!).render(
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/prereg/:token" element={<PreRegPage />} />
+            <Route path="/mri-screening/:token" element={<MriQuestionnairePage />} />
             <Route element={<RequireAuth><Layout /></RequireAuth>}>
               <Route index element={<HomePage />} />
               <Route path="/scheduling" element={<Guard path="/scheduling"><SchedulingPage /></Guard>} />
@@ -53,6 +62,13 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/reading" element={<Guard path="/reading"><ReadingRoomPage /></Guard>} />
               <Route path="/reading/:reportId" element={<Guard path="/reading"><ReportReviewPage /></Guard>} />
               <Route path="/my-reports" element={<Guard path="/my-reports"><ReferrerPage /></Guard>} />
+              <Route path="/requisitions" element={<Guard path="/requisitions"><RequisitionsPage /></Guard>} />
+              <Route path="/requisitions/:reqId" element={<Guard path="/requisitions"><RequisitionDetailPage /></Guard>} />
+              <Route path="/contrast" element={<Guard path="/contrast"><ContrastPage /></Guard>} />
+              <Route path="/mri-safety" element={<Guard path="/mri-safety"><MriSafetyPage /></Guard>} />
+              <Route path="/prep" element={<Guard path="/prep"><PrepPage /></Guard>} />
+              <Route path="/priors" element={<Guard path="/priors"><PriorsPage /></Guard>} />
+              <Route path="/evals" element={<Guard path="/evals"><EvalsPage /></Guard>} />
               <Route path="/ai-usage" element={<Guard path="/ai-usage"><AiUsagePage /></Guard>} />
               <Route path="/audit" element={<Guard path="/audit"><AuditPage /></Guard>} />
               <Route path="*" element={<EmptyState title="Page not found" />} />

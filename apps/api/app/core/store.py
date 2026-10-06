@@ -11,12 +11,15 @@ from typing import Any
 from app.core.audit import AuditLog
 from app.core.models import (
     Appointment,
+    Allergy,
     Exam,
     ImagingStudy,
+    LabResult,
     LlmCall,
     MessageOutbox,
     Patient,
     Referrer,
+    Requisition,
     Scanner,
     Site,
     StaffUser,
@@ -34,6 +37,9 @@ class Store:
     appointments: dict[str, Appointment] = field(default_factory=dict)
     waitlist: dict[str, WaitlistEntry] = field(default_factory=dict)
     studies: dict[str, ImagingStudy] = field(default_factory=dict)
+    requisitions: dict[str, Requisition] = field(default_factory=dict)
+    labs: dict[str, LabResult] = field(default_factory=dict)
+    allergies: dict[str, Allergy] = field(default_factory=dict)
     staff: dict[str, StaffUser] = field(default_factory=dict)
     outbox: dict[str, MessageOutbox] = field(default_factory=dict)
     images: dict[str, tuple[bytes, str]] = field(default_factory=dict)  # key -> (bytes, media type)

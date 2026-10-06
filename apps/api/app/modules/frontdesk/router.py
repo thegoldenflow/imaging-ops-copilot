@@ -8,9 +8,10 @@ from pydantic import BaseModel
 from app.core.auth import CLINICAL_STAFF, audit_phi, require_roles
 from app.core.models import Role, StaffUser
 from app.core.store import get_store
-from app.core.templates import LANGUAGES, format_when, prep_text
+from app.core.templates import LANGUAGES, format_when
 from app.integrations.mocks import validate_health_card, verify_private_insurance
 from app.modules.frontdesk import service
+from app.modules.prep import service as prep
 from app.modules.frontdesk.agent import agent_reply, new_session
 from app.modules.frontdesk.tools import Turn
 
@@ -178,7 +179,7 @@ def public_prereg(token: str):
             "address": site.address,
             "status": appt.status,
         },
-        "prep": prep_text(appt.exam_code, lang),
+        "prep": prep.message_text(store, appt.exam_code, lang)[0],
     }
 
 

@@ -1,0 +1,48 @@
+{
+ "task": "triage",
+ "run_at": "2026-10-06T22:35:05",
+ "mode": "mock",
+ "model": "rule-based baseline",
+ "n": 50,
+ "metrics": {
+  "agreement": 0.9,
+  "within_one_tier": 1.0,
+  "over_triage_rate": 0.08,
+  "under_triage_rate": 0.02,
+  "failed_calls": 0
+ },
+ "errors": [
+  {
+   "id": "req-16",
+   "expected": "P3",
+   "got": "P2",
+   "rationale": "Red flags suggesting possible serious disease."
+  },
+  {
+   "id": "req-31",
+   "expected": "P4",
+   "got": "P3",
+   "rationale": "Symptomatic without red flags."
+  },
+  {
+   "id": "req-34",
+   "expected": "P3",
+   "got": "P4",
+   "rationale": "Chronic or stable symptoms without red flags."
+  },
+  {
+   "id": "req-37",
+   "expected": "P3",
+   "got": "P2",
+   "rationale": "Red flags suggesting possible serious disease."
+  },
+  {
+   "id": "req-47",
+   "expected": "P4",
+   "got": "P3",
+   "rationale": "Symptomatic without red flags."
+  }
+ ],
+ "seconds": 0.2,
+ "notes": "Agreement with the labelled priority (P1-P4). Under-triage is the safety-relevant error."
+}

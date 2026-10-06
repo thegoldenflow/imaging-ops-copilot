@@ -113,6 +113,8 @@ class Appointment(BaseModel):  # FHIR Appointment
     no_show_risk: float | None = None
     risk_factors: list[str] = Field(default_factory=list)
     extra_reminder: bool = False
+    requisition_id: str | None = None
+    protocol_id: str | None = None
 
 
 class WaitlistEntry(BaseModel):
@@ -126,6 +128,9 @@ class WaitlistEntry(BaseModel):
     added_at: datetime
     notes: str = ""
     active: bool = True
+    requisition_id: str | None = None
+    protocol_id: str | None = None
+    duration_minutes: int | None = None  # from the approved protocol
 
 
 class ImagingStudy(BaseModel):  # FHIR ImagingStudy
@@ -138,6 +143,38 @@ class ImagingStudy(BaseModel):  # FHIR ImagingStudy
     image_key: str  # key into the in-memory image store
     study_uid: str
     indication: str = ""
+    source_facility: str | None = None  # set for priors imported from outside archives
+    prior_for_appointment_id: str | None = None
+
+
+class Requisition(BaseModel):  # FHIR ServiceRequest
+    id: str
+    patient_id: str
+    referrer_id: str
+    received_at: datetime
+    channel: str  # fax, portal, online_form
+    text: str  # the requisition as received (contains PHI)
+    status: str = "received"  # received, processing, ready, waitlisted, booked, failed
+    appointment_id: str | None = None
+    waitlist_id: str | None = None
+
+
+class LabResult(BaseModel):  # FHIR Observation
+    id: str
+    patient_id: str
+    code: str  # egfr
+    value: float
+    unit: str
+    taken_at: datetime
+
+
+class Allergy(BaseModel):  # FHIR AllergyIntolerance
+    id: str
+    patient_id: str
+    substance: str
+    reaction: str
+    severity: str  # mild, moderate, severe
+    contrast: bool
 
 
 class StaffUser(BaseModel):  # FHIR PractitionerRole
@@ -160,6 +197,7 @@ class MessageOutbox(BaseModel):  # FHIR Communication
     scheduled_for: datetime
     status: str = "scheduled"  # scheduled, sent, failed, cancelled
     sent_at: datetime | None = None
+    note: str | None = None  # staff-facing, never sent to the patient
 
 
 class AuditEvent(BaseModel):  # FHIR AuditEvent

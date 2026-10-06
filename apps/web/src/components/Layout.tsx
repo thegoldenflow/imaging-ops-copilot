@@ -2,9 +2,15 @@ import clsx from "clsx";
 import {
   Activity,
   CalendarClock,
+  ClipboardList,
+  Droplet,
   FileText,
+  FlaskConical,
+  History,
   Home,
+  Languages,
   LogOut,
+  Magnet,
   PhoneCall,
   RotateCcw,
   ScanLine,
@@ -24,16 +30,25 @@ interface NavItem {
   label: string;
   icon: typeof Home;
   roles: Role[] | "all";
+  section: "" | "Operations" | "Intake pipeline" | "Oversight";
 }
 
+const STAFF: Role[] = ["front_desk", "technologist", "radiologist", "operations_manager", "medical_director", "admin"];
+
 export const NAV: NavItem[] = [
-  { to: "/", label: "Home", icon: Home, roles: "all" },
-  { to: "/scheduling", label: "Scheduling", icon: CalendarClock, roles: ["front_desk", "technologist", "operations_manager", "medical_director", "admin"] },
-  { to: "/front-desk", label: "Front desk", icon: PhoneCall, roles: ["front_desk", "operations_manager", "admin"] },
-  { to: "/reading", label: "Reading room", icon: ScanLine, roles: ["radiologist", "medical_director", "admin"] },
-  { to: "/my-reports", label: "My reports", icon: FileText, roles: ["referrer"] },
-  { to: "/ai-usage", label: "AI usage", icon: Activity, roles: ["operations_manager", "medical_director", "admin"] },
-  { to: "/audit", label: "Audit log", icon: ShieldCheck, roles: ["medical_director", "admin"] },
+  { to: "/", label: "Home", icon: Home, roles: "all", section: "" },
+  { to: "/scheduling", label: "Scheduling", icon: CalendarClock, roles: ["front_desk", "technologist", "operations_manager", "medical_director", "admin"], section: "Operations" },
+  { to: "/front-desk", label: "Front desk", icon: PhoneCall, roles: ["front_desk", "operations_manager", "admin"], section: "Operations" },
+  { to: "/reading", label: "Reading room", icon: ScanLine, roles: ["radiologist", "medical_director", "admin"], section: "Operations" },
+  { to: "/my-reports", label: "My reports", icon: FileText, roles: ["referrer"], section: "Operations" },
+  { to: "/requisitions", label: "Requisitions", icon: ClipboardList, roles: STAFF, section: "Intake pipeline" },
+  { to: "/contrast", label: "Contrast checks", icon: Droplet, roles: ["technologist", "radiologist", "medical_director", "admin"], section: "Intake pipeline" },
+  { to: "/mri-safety", label: "MRI safety", icon: Magnet, roles: ["technologist", "radiologist", "medical_director", "admin"], section: "Intake pipeline" },
+  { to: "/prep", label: "Prep instructions", icon: Languages, roles: ["front_desk", "radiologist", "medical_director", "admin"], section: "Intake pipeline" },
+  { to: "/priors", label: "Prior imaging", icon: History, roles: ["front_desk", "technologist", "radiologist", "operations_manager", "admin"], section: "Intake pipeline" },
+  { to: "/ai-usage", label: "AI usage", icon: Activity, roles: ["operations_manager", "medical_director", "admin"], section: "Oversight" },
+  { to: "/evals", label: "AI evaluations", icon: FlaskConical, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Oversight" },
+  { to: "/audit", label: "Audit log", icon: ShieldCheck, roles: ["medical_director", "admin"], section: "Oversight" },
 ];
 
 export function canSee(item: NavItem, role: Role) {
@@ -74,9 +89,12 @@ export function Layout() {
           </div>
         </div>
         <nav className="flex-1 space-y-0.5 px-2" aria-label="Main">
-          {NAV.filter((item) => canSee(item, user.role)).map((item) => (
+          {NAV.filter((item) => canSee(item, user.role)).map((item, i, items) => (
+            <div key={item.to}>
+            {item.section && item.section !== items[i - 1]?.section && (
+              <p className="px-3 pt-4 pb-1 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">{item.section}</p>
+            )}
             <NavLink
-              key={item.to}
               to={item.to}
               end={item.to === "/"}
               className={({ isActive }) =>
@@ -89,6 +107,7 @@ export function Layout() {
               <item.icon className="size-4" />
               {item.label}
             </NavLink>
+            </div>
           ))}
         </nav>
         <div className="border-t border-slate-100 p-3 text-xs text-slate-500">

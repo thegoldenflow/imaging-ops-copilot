@@ -1,0 +1,282 @@
+[
+ {
+  "id": "pro-00",
+  "requested_exam": "CT thorax with IV contrast",
+  "clinical": "Spiculated lung nodule seen on recent chest X-ray, rule out malignancy.",
+  "protocol_id": "CT-CH-CONTRAST",
+  "protocol_name": "CT chest with contrast"
+ },
+ {
+  "id": "pro-01",
+  "requested_exam": "Low-dose CT chest",
+  "clinical": "Surveillance of known small pulmonary nodule, follow-up as per guidelines.",
+  "protocol_id": "CT-CH-LDCT",
+  "protocol_name": "Low-dose CT chest, nodule follow-up"
+ },
+ {
+  "id": "pro-02",
+  "requested_exam": "CT chest non-contrast",
+  "clinical": "Progressive dyspnea, query fibrosis.",
+  "protocol_id": "CT-CH-ROUTINE",
+  "protocol_name": "CT chest without contrast"
+ },
+ {
+  "id": "pro-03",
+  "requested_exam": "CT abdomen and pelvis with contrast",
+  "clinical": "Weight loss and change in bowel habit, rule out malignancy.",
+  "protocol_id": "CT-AP-CONTRAST",
+  "protocol_name": "CT abdomen and pelvis with contrast"
+ },
+ {
+  "id": "pro-04",
+  "requested_exam": "CT abdomen for renal stone",
+  "clinical": "Recurrent renal colic, known kidney stone history.",
+  "protocol_id": "CT-AP-RENAL",
+  "protocol_name": "CT renal stone (KUB, no contrast)"
+ },
+ {
+  "id": "pro-05",
+  "requested_exam": "CT head without contrast",
+  "clinical": "Fall two weeks ago with persistent mild headache, on no anticoagulants.",
+  "protocol_id": "CT-HD-ROUTINE",
+  "protocol_name": "CT head without contrast"
+ },
+ {
+  "id": "pro-06",
+  "requested_exam": "MRI brain with and without contrast",
+  "clinical": "History of melanoma, new focal weakness, query metastasis.",
+  "protocol_id": "MR-BR-TUMOUR",
+  "protocol_name": "MRI brain with and without contrast, tumour"
+ },
+ {
+  "id": "pro-07",
+  "requested_exam": "MRI head",
+  "clinical": "New-onset seizure, query epilepsy.",
+  "protocol_id": "MR-BR-EPILEPSY",
+  "protocol_name": "MRI brain, epilepsy protocol"
+ },
+ {
+  "id": "pro-08",
+  "requested_exam": "MRI brain with contrast",
+  "clinical": "Optic neuritis last month and intermittent leg numbness, query multiple sclerosis.",
+  "protocol_id": "MR-BR-MS",
+  "protocol_name": "MRI brain, demyelination (MS) with contrast"
+ },
+ {
+  "id": "pro-09",
+  "requested_exam": "MRI head without contrast",
+  "clinical": "Gradual memory decline over 12 months, query dementia.",
+  "protocol_id": "MR-BR-ROUTINE",
+  "protocol_name": "MRI brain, routine (no contrast)"
+ },
+ {
+  "id": "pro-10",
+  "requested_exam": "MRI lumbar spine",
+  "clinical": "Lumbar radiculopathy L5, failed physiotherapy.",
+  "protocol_id": "MR-LS-ROUTINE",
+  "protocol_name": "MRI lumbar spine, routine"
+ },
+ {
+  "id": "pro-11",
+  "requested_exam": "MRI L-spine",
+  "clinical": "Bilateral leg weakness with saddle anesthesia.",
+  "protocol_id": "MR-LS-ROUTINE",
+  "protocol_name": "MRI lumbar spine, routine"
+ },
+ {
+  "id": "pro-12",
+  "requested_exam": "MRI L-spine with gadolinium",
+  "clinical": "Previous laminectomy, recurrent symptoms, query recurrent disc.",
+  "protocol_id": "MR-LS-POSTOP",
+  "protocol_name": "MRI lumbar spine, post-operative with contrast"
+ },
+ {
+  "id": "pro-13",
+  "requested_exam": "MRI left knee",
+  "clinical": "Locking and medial joint line pain after twisting injury, query meniscal tear.",
+  "protocol_id": "MR-KN-ROUTINE",
+  "protocol_name": "MRI knee, routine"
+ },
+ {
+  "id": "pro-14",
+  "requested_exam": "Ultrasound abdomen",
+  "clinical": "Right upper quadrant pain after fatty meals, query gallstones.",
+  "protocol_id": "US-ABD-COMPLETE",
+  "protocol_name": "Ultrasound abdomen, complete"
+ },
+ {
+  "id": "pro-15",
+  "requested_exam": "Ultrasound pelvis",
+  "clinical": "Postmenopausal bleeding for 3 weeks.",
+  "protocol_id": "US-PEL-TV",
+  "protocol_name": "Ultrasound pelvis, transabdominal and transvaginal"
+ },
+ {
+  "id": "pro-16",
+  "requested_exam": "Ultrasound thyroid",
+  "clinical": "Palpable 2 cm thyroid nodule.",
+  "protocol_id": "US-THY",
+  "protocol_name": "Ultrasound thyroid"
+ },
+ {
+  "id": "pro-17",
+  "requested_exam": "Venous Doppler left leg",
+  "clinical": "Unilateral leg swelling after long flight, rule out deep vein thrombosis.",
+  "protocol_id": "US-VEN-LE",
+  "protocol_name": "Ultrasound lower limb venous Doppler"
+ },
+ {
+  "id": "pro-18",
+  "requested_exam": "CXR PA and lateral",
+  "clinical": "Cough for 3 weeks with fever.",
+  "protocol_id": "XR-CH-PALAT",
+  "protocol_name": "Chest X-ray, PA and lateral"
+ },
+ {
+  "id": "pro-19",
+  "requested_exam": "X-ray knee",
+  "clinical": "Bilateral knee pain worse on stairs.",
+  "protocol_id": "XR-KN-3V",
+  "protocol_name": "Knee X-ray, 3 views"
+ },
+ {
+  "id": "pro-20",
+  "requested_exam": "X-ray lumbar spine",
+  "clinical": "Mechanical back pain after lifting a box.",
+  "protocol_id": "XR-LS-2V",
+  "protocol_name": "Lumbar spine X-ray, 2 views"
+ },
+ {
+  "id": "pro-21",
+  "requested_exam": "CT thorax with IV contrast",
+  "clinical": "New 1.5 cm right upper lobe nodule on chest X-ray. Former smoker, 20 pack-years.",
+  "protocol_id": "CT-CH-CONTRAST",
+  "protocol_name": "CT chest with contrast"
+ },
+ {
+  "id": "pro-22",
+  "requested_exam": "CT chest low dose",
+  "clinical": "Known 6 mm left lower lobe nodule, 12-month follow-up.",
+  "protocol_id": "CT-CH-LDCT",
+  "protocol_name": "Low-dose CT chest, nodule follow-up"
+ },
+ {
+  "id": "pro-23",
+  "requested_exam": "CT chest without contrast",
+  "clinical": "Chronic cough and crackles, query interstitial lung disease.",
+  "protocol_id": "CT-CH-ROUTINE",
+  "protocol_name": "CT chest without contrast"
+ },
+ {
+  "id": "pro-24",
+  "requested_exam": "CT A/P with IV contrast",
+  "clinical": "Unintentional weight loss of 8 kg over 3 months with iron deficiency anemia.",
+  "protocol_id": "CT-AP-CONTRAST",
+  "protocol_name": "CT abdomen and pelvis with contrast"
+ },
+ {
+  "id": "pro-25",
+  "requested_exam": "CT KUB",
+  "clinical": "Recurrent renal colic, known kidney stone history.",
+  "protocol_id": "CT-AP-RENAL",
+  "protocol_name": "CT renal stone (KUB, no contrast)"
+ },
+ {
+  "id": "pro-26",
+  "requested_exam": "CT head",
+  "clinical": "Fall two weeks ago with persistent mild headache, on no anticoagulants.",
+  "protocol_id": "CT-HD-ROUTINE",
+  "protocol_name": "CT head without contrast"
+ },
+ {
+  "id": "pro-27",
+  "requested_exam": "MRI head with gadolinium",
+  "clinical": "History of melanoma, new focal weakness, query metastasis.",
+  "protocol_id": "MR-BR-TUMOUR",
+  "protocol_name": "MRI brain with and without contrast, tumour"
+ },
+ {
+  "id": "pro-28",
+  "requested_exam": "MRI head",
+  "clinical": "First unprovoked seizure last week, normal CT in emergency.",
+  "protocol_id": "MR-BR-EPILEPSY",
+  "protocol_name": "MRI brain, epilepsy protocol"
+ },
+ {
+  "id": "pro-29",
+  "requested_exam": "MRI brain with contrast",
+  "clinical": "Episodes of numbness and blurred vision, query demyelination.",
+  "protocol_id": "MR-BR-MS",
+  "protocol_name": "MRI brain, demyelination (MS) with contrast"
+ },
+ {
+  "id": "pro-30",
+  "requested_exam": "MRI head without contrast",
+  "clinical": "Gradual memory decline over 12 months, query dementia.",
+  "protocol_id": "MR-BR-ROUTINE",
+  "protocol_name": "MRI brain, routine (no contrast)"
+ },
+ {
+  "id": "pro-31",
+  "requested_exam": "MRI L-spine",
+  "clinical": "Chronic low back pain with right sciatica for 6 months, no red flags.",
+  "protocol_id": "MR-LS-ROUTINE",
+  "protocol_name": "MRI lumbar spine, routine"
+ },
+ {
+  "id": "pro-32",
+  "requested_exam": "MRI L-spine",
+  "clinical": "New urinary retention and saddle numbness, query cauda equina.",
+  "protocol_id": "MR-LS-ROUTINE",
+  "protocol_name": "MRI lumbar spine, routine"
+ },
+ {
+  "id": "pro-33",
+  "requested_exam": "MRI lumbar spine with contrast",
+  "clinical": "Previous laminectomy, recurrent symptoms, query recurrent disc.",
+  "protocol_id": "MR-LS-POSTOP",
+  "protocol_name": "MRI lumbar spine, post-operative with contrast"
+ },
+ {
+  "id": "pro-34",
+  "requested_exam": "MRI left knee",
+  "clinical": "Knee instability after sports injury, query ACL tear.",
+  "protocol_id": "MR-KN-ROUTINE",
+  "protocol_name": "MRI knee, routine"
+ },
+ {
+  "id": "pro-35",
+  "requested_exam": "US abdomen",
+  "clinical": "Right upper quadrant pain after fatty meals, query gallstones.",
+  "protocol_id": "US-ABD-COMPLETE",
+  "protocol_name": "Ultrasound abdomen, complete"
+ },
+ {
+  "id": "pro-36",
+  "requested_exam": "Ultrasound pelvis",
+  "clinical": "Postmenopausal bleeding, endometrial thickness assessment.",
+  "protocol_id": "US-PEL-TV",
+  "protocol_name": "Ultrasound pelvis, transabdominal and transvaginal"
+ },
+ {
+  "id": "pro-37",
+  "requested_exam": "Ultrasound thyroid",
+  "clinical": "Palpable 2 cm thyroid nodule.",
+  "protocol_id": "US-THY",
+  "protocol_name": "Ultrasound thyroid"
+ },
+ {
+  "id": "pro-38",
+  "requested_exam": "Ultrasound venous Doppler lower limb",
+  "clinical": "Swollen painful left calf for 2 days, query DVT.",
+  "protocol_id": "US-VEN-LE",
+  "protocol_name": "Ultrasound lower limb venous Doppler"
+ },
+ {
+  "id": "pro-39",
+  "requested_exam": "CXR PA and lateral",
+  "clinical": "Shortness of breath and productive cough, query pneumonia.",
+  "protocol_id": "XR-CH-PALAT",
+  "protocol_name": "Chest X-ray, PA and lateral"
+ }
+]

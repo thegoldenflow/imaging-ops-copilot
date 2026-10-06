@@ -199,3 +199,153 @@ export interface CallSession {
   latencies_ms: number[];
   patient_name?: string | null;
 }
+
+// ---------- Phase 2: requisition pipeline ----------
+
+export interface Sourced {
+  value: string;
+  source_quote: string;
+  confidence: number;
+  corrected_by?: string;
+}
+
+export type ExtractionFields = Record<string, Sourced | Sourced[]>;
+
+export interface RequisitionSummary {
+  id: string;
+  patient_id: string;
+  patient_name: string;
+  patient_language: string;
+  referrer_name: string;
+  received_at: string;
+  channel: string;
+  status: string;
+  requested_exam: string | null;
+  low_confidence: string[];
+  ai_priority: string | null;
+  priority: string | null;
+  triage_reviewed: boolean;
+  red_flags: string[];
+  days_left: number | null;
+  protocol_id: string | null;
+  protocol_name: string | null;
+  protocol_approved: boolean;
+  modality: string | null;
+  contrast_status: string | null;
+  mri_status: string | null;
+  appointment_id: string | null;
+  waitlist_id: string | null;
+}
+
+export interface Protocol {
+  id: string;
+  name: string;
+  modality: string;
+  exam_code: string;
+  contrast: boolean;
+  minutes: number;
+  indications: string[];
+}
+
+export interface TriageRecord {
+  ai_priority: string | null;
+  ai_rationale: string;
+  ai_red_flags: string[];
+  ai_status: string;
+  model: string;
+  final_priority: string;
+  review_action: string | null;
+  override_reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+}
+
+export interface ContrastCheck {
+  status: string;
+  basis: string[];
+  egfr: number | null;
+  egfr_date: string | null;
+  risk_factors: string[];
+  reactions: string[];
+}
+
+export interface MriScreening {
+  id: string;
+  token?: string;
+  requisition_id: string;
+  patient_id: string;
+  patient_name?: string;
+  appointment_id: string | null;
+  appointment_start?: string | null;
+  language: string;
+  status: string;
+  answers: Record<string, boolean>;
+  free_text: string;
+  devices: { patient_words: string; device_name: string; category: string; list_match: string | null; mr_status: string }[];
+  flags: string[];
+  ai_status: string | null;
+  submitted_at: string | null;
+  reviewed_by: string | null;
+  review_decision: string | null;
+  review_note: string | null;
+  reviewed_at: string | null;
+}
+
+export interface RetrievalTask {
+  id: string;
+  appointment_id: string;
+  patient_id: string;
+  patient_name?: string;
+  exam_name?: string | null;
+  appointment_start?: string | null;
+  facility: string;
+  reason: string;
+  status: string;
+  attempts: number;
+  max_attempts: number;
+  next_attempt_at: string;
+  created_at: string;
+  completed_at: string | null;
+  events: { ts: string; text: string }[];
+  imported_study_ids: string[];
+}
+
+export interface RequisitionDetail {
+  summary: RequisitionSummary;
+  text: string;
+  patient: { id: string; name: string; age: number; sex: string; language: string };
+  extraction: {
+    fields: ExtractionFields;
+    ai_status: string;
+    model: string;
+    prompt_version: string;
+    low_confidence: string[];
+    corrections: { field: string; by: string; at: string }[];
+  } | null;
+  field_labels: Record<string, string>;
+  low_confidence_threshold: number;
+  triage: TriageRecord | null;
+  targets: Record<string, number>;
+  protocol: {
+    primary_id: string;
+    alternative_ids: string[];
+    rationale: string;
+    contrast_required: boolean;
+    ai_status: string;
+    model: string;
+    approved_id: string | null;
+    approved_by: string | null;
+    change_reason: string | null;
+    candidates: { id: string; name: string; score: number }[];
+    primary: Protocol;
+    alternatives: Protocol[];
+    approved: Protocol | null;
+    library: Protocol[];
+  } | null;
+  contrast: ContrastCheck | null;
+  mri: MriScreening | null;
+  appointment: Appointment | null;
+  waitlist: { id: string; urgency: string; duration_minutes: number | null } | null;
+  priors: RetrievalTask[];
+  prep: { key: string; language: string; text: string; note: string | null } | null;
+}

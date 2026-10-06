@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from app.core.models import ACTIVE_STATUSES, Appointment, AppointmentStatus
 from app.core.store import Store, get_store
-from app.core.templates import format_when, prep_text, render
+from app.core.templates import format_when, render
 from app.integrations.mocks import CoverageResult, queue_message
 from app.llm.gateway import get_gateway
 from app.llm.prompts import CALL_SUMMARY
@@ -62,8 +62,7 @@ def on_booked(appt: Appointment) -> None:
                   patient_id=patient.id, appointment_id=appt.id,
                   body=render("booking_confirmation", lang, exam=exam.name, when=when, site=site.name,
                               address=site.address, link=f"{PUBLIC_BASE}/{token}"))
-    queue_message(channel="email", kind="prep", to=patient.email, language=lang, patient_id=patient.id,
-                  appointment_id=appt.id, body=prep_text(appt.exam_code, lang))
+    # Prep instructions are sent by the prep module (System 9), approved text only.
     for hours, kind in ((72, "reminder_72h"), (24, "reminder_24h")):
         send_at = appt.start - timedelta(hours=hours)
         if send_at > now:
@@ -92,7 +91,7 @@ scheduling.CANCEL_HOOKS.append(on_cancelled)
 # ---------- Inbound SMS replies ----------
 
 class ReplyResult(BaseModel):
-    action: str  # confirmed, cancelled, offer_accepted, offer_filled, ignored
+    action: str  # confirmed, blocked, cancelled, offer_accepted, offer_filled, ignored
     detail: str
     appointment_id: str | None = None
     backfill_case_id: str | None = None
@@ -115,6 +114,8 @@ def handle_reply(store: Store, message_id: str, text: str) -> ReplyResult:
     if appt is None or appt.status not in ACTIVE_STATUSES:
         return ReplyResult(action="ignored", detail="Appointment is not active")
     if answer in ("C", "CONFIRM", "YES", "确认"):
+        if blockers := scheduling.confirm_blockers(store, appt):
+            return ReplyResult(action="blocked", detail="; ".join(blockers), appointment_id=appt.id)
         appt.status = AppointmentStatus.CONFIRMED
         appt.reminder_confirmed = True
         store.touch()

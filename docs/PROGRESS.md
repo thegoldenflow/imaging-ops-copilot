@@ -61,7 +61,71 @@ Acceptance:
 - [x] Mobile pre-registration in English, French, Chinese and Punjabi with mock OHIP / private insurance check
 - [ ] Measure speech-to-reply latency (≤ 1.5 s target) on a local machine with a real key
 
-## Phases 2–4
+## Phase 2 — Requisition intake pipeline (Systems 5–10)
+
+Status: done (demo scope), branch `feat/phase-2-requisitions`
+
+Pipeline: requisition arrives → shared extraction (one Claude call) → triage (5) → protocol suggestion (6) → contrast check (7, contrast exams) → MRI screening (8, MRI) → after booking: prep instructions (9) and prior imaging retrieval (10) in parallel.
+
+Demo-scope notes: requisitions are synthetic text generated with ground-truth labels (the same generator writes the eval sets). The mock provider is a rule-based baseline, so the whole pipeline runs without an API key. Seeded requisitions are pre-processed with that baseline; three arrive unprocessed and the intake worker runs them through the gateway at startup. Prior-imaging retrieval runs as an in-process worker with retries instead of Temporal.
+
+### Shared step · Requisition extraction — done
+
+- [x] `Requisition`, `LabResult`, `Allergy` entities and a synthetic requisition generator with labels (form and free-text letter styles)
+- [x] Extraction schema with source quote and confidence for every field; one gateway call per requisition, de-identified
+- [x] Side-by-side view: original text with highlighted sources, low-confidence fields in yellow, staff corrections recorded and audited
+- [x] Eval set: 50 synthetic requisitions; field-level accuracy
+
+### System 5 · Priority Triage — done
+
+- [x] AI priority P1–P4 with rationale and red flags; target wait days per tier, editable by the medical director
+- [x] Queue sorted by days left to target; overdue in red
+- [x] Radiologist confirm or override; override needs a reason, is audited and feeds agreement stats
+- [x] New requisition triaged and queued within seconds (acceptance: within 1 minute); eval script reports agreement, over- and under-triage
+
+### System 6 · Protocol Assignment Assistant — done
+
+- [x] Synthetic library of 20 protocols (indications, contrast, duration)
+- [x] Keyword retrieval narrows candidates; Claude picks primary + 2 alternatives with rationale and contrast flag; invalid ids fall back to retrieval order and are marked for review
+- [x] One-click approve or change; approved duration sets the booking slot length (also on waitlist backfill)
+- [x] Adoption rate, top-3 rate and most common changes on the insights tab
+- [x] Eval set: 40 indications; top-1 / top-3 hit rate
+
+### System 7 · Contrast & Renal Checker — done
+
+- [x] Synthetic eGFR results and allergy records
+- [x] Thresholds on a settings page, only the medical director (or admin) can change them; demo placeholder values labelled as such
+- [x] Status pass / needs eGFR / needs premedication / needs review with the basis written out; AI only supplies the extracted history
+- [x] Every contrast exam in the next 14 days has a status; statuses are computed on read, so a threshold change recomputes all immediately
+- [x] Unresolved checks queue a reminder to the referring office 48 hours before the exam
+
+### System 8 · MRI Safety Screening Assistant — done
+
+- [x] Questionnaire in English, French, Chinese and Punjabi, sent by link in the patient's language
+- [x] Claude extracts devices from free-text answers; matched against a synthetic device list
+- [x] Flags only ever ask for review; technologist or radiologist records cleared / not cleared with a note
+- [x] A flagged appointment cannot be confirmed (SMS reply, phone agent) before review
+- [x] Eval set: 30 implant descriptions in 4 languages; device category accuracy
+
+### System 9 · Patient Prep Instructions — done
+
+- [x] English templates per prep type, approved by clinical staff
+- [x] Claude drafts translations ahead of time; a person approves; only approved versions are sent (otherwise approved English, with a staff note)
+- [x] Sent at booking and 48 hours before, in the patient's preferred language
+
+### System 10 · Prior Imaging Retrieval — done
+
+- [x] Mock outside archives (3 facilities) with configurable latency and failure rate, switchable from the board
+- [x] Tasks created after booking from requisition mentions and patient history
+- [x] Worker with retry, exponential backoff and a 4-attempt limit; states requested / retrying / received / not found / failed, with an event timeline; received studies imported and linked to the exam
+
+### Evaluations
+
+`cd apps/api && uv run python -m app.modules.evals.build` (datasets) and `uv run python -m app.modules.evals.run` (results to `evals/results/`, shown on the AI evaluations page). Committed results are from the rule-based baselines in mock mode and are optimistic because the rules were written alongside the generator.
+
+- [ ] Run the evals with a real `ANTHROPIC_API_KEY` and record Claude's numbers
+
+## Phases 3–4
 
 Status: not started
 

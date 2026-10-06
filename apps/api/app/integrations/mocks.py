@@ -21,6 +21,7 @@ MOCK_CONFIG: dict[str, MockServiceConfig] = {
     "sms": MockServiceConfig(),
     "email": MockServiceConfig(),
     "phone": MockServiceConfig(),
+    "fax": MockServiceConfig(),
     "ohip": MockServiceConfig(latency_ms=400),
     "private_insurance": MockServiceConfig(latency_ms=600),
 }
@@ -30,7 +31,7 @@ class MockServiceError(Exception):
     pass
 
 
-def _call(service: str) -> None:
+def simulate_call(service: str) -> None:
     cfg = MOCK_CONFIG[service]
     time.sleep(cfg.latency_ms / 1000)
     if random.random() < cfg.failure_rate:
@@ -47,11 +48,12 @@ def queue_message(
     patient_id: str | None,
     appointment_id: str | None = None,
     scheduled_for: datetime | None = None,
+    note: str | None = None,
 ) -> MessageOutbox:
     store = get_store()
     msg = MessageOutbox(
         id=store.next_id("MSG"), channel=channel, kind=kind, patient_id=patient_id, to=to, language=language,
-        body=body, appointment_id=appointment_id, scheduled_for=scheduled_for or datetime.now(),
+        body=body, appointment_id=appointment_id, scheduled_for=scheduled_for or datetime.now(), note=note,
     )
     store.outbox[msg.id] = msg
     store.touch()
@@ -85,7 +87,7 @@ class CoverageResult(BaseModel):
 def validate_health_card(number: str, version: str) -> CoverageResult:
     """Mock OHIP check: 10 digits plus a two-letter version code."""
     try:
-        _call("ohip")
+        simulate_call("ohip")
     except MockServiceError as e:
         return CoverageResult(valid=False, status="service_unavailable", detail=str(e))
     digits = number.replace(" ", "").replace("-", "")
@@ -96,7 +98,7 @@ def validate_health_card(number: str, version: str) -> CoverageResult:
 
 def verify_private_insurance(insurer: str, policy: str) -> CoverageResult:
     try:
-        _call("private_insurance")
+        simulate_call("private_insurance")
     except MockServiceError as e:
         return CoverageResult(valid=False, status="service_unavailable", detail=str(e))
     if insurer.strip() and len(policy.strip()) >= 6:
