@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-brand-50: #eef7f7;
+  --color-brand-100: #d5ecec;
+  --color-brand-500: #14868a;
+  --color-brand-600: #0f6e72;
+  --color-brand-700: #0c585b;
+  --color-ai-50: #f4f1fe;
+  --color-ai-100: #e6defd;
+  --color-ai-600: #6941c6;
+  --color-ai-700: #53389e;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-800 antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
