@@ -23,4 +23,4 @@ test-results/
 .vscode/
 .DS_Store
 *.log
-apps/web/test-results/
+*.tsbuildinfo
