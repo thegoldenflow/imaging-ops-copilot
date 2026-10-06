@@ -6,6 +6,7 @@ from app.core.models import ACTIVE_STATUSES, AppointmentStatus
 from app.core.store import get_store
 from app.modules.backlog import service as backlog
 from app.modules.critical import service as critical
+from app.modules.peer_review import service as peer_review
 from app.modules.reports.service import report_for_study
 
 
@@ -230,3 +231,75 @@ def test_only_the_director_changes_the_escalation_policy(client, login):
     assert client.put("/api/critical/policy", headers=login("U-RAD"), json={"levels": pol["levels"]}).status_code == 403
     r = client.put("/api/critical/policy", headers=login("U-MD"), json={"levels": pol["levels"]})
     assert r.status_code == 200 and r.json()["levels"]["critical"]["escalate_after_s"] == 90
+
+
+# ---------- System 13 ----------
+
+def test_scheduled_sampling_runs_once_a_day_after_the_run_hour():
+    store = get_store()
+    cfg = peer_review.config(store)
+    tomorrow = (datetime.now() + timedelta(days=1)).replace(minute=5, second=0, microsecond=0)
+    before_hour = tomorrow.replace(hour=max(0, cfg.run_hour - 1))
+    if cfg.run_hour > 0:
+        assert peer_review.maybe_run_scheduled(store, before_hour) is None
+    run = peer_review.maybe_run_scheduled(store, tomorrow.replace(hour=cfg.run_hour))
+    assert run is not None and run.trigger == "schedule"
+    assert peer_review.maybe_run_scheduled(store, tomorrow.replace(hour=23)) is None  # once per day
+
+
+def test_sampling_never_assigns_a_report_to_its_original_reader():
+    store = get_store()
+    store.modules["qa_config"] = peer_review.QaConfig(sample_rate=0.5)
+    peer_review.state(store)["last_run_at"] = datetime.now() - timedelta(days=14)
+    run = peer_review.run_sampling(store, now=datetime.now(), trigger="manual", by="test")
+    assert run.sampled > 100
+    for review in peer_review.reviews(store).values():
+        assert review.reviewer_id != review.original_reader_id
+        if review.reviewer_id:
+            reviewer = store.staff[review.reviewer_id]
+            exam = store.exams[store.studies[review.study_id].exam_code]
+            assert exam.modality in reviewer.reading_modalities
+
+
+def test_reviewer_sees_a_blinded_case_and_grades_it(client, login):
+    rad = login("U-RAD")
+    data = client.get("/api/peer-review/mine", headers=rad).json()
+    review = next(r for r in data["reviews"] if r["status"] == "assigned")
+    assert review["original_reader_id"] is None and "original_reader_name" not in review
+    assert review["report_sections"]
+    r = client.post(f"/api/peer-review/{review['id']}/submit", headers=rad, json={"score": "minor"})
+    assert r.status_code == 422  # discrepancy type required
+    r = client.post(f"/api/peer-review/{review['id']}/submit", headers=rad,
+                    json={"score": "minor", "discrepancy_type": "clarity", "comment": "Impression vague"})
+    assert r.status_code == 200 and r.json()["status"] == "completed"
+    assert client.post(f"/api/peer-review/{review['id']}/submit", headers=rad, json={"score": "concur"}).status_code == 409
+
+
+def test_other_radiologists_cannot_open_someone_elses_review(client, login):
+    store = get_store()
+    other = next(r for r in peer_review.reviews(store).values() if r.reviewer_id not in (None, "U-RAD"))
+    assert client.get(f"/api/peer-review/{other.id}", headers=login("U-RAD")).status_code == 403
+    assert client.post(f"/api/peer-review/{other.id}/submit", headers=login("U-RAD"), json={"score": "concur"}).status_code == 403
+
+
+def test_qa_report_is_for_the_qa_lead_only_and_exports_csv(client, login):
+    for user in ("U-RAD", "U-OPS", "U-ADMIN"):
+        assert client.get("/api/peer-review/qa", headers=login(user)).status_code == 403
+        assert client.get("/api/peer-review/qa/export", headers=login(user)).status_code == 403
+    md = login("U-MD")
+    qa = client.get("/api/peer-review/qa", headers=md).json()
+    rows = {r["radiologist_id"]: r for r in qa["report"]["by_radiologist"]}
+    assert qa["report"]["overall"]["reviews"] > 50 and rows["U-RAD2"]["by_modality"]["MRI"]["reviews"] > 0
+    assert qa["recent"][0]["original_reader_name"]
+    r = client.get("/api/peer-review/qa/export", headers=md)
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/csv")
+    lines = r.text.strip().splitlines()
+    assert lines[0].startswith("review_id,completed_at") and len(lines) == qa["report"]["overall"]["reviews"] + 1
+    assert _audit("export", "qa_report")
+
+
+def test_qa_lead_can_run_sampling_now_and_change_the_rate(client, login):
+    md = login("U-MD")
+    assert client.put("/api/peer-review/config", headers=md, json={"sample_rate": 0.1, "run_hour": 3, "enabled": True}).status_code == 200
+    run = client.post("/api/peer-review/run", headers=md).json()
+    assert run["trigger"] == "manual" and run["by"] == "Dr. Daniel Okafor"
