@@ -68,16 +68,6 @@ class ReportUrgentFinding(BaseModel):
     confirmed: bool | None = None
 
 
-class CriticalResult(BaseModel):
-    id: str
-    report_id: str
-    patient_id: str
-    referrer_id: str
-    finding: str
-    created_at: datetime
-    status: str = "awaiting_notification"
-
-
 class Report(BaseModel):
     id: str
     study_id: str
@@ -105,10 +95,6 @@ class Report(BaseModel):
 
 def reports(store: Store) -> dict[str, Report]:
     return store.module("reports", dict)
-
-
-def critical_results(store: Store) -> dict[str, CriticalResult]:
-    return store.module("critical_results", dict)
 
 
 def _by_study(store: Store) -> dict[str, str]:
@@ -172,7 +158,9 @@ def edit_ratio(report: Report) -> float:
 
 
 def sign(store: Store, report: Report, signer_name: str, confirmed_urgent: list[int],
-         signer_id: str | None = None) -> list[CriticalResult]:
+         signer_id: str | None = None, levels: dict[int, str] | None = None) -> list:
+    from app.modules.critical import service as critical  # System 12
+
     for i, finding in enumerate(report.urgent_findings):
         finding.confirmed = i in confirmed_urgent
     report.status = "signed"
@@ -180,14 +168,9 @@ def sign(store: Store, report: Report, signer_name: str, confirmed_urgent: list[
     report.signed_by_id = signer_id
     report.signed_at = datetime.now()
     report.edit_ratio = edit_ratio(report)
-    created = []
-    # Confirmed urgent findings are handed to the Critical Results Tracker (System 12).
-    for finding in report.urgent_findings:
-        if finding.confirmed:
-            cr = CriticalResult(id=store.next_id("CR"), report_id=report.id, patient_id=report.patient_id,
-                                referrer_id=report.referrer_id, finding=finding.finding, created_at=datetime.now())
-            critical_results(store)[cr.id] = cr
-            created.append(cr)
+    # Confirmed urgent findings open a case in the Critical Results Tracker.
+    created = [critical.open_case(store, report, f.finding, (levels or {}).get(i, "urgent"), opened_by=signer_name)
+               for i, f in enumerate(report.urgent_findings) if f.confirmed]
     store.touch()
     return created
 

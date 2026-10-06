@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from app.core.models import ACTIVE_STATUSES, AppointmentStatus
 from app.core.store import get_store
 from app.modules.backlog import service as backlog
+from app.modules.critical import service as critical
 from app.modules.reports.service import report_for_study
 
 
@@ -137,3 +138,95 @@ def test_ai_drafted_studies_are_signed_in_the_reading_room(client, login):
 def test_board_is_not_available_to_front_desk_or_referrers(client, login):
     for user in ("U-FD", "U-REF"):
         assert client.get("/api/backlog", headers=login(user)).status_code == 403
+
+
+# ---------- System 12 ----------
+
+def _sign_mei_with_finding(client, login, level="urgent"):
+    rad = login("U-RAD")
+    report = client.post("/api/reports/studies/ST-DEMO1/draft", headers=rad).json()
+    for section in report["sections"]:
+        client.patch(f"/api/reports/{report['id']}/sections/{section['key']}", headers=rad, json={"action": "accept"})
+    signed = client.post(f"/api/reports/{report['id']}/sign", headers=rad,
+                         json={"confirmed_urgent": [0], "levels": {"0": level}}).json()
+    return signed["critical_results"][0]
+
+
+def test_confirmed_finding_opens_a_case_and_notifies_the_ordering_physician(client, login):
+    case = _sign_mei_with_finding(client, login)
+    assert case["referrer_id"] == "R-DEMO" and case["level"] == "urgent" and case["status"] == "open"
+    assert [e["kind"] for e in case["events"]] == ["opened", "notify"]
+    store = get_store()
+    calls = [m for m in store.outbox.values() if m.kind == "critical_result" and m.to == store.referrers["R-DEMO"].phone]
+    assert calls
+
+
+def test_unacknowledged_case_is_renotified_then_escalated_to_the_director():
+    store = get_store()
+    case = next(c for c in critical.cases(store).values() if c.status == "open")
+    pol = critical.policy(store).levels[case.level]
+    critical.process_due(store, case.created_at + timedelta(seconds=pol.renotify_after_s + 1))
+    assert case.status == "open" and case.events[-1]["kind"] == "renotify"
+    critical.process_due(store, case.created_at + timedelta(seconds=pol.escalate_after_s + 1))
+    assert case.status == "escalated" and case.events[-1]["kind"] == "escalate"
+    assert any(m.kind == "critical_escalation" for m in store.outbox.values())
+    # Nothing further happens once escalated, however long it waits.
+    n = len(case.events)
+    critical.process_due(store, case.created_at + timedelta(hours=5))
+    assert len(case.events) == n
+
+
+def test_case_cannot_close_without_acknowledgement_and_records_who_when_how(client, login):
+    rad = login("U-RAD")
+    case = next(c for c in critical.cases(get_store()).values() if c.status == "open")
+    assert client.post(f"/api/critical/{case.id}/close", headers=rad, json={"note": "done"}).status_code == 409
+    r = client.post(f"/api/critical/{case.id}/acknowledge", headers=rad, json={"by_name": " ", "method": "phone"})
+    assert r.status_code == 422
+    r = client.post(f"/api/critical/{case.id}/acknowledge", headers=rad,
+                    json={"by_name": "Dr. Michael Campbell", "by_role": "Ordering physician", "method": "phone"}).json()
+    ack = r["acknowledgement"]
+    assert ack["by_name"] == "Dr. Michael Campbell" and ack["method"] == "phone" and ack["at"] and ack["recorded_by"] == "Dr. Priya Raman"
+    closed = client.post(f"/api/critical/{case.id}/close", headers=rad, json={"note": "Patient sent to ED"}).json()
+    assert closed["status"] == "closed"
+    assert [e["kind"] for e in closed["events"]][-2:] == ["acknowledged", "closed"]
+    assert _audit("acknowledge", "critical_result") and _audit("close", "critical_result")
+
+
+def test_every_case_has_a_complete_timeline(client, login):
+    cases = client.get("/api/critical", headers=login("U-MD")).json()["cases"]
+    assert len(cases) >= 5
+    for c in cases:
+        kinds = [e["kind"] for e in c["events"]]
+        assert kinds[:2] == ["opened", "notify"]
+        if c["status"] == "closed":
+            assert "acknowledged" in kinds and kinds[-1] == "closed"
+    assert any("escalate" in [e["kind"] for e in c["events"]] for c in cases)
+
+
+def test_referrer_acknowledges_own_cases_in_the_portal_only(client, login):
+    _sign_mei_with_finding(client, login)
+    ref = login("U-REF")
+    mine = client.get("/api/critical/mine", headers=ref).json()["cases"]
+    assert mine and all(c["referrer_id"] == "R-DEMO" for c in mine)
+    r = client.post(f"/api/critical/{mine[0]['id']}/acknowledge-portal", headers=ref).json()
+    assert r["acknowledgement"]["method"] == "portal" and r["status"] == "acknowledged"
+    other = next(c for c in critical.cases(get_store()).values() if c.referrer_id != "R-DEMO")
+    assert client.post(f"/api/critical/{other.id}/acknowledge-portal", headers=ref).status_code == 403
+    assert any(e.outcome == "denied" and e.resource_id == other.id for e in get_store().audit.events())
+
+
+def test_dictated_report_with_a_finding_opens_a_case(client, login):
+    store = get_store()
+    study = next(s for s in backlog.unread(store) if not s.image_key and backlog.modality(store, s) == "CT")
+    r = client.post(f"/api/backlog/studies/{study.id}/sign", headers=login("U-RAD"), json={
+        "findings": "Filling defect in the right lower lobe segmental arteries.", "impression": "Acute pulmonary embolism.",
+        "critical_finding": "Acute pulmonary embolism", "critical_level": "critical"}).json()
+    assert r["critical_results"][0]["level"] == "critical"
+
+
+def test_only_the_director_changes_the_escalation_policy(client, login):
+    pol = client.get("/api/critical/policy", headers=login("U-RAD")).json()
+    pol["levels"]["critical"]["escalate_after_s"] = 90
+    assert client.put("/api/critical/policy", headers=login("U-RAD"), json={"levels": pol["levels"]}).status_code == 403
+    r = client.put("/api/critical/policy", headers=login("U-MD"), json={"levels": pol["levels"]})
+    assert r.status_code == 200 and r.json()["levels"]["critical"]["escalate_after_s"] == 90

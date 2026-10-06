@@ -13,6 +13,8 @@ from app.integrations.mocks import dispatch_due
 from app.modules.admin.router import router as admin_router
 from app.modules.backlog.router import router as backlog_router
 from app.modules.contrast.router import router as contrast_router
+from app.modules.critical import service as critical
+from app.modules.critical.router import router as critical_router
 from app.modules.evals.router import router as evals_router
 from app.modules.frontdesk.router import router as frontdesk_router
 from app.modules.mri_safety.router import router as mri_router
@@ -41,13 +43,15 @@ async def _dispatch_loop() -> None:
 
 
 async def _intake_loop() -> None:
-    """Runs new requisitions through the AI pipeline and works prior-imaging retrievals.
+    """Runs new requisitions through the AI pipeline, works prior-imaging retrievals
+    and moves critical-result cases through notification and escalation.
     Runs in a thread so slow LLM or mock-archive calls never block requests."""
     while True:
         await asyncio.sleep(2)
         try:
             await asyncio.to_thread(requisitions.process_pending, get_store())
             await asyncio.to_thread(priors.process_due)
+            await asyncio.to_thread(critical.process_due, get_store())
         except Exception:
             log.exception("intake worker failed")
 
@@ -80,3 +84,4 @@ app.include_router(prep_router)
 app.include_router(priors_router)
 app.include_router(evals_router)
 app.include_router(backlog_router)
+app.include_router(critical_router)
