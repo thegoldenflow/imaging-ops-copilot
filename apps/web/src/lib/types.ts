@@ -453,3 +453,46 @@ export interface CriticalCase {
 
 export interface LevelPolicy { label: string; real_world: string; renotify_after_s: number; escalate_after_s: number }
 export interface CriticalPolicy { levels: Record<string, LevelPolicy>; escalate_to_user_id: string; updated_by: string | null; updated_at: string | null }
+
+export interface PeerReviewItem {
+  id: string;
+  run_id: string;
+  report_id: string;
+  study_id: string;
+  original_reader_id: string | null;
+  original_reader_name?: string;
+  reviewer_id: string | null;
+  reviewer_name?: string | null;
+  assigned_at: string;
+  status: "assigned" | "completed" | "unassigned";
+  score: "concur" | "minor" | "significant" | null;
+  discrepancy_type: string | null;
+  comment: string;
+  completed_at: string | null;
+  exam_name: string;
+  modality: string;
+  performed_at: string;
+  patient_age: number;
+  patient_sex: string;
+  indication: string;
+  report_sections: { label: string; text: string }[];
+  report_signed_on: string | null;
+}
+
+export interface QaSummary { reviews: number; concur: number; minor: number; significant: number; concur_rate: number | null; significant_rate: number | null }
+
+export interface QaData {
+  config: { sample_rate: number; run_hour: number; enabled: boolean; updated_by: string | null; updated_at: string | null };
+  report: {
+    overall: QaSummary;
+    by_radiologist: (QaSummary & { radiologist_id: string; name: string; by_modality: Record<string, QaSummary> })[];
+    by_exam: (QaSummary & { exam_code: string; exam_name: string; modality: string })[];
+    discrepancy_types: Record<string, number>;
+  };
+  runs: { id: string; ts: string; trigger: string; by: string; candidates: number; sampled: number; assigned: number; unassigned: number }[];
+  open: number;
+  unassigned: number;
+  recent: PeerReviewItem[];
+  scores: Record<string, string>;
+  discrepancy_types: Record<string, string>;
+}
