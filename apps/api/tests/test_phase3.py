@@ -6,6 +6,7 @@ from app.core.models import ACTIVE_STATUSES, AppointmentStatus
 from app.core.store import get_store
 from app.modules.backlog import service as backlog
 from app.modules.critical import service as critical
+from app.modules.dose import service as dose
 from app.modules.peer_review import service as peer_review
 from app.modules.reports.service import report_for_study
 
@@ -303,3 +304,57 @@ def test_qa_lead_can_run_sampling_now_and_change_the_rate(client, login):
     assert client.put("/api/peer-review/config", headers=md, json={"sample_rate": 0.1, "run_hour": 3, "enabled": True}).status_code == 200
     run = client.post("/api/peer-review/run", headers=md).json()
     assert run["trigger"] == "manual" and run["by"] == "Dr. Daniel Okafor"
+
+
+# ---------- System 14 ----------
+
+def test_every_completed_ct_has_a_dose_record(client, login):
+    data = client.get("/api/dose/overview", headers=login("U-TECH")).json()
+    assert data["coverage"]["ct_exams"] > 1000 and data["coverage"]["missing"] == 0
+    appt = _next_appointment("LKS", "CT")
+    study_id = client.post(f"/api/scheduling/appointments/{appt.id}/complete", headers=login("U-TECH")).json()["study_id"]
+    store = get_store()
+    rec = next(r for r in dose.records(store).values() if r.appointment_id == appt.id)
+    assert rec.study_id == study_id and rec.ctdivol_mgy > 0 and rec.dlp_total_mgycm > rec.ctdivol_mgy
+    assert rec.sr_template.startswith("TID 10011") and {e.acquisition_type for e in rec.events} == {"Stationary Acquisition", "Spiral Acquisition"}
+    after = client.get("/api/dose/overview", headers=login("U-TECH")).json()["coverage"]
+    assert after["missing"] == 0 and after["ct_exams"] == data["coverage"]["ct_exams"] + (appt.start >= datetime.now() - timedelta(days=90))
+
+
+def test_records_above_the_reference_level_are_listed_as_exceptions(client, login):
+    headers = login("U-MD")
+    data = client.get("/api/dose/overview", headers=headers).json()
+    store = get_store()
+    exceeding = [r for r in dose.records(store).values() if dose.exceedance(store, r)]
+    assert data["exceeding"] == len(exceeding) > 0
+    for item in data["exceptions"]:
+        ref = item["reference"]
+        assert item["ctdivol_mgy"] > ref["ctdivol_mgy"] or item["dlp_total_mgycm"] > ref["dlp_mgycm"]
+
+
+def test_lowering_a_reference_level_recomputes_exceptions(client, login):
+    headers = login("U-MD")
+    before = client.get("/api/dose/overview", headers=headers).json()["exceeding"]
+    assert client.put("/api/dose/references/CT-HD-ROUTINE", headers=login("U-TECH"),
+                      json={"ctdivol_mgy": 30, "dlp_mgycm": 500}).status_code == 403
+    assert client.put("/api/dose/references/CT-HD-ROUTINE", headers=headers,
+                      json={"ctdivol_mgy": 30, "dlp_mgycm": 500}).status_code == 200
+    assert client.get("/api/dose/overview", headers=headers).json()["exceeding"] > before
+    assert _audit("update", "dose_reference")
+
+
+def test_exception_review_is_recorded_and_audited(client, login):
+    headers = login("U-TECH")
+    item = next(e for e in client.get("/api/dose/overview", headers=headers).json()["exceptions"] if e["review"] is None)
+    assert client.post(f"/api/dose/records/{item['id']}/review", headers=headers, json={"outcome": "nope"}).status_code == 422
+    r = client.post(f"/api/dose/records/{item['id']}/review", headers=headers, json={"outcome": "justified", "note": "Large patient"})
+    assert r.status_code == 200 and r.json()["review"]["by"] == "Sam Rivera"
+    detail = client.get(f"/api/dose/records/{item['id']}", headers=headers).json()
+    assert len(detail["events"]) == 2 and detail["review"]["outcome"] == "justified"
+
+
+def test_trends_by_scanner_show_the_seeded_drift(client, login):
+    trend = client.get("/api/dose/overview", headers=login("U-MD")).json()["trend_by_scanner"]
+    series = {s["name"]: [v for v in s["values"] if v is not None] for s in trend["series"]}  # current week may be empty
+    drift, steady = series["EVW-CT1"], series["LKS-CT1"]
+    assert drift[-1] > drift[0] * 1.15 and abs(steady[-1] - steady[0]) < 10

@@ -482,8 +482,10 @@ def _add_radiology_ops(s: Store, rng: random.Random, now: datetime) -> None:
     """Phase 3: reading history and backlog, critical results, peer review, CT dose."""
     from app.modules.backlog import service as backlog
     from app.modules.critical import service as critical
+    from app.modules.dose import service as dose
     from app.modules.peer_review import service as peer_review
 
     backlog.seed(s, rng, now)
     critical.seed(s, rng, now)
     peer_review.seed(s, rng, now)
+    dose.seed(s, rng, now)
