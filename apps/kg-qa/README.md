@@ -67,6 +67,8 @@ docker exec -it sm_neo4j cypher-shell -u neo4j -p "<你的NEO4J_PASSWORD>" \
 并在 `.env` 设 `NEO4J_READONLY_USER=readonly` / `NEO4J_READONLY_PASSWORD=...`（不设则回退主账号）。
 
 ## 3. 离线：构建图谱与索引（首次/更新数据时）
+> `data/knowledge_graph/medical_kg.jsonl` 不在仓库里（已从 git 历史中移除，并加入 `.gitignore`）。建库前需自行把该文件放到这个路径。
+
 ```bash
 cd src
 python -m datasync.data_prepare

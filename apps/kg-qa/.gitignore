@@ -21,3 +21,6 @@ pretrained/
 compact_log.txt
 .idea/
 .vscode/
+
+# 图谱源数据不入库（见 README「离线：构建图谱与索引」）
+data/knowledge_graph/medical_kg.jsonl
