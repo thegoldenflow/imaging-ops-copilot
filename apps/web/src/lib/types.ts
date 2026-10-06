@@ -496,3 +496,44 @@ export interface QaData {
   scores: Record<string, string>;
   discrepancy_types: Record<string, string>;
 }
+
+export interface DoseEvent { sequence: number; protocol_step: string; acquisition_type: string; kvp: number; exposure_mas: number; scanning_length_mm: number; ctdivol_mgy: number; dlp_mgycm: number; phantom: string }
+
+export interface DoseRecord {
+  id: string;
+  appointment_id: string;
+  study_id: string | null;
+  patient_id: string;
+  patient_name: string;
+  scanner_id: string;
+  scanner_name: string;
+  site_id: string;
+  exam_code: string;
+  exam_name: string;
+  protocol_id: string;
+  protocol_name: string;
+  performed_at: string;
+  sr_template: string;
+  source: string;
+  ctdivol_mgy: number;
+  dlp_total_mgycm: number;
+  reference: { ctdivol_mgy: number; dlp_mgycm: number };
+  exceedance: { metrics: string[]; ctdivol_ratio: number; dlp_ratio: number } | null;
+  review: { outcome: string; note: string; by: string; at: string } | null;
+  events?: DoseEvent[];
+}
+
+export interface Trend { labels: string[]; series: { name: string; values: (number | null)[] }[] }
+
+export interface DoseOverview {
+  coverage: { ct_exams: number; with_record: number; missing: number };
+  records: number;
+  exceeding: number;
+  open_exceptions: number;
+  exceptions: DoseRecord[];
+  protocols: { protocol_id: string; name: string; reference: { ctdivol_mgy: number; dlp_mgycm: number }; records: number; median_ctdivol: number | null; median_dlp: number | null; exceeding: number }[];
+  scanners: { scanner_id: string; site: string; records: number; exceeding: number; recent_exceed_rate: number | null }[];
+  trend_by_scanner: Trend;
+  trend_by_protocol: Trend;
+  review_outcomes: Record<string, string>;
+}

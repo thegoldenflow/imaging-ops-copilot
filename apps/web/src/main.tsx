@@ -8,6 +8,7 @@ import { AiUsagePage } from "./features/admin/AiUsagePage";
 import { AuditPage } from "./features/admin/AuditPage";
 import { BacklogPage } from "./features/backlog/BacklogPage";
 import { CriticalPage } from "./features/critical/CriticalPage";
+import { DosePage } from "./features/dose/DosePage";
 import { PeerReviewPage } from "./features/peer-review/PeerReviewPage";
 import { ContrastPage } from "./features/contrast/ContrastPage";
 import { EvalsPage } from "./features/evals/EvalsPage";
@@ -74,6 +75,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/backlog" element={<Guard path="/backlog"><BacklogPage /></Guard>} />
               <Route path="/critical" element={<Guard path="/critical"><CriticalPage /></Guard>} />
               <Route path="/peer-review" element={<Guard path="/peer-review"><PeerReviewPage /></Guard>} />
+              <Route path="/dose" element={<Guard path="/dose"><DosePage /></Guard>} />
               <Route path="/evals" element={<Guard path="/evals"><EvalsPage /></Guard>} />
               <Route path="/ai-usage" element={<Guard path="/ai-usage"><AiUsagePage /></Guard>} />
               <Route path="/audit" element={<Guard path="/audit"><AuditPage /></Guard>} />

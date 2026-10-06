@@ -76,7 +76,7 @@ export function LineChart({ labels, series, height = 200, reference, referenceLa
           </g>
         ))}
         {labels.map((l, i) => (i % Math.ceil(labels.length / 8) === 0 || i === labels.length - 1) && (
-          <text key={l} x={x(i)} y={height - 6} textAnchor="middle" className="fill-slate-500 text-[10px]">{l}</text>
+          <text key={l} x={x(i)} y={height - 6} textAnchor={i === labels.length - 1 ? "end" : "middle"} className="fill-slate-500 text-[10px]">{l}</text>
         ))}
         {reference != null && (
           <g>
