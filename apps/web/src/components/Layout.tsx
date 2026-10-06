@@ -16,6 +16,7 @@ import {
   RotateCcw,
   ScanLine,
   ShieldCheck,
+  Siren,
   Sparkles,
 } from "lucide-react";
 import { useState } from "react";
@@ -48,6 +49,7 @@ export const NAV: NavItem[] = [
   { to: "/prep", label: "Prep instructions", icon: Languages, roles: ["front_desk", "radiologist", "medical_director", "admin"], section: "Intake pipeline" },
   { to: "/priors", label: "Prior imaging", icon: History, roles: ["front_desk", "technologist", "radiologist", "operations_manager", "admin"], section: "Intake pipeline" },
   { to: "/backlog", label: "Reading backlog", icon: Inbox, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Radiology ops" },
+  { to: "/critical", label: "Critical results", icon: Siren, roles: ["front_desk", "radiologist", "operations_manager", "medical_director", "admin"], section: "Radiology ops" },
   { to: "/ai-usage", label: "AI usage", icon: Activity, roles: ["operations_manager", "medical_director", "admin"], section: "Oversight" },
   { to: "/evals", label: "AI evaluations", icon: FlaskConical, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Oversight" },
   { to: "/audit", label: "Audit log", icon: ShieldCheck, roles: ["medical_director", "admin"], section: "Oversight" },

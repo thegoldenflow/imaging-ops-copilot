@@ -73,8 +73,9 @@ export function ReportReviewPage() {
   const queryClient = useQueryClient();
   const report = useQuery({ queryKey: ["report", reportId], queryFn: () => api<Report>(`/api/reports/${reportId}`) });
   const [confirmed, setConfirmed] = useState<number[]>([]);
+  const [levels, setLevels] = useState<Record<number, string>>({});
   const sign = useMutation({
-    mutationFn: () => post<{ report: Report; critical_results: unknown[] }>(`/api/reports/${reportId}/sign`, { confirmed_urgent: confirmed }),
+    mutationFn: () => post<{ report: Report; critical_results: unknown[] }>(`/api/reports/${reportId}/sign`, { confirmed_urgent: confirmed, levels }),
     onSuccess: (res) => {
       queryClient.setQueryData(["report", reportId], res.report);
       queryClient.invalidateQueries({ queryKey: ["worklist"] });
@@ -147,6 +148,14 @@ export function ReportReviewPage() {
                     <div>
                       <p className="font-medium text-slate-900">{f.finding} <AiBadge label="AI flagged" /></p>
                       <p className="text-xs text-slate-500">{f.reason}</p>
+                      {r.status === "draft" && confirmed.includes(i) && (
+                        <select value={levels[i] ?? "urgent"} onChange={(e) => setLevels({ ...levels, [i]: e.target.value })}
+                          className="mt-1 h-7 rounded-md border border-slate-300 px-1.5 text-xs" aria-label={`Level for ${f.finding}`}>
+                          <option value="critical">Critical (Level 1)</option>
+                          <option value="urgent">Urgent (Level 2)</option>
+                          <option value="significant">Significant unexpected (Level 3)</option>
+                        </select>
+                      )}
                     </div>
                   </li>
                 ))}

@@ -420,3 +420,36 @@ export interface BacklogStudyDetail extends BacklogStudy {
   template: { findings: string; impression: string };
   assignment_history: { ts: string; to: string; from: string | null; by: string; reason: string }[];
 }
+
+export interface CaseEvent { ts: string; kind: "opened" | "notify" | "renotify" | "escalate" | "acknowledged" | "closed"; text: string; actor: string }
+
+export interface CriticalCase {
+  id: string;
+  report_id: string;
+  study_id: string | null;
+  patient_id: string;
+  patient_name: string;
+  referrer_id: string;
+  referrer_name: string;
+  referrer_phone: string;
+  exam_name: string | null;
+  finding: string;
+  level: "critical" | "urgent" | "significant";
+  level_label: string;
+  created_at: string;
+  opened_by: string;
+  status: "open" | "escalated" | "acknowledged" | "closed";
+  step: number;
+  next_action_at: string | null;
+  ack_due_at: string;
+  seconds_to_ack_due: number;
+  overdue: boolean;
+  acknowledgement: { by_name: string; by_role: string; method: string; at: string; recorded_by: string } | null;
+  closed_at: string | null;
+  closed_by: string | null;
+  close_note: string | null;
+  events: CaseEvent[];
+}
+
+export interface LevelPolicy { label: string; real_world: string; renotify_after_s: number; escalate_after_s: number }
+export interface CriticalPolicy { levels: Record<string, LevelPolicy>; escalate_to_user_id: string; updated_by: string | null; updated_at: string | null }
