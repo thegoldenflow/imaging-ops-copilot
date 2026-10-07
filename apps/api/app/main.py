@@ -18,6 +18,7 @@ from app.modules.critical.router import router as critical_router
 from app.modules.dose.router import router as dose_router
 from app.modules.evals.router import router as evals_router
 from app.modules.frontdesk.router import router as frontdesk_router
+from app.modules.inventory.router import router as inventory_router
 from app.modules.mri_safety.router import router as mri_router
 from app.modules.peer_review import service as peer_review
 from app.modules.peer_review.router import router as peer_review_router
@@ -92,3 +93,4 @@ app.include_router(backlog_router)
 app.include_router(critical_router)
 app.include_router(peer_review_router)
 app.include_router(dose_router)
+app.include_router(inventory_router)

@@ -246,6 +246,7 @@ def build_store(seed: int | None = None) -> Store:
     _add_clinical_records(s, rng, now)
     _add_requisitions(s, rng, now)
     _add_radiology_ops(s, rng, now)
+    _add_business_compliance(s, rng, now)
     return s
 
 
@@ -489,3 +490,10 @@ def _add_radiology_ops(s: Store, rng: random.Random, now: datetime) -> None:
     critical.seed(s, rng, now)
     peer_review.seed(s, rng, now)
     dose.seed(s, rng, now)
+
+
+def _add_business_compliance(s: Store, rng: random.Random, now: datetime) -> None:
+    """Phase 4: inventory, referrals, portal, billing, feedback, access monitoring, inspection."""
+    from app.modules.inventory import service as inventory
+
+    inventory.seed(s, rng, now)
