@@ -499,5 +499,7 @@ def _add_radiology_ops(s: Store, rng: random.Random, now: datetime) -> None:
 def _add_business_compliance(s: Store, rng: random.Random, now: datetime) -> None:
     """Phase 4: inventory, referrals, portal, billing, feedback, access monitoring, inspection."""
     from app.modules.inventory import service as inventory
+    from app.modules.portal import service as portal
 
     inventory.seed(s, rng, now)
+    portal.seed(s, rng, now)

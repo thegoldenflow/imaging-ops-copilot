@@ -171,3 +171,58 @@ def test_summary_with_invented_numbers_fails_validation():
         MOCK_FIXTURES["referral_weekly_summary"] = original
     assert summary.ai_status == "needs_human" and summary.sentences == []
     assert get_store().llm_calls[-1].outcome == "needs_human"
+
+
+# ---------- System 17 · Referrer portal ----------
+
+def test_referrer_sees_only_own_patients_and_others_are_denied(client, login):
+    ref = login("U-REF")
+    data = client.get("/api/portal/patients", headers=ref).json()
+    ids = {p["id"] for p in data["patients"]}
+    assert "PT-DEMO1" in ids and len(ids) >= 6
+    assert client.get("/api/portal/patients/PT-DEMO1", headers=ref).status_code == 200
+    other = next(pid for pid in get_store().patients if pid not in ids)
+    r = client.get(f"/api/portal/patients/{other}", headers=ref)
+    assert r.status_code == 403
+    denied = _audit("get", "patient", "denied")
+    assert denied and denied[-1].resource_id == other and denied[-1].role == "referrer"
+    # Unknown ids get the same answer, so ids cannot be probed.
+    assert client.get("/api/portal/patients/PT-NOPE", headers=ref).status_code == 403
+    # Staff cannot use the portal API.
+    assert client.get("/api/portal/patients", headers=login("U-FD")).status_code == 403
+
+
+def test_portal_requisition_enters_the_pipeline(client, login):
+    from app.modules.requisitions import service as requisitions
+
+    ref = login("U-REF")
+    body = {"new_patient": {"given_name": "Ana", "family_name": "Example", "dob": "1958-02-11", "sex": "F",
+                            "phone": "+1-416-555-0101", "health_card": "1234567890", "health_card_version": "AB",
+                            "preferred_language": "fr"},
+            "exam_requested": "CT abdomen and pelvis with contrast",
+            "clinical_information": "Right lower quadrant pain and weight loss over 2 months",
+            "relevant_history": "Type 2 diabetes", "allergies": "", "urgent": True, "notes": "Please call with results"}
+    r = client.post("/api/portal/requisitions", json=body, headers=ref)
+    assert r.status_code == 200, r.text
+    req = get_store().requisitions[r.json()["id"]]
+    assert req.channel == "portal" and req.status == "received" and req.referrer_id == "R-DEMO"
+    requisitions.process_pending(get_store())
+    staff = client.get(f"/api/requisitions/{req.id}", headers=login("U-RAD")).json()
+    assert staff["triage"]["ai_priority"] in ("P1", "P2") and staff["protocol"]["primary_id"] == "CT-AP-CONTRAST"
+    mine = client.get("/api/portal/requisitions", headers=ref).json()["requisitions"]
+    row = next(x for x in mine if x["id"] == req.id)
+    assert row["status_text"] == "With the radiologist for review" and row["confirmed_priority"] is None
+    assert req.patient_id in {p["id"] for p in client.get("/api/portal/patients", headers=ref).json()["patients"]}
+    assert _audit("create", "requisition")
+
+
+def test_referrer_cannot_order_for_someone_elses_patient(client, login):
+    ref = login("U-REF")
+    from app.modules.portal.service import patient_ids
+
+    mine = patient_ids(get_store(), "R-DEMO")
+    other = next(pid for pid in get_store().patients if pid not in mine)
+    r = client.post("/api/portal/requisitions", json={"patient_id": other, "exam_requested": "MRI knee",
+                                                      "clinical_information": "Knee pain"}, headers=ref)
+    assert r.status_code == 403 and _audit("post", "patient", "denied")
+    assert not any(q.patient_id == other and q.channel == "portal" for q in get_store().requisitions.values())
