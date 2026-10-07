@@ -258,7 +258,7 @@ Status: done, needs a real-key check. Branch `feat/gemini-provider` (built on `f
 Choices:
 
 - SDK: the official `google-genai` SDK rather than Gemini's OpenAI-compatible endpoint. It supports `response_json_schema`, inline image parts, function calling with thought signatures (Gemini 3 models expect the signature of each function call to be sent back on the next turn; the provider keeps it on the content block) and typed errors. The OpenAI-compatible endpoint would add a third message format and drop the signatures and finish/block reasons we use for refusals.
-- Default model `gemini-2.5-flash` for all three tiers until it is verified locally through the Agent Platform endpoint. `gemini-3.5-flash` is the next configured option after that check. Override per tier with the environment variables.
+- Minimal local `gemini-2.5-flash` and `gemini-3.5-flash` requests were verified through `aiplatform.googleapis.com` with HTTP 200 and non-empty text on 2026-10-07. Default model is `gemini-3.5-flash` for all three tiers; override per tier with the environment variables.
 - Vertex AI global standard price as checked 2026-10-07: `gemini-2.5-flash` is $0.30 input / $2.50 output, and `gemini-3.5-flash` is $1.50 input / $9.00 output, per million tokens. Output includes reasoning tokens.
 
 Limits:

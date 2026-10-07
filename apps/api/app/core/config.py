@@ -20,9 +20,9 @@ def _load_dotenv(path: Path) -> None:
 _load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 
-# Verified with this Google Cloud project through the Agent Platform endpoint.
-# Used for every tier unless overridden.
-GEMINI_DEFAULT_MODEL = "gemini-2.5-flash"
+# Verified with this Google Cloud project through the Agent Platform endpoint
+# after a successful gemini-2.5-flash smoke test. Used for every tier unless overridden.
+GEMINI_DEFAULT_MODEL = "gemini-3.5-flash"
 
 
 @dataclass(frozen=True)

@@ -58,7 +58,7 @@ def response(parts: list, finish="STOP", prompt_tokens=100, out_tokens=20, thoug
         prompt_feedback=types.GenerateContentResponsePromptFeedback(block_reason=block) if block else None,
         usage_metadata=types.GenerateContentResponseUsageMetadata(
             prompt_token_count=prompt_tokens, candidates_token_count=out_tokens, thoughts_token_count=thoughts),
-        model_version="gemini-2.5-flash",
+        model_version="gemini-3.5-flash",
     )
 
 
@@ -106,8 +106,8 @@ def test_gateway_on_gemini_logs_vendor_model_and_cost():
     assert outcome.status == "ok" and outcome.mode == "gemini"
     assert outcome.model == config.settings.gemini_model_reasoning == client.models.calls[0]["model"]
     call = get_store().llm_calls[-1]
-    assert call.mode == "gemini" and call.model == "gemini-2.5-flash"
-    assert call.cost_usd == round((100 * 0.30 + 25 * 2.50) / 1e6, 6)
+    assert call.mode == "gemini" and call.model == "gemini-3.5-flash"
+    assert call.cost_usd == round((100 * 1.50 + 25 * 9.00) / 1e6, 6)
 
 
 def test_gateway_retries_once_after_schema_failure_on_gemini():
@@ -290,7 +290,7 @@ def test_eval_result_names_vendor_and_model(monkeypatch, tmp_path):
     started = time.monotonic()
     gw.structured(task="t", prompt=PROMPT, variables={"q": "x"}, schema_cls=Answer)
     result = run._write("t", gw, {"m": 1}, 1, [], started, "")
-    assert result["mode"] == "gemini" and result["model"] == "Gemini: gemini-2.5-flash"
+    assert result["mode"] == "gemini" and result["model"] == "Gemini: gemini-3.5-flash"
     mock = run._write("t", LlmGateway(MockProvider(latency_s=0)), {}, 0, [], started, "")
     assert mock["model"] == "rule-based baseline"
 

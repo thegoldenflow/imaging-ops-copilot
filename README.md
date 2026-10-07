@@ -79,10 +79,10 @@ Claude is the default. To run every AI feature on Gemini instead, put these line
 ```bash
 LLM_PROVIDER=gemini
 GOOGLE_AGENT_PLATFORM_API_KEY=your-agent-platform-key
-# Optional: models per tier (all default to gemini-2.5-flash)
-# GEMINI_MODEL_REASONING=gemini-2.5-flash
-# GEMINI_MODEL_FAST=gemini-2.5-flash
-# GEMINI_MODEL_VOICE=gemini-2.5-flash
+# Optional: models per tier (all default to gemini-3.5-flash)
+# GEMINI_MODEL_REASONING=gemini-3.5-flash
+# GEMINI_MODEL_FAST=gemini-3.5-flash
+# GEMINI_MODEL_VOICE=gemini-3.5-flash
 ```
 
 `LLM_PROVIDER` takes `anthropic`, `gemini` or `mock`. Left unset, the app uses Claude when `ANTHROPIC_API_KEY` is set and mock outputs otherwise; a provider without its key also falls back to mock. Gemini uses the Google Gen AI SDK in Agent Platform / Vertex AI mode (not Google AI Studio or the Gemini Developer API), while retaining the same call layer for de-identification, schema validation, call logging and degradation. The header shows "AI: Gemini via Vertex AI API", and `uv run python -m app.modules.evals.run` records Gemini results as mode `gemini`. See [docs/PROGRESS.md](docs/PROGRESS.md) for limits.
