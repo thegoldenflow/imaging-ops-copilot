@@ -12,6 +12,7 @@ from app.core.store import get_store
 from app.integrations.mocks import dispatch_due
 from app.modules.admin.router import router as admin_router
 from app.modules.backlog.router import router as backlog_router
+from app.modules.billing.router import router as billing_router
 from app.modules.contrast.router import router as contrast_router
 from app.modules.critical import service as critical
 from app.modules.critical.router import router as critical_router
@@ -98,3 +99,4 @@ app.include_router(dose_router)
 app.include_router(inventory_router)
 app.include_router(referrals_router)
 app.include_router(portal_router)
+app.include_router(billing_router)

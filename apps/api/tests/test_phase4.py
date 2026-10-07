@@ -226,3 +226,47 @@ def test_referrer_cannot_order_for_someone_elses_patient(client, login):
                                                       "clinical_information": "Knee pain"}, headers=ref)
     assert r.status_code == 403 and _audit("post", "patient", "denied")
     assert not any(q.patient_id == other and q.channel == "portal" for q in get_store().requisitions.values())
+
+
+# ---------- System 18 · Billing ----------
+
+def test_reconciliation_finds_every_planted_discrepancy(client, login):
+    data = client.get("/api/billing/overview", headers=login("U-ADMIN")).json()
+    found = {(r["kind"], r["appointment_id"]) for r in data["discrepancies"]}
+    planted = set(get_store().modules["billing_planted"])
+    assert {k for k, _ in planted} == set(data["kinds"])  # every kind is seeded
+    assert planted <= found
+    assert found == planted  # and nothing else is flagged in the seeded data
+    assert data["kinds"]["missing"]["resolved"] == 1
+
+
+def test_resolve_export_and_access(client, login):
+    ops = login("U-OPS")
+    rows = client.get("/api/billing/overview", headers=ops).json()["discrepancies"]
+    dup = next(r for r in rows if r["kind"] == "duplicate" and r["status"] == "open")
+    assert client.post(f"/api/billing/discrepancies/{dup['id']}/resolve", json={"outcome": "written_off"},
+                       headers=ops).status_code == 422  # write-off needs a reason
+    r = client.post(f"/api/billing/discrepancies/{dup['id']}/resolve",
+                    json={"outcome": "duplicate_voided", "note": "Second claim voided"}, headers=ops)
+    assert r.status_code == 200 and r.json()["resolved_by"] == "Jordan Lee"
+    csv_text = client.get("/api/billing/export.csv", headers=ops).text
+    assert csv_text.splitlines()[0].startswith("id,kind_label,status") and dup["id"] in csv_text
+    assert _audit("export", "billing_discrepancies")
+    assert client.get("/api/billing/overview", headers=login("U-FD")).status_code == 403
+    assert client.post("/api/billing/discrepancies/missing.AP-NOPE/resolve", json={"outcome": "no_action"},
+                       headers=ops).status_code == 404
+
+
+def test_cancelled_exam_billed_is_flagged_live(client, login):
+    store = get_store()
+    from app.modules.billing import service as billing
+
+    appt = next(a for a in store.appointments.values() if a.status == "cancelled"
+                and datetime.now() - timedelta(days=5) < a.start < datetime.now()
+                and not any(c.appointment_id == a.id for c in billing.claims(store).values()))
+    billing.claims(store)["CLM-X"] = billing.Claim(id="CLM-X", appointment_id=appt.id, patient_id=appt.patient_id,
+                                                   site_id=appt.site_id, payer="ohip", fee_code="SYN-X101", amount=34.5,
+                                                   service_date=appt.start.date().isoformat(), submitted_at=datetime.now(),
+                                                   status="submitted")
+    rows = client.get("/api/billing/overview", headers=login("U-OPS")).json()["discrepancies"]
+    assert any(r["id"] == f"not_performed.{appt.id}" for r in rows)
