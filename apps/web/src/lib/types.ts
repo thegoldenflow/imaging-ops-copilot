@@ -537,3 +537,85 @@ export interface DoseOverview {
   trend_by_protocol: Trend;
   review_outcomes: Record<string, string>;
 }
+
+// ---------- Phase 4 · System 15 inventory ----------
+
+export interface InventoryLot {
+  lot: string;
+  expiry: string;
+  quantity: number;
+  received_at: string;
+  status: "ok" | "expiring" | "expired" | "empty";
+  days_to_expiry: number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  item_id: string;
+  site_id: string;
+  supplier: string;
+  quantity: number;
+  status: "draft" | "submitted" | "received" | "cancelled";
+  created_at: string;
+  reason: string;
+  submitted_by: string | null;
+  submitted_at: string | null;
+  received_at: string | null;
+  item_name?: string;
+  site_name?: string;
+}
+
+export interface InventoryItem {
+  id: string;
+  site_id: string;
+  site_name: string;
+  product_code: string;
+  name: string;
+  category: "contrast" | "consumable";
+  unit: string;
+  uses: string;
+  reorder_point: number;
+  reorder_qty: number;
+  quantity: number;
+  usable: number;
+  status: "low" | "ok";
+  usage_per_day: number;
+  days_left: number | null;
+  open_order: PurchaseOrder | null;
+  lots: InventoryLot[];
+}
+
+export interface InventoryAlert {
+  kind: "low_stock" | "expiring" | "expired";
+  severity: "red" | "amber";
+  item_id: string;
+  site_id: string;
+  name: string;
+  text: string;
+  lot?: string;
+  expiry?: string;
+  order_id?: string | null;
+}
+
+export interface StockMovement {
+  id: string;
+  item_id: string;
+  item_name: string;
+  site_id: string;
+  at: string;
+  kind: "consumed" | "received" | "adjusted" | "discarded";
+  quantity: number;
+  lot: string | null;
+  appointment_id: string | null;
+  by: string;
+  note: string;
+}
+
+export interface InventoryOverview {
+  items: InventoryItem[];
+  alerts: InventoryAlert[];
+  orders: PurchaseOrder[];
+  movements: StockMovement[];
+  sites: { id: string; name: string }[];
+  expiry_warning_days: number;
+}

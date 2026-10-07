@@ -299,7 +299,7 @@ def receive_order(store: Store, po: PurchaseOrder, by: str, now: datetime, lot_n
 def seed(s: Store, rng: random.Random, now: datetime) -> None:
     """Stock for every site that does the exams, 30 days of consumption history and
     a few planted situations: Lakeshore's iohexol one exam above its reorder point,
-    a gadobutrol lot at Northgate close to expiry, an expired saline lot at Eastview
+    lots close to expiry at Northgate and Lakeshore, an expired saline lot at Eastview
     and gel already low at Westbrook (with a draft order)."""
     today = now.date()
     for site in s.sites.values():
@@ -332,8 +332,8 @@ def seed(s: Store, rng: random.Random, now: datetime) -> None:
     # Planted situations for the demo.
     ioh = items(s)["INV-LKS-IOHEXOL-350"]
     ioh.lots[0].quantity, ioh.lots[1].quantity = 5, ioh.reorder_point + 1 - 5
-    gad = items(s)["INV-NGT-GADOBUTROL-7.5"]
-    gad.lots[0].expiry = today + timedelta(days=18)
+    items(s)["INV-NGT-GADOBUTROL-7.5"].lots[0].expiry = today + timedelta(days=18)
+    items(s)["INV-LKS-SALINE-10"].lots[0].expiry = today + timedelta(days=26)
     saline = items(s)["INV-EVW-SALINE-10"]
     saline.lots[0].expiry = today - timedelta(days=4)
     gel = items(s)["INV-WBK-US-GEL"]

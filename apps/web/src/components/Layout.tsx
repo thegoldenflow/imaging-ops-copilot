@@ -13,6 +13,7 @@ import {
   Languages,
   LogOut,
   Magnet,
+  Package,
   Radiation,
   PhoneCall,
   RotateCcw,
@@ -34,7 +35,7 @@ interface NavItem {
   label: string;
   icon: typeof Home;
   roles: Role[] | "all";
-  section: "" | "Operations" | "Intake pipeline" | "Radiology ops" | "Oversight";
+  section: "" | "Operations" | "Intake pipeline" | "Radiology ops" | "Business & compliance" | "Oversight";
 }
 
 const STAFF: Role[] = ["front_desk", "technologist", "radiologist", "operations_manager", "medical_director", "admin"];
@@ -54,6 +55,7 @@ export const NAV: NavItem[] = [
   { to: "/critical", label: "Critical results", icon: Siren, roles: ["front_desk", "radiologist", "operations_manager", "medical_director", "admin"], section: "Radiology ops" },
   { to: "/peer-review", label: "Peer review", icon: ClipboardCheck, roles: ["radiologist", "medical_director"], section: "Radiology ops" },
   { to: "/dose", label: "CT dose", icon: Radiation, roles: ["technologist", "radiologist", "operations_manager", "medical_director", "admin"], section: "Radiology ops" },
+  { to: "/inventory", label: "Inventory", icon: Package, roles: ["technologist", "operations_manager", "medical_director", "admin"], section: "Business & compliance" },
   { to: "/ai-usage", label: "AI usage", icon: Activity, roles: ["operations_manager", "medical_director", "admin"], section: "Oversight" },
   { to: "/evals", label: "AI evaluations", icon: FlaskConical, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Oversight" },
   { to: "/audit", label: "Audit log", icon: ShieldCheck, roles: ["medical_director", "admin"], section: "Oversight" },

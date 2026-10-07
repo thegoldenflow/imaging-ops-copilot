@@ -181,11 +181,11 @@ Status: in progress, branch `feat/phase-4-business-compliance`
 
 Plan (same shape as phase 3: module state in `store.module(...)`, a `seed(s, rng, now)` per module, one api and one web commit per system):
 
-### System 15 · Inventory Manager
+### System 15 · Inventory Manager — done
 
-- [ ] `InventoryItem` per site and product with lots (lot number, expiry, quantity), reorder point and reorder quantity
-- [ ] Completion hook deducts contrast and consumables (first-expiring lot first) when an exam is completed; movement log
-- [ ] Low-stock alert plus purchase-order draft; near-expiry and expired lot alerts; receive stock and count corrections (audited)
+- [x] `InventoryItem` per site and product with lots (lot number, expiry, quantity), reorder point and reorder quantity
+- [x] Completion hook deducts contrast and consumables (first-expiring lot first) when an exam is completed; movement log
+- [x] Low-stock alert plus purchase-order draft; near-expiry and expired lot alerts; receive stock and count corrections (audited)
 
 ### System 16 · Referral Analytics Dashboard
 
