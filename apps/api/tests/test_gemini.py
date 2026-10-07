@@ -315,9 +315,17 @@ def test_vertex_client_uses_agent_platform_configuration(monkeypatch):
     (403, "authentication or permission"),
     (404, "model or endpoint not found"),
     (429, "rate or quota limit"),
-    (402, "Gemini Developer API payment route"),
+    (402, "payment required"),
 ])
 def test_vertex_api_errors_have_actionable_messages(code, expected):
     provider = GeminiProvider("k", 5, client=FakeClient([api_error(code, "ERROR")]))
-    with pytest.raises(ProviderUnavailable, match=expected):
-        provider.complete_json(task="t", model="gemini-2.5-flash", system="s", text="x", schema={})
+    with pytest.raises(ProviderUnavailable, match=expected) as raised:
+        provider.complete_json(task="t", model="gemini-3.5-flash", system="s", text="x", schema={})
+    assert "Google: error" in str(raised.value)  # Google's own message is kept
+
+
+def test_ai_studio_key_is_not_used_for_vertex(monkeypatch, caplog):
+    monkeypatch.delenv("GOOGLE_AGENT_PLATFORM_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "ai-studio-key")
+    assert config.load_settings().google_agent_platform_api_key is None
+    assert "GEMINI_API_KEY is ignored" in caplog.text

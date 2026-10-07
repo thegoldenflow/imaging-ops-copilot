@@ -267,16 +267,17 @@ class GeminiProvider:
         except genai_errors.APIError as e:  # 4xx incl. 429 rate limit, 5xx
             code = int(e.code or 0)
             if code in (401, 403):
-                message = "Agent Platform authentication or permission error (401/403): check the API key and API access"
+                hint = "authentication or permission error: check the API key and API access"
             elif code == 404:
-                message = "Agent Platform model or endpoint not found (404): check the model and Vertex endpoint"
+                hint = "model or endpoint not found: check the model and Vertex endpoint"
             elif code == 429:
-                message = "Agent Platform rate or quota limit reached (429)"
+                hint = "rate or quota limit reached"
             elif code == 402:
-                message = "Received 402: the request may still be using the Gemini Developer API payment route, not Agent Platform"
+                hint = "payment required: check billing on the Google Cloud project"
             else:
-                message = f"Agent Platform API error {code}: {e.message or e.status}"
-            raise ProviderUnavailable(message) from e
+                hint = "request failed"
+            # Keep Google's own message: it names the actual cause.
+            raise ProviderUnavailable(f"Agent Platform {code} {hint}. Google: {e.message or e.status}") from e
         except (httpx.HTTPError, OSError) as e:  # timeouts and network failures
             raise ProviderUnavailable(f"Connection error: {type(e).__name__}: {e}") from e
 

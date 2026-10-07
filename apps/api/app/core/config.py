@@ -1,5 +1,6 @@
 """Runtime settings, read once from environment variables."""
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,17 +48,17 @@ class Settings:
 
 
 def load_settings() -> Settings:
+    if os.getenv("GEMINI_API_KEY") and not os.getenv("GOOGLE_AGENT_PLATFORM_API_KEY"):
+        # A Google AI Studio key does not work on the Vertex AI endpoint; say so instead of a bare 401.
+        logging.getLogger(__name__).warning(
+            "GEMINI_API_KEY is ignored: Gemini runs through Vertex AI and needs GOOGLE_AGENT_PLATFORM_API_KEY")
     key = os.getenv("ANTHROPIC_API_KEY") or None
     provider = (os.getenv("LLM_PROVIDER") or os.getenv("LLM_MODE") or ("anthropic" if key else "mock")).strip().lower()
     if provider not in ("anthropic", "gemini", "mock"):
         raise ValueError(f"LLM_PROVIDER must be anthropic, gemini or mock, not {provider!r}")
     return Settings(
         anthropic_api_key=key,
-        # GEMINI_API_KEY remains a temporary local migration fallback only. Every
-        # Gemini request is still constructed as a Vertex / Agent Platform request.
-        google_agent_platform_api_key=(
-            os.getenv("GOOGLE_AGENT_PLATFORM_API_KEY") or os.getenv("GEMINI_API_KEY") or None
-        ),
+        google_agent_platform_api_key=os.getenv("GOOGLE_AGENT_PLATFORM_API_KEY") or None,
         llm_provider=provider,
         model_reasoning=os.getenv("CLAUDE_MODEL_REASONING", "claude-sonnet-5-5"),
         model_fast=os.getenv("CLAUDE_MODEL_FAST", "claude-haiku-4-5"),
