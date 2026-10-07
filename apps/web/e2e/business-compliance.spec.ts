@@ -72,3 +72,35 @@ async function demoDay(request: APIRequestContext) {
   }
   throw new Error("AP-DEMO2 not found");
 }
+
+test("referral analytics: filters, visit list and an AI summary whose numbers match the tiles (system 16)", async ({ page }) => {
+  await signInAs(page, "operations_manager");
+  await page.getByRole("link", { name: "Referral analytics" }).click();
+  await expect(page.getByTestId("kpi-last-week")).toBeVisible();
+  const all = Number(await page.getByTestId("kpi-avg").textContent());
+  await page.getByLabel("Modality", { exact: true }).selectOption("CT");
+  await expect.poll(async () => Number(await page.getByTestId("kpi-avg").textContent())).toBeLessThan(all);
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page.getByTestId("visit-list").locator('[data-testid^="visit-R-"]').first()).toBeVisible();
+
+  await page.getByTestId("generate-summary").click();
+  const summary = page.getByTestId("weekly-summary");
+  await expect(summary).toBeVisible();
+  await expect(page.getByText("AI draft", { exact: true })).toBeVisible();
+  // Every filled-in value is shown on the dashboard tile it names.
+  const facts = summary.locator("[data-tile]");
+  const n = await facts.count();
+  expect(n).toBeGreaterThan(5);
+  for (let i = 0; i < n; i++) {
+    const fact = facts.nth(i);
+    const tile = await fact.getAttribute("data-tile");
+    const value = (await fact.textContent())!.trim();
+    await expect(page.getByTestId(tile!).first()).toContainText(value);
+  }
+  await facts.first().click();
+  await shot(page, "p4-03-referrals");
+  await page.getByTestId("approve-summary").click();
+  await expect(page.getByText(/Approved by Jordan Lee/)).toBeVisible();
+  await page.locator('[data-testid^="plan-R-"]').first().click();
+  await expect(page.getByTestId("visit-list")).toContainText("planned by Jordan Lee");
+});

@@ -619,3 +619,60 @@ export interface InventoryOverview {
   sites: { id: string; name: string }[];
   expiry_warning_days: number;
 }
+
+// ---------- System 16 referral analytics ----------
+
+export interface ReferrerTrend {
+  referrer_id: string;
+  name: string;
+  specialty: string;
+  clinic: string;
+  phone: string;
+  is_key: boolean;
+  total: number;
+  last_week: number;
+  series: number[];
+  baseline_per_week: number;
+  recent_per_week: number;
+  change: number | null;
+  change_label: string;
+  last_referral: string;
+  declining: boolean;
+  visit?: { status: "planned" | "visited"; note: string; by: string; at: string } | null;
+}
+
+export interface Breakdown { key: string; name?: string; total: number; last_week: number }
+
+export interface ReferralOverview {
+  weeks: string[];
+  labels: string[];
+  kpis: { total: number; last_week: number; prior_week: number; week_change: number | null; week_change_label: string; week_label: string; avg_per_week: number; active_referrers: number; declining: number };
+  series: { name: string; values: number[] }[];
+  series_by_modality: { name: string; values: number[] }[];
+  by_specialty: Breakdown[];
+  by_modality: Breakdown[];
+  by_site: Breakdown[];
+  by_exam: Breakdown[];
+  referrers: ReferrerTrend[];
+  visit_list: ReferrerTrend[];
+  specialties: string[];
+  sites: { id: string; name: string }[];
+  thresholds: { decline: number; recent_weeks: number; baseline_weeks: number; min_baseline_per_week: number };
+}
+
+export type SummarySegment = { text: string } | { fact: string; value: string; label: string; tile: string };
+
+export interface WeeklySummary {
+  week_start: string;
+  headline: SummarySegment[];
+  sentences: SummarySegment[][];
+  status: "draft" | "approved";
+  ai_status: "ok" | "needs_human" | "unavailable";
+  model: string;
+  prompt_version: string;
+  generated_at: string;
+  generated_by: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  error: string | null;
+}

@@ -187,11 +187,11 @@ Plan (same shape as phase 3: module state in `store.module(...)`, a `seed(s, rng
 - [x] Completion hook deducts contrast and consumables (first-expiring lot first) when an exam is completed; movement log
 - [x] Low-stock alert plus purchase-order draft; near-expiry and expired lot alerts; receive stock and count corrections (audited)
 
-### System 16 · Referral Analytics Dashboard
+### System 16 · Referral Analytics Dashboard — done
 
-- [ ] Referral volume by referrer, specialty, exam type, site and week, with filters and trend charts
-- [ ] Referrers with a marked drop in volume form a visit list
-- [ ] Weekly summary drafted by Claude from query results only: the model places numbers by fact key, the server fills them in and rejects any number it did not supply; each number links to its dashboard tile
+- [x] Referral volume by referrer, specialty, exam type, site and week, with filters and trend charts
+- [x] Referrers with a marked drop in volume form a visit list
+- [x] Weekly summary drafted by Claude from query results only: the model places numbers by fact key, the server fills them in and rejects any number it did not supply; each number links to its dashboard tile
 
 ### System 17 · Referring Physician Portal
 
