@@ -112,6 +112,44 @@ const OPERATIONS: Step[] = [
   },
 ];
 
+const BUSINESS: Step[] = [
+  {
+    title: "A contrast CT finishes and stock goes down",
+    detail: "Mark a contrast CT done at Lakeshore. Iohexol and the injector kit are deducted from the first-expiring lot; iohexol reaches its reorder point and a purchase order is drafted.",
+    role: "technologist", userId: "U-TECH", to: "/inventory", system: "Inventory",
+  },
+  {
+    title: "The patient rates the visit on her phone",
+    detail: "Every completed exam sends a survey in the patient's language. Open one from “Surveys sent”, give one star: the site manager is alerted at once and AI labels the comment's sentiment and themes for staff to confirm.",
+    role: "operations_manager", userId: "U-OPS", to: "/feedback", system: "Patient feedback",
+  },
+  {
+    title: "Dr. Park orders online and only sees her own patients",
+    detail: "Submit a requisition in the portal; it is triaged and given a protocol within seconds. Try opening patient PT-00001: refused and written to the audit log.",
+    role: "referrer", userId: "U-REF", to: "/portal/new", system: "Referrer portal",
+  },
+  {
+    title: "Referral trends and an AI weekly summary",
+    detail: "Filter by specialty, modality or site. Six referrers dropped sharply and form the visit list. Draft the weekly summary: every number is filled in from the queries; click one to see its tile.",
+    role: "operations_manager", userId: "U-OPS", to: "/referrals", system: "Referral analytics",
+  },
+  {
+    title: "Billing QA work queue",
+    detail: "Completed exams reconciled against claims: not submitted, duplicates, wrong codes, wrong amounts, rejections and claims for exams never performed. Work an item and export the list.",
+    role: "admin", userId: "U-ADMIN", to: "/billing", system: "Billing QA",
+  },
+  {
+    title: "Privacy officer reviews unusual access",
+    detail: "Rules over the audit log caught a bulk lookup, after-hours access, a possible relative, a self-lookup, cross-site access and repeated refusals. Investigate one; every step is recorded.",
+    role: "admin", userId: "U-ADMIN", to: "/phipa", system: "PHIPA monitoring",
+  },
+  {
+    title: "Get ready for an inspection",
+    detail: "The checklist shows what is out of date (an overdue scanner service, an expired BLS). Ask the policies a question: the answer quotes the policy with a link to the exact section, or says it is not covered.",
+    role: "operations_manager", userId: "U-OPS", to: "/inspection", system: "Inspection hub",
+  },
+];
+
 function StoryCard({ title, steps, onGo, userId }: { title: string; steps: Step[]; onGo: (s: Step) => void; userId: string }) {
   return (
     <Card title={title} className="mb-4">
@@ -156,6 +194,7 @@ export function HomePage() {
       <StoryCard title="Storyline 1 · one patient through scheduling, reporting and the front desk" steps={STORY} onGo={go} userId={user.id} />
       <StoryCard title="Storyline 2 · the requisition intake pipeline" steps={PIPELINE} onGo={go} userId={user.id} />
       <StoryCard title="Storyline 3 · radiology operations" steps={OPERATIONS} onGo={go} userId={user.id} />
+      <StoryCard title="Storyline 4 · business and compliance" steps={BUSINESS} onGo={go} userId={user.id} />
       <p className="flex items-center gap-1.5 text-xs text-slate-500">
         <CheckCircle2 className="size-3.5" /> Use “Reset demo” in the header to start over.
       </p>

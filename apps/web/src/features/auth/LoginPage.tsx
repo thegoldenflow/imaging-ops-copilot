@@ -11,10 +11,10 @@ const ROLE_HINT: Record<Role, string> = {
   front_desk: "Phone agent, reminders, pre-registration",
   technologist: "Today's schedule at your site",
   radiologist: "AI report drafts, review and sign",
-  operations_manager: "Utilization, backfill, no-show risk",
+  operations_manager: "Utilization, backfill, referrals, feedback, billing",
   medical_director: "Reports, audit log, AI usage",
   admin: "Everything, including audit and settings",
-  referrer: "Signed reports for your patients",
+  referrer: "Online requisitions, your patients and signed reports",
 };
 
 export function LoginPage() {

@@ -177,9 +177,20 @@ Tests: `tests/test_phase3.py` (29 backend tests) and `e2e/radiology-ops.spec.ts`
 
 ## Phase 4 — Business & compliance (Systems 15–21)
 
-Status: in progress, branch `feat/phase-4-business-compliance`
+Status: done (demo scope), branch `feat/phase-4-business-compliance` (built on `feat/phase-3-radiology-ops`)
 
-Plan (same shape as phase 3: module state in `store.module(...)`, a `seed(s, rng, now)` per module, one api and one web commit per system):
+Same shape as phase 3: module state in `store.module(...)`, a `seed(s, rng, now)` per module, completion hooks for exam-driven work (inventory deduction, satisfaction survey), the in-process worker for background steps (feedback classification, inspection reminders). Three new Claude tasks go through the gateway with mock fixtures, so the demo runs without a key: `referral_weekly_summary`, `feedback_classify` and `policy_qa`.
+
+Demo-scope notes:
+
+- Data model: fields and spec entities added, nothing removed. Spec entities live in their modules, like `Screening` and `CriticalCase` before them: `InventoryItem` (one per site and product, with lots), `Claim`, `Document` (DocumentReference, versioned for policies) and `FeedbackResponse` (the satisfaction-survey QuestionnaireResponse). `AuditLog.record` gained an optional `ts` so the seed can import a chronological 30-day access history; the hash chain covers it the same way.
+- Referral volume counts ordered exams by exam date (the 90-day history gives complete weeks). Six referrers' recent referrals are moved to colleagues in the seed so the visit list has real cases; this runs before studies are seeded and uses its own random stream, so earlier phases' data does not change.
+- The weekly summary never contains a number written by the model: Claude places facts by key (`{last_week_total}`), the server fills in values from the dashboard queries and rejects drafts with their own digits or unknown keys (one retry, then "needs human review"). Each fact names the dashboard tile that shows it.
+- Portal: a referrer's patients are those with an appointment, requisition, waitlist entry or study naming them. A refused patient id gets the same 403 whether it exists or not. Portal requisitions are composed into the same text layout as faxed ones and run through the same pipeline; referrers see a priority only after a radiologist confirms it, never the AI suggestion. Six upcoming appointments are given to Dr. Park in the seed.
+- Billing: fee codes and amounts are a synthetic table, not the OHIP schedule. Claims cover the last 30 days; a claim is expected within 2 days of the exam. The seed plants every kind of discrepancy (also an amount that differs from the fee table) and records the planted set so tests check that each is found and nothing else is flagged.
+- Feedback: surveys go out immediately after completion (a clinic would wait a few hours). A 1–2 star rating alerts the site manager by rule, with or without AI; an AI "negative" reading on a higher rating alerts too. Site managers are fictional contacts. Westbrook has a planted bad month.
+- PHIPA monitoring recomputes alerts from the audit log (cached by log length), so the log stays the single source of truth; investigation state is stored by alert id and every step is itself audited. Three site staff (Laura Gagnon, Dana Kim, Chris Patel) and a patient record for Sam Rivera were added for the planted cases. Central intake (requisitions) is exempt from the cross-site rule. Thresholds (after hours 22:00–06:00, 25 patients in 15 minutes, 3 refusals in 10 minutes) are demo values.
+- Inspection: policies are synthetic text (labelled "not clinical or legal guidance"); uploads accept pasted text or .md/.txt files, split into sections by `#` headings. Retrieval is keyword scoring (no embeddings); when nothing scores, the reply says the documents do not cover it without calling Claude. Citations must name a retrieved section and quote it verbatim, checked by the server. Reminders go out at 60, 30 and 7 days and when overdue, once per stage. Quality records from systems 13 and 14 are generated summaries.
 
 ### System 15 · Inventory Manager — done
 
@@ -201,7 +212,7 @@ Plan (same shape as phase 3: module state in `store.module(...)`, a `seed(s, rng
 ### System 18 · Billing & Claims QA — done
 
 - [x] `Claim` entity and a synthetic fee code table (not the OHIP schedule)
-- [x] Reconciliation rules: missing claim, duplicate claim, code does not match the exam performed, rejected claim, claim for an exam that was not performed; seeded with each kind
+- [x] Reconciliation rules: missing claim, duplicate claim, code does not match the exam performed, amount differs from the fee table, rejected claim, claim for an exam that was not performed; seeded with each kind
 - [x] Work queue with resolution outcomes; CSV export (audited)
 
 ### System 19 · Patient Feedback — done
@@ -222,9 +233,13 @@ Plan (same shape as phase 3: module state in `store.module(...)`, a `seed(s, rng
 - [x] Expiry reminders (credentials and equipment tests) and an inspection checklist
 - [x] Policy Q&A grounded in uploaded documents only, with clickable citations; says so when the answer is not in the documents; eval set
 
-### Phase 4 wrap-up
+### Phase 4 wrap-up — done
 
-- [ ] Storyline 4 on the home page; Playwright spec for phase 4; README and PROGRESS updated
+- [x] Storyline 4 on the home page; Playwright spec for phase 4; README and PROGRESS updated
+- [x] Evals: `feedback` (60 comments, 4 languages), `policy_qa` (20 questions, 4 not covered) and `referral_summary` (number traceability over 3 data sets); baseline results committed
+- [ ] Run the phase 4 evals with a real `ANTHROPIC_API_KEY` (mock baselines only so far: feedback sentiment 95%, theme F1 0.93; policy Q&A 88% answered with the right citation, 75% correct "not found"; summary numbers 100% traceable by construction)
+
+Tests: `tests/test_phase4.py` (28 backend tests) and `e2e/business-compliance.spec.ts` (one test per system plus the storyline card).
 
 ## Environment notes
 

@@ -1,6 +1,6 @@
 # Imaging Ops Copilot
 
-A demo AI toolkit for an outpatient medical imaging center: scheduling, chest X-ray report drafting, front desk automation, requisition triage, radiology operations and compliance. The full scope is 21 systems delivered in 5 phases; phases 0–3 (systems 1–14) are built.
+A demo AI toolkit for an outpatient medical imaging center: scheduling, chest X-ray report drafting, front desk automation, requisition triage, radiology operations and compliance. The full scope is 21 systems delivered in 5 phases; all five phases (systems 1–21) are built in a lean demo form.
 
 > All data is synthetic. No real patient information is used anywhere. AI output is always a draft or a suggestion that a person must confirm. Nothing in this repository is a medical device or gives diagnostic advice.
 
@@ -34,11 +34,23 @@ A demo AI toolkit for an outpatient medical imaging center: scheduling, chest X-
 | 13 | Peer Review / QA | Nightly sampling at a set rate, blind assignment never back to the original reader, concur / minor / significant grading with discrepancy type, QA report by radiologist and exam type for the QA lead only, CSV export |
 | 14 | CT Dose Monitoring | Dose record per CT shaped like a DICOM dose SR (CTDIvol, DLP per irradiation event), reference levels per protocol, exceedance review list, weekly trends by scanner and protocol |
 
+### Phase 4: business and compliance
+
+| # | System | What you can demo |
+| --- | --- | --- |
+| 15 | Inventory Manager | Contrast and consumables per site with lots and expiry; completing an exam deducts what it used (first-expiring lot first); low-stock alerts with a drafted purchase order, near-expiry and expired lots, receiving and count corrections |
+| 16 | Referral Analytics | Referral volume by referrer, specialty, modality, site and week with filters and trends; a visit list of referrers whose volume dropped; a Claude weekly summary in which every number is filled in from the queries and links to its dashboard tile |
+| 17 | Referring Physician Portal | Separate referrer login; online requisitions (form plus free text) go through the intake pipeline; referrers see only their own patients, anything else is 403 and audited |
+| 18 | Billing & Claims QA | Completed exams reconciled against claims (synthetic fee codes): not submitted, duplicate, wrong code, wrong amount, rejected, billed but not performed; work queue with outcomes; CSV export |
+| 19 | Patient Feedback | Survey by SMS after every exam, mobile page in 4 languages; Claude labels sentiment and themes for staff to confirm; low ratings alert the site manager at once; ratings and themes by site and week |
+| 20 | PHIPA Access Monitoring | Rules over the hash-chained audit log (cross-site, after hours, bulk, same family name, own record, repeated refusals) with risk scores and evidence; investigation trail; compliance report and export |
+| 21 | Inspection Readiness Hub | Versioned policies, equipment records, staff credentials and quality records; reminders at 60/30/7 days and when overdue; inspection checklist; policy Q&A that cites the exact section or says the documents do not cover it |
+
 Phase 3 uses no AI; it is about data, workflow and an audit trail. Exams finish when a technologist marks them done (Scheduling → Appointments), which creates the study, assigns a reader and records CT dose.
 
 Each AI feature has an eval set in `evals/` (`cd apps/api && uv run python -m app.modules.evals.run`), shown on the AI evaluations page.
 
-The home page walks through three storylines. The first: a chest X-ray flags a possible nodule, the report is signed, another patient phones to cancel a CT, and the freed slot is backfilled with the first patient, who gets her messages in Chinese.
+The home page walks through four storylines. The first: a chest X-ray flags a possible nodule, the report is signed, another patient phones to cancel a CT, and the freed slot is backfilled with the first patient, who gets her messages in Chinese.
 
 ## Run it
 
@@ -63,8 +75,8 @@ Without an API key every AI feature runs on built-in mock outputs, so the whole 
 ### Tests
 
 ```bash
-cd apps/api && uv run pytest -q          # 70 backend tests
-cd apps/web && npx playwright test       # 3 end-to-end specs, one per phase storyline (starts both servers if needed)
+cd apps/api && uv run pytest -q          # 98 backend tests
+cd apps/web && npx playwright test       # 4 end-to-end specs, one per phase (starts both servers if needed)
 ```
 
 ## Tech stack

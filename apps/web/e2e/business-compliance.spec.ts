@@ -23,6 +23,12 @@ test.beforeAll(async ({ request }) => {
   await request.post("/api/demo/reset", { headers: await tokenFor(request, "U-ADMIN") });
 });
 
+test("home page walks through storyline 4", async ({ page }) => {
+  await signInAs(page, "operations_manager");
+  await expect(page.getByText("Storyline 4 · business and compliance")).toBeVisible();
+  await expect(page.getByText("Get ready for an inspection")).toBeVisible();
+});
+
 test("inventory: a contrast CT deducts stock and raises a low-stock alert (system 15)", async ({ page, request }) => {
   // Robert Taylor's contrast CT at Lakeshore (storyline appointment).
   const day = await demoDay(request);
