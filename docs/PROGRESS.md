@@ -175,9 +175,56 @@ Demo-scope notes:
 
 Tests: `tests/test_phase3.py` (29 backend tests) and `e2e/radiology-ops.spec.ts` (technologist → backlog balancing → dictation → live escalation and close → blind peer review → QA export → CT dose).
 
-## Phase 4
+## Phase 4 — Business & compliance (Systems 15–21)
 
-Status: not started
+Status: in progress, branch `feat/phase-4-business-compliance`
+
+Plan (same shape as phase 3: module state in `store.module(...)`, a `seed(s, rng, now)` per module, one api and one web commit per system):
+
+### System 15 · Inventory Manager
+
+- [ ] `InventoryItem` per site and product with lots (lot number, expiry, quantity), reorder point and reorder quantity
+- [ ] Completion hook deducts contrast and consumables (first-expiring lot first) when an exam is completed; movement log
+- [ ] Low-stock alert plus purchase-order draft; near-expiry and expired lot alerts; receive stock and count corrections (audited)
+
+### System 16 · Referral Analytics Dashboard
+
+- [ ] Referral volume by referrer, specialty, exam type, site and week, with filters and trend charts
+- [ ] Referrers with a marked drop in volume form a visit list
+- [ ] Weekly summary drafted by Claude from query results only: the model places numbers by fact key, the server fills them in and rejects any number it did not supply; each number links to its dashboard tile
+
+### System 17 · Referring Physician Portal
+
+- [ ] Referrer sees only their own patients (appointments, requisition status, signed reports); anything else is 403 and audited
+- [ ] Online requisition (structured form plus free text) enters the phase 2 pipeline; staff see triage and protocol suggestions
+
+### System 18 · Billing & Claims QA
+
+- [ ] `Claim` entity and a synthetic fee code table (not the OHIP schedule)
+- [ ] Reconciliation rules: missing claim, duplicate claim, code does not match the exam performed, rejected claim, claim for an exam that was not performed; seeded with each kind
+- [ ] Work queue with resolution outcomes; CSV export (audited)
+
+### System 19 · Patient Feedback
+
+- [ ] Survey sent after completion in the patient's language; mobile page in 4 languages (rating plus free text)
+- [ ] Claude classifies sentiment and themes; staff confirm or correct; low rating or negative sentiment notifies the site manager
+- [ ] Ratings and themes by site and week; 60-item eval set (sentiment and theme accuracy)
+
+### System 20 · PHIPA Access Monitoring
+
+- [ ] Rules over the audit log: patient not seen at the user's sites, after-hours access, bulk access, same family name, own record, repeated denials
+- [ ] Alerts with risk score and evidence (audit sequence numbers); seeded anomalies of every kind
+- [ ] Investigation queue with a full trail (assign, notes, outcome); compliance report and CSV export
+
+### System 21 · Inspection Readiness Hub
+
+- [ ] Document library: versioned policies, equipment records (maintenance, QC tests, repairs), staff credentials, QC records generated from systems 13 and 14
+- [ ] Expiry reminders (credentials and equipment tests) and an inspection checklist
+- [ ] Policy Q&A grounded in uploaded documents only, with clickable citations; says so when the answer is not in the documents; eval set
+
+### Phase 4 wrap-up
+
+- [ ] Storyline 4 on the home page; Playwright spec for phase 4; README and PROGRESS updated
 
 ## Environment notes
 
