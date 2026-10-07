@@ -101,3 +101,73 @@ def test_technologist_cannot_touch_another_sites_stock(client, login):
     assert r.status_code == 403
     assert _audit("post", "inventory_item", "denied")
     assert client.get("/api/inventory", headers=login("U-FD")).status_code == 403
+
+
+# ---------- System 16 · Referral analytics ----------
+
+def test_referral_dashboard_filters_and_trends(client, login):
+    ops = login("U-OPS")
+    data = client.get("/api/referrals/overview", headers=ops).json()
+    k = data["kpis"]
+    assert k["total"] == sum(data["series"][0]["values"]) and len(data["labels"]) == 12
+    assert k["last_week"] == data["series"][0]["values"][-1]
+    assert sum(b["total"] for b in data["by_modality"]) == k["total"]
+    ct = client.get("/api/referrals/overview?modality=CT&site_id=LKS", headers=ops).json()
+    assert 0 < ct["kpis"]["total"] < k["total"] and [b["key"] for b in ct["by_modality"]] == ["CT"]
+    assert [b["key"] for b in ct["by_site"]] == ["LKS"]
+    one = client.get("/api/referrals/overview?specialty=Neurology", headers=ops).json()
+    assert {r["specialty"] for r in one["referrers"]} == {"Neurology"}
+    assert client.get("/api/referrals/overview", headers=login("U-FD")).status_code == 403
+
+
+def test_planted_declines_form_the_visit_list(client, login):
+    data = client.get("/api/referrals/overview", headers=login("U-OPS")).json()
+    planted = set(get_store().modules["referral_planted_declines"])
+    flagged = {r["referrer_id"] for r in data["visit_list"]}
+    assert planted <= flagged and len(flagged) <= len(planted) + 2
+    r = client.put(f"/api/referrals/visits/{data['visit_list'][0]['referrer_id']}",
+                   json={"status": "planned", "note": "Lunch visit"}, headers=login("U-OPS"))
+    assert r.status_code == 200
+
+
+def test_weekly_summary_numbers_all_come_from_facts(client, login):
+    ops = login("U-OPS")
+    summary = client.post("/api/referrals/summary", headers=ops).json()["summary"]
+    assert summary["ai_status"] == "ok" and summary["status"] == "draft"
+    data = client.get("/api/referrals/overview", headers=ops).json()
+    tiles = {"kpi-last-week": str(data["kpis"]["last_week"]), "kpi-prior-week": str(data["kpis"]["prior_week"]),
+             "kpi-change": data["kpis"]["week_change_label"], "kpi-avg": str(data["kpis"]["avg_per_week"]),
+             "kpi-declining": str(data["kpis"]["declining"]), "kpi-week": data["kpis"]["week_label"]}
+    tiles |= {f"mod-{b['key']}-week": str(b["last_week"]) for b in data["by_modality"]}
+    tiles |= {f"site-{b['key']}-week": str(b["last_week"]) for b in data["by_site"]}
+    tiles |= {f"ref-{r['referrer_id']}-week": str(r["last_week"]) for r in data["referrers"]}
+    tiles |= {f"visit-{r['referrer_id']}-change": r["change_label"] for r in data["visit_list"]}
+    numeric = 0
+    for sentence in [summary["headline"], *summary["sentences"]]:
+        for seg in sentence:
+            if "fact" in seg:
+                assert seg["tile"].split("-")[0] in ("kpi", "mod", "site", "ref", "visit")
+                if seg["tile"] in tiles:  # value cells; name facts point at the row
+                    assert tiles[seg["tile"]] == seg["value"], seg
+                    numeric += 1
+            else:
+                assert not any(ch.isdigit() for ch in seg["text"])
+    assert numeric >= 5
+    assert client.post("/api/referrals/summary/approve", headers=ops).json()["summary"]["status"] == "approved"
+
+
+def test_summary_with_invented_numbers_fails_validation():
+    from app.llm.gateway import LlmGateway, set_gateway
+    from app.llm.providers import MockProvider, MOCK_FIXTURES
+    from app.modules.referrals import service as referrals
+
+    original = MOCK_FIXTURES["referral_weekly_summary"]
+    MOCK_FIXTURES["referral_weekly_summary"] = lambda text, images, attempt: {
+        "headline": "Referrals up 12%", "sentences": ["We had {last_week_total} referrals.", "About 40 more than usual."]}
+    try:
+        set_gateway(LlmGateway(MockProvider(latency_s=0)))
+        summary = referrals.generate_summary(get_store(), datetime.now(), "test")
+    finally:
+        MOCK_FIXTURES["referral_weekly_summary"] = original
+    assert summary.ai_status == "needs_human" and summary.sentences == []
+    assert get_store().llm_calls[-1].outcome == "needs_human"

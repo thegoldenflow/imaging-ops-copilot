@@ -240,6 +240,10 @@ def build_store(seed: int | None = None) -> Store:
             added_at=now - timedelta(days=rng.randint(1, 40), hours=rng.randint(0, 12)),
         )
 
+    # Phase 4 (system 16): a few referrers lose volume; before studies copy referrer ids.
+    from app.modules.referrals.service import seed_declines
+
+    seed_declines(s, now, (settings.seed if seed is None else seed) + 16)  # own stream: main rng untouched
     _add_staff(s)
     _add_demo_storyline(s, rng, now)
     _add_reading_worklist(s, rng, now)

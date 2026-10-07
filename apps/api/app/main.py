@@ -26,6 +26,7 @@ from app.modules.prep.router import router as prep_router
 from app.modules.priors import service as priors
 from app.modules.priors.router import router as priors_router
 from app.modules.protocols.router import router as protocols_router
+from app.modules.referrals.router import router as referrals_router
 from app.modules.reports.router import router as reports_router
 from app.modules.requisitions import service as requisitions
 from app.modules.requisitions.router import router as requisitions_router
@@ -94,3 +95,4 @@ app.include_router(critical_router)
 app.include_router(peer_review_router)
 app.include_router(dose_router)
 app.include_router(inventory_router)
+app.include_router(referrals_router)
