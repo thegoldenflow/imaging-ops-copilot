@@ -200,3 +200,30 @@ test("patient feedback: survey on a phone in Chinese, low rating alerts the site
   await page.getByRole("tab", { name: "Trends" }).click();
   await shot(page, "p4-09-feedback");
 });
+
+test("PHIPA monitoring: planted anomalies are caught and an investigation is traced end to end (system 20)", async ({ page }) => {
+  await signInAs(page, "admin");
+  await page.getByRole("link", { name: "Access monitoring" }).click();
+  for (const id of ["cross_site-U-FD", "after_hours-U-TECH2", "bulk-U-FD3", "same_family_name-U-FD2", "own_record-U-TECH", "repeated_denials-U-FD3"]) {
+    await expect(page.getByTestId(`phipa-${id}`)).toBeVisible();
+  }
+  await shot(page, "p4-10-phipa");
+  await page.getByTestId("phipa-own_record-U-TECH").click();
+  await expect(page.getByTestId("evidence")).toContainText("PT-STAFF1");
+  await page.getByTestId("assign").click();
+  await expect(page.getByTestId("phipa-trail")).toContainText("Assigned to Casey Brooks");
+  await page.getByLabel("Investigation note").fill("Sam Rivera says he checked his own booking time.");
+  await page.getByTestId("add-note").click();
+  await expect(page.getByTestId("phipa-trail")).toContainText("Note added");
+  await page.getByLabel("Investigation note").fill("Reminded of the self-access policy; no further action.");
+  await page.getByLabel("Outcome").selectOption("education");
+  await page.getByTestId("close-investigation").click();
+  await expect(page.getByTestId("phipa-trail")).toContainText("Closed: Minor; staff member coached");
+  await expect(page.getByTestId("phipa-trail").locator("li")).toHaveCount(3);
+  await shot(page, "p4-11-phipa-investigation");
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("tab", { name: "Compliance report" }).click();
+  await expect(page.getByTestId("phipa-report")).toContainText("hash chain intact");
+  const [file] = await Promise.all([page.waitForEvent("download"), page.getByTestId("export-phipa").click()]);
+  expect(file.suggestedFilename()).toMatch(/phipa-alerts-.*\.csv/);
+});

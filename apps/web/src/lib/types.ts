@@ -800,3 +800,48 @@ export interface FeedbackOverview {
 }
 
 export interface SurveyRow { id: string; token: string; link: string; patient_name: string; exam_name: string; site_id: string; language: string; sent_at: string; status: string }
+
+// ---------- System 20 PHIPA access monitoring ----------
+
+export interface Investigation {
+  alert_id: string;
+  status: "new" | "investigating" | "closed";
+  assignee: string | null;
+  outcome: string | null;
+  opened_at: string | null;
+  closed_at: string | null;
+  trail: { ts: string; by: string; action: string; text: string; note: string }[];
+}
+
+export interface PhipaAlert {
+  id: string;
+  rule: string;
+  rule_label: string;
+  user_id: string;
+  user_name: string;
+  role: string;
+  user_sites: string[];
+  patient_id: string | null;
+  patient_name: string | null;
+  patients: string[];
+  first_at: string;
+  last_at: string;
+  why: string;
+  risk: number;
+  evidence: { seq: number; ts: string; action: string; resource_type: string; resource_id: string | null; outcome: string; patient_id: string | null; source_ip: string | null }[];
+  evidence_count?: number;
+  investigation: Investigation;
+}
+
+export interface PhipaReport {
+  period_days: number;
+  since: string;
+  generated_at: string;
+  alerts: number;
+  open: number;
+  by_rule: Record<string, { label: string; alerts: number; closed: number }>;
+  outcomes: Record<string, number>;
+  median_hours_to_close: number | null;
+  audit_chain: { intact: boolean; broken_at_seq: number | null };
+  events_in_log: number;
+}

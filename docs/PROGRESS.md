@@ -210,11 +210,11 @@ Plan (same shape as phase 3: module state in `store.module(...)`, a `seed(s, rng
 - [x] Claude classifies sentiment and themes; staff confirm or correct; low rating or negative sentiment notifies the site manager
 - [x] Ratings and themes by site and week; 60-item eval set (sentiment and theme accuracy)
 
-### System 20 · PHIPA Access Monitoring
+### System 20 · PHIPA Access Monitoring — done
 
-- [ ] Rules over the audit log: patient not seen at the user's sites, after-hours access, bulk access, same family name, own record, repeated denials
-- [ ] Alerts with risk score and evidence (audit sequence numbers); seeded anomalies of every kind
-- [ ] Investigation queue with a full trail (assign, notes, outcome); compliance report and CSV export
+- [x] Rules over the audit log: patient not seen at the user's sites, after-hours access, bulk access, same family name, own record, repeated denials
+- [x] Alerts with risk score and evidence (audit sequence numbers); seeded anomalies of every kind
+- [x] Investigation queue with a full trail (assign, notes, outcome); compliance report and CSV export
 
 ### System 21 · Inspection Readiness Hub
 
