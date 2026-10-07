@@ -96,7 +96,7 @@ GOOGLE_AGENT_PLATFORM_API_KEY=your-agent-platform-key
 ### Tests
 
 ```bash
-cd apps/api && uv run pytest -q          # 145 backend tests
+cd apps/api && uv run pytest -q          # 147 backend tests
 cd apps/web && npx playwright test       # 6 end-to-end specs: one per phase, the model-provider badge and clinical knowledge (starts both servers if needed)
 ```
 

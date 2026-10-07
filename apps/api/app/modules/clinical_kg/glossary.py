@@ -3,11 +3,15 @@
 The graph is in Chinese. Every target here must be a node in the graph
 (checked by tests/test_clinical_kg.py), so the rule-based path can align
 English questions without a model. The kg-qa sub-project's reviewable
-terminology sample is merged in at load time.
+terminology sample is merged in at load time, and so is the generated
+English terminology for graph nodes (data/terminology_en.jsonl, see terms.py)
+when it exists. The hand-written entries win on conflicts.
 """
 
 import json
+import re
 from functools import lru_cache
+from pathlib import Path
 
 from app.modules.clinical_kg.graph import KG_DIR
 
@@ -54,23 +58,51 @@ GLOSSARY: dict[str, str] = {
 }
 
 TERMINOLOGY_FILE = KG_DIR.parent / "terminology" / "bilingual_medical_sample.json"
+# One JSON object per line: {"name": zh node, "kind", "en", "aliases_en": [...], "confidence": high|medium|low}
+GENERATED_FILE = Path(__file__).resolve().parent / "data" / "terminology_en.jsonl"
+
+
+def norm(term: str) -> str:
+    return " ".join(term.lower().replace("’", "'").split())
+
+
+def generated_entries(path: Path | None = None) -> list[dict]:
+    path = path or GENERATED_FILE
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def matching_aliases(entry: dict) -> list[str]:
+    """English strings that may match this node: the preferred name and aliases. Low-confidence entries are
+    display-only, and aliases shorter than 3 letters (ambiguous abbreviations) are never matched."""
+    if entry.get("confidence") == "low" or not entry.get("en"):
+        return []
+    return [norm(a) for a in [entry["en"], *entry.get("aliases_en", [])] if len(re.sub(r"[^a-z]", "", a.lower())) >= 3]
 
 
 @lru_cache(maxsize=1)
 def glossary() -> dict[str, str]:
-    """English (lower case) -> Chinese graph name."""
-    terms = dict(GLOSSARY)
+    """English (normalized lower case) -> Chinese graph name."""
+    terms = {norm(k): v for k, v in GLOSSARY.items()}
     if TERMINOLOGY_FILE.exists():
         for entry in json.loads(TERMINOLOGY_FILE.read_text(encoding="utf-8")):
             for alias in entry.get("aliases_en", []):
-                terms.setdefault(alias.lower(), entry["canonical_name"])
+                terms.setdefault(norm(alias), entry["canonical_name"])
+    claims: dict[str, set[str]] = {}
+    for entry in generated_entries():
+        for alias in matching_aliases(entry):
+            claims.setdefault(alias, set()).add(entry["name"])
+    for alias, names in claims.items():
+        if len(names) == 1:  # an alias claimed by two different nodes is ambiguous: skip it
+            terms.setdefault(alias, next(iter(names)))
     return terms
 
 
 @lru_cache(maxsize=1)
 def english_names() -> dict[str, str]:
     """Chinese graph name -> one English name, for display next to the Chinese term."""
-    out: dict[str, str] = {}
-    for en, zh in glossary().items():
+    out = {e["name"]: e["en"] for e in generated_entries() if e.get("en")}
+    for en, zh in GLOSSARY.items():
         out.setdefault(zh, en)
     return out

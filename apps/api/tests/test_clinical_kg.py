@@ -161,3 +161,52 @@ def test_symptom_lookup_answers_per_disease_and_flags_a_single_broad_symptom():
     assert entry["statements"][0]["text"].count("lists") == 1  # one statement per disease
     single = ask("Bilateral leg weakness, what could this be?")
     assert single["intent"] == "symptoms_to_diseases" and "Only one symptom" in single["notes"][0]
+
+
+# --- generated English terminology --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def terminology(tmp_path, monkeypatch):
+    from app.modules.clinical_kg import glossary as g
+
+    path = tmp_path / "terminology_en.jsonl"
+    monkeypatch.setattr(g, "GENERATED_FILE", path)
+    g.glossary.cache_clear()
+    g.english_names.cache_clear()
+    yield path
+    g.glossary.cache_clear()
+    g.english_names.cache_clear()
+
+
+def _write(path, entries):
+    import json
+    path.write_text("".join(json.dumps(e, ensure_ascii=False) + "\n" for e in entries), encoding="utf-8")
+
+
+def test_generated_terminology_extends_english_matching_and_display(terminology):
+    _write(terminology, [
+        {"name": "登革热", "kind": "disease", "en": "Dengue fever", "aliases_en": ["dengue"], "confidence": "high"},
+        {"name": "急性胰腺炎", "kind": "disease", "en": "acute pancreatitis", "aliases_en": ["AP"], "confidence": "high"},
+        {"name": "慢性胰腺炎", "kind": "disease", "en": "chronic pancreatitis", "aliases_en": [], "confidence": "low"},
+    ])
+    parsed = service.rule_parse(get_graph(), "What are the symptoms of dengue fevers and acute pancreatitis?")
+    assert [e["name_zh"] for e in parsed["entities"]] == ["登革热", "急性胰腺炎"]  # longest phrase, plural
+    assert service.align(get_graph(), "AP")["name"] is None  # two-letter abbreviations are never matched
+    assert service.align(get_graph(), "chronic pancreatitis")["name"] is None  # low confidence: display only
+    entry = ask("Symptoms of dengue")
+    assert entry["facts"][0]["disease_en"] == "Dengue fever"
+
+
+def test_terminology_check_reports_problems(terminology):
+    from app.modules.clinical_kg import terms
+
+    _write(terminology, [
+        {"name": "登革热", "kind": "disease", "en": "dengue", "aliases_en": ["breakbone fever"], "confidence": "high"},
+        {"name": "不存在的病", "kind": "disease", "en": "x", "confidence": "high"},
+        {"name": "疟疾感染", "kind": "disease", "en": "malaria 感染", "aliases_en": ["breakbone fever"], "confidence": "sure"},
+    ])
+    problems = "\n".join(terms.check(terminology))
+    assert "'不存在的病' is not a graph node" in problems
+    assert "contains Chinese" in problems and "confidence must be" in problems
+    assert "alias 'breakbone fever' is claimed by" in problems
