@@ -1,0 +1,19 @@
+{
+ "task": "clinical_kg",
+ "run_at": "2026-10-07T05:40:40",
+ "mode": "mock",
+ "model": "rule-based baseline",
+ "n": 30,
+ "metrics": {
+  "entity_alignment": 1.0,
+  "intent_accuracy": 1.0,
+  "expected_fact_retrieved": 1.0,
+  "answered_with_expected_citation": 1.0,
+  "correct_not_found": 1.0,
+  "rejected_unverifiable_answers": 0.0,
+  "failed_calls": 0
+ },
+ "errors": [],
+ "seconds": 1.8,
+ "notes": "24 questions the graph covers (19 about a disease: the expected fact must be cited; 3 symptom lists: a plausible disease must be among the ranked matches; 2 requisition-style indications) and 6 it does not cover (must say so), in English and Chinese. Graph facts come from annotated literature, not guidelines."
+}

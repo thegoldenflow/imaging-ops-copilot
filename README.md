@@ -46,6 +46,12 @@ A demo AI toolkit for an outpatient medical imaging center: scheduling, chest X-
 | 20 | PHIPA Access Monitoring | Rules over the hash-chained audit log (cross-site, after hours, bulk, same family name, own record, repeated refusals) with risk scores and evidence; investigation trail; compliance report and export |
 | 21 | Inspection Readiness Hub | Versioned policies, equipment records, staff credentials and quality records; reminders at 60/30/7 days and when overdue; inspection checklist; policy Q&A that cites the exact section or says the documents do not cover it |
 
+### Added: clinical knowledge Q&A
+
+| System | What you can demo |
+| --- | --- |
+| Clinical knowledge (from the `apps/kg-qa` sub-project, in-memory version) | Staff ask about a disease (symptoms, tests, drugs, treatments, complications) or list symptoms to see matching diseases, in English or Chinese. A side panel on each requisition is prefilled with the extracted clinical indication; a full page keeps recent questions. Lookups use fixed query templates over the medical knowledge graph; every answer statement cites the graph facts it uses, checked by the server; questions the graph does not cover get a plain "no facts" reply. Reference for technologists, radiologists and the medical director only, not a diagnosis; front desk and referrers have no access |
+
 Phase 3 uses no AI; it is about data, workflow and an audit trail. Exams finish when a technologist marks them done (Scheduling → Appointments), which creates the study, assigns a reader and records CT dose.
 
 Each AI feature has an eval set in `evals/` (`cd apps/api && uv run python -m app.modules.evals.run`), shown on the AI evaluations page.
@@ -90,8 +96,8 @@ GOOGLE_AGENT_PLATFORM_API_KEY=your-agent-platform-key
 ### Tests
 
 ```bash
-cd apps/api && uv run pytest -q          # 129 backend tests
-cd apps/web && npx playwright test       # 5 end-to-end specs: one per phase plus the model-provider badge (starts both servers if needed)
+cd apps/api && uv run pytest -q          # 145 backend tests
+cd apps/web && npx playwright test       # 6 end-to-end specs: one per phase, the model-provider badge and clinical knowledge (starts both servers if needed)
 ```
 
 ## Tech stack
@@ -113,7 +119,7 @@ docs/       SPEC.md, PROGRESS.md
 
 ## Sub-projects
 
-- [apps/kg-qa](apps/kg-qa) — medical knowledge-graph Q&A (LangGraph agent + Neo4j + PostgreSQL), imported from an earlier project together with its history. It runs on its own; see its README (in Chinese).
+- [apps/kg-qa](apps/kg-qa) — medical knowledge-graph Q&A (LangGraph agent + Neo4j + PostgreSQL), imported from an earlier project together with its history. It runs on its own; see its README (in Chinese). The suite's Clinical knowledge page reads its committed graph data (read only) into memory, so it works without Neo4j, PostgreSQL or an embedding model; `apps/kg-qa` itself is unchanged and stays the full version.
 
 ## Docs
 

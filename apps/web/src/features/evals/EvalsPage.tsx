@@ -14,6 +14,7 @@ const TITLES: Record<string, string> = {
   feedback: "Patient feedback sentiment and themes · 60 comments in 4 languages",
   referral_summary: "Referral weekly summary · number fidelity",
   policy_qa: "Policy Q&A · citations and refusals",
+  clinical_kg: "Clinical knowledge Q&A · 30 questions in English and Chinese",
 };
 
 export function EvalsPage() {
