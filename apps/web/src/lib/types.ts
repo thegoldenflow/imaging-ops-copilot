@@ -845,3 +845,57 @@ export interface PhipaReport {
   audit_chain: { intact: boolean; broken_at_seq: number | null };
   events_in_log: number;
 }
+
+// ---------- System 21 inspection readiness ----------
+
+export interface DocSection { id: string; heading: string; text: string }
+export interface DocVersion { version: string; effective: string; change_note: string; uploaded_by: string; sections: DocSection[] }
+
+export interface InspectionDoc {
+  id: string;
+  kind: "policy" | "equipment" | "credential" | "qc_record";
+  title: string;
+  category: string;
+  owner: string;
+  site_id: string | null;
+  site_name: string | null;
+  scanner_id: string | null;
+  staff_id: string | null;
+  performed: string | null;
+  due: string | null;
+  result: string | null;
+  source: string;
+  status: "ok" | "upcoming" | "due_soon" | "overdue" | "none";
+  days_to_due: number | null;
+  version: string | null;
+  effective: string | null;
+  versions_count: number;
+  versions?: DocVersion[];
+}
+
+export interface ChecklistItem { key: string; label: string; ok: boolean; detail: string; evidence: string[] }
+export interface InspectionReminder { id: string; doc_id: string; title: string; due: string; stage: number; text: string; to: string; sent_at: string; acknowledged_by: string | null }
+
+export interface InspectionOverview {
+  checklist: ChecklistItem[];
+  due: InspectionDoc[];
+  reminders: InspectionReminder[];
+  counts: Record<string, number>;
+  stages: number[];
+}
+
+export interface QaCitation { chunk_id: string; quote: string; doc_id: string; title: string; heading: string; version: string }
+
+export interface QaEntry {
+  id: string;
+  question: string;
+  answer: string;
+  found: boolean;
+  citations: QaCitation[];
+  suggested?: { chunk_id: string; doc_id: string; title: string; heading: string }[];
+  ai_status: "ok" | "needs_human" | "unavailable" | "no_match";
+  model: string | null;
+  prompt_version: string | null;
+  asked_by: string;
+  asked_at: string;
+}

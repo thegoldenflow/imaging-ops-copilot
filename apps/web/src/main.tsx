@@ -14,6 +14,8 @@ import { ReferralsPage } from "./features/referrals/ReferralsPage";
 import { BillingPage } from "./features/billing/BillingPage";
 import { FeedbackPage } from "./features/feedback/FeedbackPage";
 import { PhipaPage } from "./features/phipa/PhipaPage";
+import { DocumentPage } from "./features/inspection/DocumentPage";
+import { InspectionPage } from "./features/inspection/InspectionPage";
 import { FeedbackSurveyPage } from "./features/patient/FeedbackSurveyPage";
 import { NewRequisitionPage } from "./features/portal/NewRequisitionPage";
 import { PortalPage } from "./features/portal/PortalPage";
@@ -94,6 +96,8 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/billing" element={<Guard path="/billing"><BillingPage /></Guard>} />
               <Route path="/feedback" element={<Guard path="/feedback"><FeedbackPage /></Guard>} />
               <Route path="/phipa" element={<Guard path="/phipa"><PhipaPage /></Guard>} />
+              <Route path="/inspection" element={<Guard path="/inspection"><InspectionPage /></Guard>} />
+              <Route path="/inspection/documents/:docId" element={<Guard path="/inspection"><DocumentPage /></Guard>} />
               <Route path="/evals" element={<Guard path="/evals"><EvalsPage /></Guard>} />
               <Route path="/ai-usage" element={<Guard path="/ai-usage"><AiUsagePage /></Guard>} />
               <Route path="/audit" element={<Guard path="/audit"><AuditPage /></Guard>} />

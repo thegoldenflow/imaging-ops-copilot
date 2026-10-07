@@ -216,11 +216,11 @@ Plan (same shape as phase 3: module state in `store.module(...)`, a `seed(s, rng
 - [x] Alerts with risk score and evidence (audit sequence numbers); seeded anomalies of every kind
 - [x] Investigation queue with a full trail (assign, notes, outcome); compliance report and CSV export
 
-### System 21 · Inspection Readiness Hub
+### System 21 · Inspection Readiness Hub — done
 
-- [ ] Document library: versioned policies, equipment records (maintenance, QC tests, repairs), staff credentials, QC records generated from systems 13 and 14
-- [ ] Expiry reminders (credentials and equipment tests) and an inspection checklist
-- [ ] Policy Q&A grounded in uploaded documents only, with clickable citations; says so when the answer is not in the documents; eval set
+- [x] Document library: versioned policies, equipment records (maintenance, QC tests, repairs), staff credentials, QC records generated from systems 13 and 14
+- [x] Expiry reminders (credentials and equipment tests) and an inspection checklist
+- [x] Policy Q&A grounded in uploaded documents only, with clickable citations; says so when the answer is not in the documents; eval set
 
 ### Phase 4 wrap-up
 

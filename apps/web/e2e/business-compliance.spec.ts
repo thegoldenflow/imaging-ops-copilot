@@ -227,3 +227,45 @@ test("PHIPA monitoring: planted anomalies are caught and an investigation is tra
   const [file] = await Promise.all([page.waitForEvent("download"), page.getByTestId("export-phipa").click()]);
   expect(file.suggestedFilename()).toMatch(/phipa-alerts-.*\.csv/);
 });
+
+test("inspection hub: checklist, reminders, renewals and policy Q&A with clickable citations (system 21)", async ({ page, request }) => {
+  await signInAs(page, "operations_manager");
+  await page.getByRole("link", { name: "Inspection hub" }).click();
+  await expect(page.getByTestId("checklist")).toContainText("Preventive maintenance is up to date");
+  await expect(page.getByTestId("reminder-CRED-U-TECH2-REGISTRATION-30")).toContainText("Chris Patel");
+  await expect(page.getByTestId("reminder-EQ-NGT-MRI1-PM-0")).toContainText("overdue");
+  await shot(page, "p4-12-inspection");
+
+  // A credential moves into the 7-day window: the worker sends that reminder within seconds.
+  const md = await tokenFor(request, "U-MD");
+  const soon = new Date(); soon.setDate(soon.getDate() + 5);
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+  await request.put("/api/inspection/documents/CRED-U-RAD4-REGISTRATION/record", { headers: md, data: { performed: "2025-10-01", due: day(soon) } });
+  await expect(page.getByTestId("reminder-CRED-U-RAD4-REGISTRATION-7")).toBeVisible({ timeout: 15_000 });
+
+  // Record the overdue maintenance: the checklist item turns green.
+  await page.getByTestId("reminder-EQ-NGT-MRI1-PM-0").getByRole("button", { name: "Mark seen" }).click();
+  await page.goto("/inspection/documents/EQ-NGT-MRI1-PM");
+  const next = new Date(); next.setDate(next.getDate() + 182);
+  await page.getByLabel("Next due").fill(day(next));
+  await page.getByTestId("save-renewal").click();
+  await expect(page.getByText("Current").first()).toBeVisible();
+  await page.goto("/inspection");
+  await expect(page.getByTestId("check-Preventive-maintenance")).not.toContainText("not in order");
+
+  // Ask the policies: an answer with a clickable citation, and an honest "not found".
+  await page.getByRole("tab", { name: /Ask the policies/ }).click();
+  await page.getByLabel("Question").fill("How long must an outpatient stay after a contrast injection?");
+  await page.getByTestId("ask").click();
+  const answer = page.locator('[data-testid^="qa-QA-"]').filter({ hasText: "after a contrast injection" }).first();
+  await expect(answer).toContainText("15 minutes");
+  await expect(answer.getByText("AI answer from your documents")).toBeVisible();
+  await page.getByLabel("Question").fill("What is the staff parking fee?");
+  await page.getByTestId("ask").click();
+  await expect(page.locator('[data-testid^="qa-QA-"]').first().getByTestId("not-found")).toContainText("could not find");
+  await shot(page, "p4-13-policy-qa");
+  await answer.getByTestId("citation").first().click();
+  await expect(page.getByRole("heading", { name: "Contrast media administration" })).toBeVisible();
+  await expect(page.getByTestId("cited-quote")).toContainText("15 minutes");
+  await shot(page, "p4-14-citation");
+});
