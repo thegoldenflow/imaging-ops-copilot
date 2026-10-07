@@ -198,11 +198,11 @@ Plan (same shape as phase 3: module state in `store.module(...)`, a `seed(s, rng
 - [x] Referrer sees only their own patients (appointments, requisition status, signed reports); anything else is 403 and audited
 - [x] Online requisition (structured form plus free text) enters the phase 2 pipeline; staff see triage and protocol suggestions
 
-### System 18 · Billing & Claims QA
+### System 18 · Billing & Claims QA — done
 
-- [ ] `Claim` entity and a synthetic fee code table (not the OHIP schedule)
-- [ ] Reconciliation rules: missing claim, duplicate claim, code does not match the exam performed, rejected claim, claim for an exam that was not performed; seeded with each kind
-- [ ] Work queue with resolution outcomes; CSV export (audited)
+- [x] `Claim` entity and a synthetic fee code table (not the OHIP schedule)
+- [x] Reconciliation rules: missing claim, duplicate claim, code does not match the exam performed, rejected claim, claim for an exam that was not performed; seeded with each kind
+- [x] Work queue with resolution outcomes; CSV export (audited)
 
 ### System 19 · Patient Feedback
 

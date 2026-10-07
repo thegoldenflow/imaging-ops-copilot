@@ -56,3 +56,14 @@ export async function api<T = unknown>(path: string, init: RequestInit & { json?
 export const post = <T = unknown>(path: string, json?: unknown) => api<T>(path, { method: "POST", json: json ?? {} });
 export const patch = <T = unknown>(path: string, json?: unknown) => api<T>(path, { method: "PATCH", json });
 export const put = <T = unknown>(path: string, json?: unknown) => api<T>(path, { method: "PUT", json });
+
+/** Fetches a file with the session token and hands it to the browser as a download. */
+export async function download(path: string, filename: string) {
+  const blob = await api<Blob>(path);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

@@ -705,3 +705,48 @@ export interface PortalPatient {
   requisitions: PortalRequisition[];
   reports: { id: string; signed_at: string | null; exam_name: string; impression: string }[];
 }
+
+// ---------- System 18 billing ----------
+
+export interface Claim {
+  id: string;
+  appointment_id: string;
+  payer: string;
+  fee_code: string;
+  amount: number;
+  service_date: string;
+  submitted_at: string;
+  status: "submitted" | "paid" | "rejected" | "voided";
+  rejection_reason: string | null;
+}
+
+export interface Discrepancy {
+  id: string;
+  kind: string;
+  kind_label: string;
+  appointment_id: string;
+  appointment_status: string;
+  claim_ids: string[];
+  claims: Claim[];
+  detail: string;
+  at_stake: number;
+  status: "open" | "resolved";
+  outcome: string | null;
+  note: string;
+  resolved_by: string | null;
+  history: { ts: string; action: string; note: string; by: string }[];
+  service_date: string;
+  site_id: string;
+  patient_name: string;
+  exam_name: string;
+}
+
+export interface BillingOverview {
+  discrepancies: Discrepancy[];
+  kinds: Record<string, { label: string; open: number; resolved: number; at_stake: number }>;
+  outcomes: Record<string, string>;
+  claims: { total: number; paid: number; submitted: number; rejected: number; billed: number };
+  fees: { exam_code: string; exam_name: string; fee_code: string; description: string; amount: number }[];
+  window_days: number;
+  submission_days: number;
+}

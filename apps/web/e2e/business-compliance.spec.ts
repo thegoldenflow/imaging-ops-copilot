@@ -145,3 +145,22 @@ test("referrer portal: online requisition reaches triage; another doctor's patie
   await page.getByRole("tab", { name: "Denied (403)" }).click();
   await expect(page.getByRole("row").filter({ hasText: "PT-00001" }).first()).toContainText("Dr. Helen Park");
 });
+
+test("billing QA: every kind of planted discrepancy is listed, worked and exported (system 18)", async ({ page }) => {
+  await signInAs(page, "admin");
+  await page.getByRole("link", { name: "Billing QA" }).click();
+  await expect(page.getByTestId("kpi-open")).toBeVisible();
+  for (const kind of ["missing", "duplicate", "code_mismatch", "amount_mismatch", "rejected", "not_performed"]) {
+    await expect.poll(async () => Number((await page.getByTestId(`kind-${kind}`).textContent())!.replace(/\D/g, ""))).toBeGreaterThan(0);
+  }
+  await shot(page, "p4-07-billing");
+  const open = Number(await page.getByTestId("kpi-open").textContent());
+  await page.getByTestId("kind-duplicate").click();
+  await page.locator('[data-testid^="disc-duplicate."]').first().click();
+  await expect(page.getByTestId("billing-drawer")).toContainText("claims with");
+  await page.getByLabel("Note").fill("Second claim voided with the payer");
+  await page.getByTestId("resolve-discrepancy").click();
+  await expect(page.getByTestId("kpi-open")).toHaveText(String(open - 1));
+  const [file] = await Promise.all([page.waitForEvent("download"), page.getByTestId("export-billing").click()]);
+  expect(file.suggestedFilename()).toMatch(/billing-discrepancies-.*\.csv/);
+});
