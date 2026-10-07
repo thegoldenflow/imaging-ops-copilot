@@ -34,11 +34,12 @@ class AuditLog:
         outcome: str = "allowed",
         source_ip: str | None = None,
         reason: str = "",
+        ts: datetime | None = None,  # only for importing historical events in order (demo seed)
     ) -> AuditEvent:
         prev_hash = self._events[-1].hash if self._events else GENESIS_HASH
         payload = {
             "seq": len(self._events) + 1,
-            "ts": datetime.now().isoformat(timespec="seconds"),
+            "ts": (ts or datetime.now()).isoformat(timespec="seconds"),
             "user_id": user_id,
             "user_name": user_name,
             "role": role,

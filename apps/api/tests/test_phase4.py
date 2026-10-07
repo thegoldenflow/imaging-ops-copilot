@@ -353,3 +353,55 @@ def test_feedback_dashboard_confirm_and_follow_up(client, login):
     assert r.status_code == 200 and r.json()["status"] == "followed_up"
     fd = client.get("/api/feedback/overview", headers=login("U-FD")).json()
     assert {s["site_id"] for s in fd["by_site"]} == {"LKS"}
+
+
+# ---------- System 20 · PHIPA access monitoring ----------
+
+def test_every_planted_anomaly_is_caught_with_evidence(client, login):
+    data = client.get("/api/phipa/alerts", headers=login("U-ADMIN")).json()
+    caught = {(a["rule"], a["user_id"]) for a in data["alerts"]}
+    planted = set(get_store().modules["phipa_planted"])
+    assert {r for r, _ in planted} == set(data["rules"])  # one planted case per rule
+    assert planted <= caught
+    events = {e.seq: e for e in get_store().audit.events()}
+    for a in data["alerts"]:
+        assert 0 < a["risk"] <= 100 and a["evidence"]
+        for ev in a["evidence"]:
+            assert events[ev["seq"]].resource_id == ev["resource_id"]  # evidence points into the hash-chained log
+    assert get_store().audit.verify() == (True, None)
+    assert client.get("/api/phipa/alerts", headers=login("U-OPS")).status_code == 403
+
+
+def test_live_access_is_monitored(client, login):
+    """Three refused requests in a row from live traffic raise an alert."""
+    from app.modules.phipa import service as phipa
+
+    store = get_store()
+    fd = login("U-FD")
+    for appt_id in [a.id for a in store.appointments.values() if a.site_id == "NGT"][:3]:
+        assert client.post(f"/api/scheduling/appointments/{appt_id}/cancel", json={"reason": "x"},
+                           headers=fd).status_code == 403
+    alerts = phipa.detect(store)
+    assert any(a["rule"] == "repeated_denials" and a["user_id"] == "U-FD" for a in alerts)
+
+
+def test_investigation_trail_and_report(client, login):
+    admin = login("U-ADMIN")
+    data = client.get("/api/phipa/alerts?status=new", headers=admin).json()
+    alert = next(a for a in data["alerts"] if a["rule"] == "own_record")
+    url = f"/api/phipa/alerts/{alert['id']}/actions"
+    assert client.post(url, json={"action": "close", "outcome": "justified", "note": ""}, headers=admin).status_code == 422
+    assert client.post(url, json={"action": "assign", "assignee": "Casey Brooks"}, headers=admin).status_code == 200
+    assert client.post(url, json={"action": "note", "note": "Asked Sam Rivera; he checked his own booking."},
+                       headers=admin).status_code == 200
+    r = client.post(url, json={"action": "close", "outcome": "education", "note": "Reminded of the self-access policy."},
+                    headers=admin)
+    inv = r.json()["investigation"]
+    assert inv["status"] == "closed" and [t["action"] for t in inv["trail"]] == ["assign", "note", "close"]
+    assert all(t["by"] == "Casey Brooks" and t["ts"] for t in inv["trail"])
+    assert client.post(url, json={"action": "note", "note": "late"}, headers=admin).status_code == 422
+    assert len(_audit("investigation_close", "phipa_alert")) == 1  # each step is in the audit log too
+    rep = client.get("/api/phipa/report", headers=admin).json()
+    assert rep["alerts"] >= 6 and rep["by_rule"]["own_record"]["closed"] == 1 and rep["audit_chain"]["intact"]
+    csv_text = client.get("/api/phipa/export.csv", headers=admin).text
+    assert alert["id"] in csv_text and _audit("export", "phipa_alerts")

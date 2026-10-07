@@ -24,6 +24,7 @@ from app.modules.frontdesk.router import router as frontdesk_router
 from app.modules.inventory.router import router as inventory_router
 from app.modules.mri_safety.router import router as mri_router
 from app.modules.peer_review import service as peer_review
+from app.modules.phipa.router import router as phipa_router
 from app.modules.portal.router import router as portal_router
 from app.modules.peer_review.router import router as peer_review_router
 from app.modules.prep.router import router as prep_router
@@ -104,3 +105,4 @@ app.include_router(referrals_router)
 app.include_router(portal_router)
 app.include_router(billing_router)
 app.include_router(feedback_router)
+app.include_router(phipa_router)
