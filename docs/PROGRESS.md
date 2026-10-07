@@ -204,11 +204,11 @@ Plan (same shape as phase 3: module state in `store.module(...)`, a `seed(s, rng
 - [x] Reconciliation rules: missing claim, duplicate claim, code does not match the exam performed, rejected claim, claim for an exam that was not performed; seeded with each kind
 - [x] Work queue with resolution outcomes; CSV export (audited)
 
-### System 19 · Patient Feedback
+### System 19 · Patient Feedback — done
 
-- [ ] Survey sent after completion in the patient's language; mobile page in 4 languages (rating plus free text)
-- [ ] Claude classifies sentiment and themes; staff confirm or correct; low rating or negative sentiment notifies the site manager
-- [ ] Ratings and themes by site and week; 60-item eval set (sentiment and theme accuracy)
+- [x] Survey sent after completion in the patient's language; mobile page in 4 languages (rating plus free text)
+- [x] Claude classifies sentiment and themes; staff confirm or correct; low rating or negative sentiment notifies the site manager
+- [x] Ratings and themes by site and week; 60-item eval set (sentiment and theme accuracy)
 
 ### System 20 · PHIPA Access Monitoring
 

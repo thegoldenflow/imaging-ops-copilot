@@ -750,3 +750,53 @@ export interface BillingOverview {
   window_days: number;
   submission_days: number;
 }
+
+// ---------- System 19 patient feedback ----------
+
+export interface FeedbackResponse {
+  id: string;
+  patient_name: string;
+  site_id: string;
+  site_name: string;
+  exam_name: string;
+  language: string;
+  rating: number;
+  comment: string;
+  submitted_at: string;
+  ai_status: "ok" | "needs_human" | "unavailable" | "seeded" | null;
+  ai_sentiment: string | null;
+  ai_themes: string[];
+  ai_summary: string | null;
+  model: string | null;
+  sentiment: string | null;
+  themes: string[];
+  confirmed_by: string | null;
+}
+
+export interface FeedbackAlert {
+  id: string;
+  response_id: string;
+  site_id: string;
+  reason: string;
+  created_at: string;
+  notified: string;
+  status: "open" | "followed_up";
+  follow_up: string | null;
+  followed_up_by: string | null;
+  response: FeedbackResponse;
+}
+
+export interface FeedbackOverview {
+  kpis: { responses_30d: number; avg_rating_30d: number | null; open_alerts: number; to_confirm: number };
+  by_site: { site_id: string; name: string; responses: number; responses_30d: number; avg_rating_30d: number | null; negative_share_30d: number | null; top_complaint: string | null }[];
+  labels: string[];
+  rating_trend: { name: string; values: (number | null)[] }[];
+  theme_trend: { name: string; values: number[] }[];
+  theme_counts: { theme: string; label: string; positive: number; neutral: number; negative: number }[];
+  responses: FeedbackResponse[];
+  alerts: FeedbackAlert[];
+  themes: Record<string, string>;
+  sites: { id: string; name: string }[];
+}
+
+export interface SurveyRow { id: string; token: string; link: string; patient_name: string; exam_name: string; site_id: string; language: string; sent_at: string; status: string }

@@ -10,6 +10,9 @@ const TITLES: Record<string, string> = {
   triage: "Priority triage · 50 requisitions",
   protocol: "Protocol suggestion · 40 indications",
   implants: "MRI implant extraction · 30 answers in 4 languages",
+  feedback: "Patient feedback sentiment and themes · 60 comments in 4 languages",
+  referral_summary: "Referral weekly summary · number fidelity",
+  policy_qa: "Policy Q&A · citations and refusals",
 };
 
 export function EvalsPage() {

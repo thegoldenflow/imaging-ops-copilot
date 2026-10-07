@@ -12,6 +12,8 @@ import { DosePage } from "./features/dose/DosePage";
 import { InventoryPage } from "./features/inventory/InventoryPage";
 import { ReferralsPage } from "./features/referrals/ReferralsPage";
 import { BillingPage } from "./features/billing/BillingPage";
+import { FeedbackPage } from "./features/feedback/FeedbackPage";
+import { FeedbackSurveyPage } from "./features/patient/FeedbackSurveyPage";
 import { NewRequisitionPage } from "./features/portal/NewRequisitionPage";
 import { PortalPage } from "./features/portal/PortalPage";
 import { PortalPatientPage } from "./features/portal/PortalPatientPage";
@@ -65,6 +67,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/login" element={<LoginPage />} />
             <Route path="/prereg/:token" element={<PreRegPage />} />
             <Route path="/mri-screening/:token" element={<MriQuestionnairePage />} />
+            <Route path="/feedback/:token" element={<FeedbackSurveyPage />} />
             <Route element={<RequireAuth><Layout /></RequireAuth>}>
               <Route index element={<HomePage />} />
               <Route path="/scheduling" element={<Guard path="/scheduling"><SchedulingPage /></Guard>} />
@@ -88,6 +91,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/inventory" element={<Guard path="/inventory"><InventoryPage /></Guard>} />
               <Route path="/referrals" element={<Guard path="/referrals"><ReferralsPage /></Guard>} />
               <Route path="/billing" element={<Guard path="/billing"><BillingPage /></Guard>} />
+              <Route path="/feedback" element={<Guard path="/feedback"><FeedbackPage /></Guard>} />
               <Route path="/evals" element={<Guard path="/evals"><EvalsPage /></Guard>} />
               <Route path="/ai-usage" element={<Guard path="/ai-usage"><AiUsagePage /></Guard>} />
               <Route path="/audit" element={<Guard path="/audit"><AuditPage /></Guard>} />

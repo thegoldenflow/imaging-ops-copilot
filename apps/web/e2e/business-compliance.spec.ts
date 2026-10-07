@@ -164,3 +164,39 @@ test("billing QA: every kind of planted discrepancy is listed, worked and export
   const [file] = await Promise.all([page.waitForEvent("download"), page.getByTestId("export-billing").click()]);
   expect(file.suggestedFilename()).toMatch(/billing-discrepancies-.*\.csv/);
 });
+
+test("patient feedback: survey on a phone in Chinese, low rating alerts the site manager, AI labels (system 19)", async ({ page, browser }) => {
+  await signInAs(page, "operations_manager");
+  await page.getByRole("link", { name: "Patient feedback" }).click();
+  await expect(page.getByTestId("kpi-alerts")).toBeVisible();
+  const alertsBefore = Number(await page.getByTestId("kpi-alerts").textContent());
+  await page.getByRole("tab", { name: "Surveys sent" }).click();
+  const zh = page.locator('[data-testid^="survey-SRV-"]').filter({ hasText: "中文" }).first();
+  const href = await zh.locator('[data-testid^="survey-link-"]').getAttribute("href");
+
+  const phone = await browser.newPage({ viewport: { width: 390, height: 780 } });
+  await phone.goto(href!);
+  await expect(phone.getByText("您这次就诊感觉如何？")).toBeVisible();
+  await phone.getByTestId("star-1").click();
+  await phone.getByLabel("意见（可选）").fill("等了一个多小时，前台态度差，也没人解释原因。");
+  if (SHOTS) await phone.screenshot({ path: `${SHOTS}/p4-08-survey-phone.png` });
+  await phone.getByTestId("send-feedback").click();
+  await expect(phone.getByTestId("feedback-done")).toContainText("感谢您的反馈");
+  await phone.close();
+
+  await expect(page.getByTestId("kpi-alerts")).toHaveText(String(alertsBefore + 1), { timeout: 10_000 });
+  const alert = page.getByTestId("feedback-alerts").locator("li").filter({ hasText: "也没人解释原因" });
+  await expect(alert).toContainText("1-star rating");
+  await page.getByRole("tab", { name: "Responses" }).click();
+  const row = page.locator('[data-testid^="fb-FB-"]').filter({ hasText: "也没人解释原因" });
+  await expect(row).toContainText("AI label", { timeout: 15_000 });
+  await expect(row).toContainText("Wait time");
+  await expect(row).toContainText("AI summary in English");
+  await row.getByRole("button", { name: "Confirm labels" }).click();
+  await expect(row).toContainText("Confirmed by Jordan Lee");
+  await alert.getByLabel("Follow-up note").fill("Called the patient and apologised");
+  await alert.getByRole("button", { name: "Record follow-up" }).click();
+  await expect(page.getByTestId("kpi-alerts")).toHaveText(String(alertsBefore));
+  await page.getByRole("tab", { name: "Trends" }).click();
+  await shot(page, "p4-09-feedback");
+});
