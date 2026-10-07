@@ -24,6 +24,7 @@ from app.modules.feedback.router import router as feedback_router
 from app.modules.frontdesk.router import router as frontdesk_router
 from app.modules.inspection import service as inspection
 from app.modules.inspection.router import router as inspection_router
+from app.modules.clinical_kg.router import router as clinical_kg_router
 from app.modules.inventory.router import router as inventory_router
 from app.modules.mri_safety.router import router as mri_router
 from app.modules.peer_review import service as peer_review
@@ -112,3 +113,4 @@ app.include_router(billing_router)
 app.include_router(feedback_router)
 app.include_router(phipa_router)
 app.include_router(inspection_router)
+app.include_router(clinical_kg_router)

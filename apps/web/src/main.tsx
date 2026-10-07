@@ -23,6 +23,7 @@ import { PortalPatientPage } from "./features/portal/PortalPatientPage";
 import { PeerReviewPage } from "./features/peer-review/PeerReviewPage";
 import { ContrastPage } from "./features/contrast/ContrastPage";
 import { EvalsPage } from "./features/evals/EvalsPage";
+import { ClinicalKnowledgePage } from "./features/clinical-kg/ClinicalKnowledge";
 import { MriSafetyPage } from "./features/mri-safety/MriSafetyPage";
 import { MriQuestionnairePage } from "./features/patient/MriQuestionnairePage";
 import { PrepPage } from "./features/prep/PrepPage";
@@ -83,6 +84,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/my-reports" element={<Guard path="/my-reports"><ReferrerPage /></Guard>} />
               <Route path="/requisitions" element={<Guard path="/requisitions"><RequisitionsPage /></Guard>} />
               <Route path="/requisitions/:reqId" element={<Guard path="/requisitions"><RequisitionDetailPage /></Guard>} />
+              <Route path="/clinical-knowledge" element={<Guard path="/clinical-knowledge"><ClinicalKnowledgePage /></Guard>} />
               <Route path="/contrast" element={<Guard path="/contrast"><ContrastPage /></Guard>} />
               <Route path="/mri-safety" element={<Guard path="/mri-safety"><MriSafetyPage /></Guard>} />
               <Route path="/prep" element={<Guard path="/prep"><PrepPage /></Guard>} />

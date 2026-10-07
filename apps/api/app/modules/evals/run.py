@@ -290,8 +290,58 @@ def eval_referral_summary(gateway: LlmGateway) -> dict:
        "by the server; drafts with their own digits fail validation.")
 
 
+def eval_clinical_kg(gateway: LlmGateway) -> dict:
+    """Clinical knowledge Q&A through the same parse, retrieval and citation checks as the app."""
+    from app.llm.gateway import set_gateway
+    from app.modules.clinical_kg import service as kg
+
+    started, items = time.monotonic(), _load("clinical_kg")
+    set_gateway(gateway)
+    store = get_store()
+    covered = [i for i in items if i["expected_fact"] or i["expected_diseases"]]
+    aligned = intent_ok = cited = retrieved = refused = rejected = failed = 0
+    errors = []
+    for item in items:
+        r = kg.ask(store, item["question"], "eval", datetime.now())
+        names = {e["name"] for e in r["entities"] if e["name"]}
+        aligned += set(item["entities"]) <= names
+        rejected += r.get("answer_status") == "needs_human"
+        failed += r.get("answer_status") == "unavailable"
+        cited_ids = {fid for s in r["statements"] for fid in s["fact_ids"]}
+        facts = {f["id"]: (f["disease"], f["relation"], f["value"]) for f in r["facts"]}
+        if item["expected_fact"]:
+            intent_ok += r["intent"] == item["intent"]
+            want = tuple(item["expected_fact"])
+            got_retrieved = want in facts.values()
+            ok = any(facts[fid] == want for fid in cited_ids)
+        elif item["expected_diseases"]:
+            intent_ok += r["intent"] == item["intent"]
+            diseases = {d for d, _, _ in facts.values()}
+            got_retrieved = bool(diseases & set(item["expected_diseases"]))
+            ok = got_retrieved and bool(cited_ids)
+        else:
+            got_retrieved, ok = False, not r["found"] and not r["statements"]
+            refused += ok
+        retrieved += got_retrieved
+        cited += ok and bool(item["expected_fact"] or item["expected_diseases"])
+        if not ok or not set(item["entities"]) <= names:
+            errors.append({"id": item["id"], "question": item["question"], "intent": r["intent"],
+                           "aligned": sorted(names), "found": r["found"], "statements": len(r["statements"])})
+    set_gateway(None)
+    n, m = len(items), len(covered)
+    return _write("clinical_kg", gateway, {
+        "entity_alignment": round(aligned / n, 3), "intent_accuracy": round(intent_ok / m, 3),
+        "expected_fact_retrieved": round(retrieved / m, 3), "answered_with_expected_citation": round(cited / m, 3),
+        "correct_not_found": round(refused / (n - m), 3), "rejected_unverifiable_answers": round(rejected / n, 3),
+        "failed_calls": failed,
+    }, n, errors, started, "24 questions the graph covers (19 about a disease: the expected fact must be cited; 3 symptom "
+       "lists: a plausible disease must be among the ranked matches; 2 requisition-style indications) and 6 it does not "
+       "cover (must say so), in English and Chinese. Graph facts come from annotated literature, not guidelines.")
+
+
 TASKS = {"extraction": eval_extraction, "triage": eval_triage, "protocol": eval_protocol, "implants": eval_implants,
-         "feedback": eval_feedback, "policy_qa": eval_policy_qa, "referral_summary": eval_referral_summary}
+         "feedback": eval_feedback, "policy_qa": eval_policy_qa, "referral_summary": eval_referral_summary,
+         "clinical_kg": eval_clinical_kg}
 
 
 def main(names: list[str]) -> None:

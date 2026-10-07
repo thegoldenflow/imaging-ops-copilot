@@ -8,6 +8,8 @@ import { api, patch, post } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { dateTime, LANGUAGE_LABEL, pct } from "../../lib/format";
 import type { RequisitionDetail, Sourced } from "../../lib/types";
+import { KnowledgePanel } from "../clinical-kg/ClinicalKnowledge";
+import { KG_ROLES } from "../clinical-kg/KnowledgeAnswer";
 import { ContrastBadge, DaysLeft, MriBadge, RequisitionStatus } from "./badges";
 import { PriorTask } from "./PriorTask";
 
@@ -269,6 +271,10 @@ export function RequisitionDetailPage() {
           <div className="space-y-4">
             {d.triage && <TriageCard d={d} isRad={isRad} />}
             {d.protocol && <ProtocolCard d={d} isRad={isRad} />}
+            {user && KG_ROLES.includes(user.role) && (
+              <KnowledgePanel requisitionId={d.summary.id}
+                indication={asList(d.extraction?.fields.clinical_indication ?? []).map((v) => v.value).join(" ")} />
+            )}
             {d.contrast && (
               <Card title="Contrast & kidney check" actions={<ContrastBadge status={d.contrast.status} />}>
                 <ul className="list-disc space-y-1 pl-4 text-sm text-slate-700">{d.contrast.basis.map((b) => <li key={b}>{b}</li>)}</ul>

@@ -13,6 +13,7 @@ Time is short and the goal is a working demo, so the first batch deviates from t
 | STT/TTS services, Twilio | Browser Web Speech API (Chrome) plus typed input | Pluggable STT/TTS later; latency target must be measured locally |
 | shadcn/ui, OpenAPI type generation | Small hand-written component set, hand-written types | Fine for demo size |
 | Claude API | Real Claude when `ANTHROPIC_API_KEY` is set, otherwise mock outputs through the same gateway | Same code path either way |
+| Knowledge-graph Q&A on Neo4j + PostgreSQL + embeddings (`apps/kg-qa`) | In-memory graph from the same data, fixed query templates, answers through the gateway | `apps/kg-qa` unchanged as the full version; it could be called as an optional backend later |
 | Anthropic API only | Claude by default; Google Gemini selectable with `LLM_PROVIDER=gemini` (owner-approved stack change, see below) | Same gateway, same schemas and logging for both |
 
 ## Phase 0 — Backend Infrastructure (System 1)
@@ -268,6 +269,31 @@ Limits:
 - No thinking-level tuning: Gemini Flash thinks by default, which adds latency in the phone agent; the 1.5 s speech-to-reply target is unmeasured for Gemini, as for Claude.
 - The server-side refusal fallback used with Claude Sonnet 5.5 has no Gemini counterpart; a Gemini refusal goes to a person.
 - One provider per running backend; switching needs a restart.
+
+## Clinical knowledge Q&A (knowledge graph, in-memory)
+
+Status: done (demo scope), branch `feat/gemini-provider`. The owner approved bringing the `apps/kg-qa` knowledge-graph Q&A into the suite as an in-memory demo version (stack change: no Neo4j, PostgreSQL, Chroma or embedding model; `apps/kg-qa` stays unchanged as the full version). Staff-facing only: the phone agent rule (no medical questions, transfer to a person) stays.
+
+Placement: a side panel on the requisition review page (next to triage and protocol), prefilled with the extracted clinical indication, plus a "Clinical knowledge" page under Intake pipeline. Technologists, radiologists, the medical director and admins; front desk and referrers get 403.
+
+- [x] In-memory graph loaded read-only from `apps/kg-qa/data/knowledge_graph/` (the committed annotation graph: 3,668 diseases, 30,513 facts; `medical_kg.jsonl` is read too when placed there locally; `CLINICAL_KG_DIR` overrides the folder). Duplicate disease lines merged; stable fact ids (hash of disease, relation, value)
+- [x] English → Chinese glossary (159 terms common in requisitions), every target checked against the graph by a test; kg-qa's bilingual terminology sample merged in. Alignment: exact name, glossary, then fuzzy match (marked "approx.")
+- [x] Question reading (`clinical_kg_parse`, fast tier): the model maps terms to Chinese graph names and picks the intent; the rule-based reader (glossary plus dictionary scan) is the mock fixture and the fallback when AI is unavailable
+- [x] Fixed query templates instead of model-written Cypher: facts about a disease (symptoms, tests, drugs, treatments, complications, causes, affected groups), and diseases ranked by symptoms matched (then by the share of the disease's listed symptoms that matched, then by how well described the disease is), with their listed tests
+- [x] Answer (`clinical_kg_answer`, reasoning tier): statements that each cite graph fact ids; unknown ids are rejected (one retry, then the facts are listed). Nothing found → "no facts" without a model call. AI unavailable → the facts are listed. One broad symptom → a note to add findings
+- [x] Requisition questions are audited (`knowledge_query` on the requisition) and that patient's identifiers are redacted by the gateway
+- [x] UI: side panel and page, AI or template answer marked, clickable fact citations, grouped fact list, "reference only, not a diagnosis" notice, recent questions
+- [x] Eval set `clinical_kg` (30 questions, English and Chinese: 19 disease questions with an expected cited fact, 3 symptom lists with plausible diseases, 2 requisition-style indications, 6 not covered). Mock baseline: 100% on every metric, optimistic because the rules and the set were written together
+- [x] Tests: `tests/test_clinical_kg.py` (16), `e2e/clinical-knowledge.spec.ts` (3)
+- [ ] Run the eval with a real model (Claude or Gemini) and record the numbers
+
+Limits:
+
+- The graph is built from annotated Chinese medical literature (CMeIE). Coverage is uneven (paediatrics and rare diseases are over-represented; e.g. no facts for melanoma or goitre, no interstitial lung disease or meniscal tear nodes), and it is not a clinical guideline. The UI says so on every answer.
+- Symptom lookups only count listed symptoms; there is no probability, prevalence or age/sex weighting. With one generic symptom the list is broad (flagged in the answer).
+- English questions depend on the glossary when AI is off; terms outside it are reported as "not in graph". With a model, terms are translated first.
+- Fixed templates cannot answer combined questions (e.g. "diseases with fever that need a chest X-ray"); the full `apps/kg-qa` service can, and could be added later as an optional backend.
+- Questions are not kept across a reset (in-memory log), and there is no multi-turn conversation.
 
 ## Environment notes
 

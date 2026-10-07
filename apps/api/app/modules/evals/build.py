@@ -149,6 +149,53 @@ def _patient(rng: random.Random, i: int) -> Patient:
                    health_card_version="ZZ", preferred_language="en")
 
 
+# Clinical knowledge Q&A: (question, language, intent, entity names, expected diseases, expected fact).
+# Expected fact is (disease, relation, value) that a correct answer cites; expected diseases (symptom questions)
+# are clinically plausible matches that should be among the retrieved diseases. None: the graph does not cover it.
+CLINICAL_KG_QUESTIONS = [
+    ("What tests are used for pulmonary embolism?", "en", "disease_facts", ["肺栓塞"], [], ("肺栓塞", "check", "胸部增强CT")),
+    ("肺栓塞需要做哪些检查？", "zh", "disease_facts", ["肺栓塞"], [], ("肺栓塞", "check", "胸部增强CT")),
+    ("Symptoms of pneumonia", "en", "disease_facts", ["肺炎"], [], ("肺炎", "symptom", "咳嗽")),
+    ("肺炎有哪些并发症", "zh", "disease_facts", ["肺炎"], [], ("肺炎", "acompany", "脓胸")),
+    ("Which imaging is used for kidney stones?", "en", "disease_facts", ["肾结石"], [], ("肾结石", "check", "B型超声")),
+    ("肾结石怎么治疗", "zh", "disease_facts", ["肾结石"], [], ("肾结石", "treat", "多饮水")),
+    ("What exams are used to diagnose epilepsy?", "en", "disease_facts", ["癫痫"], [], ("癫痫", "check", "脑电图")),
+    ("癫痫用什么药", "zh", "disease_facts", ["癫痫"], [], ("癫痫", "drug", "苯巴比妥")),
+    ("What tests are used for gallstones?", "en", "disease_facts", ["胆石症"], [], ("胆石症", "check", "超声")),
+    ("Complications of cirrhosis", "en", "disease_facts", ["肝硬化"], [], ("肝硬化", "acompany", "腹水")),
+    ("肝硬化需要做哪些检查", "zh", "disease_facts", ["肝硬化"], [], ("肝硬化", "check", "多普勒超声")),
+    ("Drugs for heart failure", "en", "disease_facts", ["心力衰竭"], [], ("心力衰竭", "drug", "利尿剂")),
+    ("What tests are used for tuberculosis?", "en", "disease_facts", ["肺结核"], [], ("肺结核", "check", "胸片")),
+    ("急性胰腺炎做什么检查", "zh", "disease_facts", ["急性胰腺炎"], [], ("急性胰腺炎", "check", "腹部/盆腔 CT 扫描")),
+    ("What tests for COPD?", "en", "disease_facts", ["慢性阻塞性肺疾病"], [], ("慢性阻塞性肺疾病", "check", "胸部 CT 扫描")),
+    ("Symptoms of optic neuritis", "en", "disease_facts", ["视神经炎"], [], ("视神经炎", "symptom", "单眼视力下降")),
+    ("Tests for endometrial cancer", "en", "disease_facts", ["子宫内膜癌"], [], ("子宫内膜癌", "check", "盆腔超声")),
+    ("缺铁性贫血需要做哪些检查", "zh", "disease_facts", ["缺铁性贫血"], [], ("缺铁性贫血", "check", "血清铁蛋白")),
+    ("What drugs are used for asthma?", "en", "disease_facts", ["哮喘"], [], ("哮喘", "drug", "糖皮质激素")),
+    ("What could cause fever, cough and dyspnea?", "en", "symptoms_to_diseases", ["发热", "咳嗽", "呼吸困难"],
+     ["支气管炎", "肺炎", "肺炎支原体肺炎"], None),
+    ("头痛和呕吐可能是什么病", "zh", "symptoms_to_diseases", ["头痛", "呕吐"], ["颅内压增高症", "脑膜炎", "隐球菌脑膜炎"], None),
+    ("Which diseases could present with chest pain and dyspnea?", "en", "symptoms_to_diseases", ["胸痛", "呼吸困难"],
+     ["肺栓塞"], None),
+    ("Left flank pain radiating to groin with microscopic hematuria, query kidney stone.", "en", "disease_facts",
+     ["肾结石"], [], ("肾结石", "symptom", "血尿")),
+    ("Swollen painful left calf for 2 days, query DVT.", "en", "disease_facts", ["深静脉血栓"], [],
+     ("深静脉血栓", "symptom", "下肢静脉淤滞")),
+    ("What tests are used for interstitial lung disease?", "en", None, [], [], None),
+    ("Treatment for melanoma", "en", None, ["黑色素瘤"], [], None),
+    ("甲状腺肿有哪些症状", "zh", None, ["甲状腺肿"], [], None),
+    ("What is the weather today?", "en", None, [], [], None),
+    ("How do I book a parking spot?", "en", None, [], [], None),
+    ("Symptoms of a meniscal tear", "en", None, [], [], None),
+]
+
+
+def clinical_kg_items() -> list[dict]:
+    return [{"id": f"kg-{i:02d}", "question": q, "language": lang, "intent": intent, "entities": names,
+             "expected_diseases": diseases, "expected_fact": list(fact) if fact else None}
+            for i, (q, lang, intent, names, diseases, fact) in enumerate(CLINICAL_KG_QUESTIONS)]
+
+
 def build() -> None:
     rng = random.Random(SEED)
     DATASETS.mkdir(parents=True, exist_ok=True)
@@ -180,6 +227,9 @@ def build() -> None:
     policy = [{"id": f"pol-{i:02d}", "question": q, "expected_doc": doc} for i, (q, doc) in enumerate(POLICY_QUESTIONS)]
     (DATASETS / "policy_qa.json").write_text(json.dumps(policy, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"Wrote {len(policy)} policy questions")
+    kg = clinical_kg_items()
+    (DATASETS / "clinical_kg.json").write_text(json.dumps(kg, indent=1, ensure_ascii=False), encoding="utf-8")
+    print(f"Wrote {len(kg)} clinical knowledge questions")
     print(f"Wrote {len(requisitions)} requisitions, {len(protocols)} protocol cases, {len(implants)} implant answers to {DATASETS}")
 
 
