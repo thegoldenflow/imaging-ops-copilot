@@ -1,0 +1,608 @@
+[
+ {
+  "id": "fb-00",
+  "language": "en",
+  "rating": 5,
+  "comment": "Everyone was friendly and the scan started on time.",
+  "sentiment": "positive",
+  "themes": [
+   "staff_attitude",
+   "wait_time"
+  ]
+ },
+ {
+  "id": "fb-01",
+  "language": "en",
+  "rating": 1,
+  "comment": "Waited 90 minutes past my appointment. Terrible.",
+  "sentiment": "negative",
+  "themes": [
+   "wait_time"
+  ]
+ },
+ {
+  "id": "fb-02",
+  "language": "en",
+  "rating": 2,
+  "comment": "The receptionist was rude and did not listen.",
+  "sentiment": "negative",
+  "themes": [
+   "staff_attitude"
+  ]
+ },
+ {
+  "id": "fb-03",
+  "language": "en",
+  "rating": 4,
+  "comment": "Clean and comfortable. Thank you.",
+  "sentiment": "positive",
+  "themes": [
+   "environment"
+  ]
+ },
+ {
+  "id": "fb-04",
+  "language": "en",
+  "rating": 2,
+  "comment": "I was charged for parking validation and the bill was wrong.",
+  "sentiment": "negative",
+  "themes": [
+   "billing",
+   "parking_access"
+  ]
+ },
+ {
+  "id": "fb-05",
+  "language": "en",
+  "rating": 3,
+  "comment": "It was okay.",
+  "sentiment": "neutral",
+  "themes": []
+ },
+ {
+  "id": "fb-06",
+  "language": "en",
+  "rating": 5,
+  "comment": "The technologist explained everything clearly, great experience.",
+  "sentiment": "positive",
+  "themes": [
+   "staff_attitude",
+   "communication"
+  ]
+ },
+ {
+  "id": "fb-07",
+  "language": "en",
+  "rating": 1,
+  "comment": "No one could tell me when my results would be ready.",
+  "sentiment": "negative",
+  "themes": [
+   "results",
+   "communication"
+  ]
+ },
+ {
+  "id": "fb-08",
+  "language": "en",
+  "rating": 4,
+  "comment": "Booking an appointment online was quick.",
+  "sentiment": "positive",
+  "themes": [
+   "scheduling",
+   "wait_time"
+  ]
+ },
+ {
+  "id": "fb-09",
+  "language": "en",
+  "rating": 2,
+  "comment": "The waiting room was cold and dirty.",
+  "sentiment": "negative",
+  "themes": [
+   "environment"
+  ]
+ },
+ {
+  "id": "fb-10",
+  "language": "en",
+  "rating": 3,
+  "comment": "Hard to find the entrance but staff were helpful.",
+  "sentiment": "neutral",
+  "themes": [
+   "parking_access",
+   "staff_attitude"
+  ]
+ },
+ {
+  "id": "fb-11",
+  "language": "en",
+  "rating": 1,
+  "comment": "They rescheduled me three times without calling.",
+  "sentiment": "negative",
+  "themes": [
+   "scheduling",
+   "communication"
+  ]
+ },
+ {
+  "id": "fb-12",
+  "language": "en",
+  "rating": 5,
+  "comment": "Fast, friendly, easy. Thanks!",
+  "sentiment": "positive",
+  "themes": [
+   "staff_attitude",
+   "wait_time"
+  ]
+ },
+ {
+  "id": "fb-13",
+  "language": "en",
+  "rating": 2,
+  "comment": "Insurance was billed twice for one exam.",
+  "sentiment": "negative",
+  "themes": [
+   "billing"
+  ]
+ },
+ {
+  "id": "fb-14",
+  "language": "en",
+  "rating": 4,
+  "comment": "No complaints.",
+  "sentiment": "positive",
+  "themes": []
+ },
+ {
+  "id": "fb-15",
+  "language": "fr",
+  "rating": 5,
+  "comment": "Personnel très gentil et examen rapide.",
+  "sentiment": "positive",
+  "themes": [
+   "staff_attitude",
+   "wait_time"
+  ]
+ },
+ {
+  "id": "fb-16",
+  "language": "fr",
+  "rating": 1,
+  "comment": "Attente de deux heures, aucune explication.",
+  "sentiment": "negative",
+  "themes": [
+   "wait_time",
+   "communication"
+  ]
+ },
+ {
+  "id": "fb-17",
+  "language": "fr",
+  "rating": 2,
+  "comment": "La facture était fausse et personne ne répond.",
+  "sentiment": "negative",
+  "themes": [
+   "billing"
+  ]
+ },
+ {
+  "id": "fb-18",
+  "language": "fr",
+  "rating": 4,
+  "comment": "Salle d'attente propre et calme.",
+  "sentiment": "positive",
+  "themes": [
+   "environment"
+  ]
+ },
+ {
+  "id": "fb-19",
+  "language": "fr",
+  "rating": 3,
+  "comment": "Correct dans l'ensemble.",
+  "sentiment": "neutral",
+  "themes": []
+ },
+ {
+  "id": "fb-20",
+  "language": "fr",
+  "rating": 2,
+  "comment": "Pas de stationnement disponible.",
+  "sentiment": "negative",
+  "themes": [
+   "parking_access"
+  ]
+ },
+ {
+  "id": "fb-21",
+  "language": "fr",
+  "rating": 5,
+  "comment": "Le technologue m'a bien expliqué l'examen, merci.",
+  "sentiment": "positive",
+  "themes": [
+   "staff_attitude",
+   "communication"
+  ]
+ },
+ {
+  "id": "fb-22",
+  "language": "fr",
+  "rating": 1,
+  "comment": "La réceptionniste était impolie.",
+  "sentiment": "negative",
+  "themes": [
+   "staff_attitude"
+  ]
+ },
+ {
+  "id": "fb-23",
+  "language": "fr",
+  "rating": 4,
+  "comment": "Rendez-vous facile à réserver.",
+  "sentiment": "positive",
+  "themes": [
+   "scheduling"
+  ]
+ },
+ {
+  "id": "fb-24",
+  "language": "fr",
+  "rating": 2,
+  "comment": "Les consignes n'étaient pas en français.",
+  "sentiment": "negative",
+  "themes": [
+   "communication"
+  ]
+ },
+ {
+  "id": "fb-25",
+  "language": "fr",
+  "rating": 3,
+  "comment": "Résultats arrivés chez mon médecin, mais un peu lents.",
+  "sentiment": "neutral",
+  "themes": [
+   "results"
+  ]
+ },
+ {
+  "id": "fb-26",
+  "language": "fr",
+  "rating": 5,
+  "comment": "Excellent service, à l'heure.",
+  "sentiment": "positive",
+  "themes": [
+   "wait_time"
+  ]
+ },
+ {
+  "id": "fb-27",
+  "language": "fr",
+  "rating": 2,
+  "comment": "Il faisait froid dans la salle.",
+  "sentiment": "negative",
+  "themes": [
+   "environment"
+  ]
+ },
+ {
+  "id": "fb-28",
+  "language": "fr",
+  "rating": 1,
+  "comment": "Mon rendez-vous a été reporté sans prévenir.",
+  "sentiment": "negative",
+  "themes": [
+   "scheduling"
+  ]
+ },
+ {
+  "id": "fb-29",
+  "language": "fr",
+  "rating": 4,
+  "comment": "Ascenseur et accès en fauteuil faciles.",
+  "sentiment": "positive",
+  "themes": [
+   "parking_access"
+  ]
+ },
+ {
+  "id": "fb-30",
+  "language": "zh",
+  "rating": 5,
+  "comment": "工作人员态度很好，很快就做完了。",
+  "sentiment": "positive",
+  "themes": [
+   "staff_attitude",
+   "wait_time"
+  ]
+ },
+ {
+  "id": "fb-31",
+  "language": "zh",
+  "rating": 1,
+  "comment": "等了两个小时，太久了。",
+  "sentiment": "negative",
+  "themes": [
+   "wait_time"
+  ]
+ },
+ {
+  "id": "fb-32",
+  "language": "zh",
+  "rating": 2,
+  "comment": "前台不耐烦，态度差。",
+  "sentiment": "negative",
+  "themes": [
+   "staff_attitude"
+  ]
+ },
+ {
+  "id": "fb-33",
+  "language": "zh",
+  "rating": 4,
+  "comment": "环境干净舒适。",
+  "sentiment": "positive",
+  "themes": [
+   "environment"
+  ]
+ },
+ {
+  "id": "fb-34",
+  "language": "zh",
+  "rating": 2,
+  "comment": "收费不清楚，账单有错。",
+  "sentiment": "negative",
+  "themes": [
+   "billing"
+  ]
+ },
+ {
+  "id": "fb-35",
+  "language": "zh",
+  "rating": 3,
+  "comment": "一般吧。",
+  "sentiment": "neutral",
+  "themes": []
+ },
+ {
+  "id": "fb-36",
+  "language": "zh",
+  "rating": 5,
+  "comment": "有中文须知，技师解释得很清楚，谢谢。",
+  "sentiment": "positive",
+  "themes": [
+   "communication",
+   "staff_attitude"
+  ]
+ },
+ {
+  "id": "fb-37",
+  "language": "zh",
+  "rating": 1,
+  "comment": "一个星期了医生还没收到报告。",
+  "sentiment": "negative",
+  "themes": [
+   "results"
+  ]
+ },
+ {
+  "id": "fb-38",
+  "language": "zh",
+  "rating": 4,
+  "comment": "网上预约很方便。",
+  "sentiment": "positive",
+  "themes": [
+   "scheduling"
+  ]
+ },
+ {
+  "id": "fb-39",
+  "language": "zh",
+  "rating": 2,
+  "comment": "停车位太少，找了半天。",
+  "sentiment": "negative",
+  "themes": [
+   "parking_access"
+  ]
+ },
+ {
+  "id": "fb-40",
+  "language": "zh",
+  "rating": 3,
+  "comment": "检查还行，就是候诊室有点冷。",
+  "sentiment": "neutral",
+  "themes": [
+   "environment"
+  ]
+ },
+ {
+  "id": "fb-41",
+  "language": "zh",
+  "rating": 1,
+  "comment": "改期了两次也没人通知我。",
+  "sentiment": "negative",
+  "themes": [
+   "scheduling",
+   "communication"
+  ]
+ },
+ {
+  "id": "fb-42",
+  "language": "zh",
+  "rating": 5,
+  "comment": "准时，护士很热情。",
+  "sentiment": "positive",
+  "themes": [
+   "wait_time",
+   "staff_attitude"
+  ]
+ },
+ {
+  "id": "fb-43",
+  "language": "zh",
+  "rating": 2,
+  "comment": "保险没有直接付款，要自己先付。",
+  "sentiment": "negative",
+  "themes": [
+   "billing"
+  ]
+ },
+ {
+  "id": "fb-44",
+  "language": "zh",
+  "rating": 4,
+  "comment": "整体满意。",
+  "sentiment": "positive",
+  "themes": []
+ },
+ {
+  "id": "fb-45",
+  "language": "pa",
+  "rating": 5,
+  "comment": "ਸਟਾਫ ਬਹੁਤ ਚੰਗਾ ਸੀ ਅਤੇ ਜਲਦੀ ਹੋ ਗਿਆ।",
+  "sentiment": "positive",
+  "themes": [
+   "staff_attitude",
+   "wait_time"
+  ]
+ },
+ {
+  "id": "fb-46",
+  "language": "pa",
+  "rating": 1,
+  "comment": "ਦੋ ਘੰਟੇ ਉਡੀਕ ਕਰਨੀ ਪਈ।",
+  "sentiment": "negative",
+  "themes": [
+   "wait_time"
+  ]
+ },
+ {
+  "id": "fb-47",
+  "language": "pa",
+  "rating": 2,
+  "comment": "ਰਿਸੈਪਸ਼ਨ ਤੇ ਰੁੱਖਾ ਵਿਹਾਰ।",
+  "sentiment": "negative",
+  "themes": [
+   "staff_attitude"
+  ]
+ },
+ {
+  "id": "fb-48",
+  "language": "pa",
+  "rating": 4,
+  "comment": "ਕਮਰਾ ਸਾਫ਼ ਸੀ।",
+  "sentiment": "positive",
+  "themes": [
+   "environment"
+  ]
+ },
+ {
+  "id": "fb-49",
+  "language": "pa",
+  "rating": 2,
+  "comment": "ਬਿੱਲ ਗਲਤ ਸੀ।",
+  "sentiment": "negative",
+  "themes": [
+   "billing"
+  ]
+ },
+ {
+  "id": "fb-50",
+  "language": "pa",
+  "rating": 3,
+  "comment": "ਠੀਕ ਸੀ।",
+  "sentiment": "neutral",
+  "themes": []
+ },
+ {
+  "id": "fb-51",
+  "language": "pa",
+  "rating": 5,
+  "comment": "ਹਦਾਇਤਾਂ ਪੰਜਾਬੀ ਵਿੱਚ ਸਨ, ਧੰਨਵਾਦ।",
+  "sentiment": "positive",
+  "themes": [
+   "communication"
+  ]
+ },
+ {
+  "id": "fb-52",
+  "language": "pa",
+  "rating": 1,
+  "comment": "ਮੇਰੇ ਡਾਕਟਰ ਨੂੰ ਰਿਪੋਰਟ ਨਹੀਂ ਮਿਲੀ।",
+  "sentiment": "negative",
+  "themes": [
+   "results"
+  ]
+ },
+ {
+  "id": "fb-53",
+  "language": "pa",
+  "rating": 4,
+  "comment": "ਬੁਕਿੰਗ ਆਸਾਨ ਸੀ।",
+  "sentiment": "positive",
+  "themes": [
+   "scheduling"
+  ]
+ },
+ {
+  "id": "fb-54",
+  "language": "pa",
+  "rating": 2,
+  "comment": "ਪਾਰਕਿੰਗ ਨਹੀਂ ਮਿਲੀ।",
+  "sentiment": "negative",
+  "themes": [
+   "parking_access"
+  ]
+ },
+ {
+  "id": "fb-55",
+  "language": "pa",
+  "rating": 3,
+  "comment": "ਸਕੈਨ ਠੀਕ ਸੀ ਪਰ ਕਮਰੇ ਵਿੱਚ ਠੰਡ ਸੀ।",
+  "sentiment": "neutral",
+  "themes": [
+   "environment"
+  ]
+ },
+ {
+  "id": "fb-56",
+  "language": "pa",
+  "rating": 1,
+  "comment": "ਅਪੌਇੰਟਮੈਂਟ ਬਦਲ ਦਿੱਤੀ ਅਤੇ ਕਿਸੇ ਨੇ ਨਹੀਂ ਦੱਸਿਆ।",
+  "sentiment": "negative",
+  "themes": [
+   "scheduling",
+   "communication"
+  ]
+ },
+ {
+  "id": "fb-57",
+  "language": "pa",
+  "rating": 5,
+  "comment": "ਟੈਕਨੋਲੋਜਿਸਟ ਨੇ ਸਭ ਕੁਝ ਸਮਝਾਇਆ।",
+  "sentiment": "positive",
+  "themes": [
+   "staff_attitude",
+   "communication"
+  ]
+ },
+ {
+  "id": "fb-58",
+  "language": "pa",
+  "rating": 2,
+  "comment": "ਬੀਮਾ ਨੇ ਪੈਸੇ ਨਹੀਂ ਦਿੱਤੇ, ਫੀਸ ਆਪ ਭਰਨੀ ਪਈ।",
+  "sentiment": "negative",
+  "themes": [
+   "billing"
+  ]
+ },
+ {
+  "id": "fb-59",
+  "language": "pa",
+  "rating": 4,
+  "comment": "ਵ੍ਹੀਲਚੇਅਰ ਲਈ ਲਿਫਟ ਸੀ, ਵਧੀਆ।",
+  "sentiment": "positive",
+  "themes": [
+   "parking_access"
+  ]
+ }
+]

@@ -48,6 +48,70 @@ IMPLANT_ITEMS = [
     ("pa", "ਕੋਈ ਧਾਤ ਨਹੀਂ", []),
 ]
 
+# Patient feedback (rating, comment) with expected sentiment and themes; 15 per language.
+FEEDBACK_ITEMS = [
+    ("en", 5, "Everyone was friendly and the scan started on time.", "positive", ["staff_attitude", "wait_time"]),
+    ("en", 1, "Waited 90 minutes past my appointment. Terrible.", "negative", ["wait_time"]),
+    ("en", 2, "The receptionist was rude and did not listen.", "negative", ["staff_attitude"]),
+    ("en", 4, "Clean and comfortable. Thank you.", "positive", ["environment"]),
+    ("en", 2, "I was charged for parking validation and the bill was wrong.", "negative", ["billing", "parking_access"]),
+    ("en", 3, "It was okay.", "neutral", []),
+    ("en", 5, "The technologist explained everything clearly, great experience.", "positive", ["staff_attitude", "communication"]),
+    ("en", 1, "No one could tell me when my results would be ready.", "negative", ["results", "communication"]),
+    ("en", 4, "Booking an appointment online was quick.", "positive", ["scheduling", "wait_time"]),
+    ("en", 2, "The waiting room was cold and dirty.", "negative", ["environment"]),
+    ("en", 3, "Hard to find the entrance but staff were helpful.", "neutral", ["parking_access", "staff_attitude"]),
+    ("en", 1, "They rescheduled me three times without calling.", "negative", ["scheduling", "communication"]),
+    ("en", 5, "Fast, friendly, easy. Thanks!", "positive", ["staff_attitude", "wait_time"]),
+    ("en", 2, "Insurance was billed twice for one exam.", "negative", ["billing"]),
+    ("en", 4, "No complaints.", "positive", []),
+    ("fr", 5, "Personnel très gentil et examen rapide.", "positive", ["staff_attitude", "wait_time"]),
+    ("fr", 1, "Attente de deux heures, aucune explication.", "negative", ["wait_time", "communication"]),
+    ("fr", 2, "La facture était fausse et personne ne répond.", "negative", ["billing"]),
+    ("fr", 4, "Salle d'attente propre et calme.", "positive", ["environment"]),
+    ("fr", 3, "Correct dans l'ensemble.", "neutral", []),
+    ("fr", 2, "Pas de stationnement disponible.", "negative", ["parking_access"]),
+    ("fr", 5, "Le technologue m'a bien expliqué l'examen, merci.", "positive", ["staff_attitude", "communication"]),
+    ("fr", 1, "La réceptionniste était impolie.", "negative", ["staff_attitude"]),
+    ("fr", 4, "Rendez-vous facile à réserver.", "positive", ["scheduling"]),
+    ("fr", 2, "Les consignes n'étaient pas en français.", "negative", ["communication"]),
+    ("fr", 3, "Résultats arrivés chez mon médecin, mais un peu lents.", "neutral", ["results"]),
+    ("fr", 5, "Excellent service, à l'heure.", "positive", ["wait_time"]),
+    ("fr", 2, "Il faisait froid dans la salle.", "negative", ["environment"]),
+    ("fr", 1, "Mon rendez-vous a été reporté sans prévenir.", "negative", ["scheduling"]),
+    ("fr", 4, "Ascenseur et accès en fauteuil faciles.", "positive", ["parking_access"]),
+    ("zh", 5, "工作人员态度很好，很快就做完了。", "positive", ["staff_attitude", "wait_time"]),
+    ("zh", 1, "等了两个小时，太久了。", "negative", ["wait_time"]),
+    ("zh", 2, "前台不耐烦，态度差。", "negative", ["staff_attitude"]),
+    ("zh", 4, "环境干净舒适。", "positive", ["environment"]),
+    ("zh", 2, "收费不清楚，账单有错。", "negative", ["billing"]),
+    ("zh", 3, "一般吧。", "neutral", []),
+    ("zh", 5, "有中文须知，技师解释得很清楚，谢谢。", "positive", ["communication", "staff_attitude"]),
+    ("zh", 1, "一个星期了医生还没收到报告。", "negative", ["results"]),
+    ("zh", 4, "网上预约很方便。", "positive", ["scheduling"]),
+    ("zh", 2, "停车位太少，找了半天。", "negative", ["parking_access"]),
+    ("zh", 3, "检查还行，就是候诊室有点冷。", "neutral", ["environment"]),
+    ("zh", 1, "改期了两次也没人通知我。", "negative", ["scheduling", "communication"]),
+    ("zh", 5, "准时，护士很热情。", "positive", ["wait_time", "staff_attitude"]),
+    ("zh", 2, "保险没有直接付款，要自己先付。", "negative", ["billing"]),
+    ("zh", 4, "整体满意。", "positive", []),
+    ("pa", 5, "ਸਟਾਫ ਬਹੁਤ ਚੰਗਾ ਸੀ ਅਤੇ ਜਲਦੀ ਹੋ ਗਿਆ।", "positive", ["staff_attitude", "wait_time"]),
+    ("pa", 1, "ਦੋ ਘੰਟੇ ਉਡੀਕ ਕਰਨੀ ਪਈ।", "negative", ["wait_time"]),
+    ("pa", 2, "ਰਿਸੈਪਸ਼ਨ ਤੇ ਰੁੱਖਾ ਵਿਹਾਰ।", "negative", ["staff_attitude"]),
+    ("pa", 4, "ਕਮਰਾ ਸਾਫ਼ ਸੀ।", "positive", ["environment"]),
+    ("pa", 2, "ਬਿੱਲ ਗਲਤ ਸੀ।", "negative", ["billing"]),
+    ("pa", 3, "ਠੀਕ ਸੀ।", "neutral", []),
+    ("pa", 5, "ਹਦਾਇਤਾਂ ਪੰਜਾਬੀ ਵਿੱਚ ਸਨ, ਧੰਨਵਾਦ।", "positive", ["communication"]),
+    ("pa", 1, "ਮੇਰੇ ਡਾਕਟਰ ਨੂੰ ਰਿਪੋਰਟ ਨਹੀਂ ਮਿਲੀ।", "negative", ["results"]),
+    ("pa", 4, "ਬੁਕਿੰਗ ਆਸਾਨ ਸੀ।", "positive", ["scheduling"]),
+    ("pa", 2, "ਪਾਰਕਿੰਗ ਨਹੀਂ ਮਿਲੀ।", "negative", ["parking_access"]),
+    ("pa", 3, "ਸਕੈਨ ਠੀਕ ਸੀ ਪਰ ਕਮਰੇ ਵਿੱਚ ਠੰਡ ਸੀ।", "neutral", ["environment"]),
+    ("pa", 1, "ਅਪੌਇੰਟਮੈਂਟ ਬਦਲ ਦਿੱਤੀ ਅਤੇ ਕਿਸੇ ਨੇ ਨਹੀਂ ਦੱਸਿਆ।", "negative", ["scheduling", "communication"]),
+    ("pa", 5, "ਟੈਕਨੋਲੋਜਿਸਟ ਨੇ ਸਭ ਕੁਝ ਸਮਝਾਇਆ।", "positive", ["staff_attitude", "communication"]),
+    ("pa", 2, "ਬੀਮਾ ਨੇ ਪੈਸੇ ਨਹੀਂ ਦਿੱਤੇ, ਫੀਸ ਆਪ ਭਰਨੀ ਪਈ।", "negative", ["billing"]),
+    ("pa", 4, "ਵ੍ਹੀਲਚੇਅਰ ਲਈ ਲਿਫਟ ਸੀ, ਵਧੀਆ।", "positive", ["parking_access"]),
+]
+
 GIVEN = ["Ana", "Ben", "Chen", "Dana", "Eli", "Farah", "Gus", "Hira", "Ivan", "Jia"]
 FAMILY = ["Lopez", "Nguyen", "Okoye", "Petrov", "Quinn", "Rossi", "Sato", "Tan"]
 
@@ -85,6 +149,10 @@ def build() -> None:
     implants = [{"id": f"imp-{i:02d}", "language": lang, "text": text, "categories": cats}
                 for i, (lang, text, cats) in enumerate(IMPLANT_ITEMS)]
     (DATASETS / "implants.json").write_text(json.dumps(implants, indent=1, ensure_ascii=False))
+    feedback = [{"id": f"fb-{i:02d}", "language": lang, "rating": rating, "comment": text, "sentiment": sent, "themes": themes}
+                for i, (lang, rating, text, sent, themes) in enumerate(FEEDBACK_ITEMS)]
+    (DATASETS / "feedback.json").write_text(json.dumps(feedback, indent=1, ensure_ascii=False))
+    print(f"Wrote {len(feedback)} feedback comments")
     print(f"Wrote {len(requisitions)} requisitions, {len(protocols)} protocol cases, {len(implants)} implant answers to {DATASETS}")
 
 

@@ -165,7 +165,46 @@ def eval_implants(gateway: LlmGateway) -> dict:
                   "Exact match of device categories per answer, across English, French, Chinese and Punjabi.")
 
 
-TASKS = {"extraction": eval_extraction, "triage": eval_triage, "protocol": eval_protocol, "implants": eval_implants}
+def eval_feedback(gateway: LlmGateway) -> dict:
+    from app.modules.feedback.service import CLASSIFY_PROMPT, Classification
+
+    started, items = time.monotonic(), _load("feedback")
+    sentiment_ok = themes_exact = tp = fp = fn = failed = 0
+    errors = []
+    by_language: dict[str, list[int]] = {}
+    for item in items:
+        outcome = gateway.structured(task="feedback_classify", prompt=CLASSIFY_PROMPT,
+                                     variables={"rating": item["rating"], "comment": item["comment"]},
+                                     schema_cls=Classification, tier="fast")
+        if outcome.status != "ok":
+            failed += 1
+            continue
+        got, want = set(outcome.data["themes"]), set(item["themes"])
+        s_ok = outcome.data["sentiment"] == item["sentiment"]
+        sentiment_ok += s_ok
+        themes_exact += got == want
+        tp, fp, fn = tp + len(got & want), fp + len(got - want), fn + len(want - got)
+        lang = by_language.setdefault(item["language"], [0, 0])
+        lang[0] += s_ok and got == want
+        lang[1] += 1
+        if not s_ok or got != want:
+            errors.append({"id": item["id"], "language": item["language"], "comment": item["comment"],
+                           "expected": {"sentiment": item["sentiment"], "themes": sorted(want)},
+                           "got": {"sentiment": outcome.data["sentiment"], "themes": sorted(got)}})
+    n = len(items)
+    precision = tp / (tp + fp) if tp + fp else 0
+    recall = tp / (tp + fn) if tp + fn else 0
+    metrics = {"sentiment_accuracy": round(sentiment_ok / n, 3), "theme_exact_match": round(themes_exact / n, 3),
+               "theme_f1": round(2 * precision * recall / (precision + recall), 3) if precision + recall else 0,
+               "failed_calls": failed}
+    metrics |= {f"both_correct_{lang}": round(a / b, 3) for lang, (a, b) in sorted(by_language.items())}
+    return _write("feedback", gateway, metrics, n, errors, started,
+                  "60 comments, 15 per language (EN, FR, ZH, PA), with star rating. Sentiment accuracy, exact theme-set "
+                  "match and micro-F1 over themes.")
+
+
+TASKS = {"extraction": eval_extraction, "triage": eval_triage, "protocol": eval_protocol, "implants": eval_implants,
+         "feedback": eval_feedback}
 
 
 def main(names: list[str]) -> None:

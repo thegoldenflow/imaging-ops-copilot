@@ -18,6 +18,8 @@ from app.modules.critical import service as critical
 from app.modules.critical.router import router as critical_router
 from app.modules.dose.router import router as dose_router
 from app.modules.evals.router import router as evals_router
+from app.modules.feedback import service as feedback
+from app.modules.feedback.router import router as feedback_router
 from app.modules.frontdesk.router import router as frontdesk_router
 from app.modules.inventory.router import router as inventory_router
 from app.modules.mri_safety.router import router as mri_router
@@ -52,7 +54,7 @@ async def _dispatch_loop() -> None:
 async def _intake_loop() -> None:
     """Runs new requisitions through the AI pipeline, works prior-imaging retrievals
     moves critical-result cases through notification and escalation, and starts
-    the nightly peer-review sampling run.
+    the nightly peer-review sampling run, and classifies new patient feedback.
     Runs in a thread so slow LLM or mock-archive calls never block requests."""
     while True:
         await asyncio.sleep(2)
@@ -61,6 +63,7 @@ async def _intake_loop() -> None:
             await asyncio.to_thread(priors.process_due)
             await asyncio.to_thread(critical.process_due, get_store())
             await asyncio.to_thread(peer_review.maybe_run_scheduled, get_store())
+            await asyncio.to_thread(feedback.process_pending, get_store())
         except Exception:
             log.exception("intake worker failed")
 
@@ -100,3 +103,4 @@ app.include_router(inventory_router)
 app.include_router(referrals_router)
 app.include_router(portal_router)
 app.include_router(billing_router)
+app.include_router(feedback_router)

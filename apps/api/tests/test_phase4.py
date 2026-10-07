@@ -270,3 +270,86 @@ def test_cancelled_exam_billed_is_flagged_live(client, login):
                                                    status="submitted")
     rows = client.get("/api/billing/overview", headers=login("U-OPS")).json()["discrepancies"]
     assert any(r["id"] == f"not_performed.{appt.id}" for r in rows)
+
+
+# ---------- System 19 · Patient feedback ----------
+
+def test_completion_sends_survey_in_patient_language_and_low_rating_alerts(client, login):
+    from app.modules.feedback import service as feedback
+
+    store = get_store()
+    appt = _next_appointment("LKS")
+    store.patients[appt.patient_id].preferred_language = "zh"
+    assert client.post(f"/api/scheduling/appointments/{appt.id}/complete", headers=login("U-TECH")).status_code == 200
+    survey = next(s for s in feedback.surveys(store).values() if s.appointment_id == appt.id)
+    msg = next(m for m in store.outbox.values() if m.kind == "feedback_survey" and m.appointment_id == appt.id)
+    assert survey.language == "zh" and f"/feedback/{survey.token}" in msg.body and "感谢" in msg.body
+
+    info = client.get(f"/api/public/feedback/{survey.token}").json()
+    assert info["language"] == "zh" and not info["submitted"]
+    r = client.post(f"/api/public/feedback/{survey.token}", json={"rating": 1, "comment": "等了一个多小时，前台态度差。"})
+    assert r.status_code == 200
+    resp = feedback.responses(store)[r.json()["id"]]
+    alert = next(a for a in feedback.alerts(store).values() if a.response_id == resp.id)  # immediate, no AI needed
+    assert alert.status == "open" and "site manager" in alert.notified
+    assert any(m.kind == "feedback_alert" and resp.id in m.body for m in store.outbox.values())
+    assert client.post(f"/api/public/feedback/{survey.token}", json={"rating": 5}).status_code == 409
+
+    feedback.process_pending(store)
+    assert resp.ai_status == "ok" and resp.ai_sentiment == "negative"
+    assert {"wait_time", "staff_attitude"} <= set(resp.ai_themes)
+    assert any(c.task == "feedback_classify" for c in store.llm_calls)
+
+
+def test_negative_comment_with_good_rating_alerts_after_ai(client):
+    from app.modules.feedback import service as feedback
+
+    store = get_store()
+    survey = next(s for s in feedback.surveys(store).values() if s.status == "sent")
+    resp = feedback.submit(store, survey, 3, "The waiting room was dirty and the technologist was rude.", datetime.now())
+    assert not any(a.response_id == resp.id for a in feedback.alerts(store).values())
+    feedback.process_pending(store)
+    assert any(a.response_id == resp.id and "AI" in a.reason for a in feedback.alerts(store).values())
+
+
+def test_ai_unavailable_keeps_feedback_working(client):
+    from app.llm.gateway import LlmGateway, set_gateway
+    from app.llm.providers import ProviderUnavailable
+    from app.modules.feedback import service as feedback
+
+    class Down:
+        mode = "anthropic"
+
+        def complete_json(self, **_):
+            raise ProviderUnavailable("timeout")
+
+    set_gateway(LlmGateway(Down()))
+    store = get_store()
+    survey = next(s for s in feedback.surveys(store).values() if s.status == "sent")
+    resp = feedback.submit(store, survey, 2, "Too long a wait", datetime.now())
+    feedback.process_pending(store)
+    assert resp.ai_status == "unavailable" and resp.sentiment is None
+    assert any(a.response_id == resp.id for a in feedback.alerts(store).values())  # rule still fired
+
+
+def test_feedback_dashboard_confirm_and_follow_up(client, login):
+    from app.modules.feedback import service as feedback
+
+    ops = login("U-OPS")
+    feedback.process_pending(get_store())
+    data = client.get("/api/feedback/overview", headers=ops).json()
+    assert len(data["by_site"]) == 5 and data["kpis"]["open_alerts"] > 0
+    wbk = next(s for s in data["by_site"] if s["site_id"] == "WBK")
+    others = [s["avg_rating_30d"] for s in data["by_site"] if s["site_id"] != "WBK" and s["avg_rating_30d"]]
+    assert wbk["avg_rating_30d"] < min(others)  # the seeded bad month
+    item = next(r for r in data["responses"] if not r["confirmed_by"] and r["ai_status"] in ("ok", "seeded"))
+    r = client.post(f"/api/feedback/responses/{item['id']}/confirm", json={"sentiment": "neutral", "themes": ["billing"]},
+                    headers=ops)
+    assert r.status_code == 200 and r.json()["confirmed_by"] == "Jordan Lee" and r.json()["themes"] == ["billing"]
+    assert client.post(f"/api/feedback/responses/{item['id']}/confirm", json={"sentiment": "angry", "themes": []},
+                       headers=ops).status_code == 422
+    alert = next(a for a in data["alerts"] if a["status"] == "open")
+    r = client.post(f"/api/feedback/alerts/{alert['id']}/follow-up", json={"note": "Called the patient"}, headers=ops)
+    assert r.status_code == 200 and r.json()["status"] == "followed_up"
+    fd = client.get("/api/feedback/overview", headers=login("U-FD")).json()
+    assert {s["site_id"] for s in fd["by_site"]} == {"LKS"}
