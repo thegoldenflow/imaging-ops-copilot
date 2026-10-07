@@ -244,22 +244,39 @@ def blocks_from_gemini(parts: list) -> list:
 
 
 class GeminiProvider:
-    """Google Gemini through the official google-genai SDK."""
+    """Google Gemini through the Agent Platform / Vertex AI google-genai route."""
 
     mode = "gemini"
     REFUSAL_REASONS = {"SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "IMAGE_SAFETY",
                        "IMAGE_PROHIBITED_CONTENT", "IMAGE_RECITATION"}
 
     def __init__(self, api_key: str, timeout_s: float, client=None) -> None:
-        self.client = client or genai.Client(api_key=api_key, http_options=genai_types.HttpOptions(
-            timeout=int(timeout_s * 1000), retry_options=genai_types.HttpRetryOptions(attempts=2),
-        ))
+        self.client = client or genai.Client(
+            vertexai=True,
+            api_key=api_key,
+            http_options=genai_types.HttpOptions(
+                api_version="v1",
+                timeout=int(timeout_s * 1000),
+                retry_options=genai_types.HttpRetryOptions(attempts=2),
+            ),
+        )
 
     def _generate(self, *, model, contents, config):
         try:
             return self.client.models.generate_content(model=model, contents=contents, config=config)
         except genai_errors.APIError as e:  # 4xx incl. 429 rate limit, 5xx
-            raise ProviderUnavailable(f"API error {e.code}: {e.message or e.status}") from e
+            code = int(e.code or 0)
+            if code in (401, 403):
+                message = "Agent Platform authentication or permission error (401/403): check the API key and API access"
+            elif code == 404:
+                message = "Agent Platform model or endpoint not found (404): check the model and Vertex endpoint"
+            elif code == 429:
+                message = "Agent Platform rate or quota limit reached (429)"
+            elif code == 402:
+                message = "Received 402: the request may still be using the Gemini Developer API payment route, not Agent Platform"
+            else:
+                message = f"Agent Platform API error {code}: {e.message or e.status}"
+            raise ProviderUnavailable(message) from e
         except (httpx.HTTPError, OSError) as e:  # timeouts and network failures
             raise ProviderUnavailable(f"Connection error: {type(e).__name__}: {e}") from e
 

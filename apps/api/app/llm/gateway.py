@@ -34,10 +34,10 @@ PRICES = {
     "claude-opus-5-5": (4.0, 20.0),
     "claude-sonnet-5-5": (2.0, 10.0),
     "claude-haiku-4-5": (1.0, 5.0),
-    # Gemini Developer API pricing page (ai.google.dev/gemini-api/docs/pricing), checked
-    # 2026-10-07: introductory price through 2026-12-31, then $1.50 / $7.50 from
-    # 2027-01-01. Output includes thinking tokens.
-    "gemini-3.8-flash": (0.75, 3.75),
+    # Vertex AI global standard pricing, USD per million tokens, checked 2026-10-07.
+    # Output includes reasoning tokens.
+    "gemini-2.5-flash": (0.30, 2.50),
+    "gemini-3.5-flash": (1.50, 9.00),
 }
 
 Tier = Literal["reasoning", "fast", "voice"]
@@ -57,8 +57,8 @@ def make_provider():
     """Provider from LLM_PROVIDER; a provider whose API key is missing runs as mock."""
     if settings.llm_provider == "anthropic" and settings.anthropic_api_key:
         return AnthropicProvider(settings.anthropic_api_key, settings.llm_timeout_s)
-    if settings.llm_provider == "gemini" and settings.gemini_api_key:
-        return GeminiProvider(settings.gemini_api_key, settings.llm_timeout_s)
+    if settings.llm_provider == "gemini" and settings.google_agent_platform_api_key:
+        return GeminiProvider(settings.google_agent_platform_api_key, settings.llm_timeout_s)
     return MockProvider()
 
 

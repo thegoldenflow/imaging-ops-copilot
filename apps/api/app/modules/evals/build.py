@@ -160,7 +160,7 @@ def build() -> None:
         case = CASES[i % len(CASES)]  # every case appears at least twice
         text, labels = generate(rng, _patient(rng, i), referrer, case=case)
         requisitions.append({"id": f"req-{i:02d}", "text": text, "labels": labels.to_dict()})
-    (DATASETS / "requisitions.json").write_text(json.dumps(requisitions, indent=1, ensure_ascii=False))
+    (DATASETS / "requisitions.json").write_text(json.dumps(requisitions, indent=1, ensure_ascii=False), encoding="utf-8")
 
     protocols = []
     for i in range(40):
@@ -168,17 +168,17 @@ def build() -> None:
         protocols.append({"id": f"pro-{i:02d}", "requested_exam": rng.choice(case.exam_texts),
                           "clinical": rng.choice(case.indications), "protocol_id": case.protocol_id,
                           "protocol_name": BY_ID[case.protocol_id].name})
-    (DATASETS / "protocols.json").write_text(json.dumps(protocols, indent=1, ensure_ascii=False))
+    (DATASETS / "protocols.json").write_text(json.dumps(protocols, indent=1, ensure_ascii=False), encoding="utf-8")
 
     implants = [{"id": f"imp-{i:02d}", "language": lang, "text": text, "categories": cats}
                 for i, (lang, text, cats) in enumerate(IMPLANT_ITEMS)]
-    (DATASETS / "implants.json").write_text(json.dumps(implants, indent=1, ensure_ascii=False))
+    (DATASETS / "implants.json").write_text(json.dumps(implants, indent=1, ensure_ascii=False), encoding="utf-8")
     feedback = [{"id": f"fb-{i:02d}", "language": lang, "rating": rating, "comment": text, "sentiment": sent, "themes": themes}
                 for i, (lang, rating, text, sent, themes) in enumerate(FEEDBACK_ITEMS)]
-    (DATASETS / "feedback.json").write_text(json.dumps(feedback, indent=1, ensure_ascii=False))
+    (DATASETS / "feedback.json").write_text(json.dumps(feedback, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"Wrote {len(feedback)} feedback comments")
     policy = [{"id": f"pol-{i:02d}", "question": q, "expected_doc": doc} for i, (q, doc) in enumerate(POLICY_QUESTIONS)]
-    (DATASETS / "policy_qa.json").write_text(json.dumps(policy, indent=1, ensure_ascii=False))
+    (DATASETS / "policy_qa.json").write_text(json.dumps(policy, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"Wrote {len(policy)} policy questions")
     print(f"Wrote {len(requisitions)} requisitions, {len(protocols)} protocol cases, {len(implants)} implant answers to {DATASETS}")
 

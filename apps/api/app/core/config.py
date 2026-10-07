@@ -20,15 +20,15 @@ def _load_dotenv(path: Path) -> None:
 _load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 
-# Latest stable Gemini Flash in the google-genai SDK model list and the Gemini API
-# docs (checked 2026-10-07); used for every tier unless overridden.
-GEMINI_DEFAULT_MODEL = "gemini-3.8-flash"
+# Verified with this Google Cloud project through the Agent Platform endpoint.
+# Used for every tier unless overridden.
+GEMINI_DEFAULT_MODEL = "gemini-2.5-flash"
 
 
 @dataclass(frozen=True)
 class Settings:
     anthropic_api_key: str | None
-    gemini_api_key: str | None
+    google_agent_platform_api_key: str | None
     # anthropic, gemini or mock, from LLM_PROVIDER (LLM_MODE is the older name).
     # Unset: "anthropic" when ANTHROPIC_API_KEY is present, otherwise "mock".
     # A provider without its key also runs as mock.
@@ -53,7 +53,11 @@ def load_settings() -> Settings:
         raise ValueError(f"LLM_PROVIDER must be anthropic, gemini or mock, not {provider!r}")
     return Settings(
         anthropic_api_key=key,
-        gemini_api_key=os.getenv("GEMINI_API_KEY") or None,
+        # GEMINI_API_KEY remains a temporary local migration fallback only. Every
+        # Gemini request is still constructed as a Vertex / Agent Platform request.
+        google_agent_platform_api_key=(
+            os.getenv("GOOGLE_AGENT_PLATFORM_API_KEY") or os.getenv("GEMINI_API_KEY") or None
+        ),
         llm_provider=provider,
         model_reasoning=os.getenv("CLAUDE_MODEL_REASONING", "claude-sonnet-5-5"),
         model_fast=os.getenv("CLAUDE_MODEL_FAST", "claude-haiku-4-5"),

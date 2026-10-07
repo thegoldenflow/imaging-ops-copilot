@@ -1,8 +1,8 @@
 import type { LlmMode } from "./types";
 
-const VENDOR: Record<string, string> = { anthropic: "Claude", gemini: "Gemini" };
+const VENDOR: Record<string, string> = { anthropic: "Claude", gemini: "Gemini via Vertex AI" };
 
-/** "Claude" or "Gemini" for a real provider, null in mock mode. */
+/** The active real model vendor, or null in mock mode. */
 export function llmVendor(mode: string | undefined): string | null {
   return (mode && VENDOR[mode]) || null;
 }

@@ -22,16 +22,16 @@ test("header and evaluations show Gemini when the API runs on Gemini", async ({ 
   await page.route("**/api/evals", async (route) => {
     const response = await route.fetch();
     const body = await response.json();
-    body.results.triage = { ...body.results.triage, mode: "gemini", model: "Gemini: gemini-3.8-flash" };
+    body.results.triage = { ...body.results.triage, mode: "gemini", model: "Gemini: gemini-2.5-flash" };
     body.results.protocol = { ...body.results.protocol, mode: "anthropic", model: "Claude: claude-sonnet-5-5" };
     await route.fulfill({ response, json: body });
   });
 
   await signInAs(page, "admin");
-  await expect(page.getByTestId("llm-mode")).toHaveText("AI: Gemini API");
+  await expect(page.getByTestId("llm-mode")).toHaveText("AI: Gemini via Vertex AI API");
 
   await page.goto("/evals");
-  await expect(page.getByTestId("eval-model-triage")).toHaveText("Gemini: gemini-3.8-flash");
+  await expect(page.getByTestId("eval-model-triage")).toHaveText("Gemini: gemini-2.5-flash");
   await expect(page.getByTestId("eval-model-protocol")).toHaveText("Claude: claude-sonnet-5-5");
   await expect(page.getByTestId("eval-model-extraction")).toHaveText("rule-based baseline");
 });

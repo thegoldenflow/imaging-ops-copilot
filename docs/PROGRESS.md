@@ -246,20 +246,20 @@ Tests: `tests/test_phase4.py` (28 backend tests) and `e2e/business-compliance.sp
 
 Status: done, needs a real-key check. Branch `feat/gemini-provider` (built on `feat/phase-4-business-compliance`). The owner approved this stack change: Gemini as an optional model vendor next to Claude, chosen by an environment variable, Claude staying the default.
 
-- [x] Settings: `LLM_PROVIDER` (`anthropic`, `gemini`, `mock`; `LLM_MODE` still works as the old name). Unset keeps the earlier behaviour: Claude with `ANTHROPIC_API_KEY`, mock without. A provider whose key is missing runs as mock, as `LLM_MODE=anthropic` without a key did before. New: `GEMINI_API_KEY`, `GEMINI_MODEL_REASONING`, `GEMINI_MODEL_FAST`, `GEMINI_MODEL_VOICE`
+- [x] Settings: `LLM_PROVIDER` (`anthropic`, `gemini`, `mock`; `LLM_MODE` still works as the old name). Unset keeps the earlier behaviour: Claude with `ANTHROPIC_API_KEY`, mock without. A provider whose key is missing runs as mock. Gemini uses `GOOGLE_AGENT_PLATFORM_API_KEY` with Agent Platform / Vertex AI; `GEMINI_API_KEY` is a temporary local migration fallback. Tier overrides remain `GEMINI_MODEL_REASONING`, `GEMINI_MODEL_FAST` and `GEMINI_MODEL_VOICE`.
 - [x] `GeminiProvider` with the same interface as `AnthropicProvider`. `complete_json` sends images as inline parts (the chest X-ray draft works the same way) and constrains output with `response_mime_type=application/json` plus `response_json_schema` (the same closed schema the Claude path uses). `tool_turn` takes and returns the Anthropic-style messages, tool definitions and content blocks, converting to Gemini contents, function declarations, function calls and function responses, so the phone agent is unchanged apart from a rename (`ClaudeAgent` → `LlmAgent`) and the agent mode (`claude` or `gemini`)
 - [x] Errors: API errors (4xx including 429, 5xx), timeouts and network errors raise `ProviderUnavailable`; a blocked prompt, a safety/recitation/prohibited-content finish or no candidates raise `ProviderRefusal`. The SDK retries once (2 attempts), like the Anthropic client's `max_retries=1`
-- [x] Gateway picks provider and model names by vendor; the call log's `mode` is `anthropic`, `gemini` or `mock` and `model` is the model id sent. `PRICES` has `gemini-3.8-flash`
-- [x] UI: header badge "AI: Gemini API"; AI usage, report review, phone agent and evaluations name the vendor. Eval results record `mode` and `model` as "Gemini: gemini-3.8-flash" or "Claude: claude-sonnet-5-5, claude-haiku-4-5" (models taken from the call log of the run)
-- [x] `LLM_PROVIDER=gemini uv run python -m app.modules.evals.run` runs as is (checked with an invalid key: calls reached Google, were refused, degraded and were counted as failed calls)
+- [x] Gateway picks provider and model names by vendor; the call log's `mode` is `anthropic`, `gemini` or `mock` and `model` is the model id sent. Vertex AI prices are recorded for `gemini-2.5-flash` and `gemini-3.5-flash`.
+- [x] UI: header badge "AI: Gemini via Vertex AI API"; AI usage, report review, phone agent and evaluations name the vendor. Eval results record the model id from the call log.
+- [x] `LLM_PROVIDER=gemini uv run python -m app.modules.evals.run` uses the Agent Platform / Vertex AI SDK route and degrades unavailable calls safely.
 - [x] Tests: `tests/test_gemini.py` (24 tests, fake client, no network): JSON output with image and schema, retry after a schema failure and after invalid JSON, timeout / connection / 429 / 503 degradation, refusals, history and tool-call conversion including thought signatures, the phone agent's tool loop and scripted fallback on Gemini, settings and provider selection, `/api/meta` mode, eval labels. `e2e/llm-provider.spec.ts` checks the badge and the eval labels (Gemini responses simulated in the browser)
-- [ ] Real calls with a key: needs the owner to set `GEMINI_API_KEY` locally and try a chest X-ray draft, a requisition, a phone call (tool use) and the evals. The cloud environment has no Gemini key
+- [ ] Real calls with the Agent Platform key: verify a minimal request, then a chest X-ray draft, requisition, phone call and the evals.
 
 Choices:
 
 - SDK: the official `google-genai` SDK rather than Gemini's OpenAI-compatible endpoint. It supports `response_json_schema`, inline image parts, function calling with thought signatures (Gemini 3 models expect the signature of each function call to be sent back on the next turn; the provider keeps it on the content block) and typed errors. The OpenAI-compatible endpoint would add a third message format and drop the signatures and finish/block reasons we use for refusals.
-- Default model `gemini-3.8-flash` for all three tiers: the newest stable Flash model in the google-genai SDK (2.28.0) model list and the Gemini API models page, checked 2026-10-07. Override per tier with the environment variables.
-- Price `gemini-3.8-flash`: $0.75 input / $3.75 output per million tokens (output includes thinking tokens), Gemini Developer API pricing page, checked 2026-10-07. This is an introductory price through 2026-12-31; from 2027-01-01 it is $1.50 / $7.50, so update `PRICES` then. Any other Gemini model is logged at cost 0 until it is added to `PRICES`.
+- Default model `gemini-2.5-flash` for all three tiers until it is verified locally through the Agent Platform endpoint. `gemini-3.5-flash` is the next configured option after that check. Override per tier with the environment variables.
+- Vertex AI global standard price as checked 2026-10-07: `gemini-2.5-flash` is $0.30 input / $2.50 output, and `gemini-3.5-flash` is $1.50 input / $9.00 output, per million tokens. Output includes reasoning tokens.
 
 Limits:
 
@@ -271,7 +271,7 @@ Limits:
 
 ## Environment notes
 
-- `ANTHROPIC_API_KEY` and `GEMINI_API_KEY` are not configured in the cloud environment; everything runs in mock mode there.
+- `ANTHROPIC_API_KEY` and `GOOGLE_AGENT_PLATFORM_API_KEY` are not configured in the cloud environment; everything runs in mock mode there.
 - The cloud network blocks Google's docs hosts (ai.google.dev, docs.cloud.google.com); the Gemini API host itself is reachable.
 - The cloud network policy blocks the chest X-ray dataset hosts (NIH ChestX-ray14, Open-i).
 - Public deployment target is not decided yet.

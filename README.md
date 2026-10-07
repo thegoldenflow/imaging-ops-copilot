@@ -72,20 +72,20 @@ Open http://localhost:5173 and pick a role. "Reset demo" in the header regenerat
 
 Without an API key every AI feature runs on built-in mock outputs, so the whole demo works offline. To use Claude, copy `apps/api/.env.example` to `apps/api/.env` and set `ANTHROPIC_API_KEY`, then restart the backend.
 
-### Switching to Google Gemini
+### Switching to Gemini on Google Cloud Agent Platform
 
 Claude is the default. To run every AI feature on Gemini instead, put these lines in `apps/api/.env` and restart the backend:
 
 ```bash
 LLM_PROVIDER=gemini
-GEMINI_API_KEY=your-key-from-google-ai-studio
-# Optional: models per tier (all default to gemini-3.8-flash)
-# GEMINI_MODEL_REASONING=gemini-3.8-flash
-# GEMINI_MODEL_FAST=gemini-3.8-flash
-# GEMINI_MODEL_VOICE=gemini-3.8-flash
+GOOGLE_AGENT_PLATFORM_API_KEY=your-agent-platform-key
+# Optional: models per tier (all default to gemini-2.5-flash)
+# GEMINI_MODEL_REASONING=gemini-2.5-flash
+# GEMINI_MODEL_FAST=gemini-2.5-flash
+# GEMINI_MODEL_VOICE=gemini-2.5-flash
 ```
 
-`LLM_PROVIDER` takes `anthropic`, `gemini` or `mock`. Left unset, the app uses Claude when `ANTHROPIC_API_KEY` is set and mock outputs otherwise; a provider without its key also falls back to mock. Gemini goes through the same call layer (de-identification, schema validation, call log, degradation), the header shows "AI: Gemini API", and `uv run python -m app.modules.evals.run` records Gemini results as mode `gemini`. See [docs/PROGRESS.md](docs/PROGRESS.md) for limits.
+`LLM_PROVIDER` takes `anthropic`, `gemini` or `mock`. Left unset, the app uses Claude when `ANTHROPIC_API_KEY` is set and mock outputs otherwise; a provider without its key also falls back to mock. Gemini uses the Google Gen AI SDK in Agent Platform / Vertex AI mode (not Google AI Studio or the Gemini Developer API), while retaining the same call layer for de-identification, schema validation, call logging and degradation. The header shows "AI: Gemini via Vertex AI API", and `uv run python -m app.modules.evals.run` records Gemini results as mode `gemini`. See [docs/PROGRESS.md](docs/PROGRESS.md) for limits.
 
 ### Tests
 

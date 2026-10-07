@@ -46,7 +46,7 @@ def _model_label(gateway: LlmGateway, started: float) -> str:
 
 
 def _load(name: str) -> list[dict]:
-    return json.loads((DATASETS / f"{name}.json").read_text())
+    return json.loads((DATASETS / f"{name}.json").read_text(encoding="utf-8"))
 
 
 def _write(task: str, gateway: LlmGateway, metrics: dict, n: int, errors: list, started: float, notes: str) -> dict:
@@ -56,7 +56,7 @@ def _write(task: str, gateway: LlmGateway, metrics: dict, n: int, errors: list, 
         "model": _model_label(gateway, started),
         "n": n, "metrics": metrics, "errors": errors[:12], "seconds": round(time.monotonic() - started, 1), "notes": notes,
     }
-    (RESULTS / f"{task}.json").write_text(json.dumps(result, indent=1, ensure_ascii=False))
+    (RESULTS / f"{task}.json").write_text(json.dumps(result, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"{task}: {json.dumps(metrics)}")
     return result
 

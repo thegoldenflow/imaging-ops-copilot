@@ -59,7 +59,7 @@ export function AiUsagePage() {
       {usage.data && (
         <>
           <div className="mb-4 grid gap-3 sm:grid-cols-3">
-            <Stat label="Mode" value={llmVendor(usage.data.mode) ? `${llmVendor(usage.data.mode)} API` : "Mock"} hint={usage.data.mode === "mock" ? "Set ANTHROPIC_API_KEY (or LLM_PROVIDER=gemini and GEMINI_API_KEY) to use a real model" : undefined} />
+            <Stat label="Mode" value={llmVendor(usage.data.mode) ? `${llmVendor(usage.data.mode)} API` : "Mock"} hint={usage.data.mode === "mock" ? "Set ANTHROPIC_API_KEY (or LLM_PROVIDER=gemini and GOOGLE_AGENT_PLATFORM_API_KEY) to use a real model" : undefined} />
             <Stat label="Calls" value={totals?.calls ?? 0} />
             <Stat label="Cost" value={`$${(totals?.cost ?? 0).toFixed(4)}`} hint="Estimated from token usage" />
           </div>
