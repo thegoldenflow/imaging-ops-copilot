@@ -1,8 +1,10 @@
 """Front-desk call agents.
 
-ClaudeAgent runs a tool-use loop through the LLM gateway (with
-de-identification). ScriptedAgent is a deterministic fallback used when no API
-key is configured or the API is unavailable, so the phone flow always works.
+LlmAgent runs a tool-use loop through the LLM gateway (with
+de-identification) on Claude or Gemini; either provider takes and returns
+Anthropic-style messages and content blocks. ScriptedAgent is a deterministic
+fallback used when no API key is configured or the API is unavailable, so the
+phone flow always works.
 Both call the same server-side tools.
 """
 
@@ -163,8 +165,7 @@ class ScriptedAgent:
                 "I can also transfer you to a person.")
 
 
-class ClaudeAgent:
-    mode = "claude"
+class LlmAgent:
     MAX_STEPS = 6
 
     def __init__(self) -> None:
@@ -195,16 +196,19 @@ class ClaudeAgent:
 
 
 _scripted = ScriptedAgent()
-_claude = ClaudeAgent()
+_llm = LlmAgent()
+
+# Gateway mode -> agent mode for providers with a tool-use agent.
+LLM_AGENT_MODES = {"anthropic": "claude", "gemini": "gemini"}
 
 
 def agent_reply(store: Store, session: CallSession, text: str) -> tuple[str, str]:
-    """Returns (reply, mode used). Falls back to the scripted agent if Claude is unavailable."""
+    """Returns (reply, mode used). Falls back to the scripted agent if the LLM is unavailable."""
     started = time.monotonic()
     mode = session.agent_mode
-    if mode == "claude":
+    if mode != "scripted":
         try:
-            reply = _claude.respond(store, session, text)
+            reply = _llm.respond(store, session, text)
         except (ProviderUnavailable, ProviderRefusal):
             mode = "scripted"
             reply = _scripted.respond(store, session, text)
@@ -215,7 +219,7 @@ def agent_reply(store: Store, session: CallSession, text: str) -> tuple[str, str
 
 
 def new_session(store: Store) -> CallSession:
-    mode = "claude" if get_gateway().mode == "anthropic" else "scripted"
+    mode = LLM_AGENT_MODES.get(get_gateway().mode, "scripted")
     session = CallSession(id=store.next_id("CALL"), started_at=datetime.now(), agent_mode=mode)
     session.transcript.append(Turn(role="agent", text=GREETING))
     return session

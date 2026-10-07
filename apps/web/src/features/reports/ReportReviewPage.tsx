@@ -7,6 +7,7 @@ import { AiBadge, Badge, Button, Card, ErrorState, Loading } from "../../compone
 import { api, patch, post } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { dateTime, pct } from "../../lib/format";
+import { llmVendor } from "../../lib/llm";
 import type { Report, Section } from "../../lib/types";
 import { StudyImage } from "./StudyImage";
 
@@ -123,7 +124,7 @@ export function ReportReviewPage() {
         <div className="space-y-3">
           <div className="rounded-lg border border-ai-100 bg-ai-50 px-3 py-2 text-xs text-ai-700">
             <strong>AI-generated preliminary draft for radiologist review only. Not a diagnosis.</strong>{" "}
-            Model {r.model} · prompt {r.prompt_version} · {r.llm_mode === "mock" ? "mock output" : "Claude API"}
+            Model {r.model} · prompt {r.prompt_version} · {llmVendor(r.llm_mode) ? `${llmVendor(r.llm_mode)} API` : "mock output"}
           </div>
           {r.ai_status !== "ok" && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800" role="alert">

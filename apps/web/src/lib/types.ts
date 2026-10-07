@@ -34,8 +34,10 @@ export interface Site {
   modalities: string[];
 }
 
+export type LlmMode = "mock" | "anthropic" | "gemini";
+
 export interface Meta {
-  llm_mode: "mock" | "anthropic";
+  llm_mode: LlmMode;
   version: number;
   now: string;
   sites: Site[];

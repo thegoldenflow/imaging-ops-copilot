@@ -20,14 +20,25 @@ def _load_dotenv(path: Path) -> None:
 _load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 
+# Latest stable Gemini Flash in the google-genai SDK model list and the Gemini API
+# docs (checked 2026-10-07); used for every tier unless overridden.
+GEMINI_DEFAULT_MODEL = "gemini-3.8-flash"
+
+
 @dataclass(frozen=True)
 class Settings:
     anthropic_api_key: str | None
-    # "anthropic" when a key is present, otherwise "mock". Can be forced with LLM_MODE.
-    llm_mode: str
+    gemini_api_key: str | None
+    # anthropic, gemini or mock, from LLM_PROVIDER (LLM_MODE is the older name).
+    # Unset: "anthropic" when ANTHROPIC_API_KEY is present, otherwise "mock".
+    # A provider without its key also runs as mock.
+    llm_provider: str
     model_reasoning: str  # vision and reasoning tasks (Sonnet tier)
     model_fast: str  # simple extraction / classification (Haiku tier)
     model_voice: str  # latency-sensitive voice agent
+    gemini_model_reasoning: str
+    gemini_model_fast: str
+    gemini_model_voice: str
     llm_timeout_s: float
     seed: int
     # When set, demo login requires this passcode (for public deployments).
@@ -37,13 +48,19 @@ class Settings:
 
 def load_settings() -> Settings:
     key = os.getenv("ANTHROPIC_API_KEY") or None
-    mode = os.getenv("LLM_MODE") or ("anthropic" if key else "mock")
+    provider = (os.getenv("LLM_PROVIDER") or os.getenv("LLM_MODE") or ("anthropic" if key else "mock")).strip().lower()
+    if provider not in ("anthropic", "gemini", "mock"):
+        raise ValueError(f"LLM_PROVIDER must be anthropic, gemini or mock, not {provider!r}")
     return Settings(
         anthropic_api_key=key,
-        llm_mode=mode,
+        gemini_api_key=os.getenv("GEMINI_API_KEY") or None,
+        llm_provider=provider,
         model_reasoning=os.getenv("CLAUDE_MODEL_REASONING", "claude-sonnet-5-5"),
         model_fast=os.getenv("CLAUDE_MODEL_FAST", "claude-haiku-4-5"),
         model_voice=os.getenv("CLAUDE_MODEL_VOICE", "claude-haiku-4-5"),
+        gemini_model_reasoning=os.getenv("GEMINI_MODEL_REASONING", GEMINI_DEFAULT_MODEL),
+        gemini_model_fast=os.getenv("GEMINI_MODEL_FAST", GEMINI_DEFAULT_MODEL),
+        gemini_model_voice=os.getenv("GEMINI_MODEL_VOICE", GEMINI_DEFAULT_MODEL),
         llm_timeout_s=float(os.getenv("LLM_TIMEOUT_S", "30")),
         seed=int(os.getenv("SEED", "42")),
         demo_passcode=os.getenv("DEMO_PASSCODE") or None,

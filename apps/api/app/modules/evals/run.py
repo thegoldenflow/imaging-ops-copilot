@@ -3,18 +3,19 @@
     uv run python -m app.modules.evals.run            # all tasks
     uv run python -m app.modules.evals.run triage     # one task
 
-Uses Claude when ANTHROPIC_API_KEY is set, otherwise the rule-based baselines
-behind the mock provider. Every call goes through the same LLM gateway as the
-app."""
+Uses the provider chosen by LLM_PROVIDER (Claude or Gemini) when its API key is
+set, otherwise the rule-based baselines behind the mock provider. Every call
+goes through the same LLM gateway as the app. Each result records the mode
+(anthropic, gemini or mock) and the models that answered."""
 
 import json
 import re
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from app.core.config import settings
 from app.core.models import Patient
+from app.core.store import get_store
 from app.llm.gateway import LlmGateway
 from app.llm.providers import MockProvider
 from app.modules.evals.paths import DATASETS, RESULTS
@@ -28,8 +29,20 @@ from app.modules.triage import service as triage
 CONTRAST = re.compile(r"contrast|iodin|gadolin|\bdye\b", re.I)
 
 
+VENDORS = {"anthropic": "Claude", "gemini": "Gemini"}
+
+
 def _gateway() -> LlmGateway:
-    return LlmGateway(MockProvider(latency_s=0)) if settings.llm_mode == "mock" else LlmGateway()
+    gateway = LlmGateway()
+    return LlmGateway(MockProvider(latency_s=0)) if gateway.mode == "mock" else gateway
+
+
+def _model_label(gateway: LlmGateway, started: float) -> str:
+    if gateway.mode == "mock":
+        return "rule-based baseline"
+    since = datetime.now() - timedelta(seconds=time.monotonic() - started + 1)
+    models = sorted({c.model for c in get_store().llm_calls if c.ts >= since and c.mode == gateway.mode})
+    return f"{VENDORS.get(gateway.mode, gateway.mode)}: {', '.join(models) or 'no calls logged'}"
 
 
 def _load(name: str) -> list[dict]:
@@ -40,7 +53,7 @@ def _write(task: str, gateway: LlmGateway, metrics: dict, n: int, errors: list, 
     RESULTS.mkdir(parents=True, exist_ok=True)
     result = {
         "task": task, "run_at": datetime.now().isoformat(timespec="seconds"), "mode": gateway.mode,
-        "model": "rule-based baseline" if gateway.mode == "mock" else "claude (see llm_calls)",
+        "model": _model_label(gateway, started),
         "n": n, "metrics": metrics, "errors": errors[:12], "seconds": round(time.monotonic() - started, 1), "notes": notes,
     }
     (RESULTS / f"{task}.json").write_text(json.dumps(result, indent=1, ensure_ascii=False))

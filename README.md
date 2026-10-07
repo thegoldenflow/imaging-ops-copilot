@@ -72,16 +72,31 @@ Open http://localhost:5173 and pick a role. "Reset demo" in the header regenerat
 
 Without an API key every AI feature runs on built-in mock outputs, so the whole demo works offline. To use Claude, copy `apps/api/.env.example` to `apps/api/.env` and set `ANTHROPIC_API_KEY`, then restart the backend.
 
+### Switching to Google Gemini
+
+Claude is the default. To run every AI feature on Gemini instead, put these lines in `apps/api/.env` and restart the backend:
+
+```bash
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your-key-from-google-ai-studio
+# Optional: models per tier (all default to gemini-3.8-flash)
+# GEMINI_MODEL_REASONING=gemini-3.8-flash
+# GEMINI_MODEL_FAST=gemini-3.8-flash
+# GEMINI_MODEL_VOICE=gemini-3.8-flash
+```
+
+`LLM_PROVIDER` takes `anthropic`, `gemini` or `mock`. Left unset, the app uses Claude when `ANTHROPIC_API_KEY` is set and mock outputs otherwise; a provider without its key also falls back to mock. Gemini goes through the same call layer (de-identification, schema validation, call log, degradation), the header shows "AI: Gemini API", and `uv run python -m app.modules.evals.run` records Gemini results as mode `gemini`. See [docs/PROGRESS.md](docs/PROGRESS.md) for limits.
+
 ### Tests
 
 ```bash
-cd apps/api && uv run pytest -q          # 98 backend tests
-cd apps/web && npx playwright test       # 4 end-to-end specs, one per phase (starts both servers if needed)
+cd apps/api && uv run pytest -q          # 122 backend tests
+cd apps/web && npx playwright test       # 5 end-to-end specs: one per phase plus the model-provider badge (starts both servers if needed)
 ```
 
 ## Tech stack
 
-React + TypeScript (Vite, Tailwind, TanStack Query) · Python 3.12 FastAPI · Pydantic · scikit-learn · Anthropic Python SDK · Playwright
+React + TypeScript (Vite, Tailwind, TanStack Query) · Python 3.12 FastAPI · Pydantic · scikit-learn · Anthropic Python SDK (optional Google Gen AI SDK for Gemini) · Playwright
 
 For the demo, data lives in memory and is regenerated from a seeded generator; external systems are mocked in process. See [docs/PROGRESS.md](docs/PROGRESS.md) for how this differs from the full spec.
 

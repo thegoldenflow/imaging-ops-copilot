@@ -106,7 +106,7 @@ export function PhoneAgent() {
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
       <Card
-        title={<span className="flex items-center gap-2">AI phone receptionist {mode === "claude" ? <AiBadge /> : mode && <Badge>Scripted fallback</Badge>}</span>}
+        title={<span className="flex items-center gap-2">AI phone receptionist {mode && mode !== "scripted" ? <AiBadge /> : mode && <Badge>Scripted fallback</Badge>}</span>}
         actions={
           <>
             <Button size="sm" variant="ghost" onClick={() => setSpeak(!speak)} aria-label={speak ? "Mute agent voice" : "Unmute agent voice"}>
@@ -169,7 +169,7 @@ export function PhoneAgent() {
           <p className="text-sm text-slate-500">Details appear once a call starts.</p>
         ) : (
           <dl className="space-y-3 text-sm">
-            <div><dt className="text-xs text-slate-500">Agent</dt><dd>{mode === "claude" ? "Claude (tool use)" : "Scripted fallback (no API key)"}</dd></div>
+            <div><dt className="text-xs text-slate-500">Agent</dt><dd>{mode === "claude" ? "Claude (tool use)" : mode === "gemini" ? "Gemini (tool use)" : "Scripted fallback (no API key)"}</dd></div>
             <div><dt className="text-xs text-slate-500">Identity</dt><dd>{session.verified_patient_id ? <Badge tone="green">Verified</Badge> : <Badge tone="amber">Not verified</Badge>}</dd></div>
             <div><dt className="text-xs text-slate-500">Last response time (server)</dt><dd className="tabular">{lastLatency == null ? "–" : `${lastLatency} ms`}</dd></div>
             <div>

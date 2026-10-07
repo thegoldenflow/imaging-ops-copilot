@@ -34,6 +34,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { isLiveLlm, llmVendor } from "../lib/llm";
 import { ROLE_LABEL, type Meta, type Role } from "../lib/types";
 import { Badge, Button } from "./ui";
 
@@ -150,9 +151,9 @@ export function Layout() {
           </nav>
           <div className="hidden md:block">
             {meta.data && (
-              <Badge tone={meta.data.llm_mode === "anthropic" ? "ai" : "slate"}>
+              <Badge tone={isLiveLlm(meta.data.llm_mode) ? "ai" : "slate"}>
                 <Sparkles className="size-3" />
-                {meta.data.llm_mode === "anthropic" ? "AI: Claude API" : "AI: mock mode (no API key)"}
+                <span data-testid="llm-mode">{isLiveLlm(meta.data.llm_mode) ? `AI: ${llmVendor(meta.data.llm_mode)} API` : "AI: mock mode (no API key)"}</span>
               </Badge>
             )}
           </div>

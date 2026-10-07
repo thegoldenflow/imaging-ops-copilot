@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, EmptyState, ErrorState, Loading, PageHeader, Stat, Badge } from "../../components/ui";
 import { api } from "../../lib/api";
 import { dateTime, pct } from "../../lib/format";
+import { llmVendor } from "../../lib/llm";
 
 interface TaskRow {
   task: string;
@@ -51,14 +52,14 @@ export function AiUsagePage() {
     <div>
       <PageHeader
         title="AI usage"
-        subtitle="Every Claude call goes through one gateway: de-identified input, schema-checked output, logged without PHI."
+        subtitle="Every AI call (Claude or Gemini) goes through one gateway: de-identified input, schema-checked output, logged without PHI."
       />
       {usage.isLoading && <Loading />}
       {usage.error && <ErrorState error={usage.error} onRetry={() => usage.refetch()} />}
       {usage.data && (
         <>
           <div className="mb-4 grid gap-3 sm:grid-cols-3">
-            <Stat label="Mode" value={usage.data.mode === "anthropic" ? "Claude API" : "Mock"} hint={usage.data.mode === "mock" ? "Set ANTHROPIC_API_KEY to use Claude" : undefined} />
+            <Stat label="Mode" value={llmVendor(usage.data.mode) ? `${llmVendor(usage.data.mode)} API` : "Mock"} hint={usage.data.mode === "mock" ? "Set ANTHROPIC_API_KEY (or LLM_PROVIDER=gemini and GEMINI_API_KEY) to use a real model" : undefined} />
             <Stat label="Calls" value={totals?.calls ?? 0} />
             <Stat label="Cost" value={`$${(totals?.cost ?? 0).toFixed(4)}`} hint="Estimated from token usage" />
           </div>

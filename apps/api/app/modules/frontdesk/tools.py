@@ -26,7 +26,7 @@ class CallSession(BaseModel):
     id: str
     started_at: datetime
     ended_at: datetime | None = None
-    agent_mode: str  # claude, scripted
+    agent_mode: str  # claude, gemini (LLM tool use) or scripted
     verified_patient_id: str | None = None
     failed_verifications: int = 0
     transcript: list[Turn] = []

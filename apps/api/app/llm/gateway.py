@@ -1,4 +1,4 @@
-"""The single entry point for every Claude call.
+"""The single entry point for every LLM call (Claude, Gemini or the mock).
 
 Responsibilities: de-identify input, enforce a Pydantic output schema (one
 retry, then "needs human review"), degrade on timeouts and API failures, and
@@ -20,6 +20,7 @@ from app.llm.deid import Pseudonymizer
 from app.llm.prompts import Prompt
 from app.llm.providers import (
     AnthropicProvider,
+    GeminiProvider,
     InvalidOutput,
     MockProvider,
     ProviderRefusal,
@@ -28,11 +29,15 @@ from app.llm.providers import (
     strict_schema,
 )
 
-# USD per million tokens (input, output).
+# USD per million tokens (input, output), standard tier.
 PRICES = {
     "claude-opus-5-5": (4.0, 20.0),
     "claude-sonnet-5-5": (2.0, 10.0),
     "claude-haiku-4-5": (1.0, 5.0),
+    # Gemini Developer API pricing page (ai.google.dev/gemini-api/docs/pricing), checked
+    # 2026-10-07: introductory price through 2026-12-31, then $1.50 / $7.50 from
+    # 2027-01-01. Output includes thinking tokens.
+    "gemini-3.8-flash": (0.75, 3.75),
 }
 
 Tier = Literal["reasoning", "fast", "voice"]
@@ -48,21 +53,30 @@ class LlmOutcome(BaseModel):
     error: str | None = None
 
 
+def make_provider():
+    """Provider from LLM_PROVIDER; a provider whose API key is missing runs as mock."""
+    if settings.llm_provider == "anthropic" and settings.anthropic_api_key:
+        return AnthropicProvider(settings.anthropic_api_key, settings.llm_timeout_s)
+    if settings.llm_provider == "gemini" and settings.gemini_api_key:
+        return GeminiProvider(settings.gemini_api_key, settings.llm_timeout_s)
+    return MockProvider()
+
+
 class LlmGateway:
     def __init__(self, provider=None) -> None:
         if provider is None:
-            if settings.llm_mode == "anthropic" and settings.anthropic_api_key:
-                provider = AnthropicProvider(settings.anthropic_api_key, settings.llm_timeout_s)
-            else:
-                provider = MockProvider()
+            provider = make_provider()
         self.provider = provider
 
     @property
     def mode(self) -> str:
+        """The vendor actually used: anthropic, gemini or mock."""
         return self.provider.mode
 
-    @staticmethod
-    def model_for(tier: Tier) -> str:
+    def model_for(self, tier: Tier) -> str:
+        if self.mode == "gemini":
+            return {"reasoning": settings.gemini_model_reasoning, "fast": settings.gemini_model_fast,
+                    "voice": settings.gemini_model_voice}[tier]
         return {"reasoning": settings.model_reasoning, "fast": settings.model_fast, "voice": settings.model_voice}[tier]
 
     def _log(self, *, task, model, prompt, text, started, outcome, result: ProviderResult | None = None,

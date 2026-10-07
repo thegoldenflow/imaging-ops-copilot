@@ -228,7 +228,7 @@ class LlmCall(BaseModel):
     ts: datetime
     task: str
     model: str
-    mode: str  # anthropic or mock
+    mode: str  # anthropic, gemini or mock
     prompt_version: str
     input_tokens: int
     output_tokens: int
