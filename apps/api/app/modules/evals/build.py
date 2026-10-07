@@ -112,6 +112,30 @@ FEEDBACK_ITEMS = [
     ("pa", 4, "ਵ੍ਹੀਲਚੇਅਰ ਲਈ ਲਿਫਟ ਸੀ, ਵਧੀਆ।", "positive", ["parking_access"]),
 ]
 
+# Policy questions: expected policy document, or None when the documents do not cover it.
+POLICY_QUESTIONS = [
+    ("How long must an outpatient stay after a contrast injection?", "POL-CONTRAST"),
+    ("Which patients need an eGFR before contrast?", "POL-CONTRAST"),
+    ("What do we do if contrast leaks into the tissue (extravasation)?", "POL-CONTRAST"),
+    ("Who has to review the request when the eGFR is below 30?", "POL-CONTRAST"),
+    ("Can a visitor go into the magnet room without screening?", "POL-MRI"),
+    ("What is needed before MRI for someone who had metal in the eyes?", "POL-MRI"),
+    ("Can I look up my own test results in the work system?", "POL-PRIVACY"),
+    ("How quickly must a suspected privacy breach be reported?", "POL-PRIVACY"),
+    ("Within what time must a level 1 critical finding be phoned to the ordering physician?", "POL-CRITICAL"),
+    ("What happens if the ordering physician cannot be reached about a critical result?", "POL-CRITICAL"),
+    ("How soon must a CT dose exceedance be reviewed?", "POL-RADIATION"),
+    ("How often are staff dosimeters read?", "POL-RADIATION"),
+    ("Which two identifiers confirm a patient's identity?", "POL-ID"),
+    ("How are endocavity ultrasound probes disinfected?", "POL-INFECTION"),
+    ("What percentage of signed reports is sampled for peer review?", "POL-QA"),
+    ("How often does a scanner need preventive maintenance?", "POL-EQUIPMENT"),
+    ("What is the fee for parking validation?", None),
+    ("How many vacation days do technologists get?", None),
+    ("What is the dress code for front desk staff?", None),
+    ("Which courier do we use for film couriers to hospitals?", None),
+]
+
 GIVEN = ["Ana", "Ben", "Chen", "Dana", "Eli", "Farah", "Gus", "Hira", "Ivan", "Jia"]
 FAMILY = ["Lopez", "Nguyen", "Okoye", "Petrov", "Quinn", "Rossi", "Sato", "Tan"]
 
@@ -153,6 +177,9 @@ def build() -> None:
                 for i, (lang, rating, text, sent, themes) in enumerate(FEEDBACK_ITEMS)]
     (DATASETS / "feedback.json").write_text(json.dumps(feedback, indent=1, ensure_ascii=False))
     print(f"Wrote {len(feedback)} feedback comments")
+    policy = [{"id": f"pol-{i:02d}", "question": q, "expected_doc": doc} for i, (q, doc) in enumerate(POLICY_QUESTIONS)]
+    (DATASETS / "policy_qa.json").write_text(json.dumps(policy, indent=1, ensure_ascii=False))
+    print(f"Wrote {len(policy)} policy questions")
     print(f"Wrote {len(requisitions)} requisitions, {len(protocols)} protocol cases, {len(implants)} implant answers to {DATASETS}")
 
 

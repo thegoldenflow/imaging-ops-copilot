@@ -1,0 +1,102 @@
+[
+ {
+  "id": "pol-00",
+  "question": "How long must an outpatient stay after a contrast injection?",
+  "expected_doc": "POL-CONTRAST"
+ },
+ {
+  "id": "pol-01",
+  "question": "Which patients need an eGFR before contrast?",
+  "expected_doc": "POL-CONTRAST"
+ },
+ {
+  "id": "pol-02",
+  "question": "What do we do if contrast leaks into the tissue (extravasation)?",
+  "expected_doc": "POL-CONTRAST"
+ },
+ {
+  "id": "pol-03",
+  "question": "Who has to review the request when the eGFR is below 30?",
+  "expected_doc": "POL-CONTRAST"
+ },
+ {
+  "id": "pol-04",
+  "question": "Can a visitor go into the magnet room without screening?",
+  "expected_doc": "POL-MRI"
+ },
+ {
+  "id": "pol-05",
+  "question": "What is needed before MRI for someone who had metal in the eyes?",
+  "expected_doc": "POL-MRI"
+ },
+ {
+  "id": "pol-06",
+  "question": "Can I look up my own test results in the work system?",
+  "expected_doc": "POL-PRIVACY"
+ },
+ {
+  "id": "pol-07",
+  "question": "How quickly must a suspected privacy breach be reported?",
+  "expected_doc": "POL-PRIVACY"
+ },
+ {
+  "id": "pol-08",
+  "question": "Within what time must a level 1 critical finding be phoned to the ordering physician?",
+  "expected_doc": "POL-CRITICAL"
+ },
+ {
+  "id": "pol-09",
+  "question": "What happens if the ordering physician cannot be reached about a critical result?",
+  "expected_doc": "POL-CRITICAL"
+ },
+ {
+  "id": "pol-10",
+  "question": "How soon must a CT dose exceedance be reviewed?",
+  "expected_doc": "POL-RADIATION"
+ },
+ {
+  "id": "pol-11",
+  "question": "How often are staff dosimeters read?",
+  "expected_doc": "POL-RADIATION"
+ },
+ {
+  "id": "pol-12",
+  "question": "Which two identifiers confirm a patient's identity?",
+  "expected_doc": "POL-ID"
+ },
+ {
+  "id": "pol-13",
+  "question": "How are endocavity ultrasound probes disinfected?",
+  "expected_doc": "POL-INFECTION"
+ },
+ {
+  "id": "pol-14",
+  "question": "What percentage of signed reports is sampled for peer review?",
+  "expected_doc": "POL-QA"
+ },
+ {
+  "id": "pol-15",
+  "question": "How often does a scanner need preventive maintenance?",
+  "expected_doc": "POL-EQUIPMENT"
+ },
+ {
+  "id": "pol-16",
+  "question": "What is the fee for parking validation?",
+  "expected_doc": null
+ },
+ {
+  "id": "pol-17",
+  "question": "How many vacation days do technologists get?",
+  "expected_doc": null
+ },
+ {
+  "id": "pol-18",
+  "question": "What is the dress code for front desk staff?",
+  "expected_doc": null
+ },
+ {
+  "id": "pol-19",
+  "question": "Which courier do we use for film couriers to hospitals?",
+  "expected_doc": null
+ }
+]

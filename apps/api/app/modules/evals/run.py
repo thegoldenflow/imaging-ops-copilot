@@ -203,8 +203,82 @@ def eval_feedback(gateway: LlmGateway) -> dict:
                   "match and micro-F1 over themes.")
 
 
+def eval_policy_qa(gateway: LlmGateway) -> dict:
+    """Runs over the seeded policy library through the same retrieval and validation as the app."""
+    from app.core.store import get_store
+    from app.llm.gateway import set_gateway
+    from app.modules.inspection import service as inspection
+
+    started, items = time.monotonic(), _load("policy_qa")
+    set_gateway(gateway)
+    store = get_store()
+    answerable = [i for i in items if i["expected_doc"]]
+    hit = refused = invalid = 0
+    errors = []
+    for item in items:
+        r = inspection.ask(store, item["question"], "eval", datetime.now())
+        invalid += r["ai_status"] == "needs_human"
+        cited = {c["doc_id"] for c in r["citations"]}
+        if item["expected_doc"]:
+            ok = r["found"] and item["expected_doc"] in cited
+            hit += ok
+        else:
+            ok = not r["found"] and not r["citations"]
+            refused += ok
+        if not ok:
+            errors.append({"id": item["id"], "question": item["question"], "expected": item["expected_doc"],
+                           "found": r["found"], "cited": sorted(cited), "answer": r["answer"][:200]})
+    set_gateway(None)
+    n = len(items)
+    return _write("policy_qa", gateway, {
+        "answered_with_right_citation": round(hit / len(answerable), 3),
+        "correct_not_found": round(refused / (n - len(answerable)), 3),
+        "rejected_unverifiable_answers": round(invalid / n, 3), "failed_calls": 0,
+    }, n, errors, started, "16 answerable questions (expected policy cited with a verbatim quote) and 4 the documents do "
+       "not cover (must say so). Citations are checked against the retrieved text by the server.")
+
+
+def eval_referral_summary(gateway: LlmGateway) -> dict:
+    """Drafts the weekly summary for three seeded data sets and checks every number against the facts."""
+    from app.llm.gateway import set_gateway
+    from app.modules.referrals import service as referrals
+    from app.seed import build_store
+
+    started = time.monotonic()
+    set_gateway(gateway)
+    ok = traced = numbers = coverage = 0
+    errors = []
+    seeds = [7, 42, 2026]
+    for seed in seeds:
+        store = build_store(seed)
+        summary = referrals.generate_summary(store, datetime.now(), "eval")
+        if summary.ai_status != "ok":
+            errors.append({"seed": seed, "status": summary.ai_status, "error": summary.error})
+            continue
+        ok += 1
+        used = set()
+        for sentence in [summary.headline, *summary.sentences]:
+            for seg in sentence:
+                if "fact" in seg:
+                    used.add(seg["fact"])
+                    if any(ch.isdigit() for ch in seg["value"]):
+                        numbers += 1
+                        traced += summary.facts[seg["fact"]].value == seg["value"]
+                elif any(ch.isdigit() for ch in seg["text"]):
+                    numbers += 1  # a digit outside a fact is never traceable
+                    errors.append({"seed": seed, "untraceable": seg["text"]})
+        coverage += len(used) / len(summary.facts)
+    set_gateway(None)
+    n = len(seeds)
+    return _write("referral_summary", gateway, {
+        "valid_drafts": round(ok / n, 3), "numbers_traceable": round(traced / numbers, 3) if numbers else 0,
+        "fact_coverage": round(coverage / n, 3), "failed_calls": n - ok,
+    }, n, errors, started, "Weekly summary drafted for three synthetic data sets. Every number must be a fact filled in "
+       "by the server; drafts with their own digits fail validation.")
+
+
 TASKS = {"extraction": eval_extraction, "triage": eval_triage, "protocol": eval_protocol, "implants": eval_implants,
-         "feedback": eval_feedback}
+         "feedback": eval_feedback, "policy_qa": eval_policy_qa, "referral_summary": eval_referral_summary}
 
 
 def main(names: list[str]) -> None:

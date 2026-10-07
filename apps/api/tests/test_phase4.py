@@ -405,3 +405,95 @@ def test_investigation_trail_and_report(client, login):
     assert rep["alerts"] >= 6 and rep["by_rule"]["own_record"]["closed"] == 1 and rep["audit_chain"]["intact"]
     csv_text = client.get("/api/phipa/export.csv", headers=admin).text
     assert alert["id"] in csv_text and _audit("export", "phipa_alerts")
+
+
+# ---------- System 21 · Inspection readiness ----------
+
+def test_reminders_fire_at_each_stage_and_once(client, login):
+    from app.modules.inspection import service as inspection
+
+    store = get_store()
+    doc = inspection.documents(store)["CRED-U-RAD3-REGISTRATION"]
+    now = datetime.now()
+    doc.due = (now + timedelta(days=90)).date()
+    assert not [r for r in inspection.process_reminders(store, now) if r["doc_id"] == doc.id]  # not yet
+    doc.due = (now + timedelta(days=25)).date()
+    new = [r for r in inspection.process_reminders(store, now) if r["doc_id"] == doc.id]
+    assert [r["stage"] for r in new] == [30]
+    assert any(m.kind == "inspection_reminder" and "Aisha Nwosu" in m.body for m in store.outbox.values())
+    assert not inspection.process_reminders(store, now)  # sent once per stage
+    later = [r for r in inspection.process_reminders(store, now + timedelta(days=20)) if r["doc_id"] == doc.id]
+    assert [r["stage"] for r in later] == [7]
+    overdue = [r for r in inspection.process_reminders(store, now + timedelta(days=26)) if r["doc_id"] == doc.id]
+    assert [r["stage"] for r in overdue] == [0]
+    data = client.get("/api/inspection/overview", headers=login("U-OPS")).json()
+    assert any(r["doc_id"] == "CRED-U-TECH2-REGISTRATION" and r["stage"] == 30 for r in data["reminders"])
+
+
+def test_checklist_reflects_records_and_renewal_fixes_it(client, login):
+    ops = login("U-OPS")
+    data = client.get("/api/inspection/overview", headers=ops).json()
+    items = {c["key"]: c for c in data["checklist"]}
+    assert not items["Preventive maintenance"]["ok"] and "EQ-NGT-MRI1-PM" in items["Preventive maintenance"]["evidence"]
+    assert not items["BLS / CPR"]["ok"] and items["Registration"]["ok"] and items["qa_report"]["ok"]
+    today = datetime.now().date()
+    r = client.put("/api/inspection/documents/EQ-NGT-MRI1-PM/record",
+                   json={"performed": today.isoformat(), "due": (today + timedelta(days=182)).isoformat(), "result": "Done"},
+                   headers=ops)
+    assert r.status_code == 200 and r.json()["status"] == "ok"
+    items = {c["key"]: c for c in client.get("/api/inspection/overview", headers=ops).json()["checklist"]}
+    assert items["Preventive maintenance"]["ok"]
+    assert client.put("/api/inspection/documents/EQ-NGT-MRI1-PM/record", json={"performed": today.isoformat(),
+                      "due": today.isoformat()}, headers=login("U-TECH")).status_code == 403
+
+
+def test_policy_qa_cites_verbatim_and_admits_when_not_found(client, login):
+    from app.modules.inspection import service as inspection
+
+    tech = login("U-TECH")
+    r = client.post("/api/inspection/ask", json={"question": "How long do outpatients stay after a contrast injection?"},
+                    headers=tech).json()
+    assert r["found"] and r["ai_status"] == "ok" and r["citations"]
+    store = get_store()
+    for c in r["citations"]:
+        doc = inspection.documents(store)[c["doc_id"]]
+        section = next(s for s in doc.current.sections if s.id == c["chunk_id"])
+        assert c["quote"] in section.text
+    assert r["citations"][0]["doc_id"] == "POL-CONTRAST"
+    r = client.post("/api/inspection/ask", json={"question": "What is the staff parking validation fee?"}, headers=tech).json()
+    assert not r["found"] and r["citations"] == [] and "could not find" in r["answer"]
+
+
+def test_policy_qa_rejects_invented_citations():
+    from app.llm.providers import MOCK_FIXTURES
+    from app.modules.inspection import service as inspection
+
+    original = MOCK_FIXTURES["policy_qa"]
+    MOCK_FIXTURES["policy_qa"] = lambda text, images, attempt: {
+        "found": True, "answer": "Stay 45 minutes.", "citations": [{"chunk_id": "POL-CONTRAST#s5", "quote": "Stay 45 minutes."}]}
+    try:
+        r = inspection.ask(get_store(), "How long do outpatients stay after a contrast injection?", "t", datetime.now())
+    finally:
+        MOCK_FIXTURES["policy_qa"] = original
+    assert r["ai_status"] == "needs_human" and not r["found"] and r["citations"] == [] and r["suggested"]
+
+
+def test_uploaded_and_versioned_documents_are_answerable(client, login):
+    md = login("U-MD")
+    text = "# Visitors\nEach patient may bring one support person into the waiting area.\n\n# Children\nChildren under 12 cannot wait alone in the waiting room."
+    r = client.post("/api/inspection/documents", json={"title": "Visitor policy", "owner": "Operations manager", "text": text},
+                    headers=md)
+    assert r.status_code == 200
+    doc_id = r.json()["id"]
+    ans = client.post("/api/inspection/ask", json={"question": "Can children under 12 wait alone in the waiting room?"},
+                      headers=md).json()
+    assert ans["found"] and ans["citations"][0]["doc_id"] == doc_id
+    v2 = text.replace("one support person", "two support people")
+    r = client.post(f"/api/inspection/documents/{doc_id}/versions", json={"version": "1.1", "change_note": "Two visitors",
+                                                                          "text": v2}, headers=md)
+    assert r.status_code == 200 and [v["version"] for v in r.json()["versions"]] == ["1.1", "1.0"]
+    ans = client.post("/api/inspection/ask", json={"question": "How many support people may each patient bring?"},
+                      headers=md).json()
+    assert "two support people" in ans["answer"] and ans["citations"][0]["version"] == "1.1"
+    assert client.post("/api/inspection/documents", json={"title": "x", "owner": "y", "text": "z" * 30},
+                       headers=login("U-TECH")).status_code == 403

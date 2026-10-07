@@ -1,0 +1,43 @@
+{
+ "task": "policy_qa",
+ "run_at": "2026-10-07T00:39:14",
+ "mode": "mock",
+ "model": "rule-based baseline",
+ "n": 20,
+ "metrics": {
+  "answered_with_right_citation": 0.875,
+  "correct_not_found": 0.75,
+  "rejected_unverifiable_answers": 0.0,
+  "failed_calls": 0
+ },
+ "errors": [
+  {
+   "id": "pol-07",
+   "question": "How quickly must a suspected privacy breach be reported?",
+   "expected": "POL-PRIVACY",
+   "found": false,
+   "cited": [],
+   "answer": "I could not find this in the uploaded documents. Check with the document owner or upload the relevant policy."
+  },
+  {
+   "id": "pol-10",
+   "question": "How soon must a CT dose exceedance be reviewed?",
+   "expected": "POL-RADIATION",
+   "found": false,
+   "cited": [],
+   "answer": "I could not find this in the uploaded documents. Check with the document owner or upload the relevant policy."
+  },
+  {
+   "id": "pol-18",
+   "question": "What is the dress code for front desk staff?",
+   "expected": null,
+   "found": true,
+   "cited": [
+    "POL-PRIVACY"
+   ],
+   "answer": "Staff who want their own results use the patient portal or ask the front desk like any other patient."
+  }
+ ],
+ "seconds": 1.2,
+ "notes": "16 answerable questions (expected policy cited with a verbatim quote) and 4 the documents do not cover (must say so). Citations are checked against the retrieved text by the server."
+}

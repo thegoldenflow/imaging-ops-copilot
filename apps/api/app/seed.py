@@ -500,6 +500,7 @@ def _add_business_compliance(s: Store, rng: random.Random, now: datetime) -> Non
     """Phase 4: inventory, referrals, portal, billing, feedback, access monitoring, inspection."""
     from app.modules.billing import service as billing
     from app.modules.feedback import service as feedback
+    from app.modules.inspection import service as inspection
     from app.modules.inventory import service as inventory
     from app.modules.phipa import service as phipa
     from app.modules.portal import service as portal
@@ -508,4 +509,5 @@ def _add_business_compliance(s: Store, rng: random.Random, now: datetime) -> Non
     portal.seed(s, rng, now)
     billing.seed(s, rng, now)
     feedback.seed(s, rng, now)
-    phipa.seed(s, rng, now)  # last: audit history covers records created above
+    phipa.seed(s, rng, now)  # adds site staff and an access history over the records created above
+    inspection.seed(s, rng, now)  # credentials for all staff, including those added for system 20
