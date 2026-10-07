@@ -90,7 +90,7 @@ function Queue() {
                       ) : <span className="text-xs text-slate-400">pending</span>}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap"><DaysLeft days={r.days_left} /></td>
-                    <td className="px-3 py-2"><p className="font-medium">{r.patient_name}</p><p className="text-xs text-slate-500">{r.referrer_name}</p></td>
+                    <td className="px-3 py-2"><p className="font-medium">{r.patient_name}</p><p className="text-xs text-slate-500">{r.referrer_name}{r.channel === "portal" && <Badge tone="blue" className="ml-1">Portal</Badge>}</p></td>
                     <td className="px-3 py-2">{r.requested_exam ?? "–"}{r.low_confidence.length > 0 && <Badge tone="amber" className="ml-1">{r.low_confidence.length} to check</Badge>}</td>
                     <td className="px-3 py-2 text-xs">{r.protocol_name ?? "–"}{r.protocol_name && !r.protocol_approved && <span className="text-ai-700"> (suggested)</span>}</td>
                     <td className="px-3 py-2"><div className="flex flex-col items-start gap-1"><ContrastBadge status={r.contrast_status} /><MriBadge status={r.mri_status} /></div></td>

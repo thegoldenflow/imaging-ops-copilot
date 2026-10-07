@@ -14,6 +14,8 @@ import {
   LogOut,
   Magnet,
   Package,
+  FilePlus2,
+  Users,
   TrendingUp,
   Radiation,
   PhoneCall,
@@ -46,6 +48,8 @@ export const NAV: NavItem[] = [
   { to: "/scheduling", label: "Scheduling", icon: CalendarClock, roles: ["front_desk", "technologist", "operations_manager", "medical_director", "admin"], section: "Operations" },
   { to: "/front-desk", label: "Front desk", icon: PhoneCall, roles: ["front_desk", "operations_manager", "admin"], section: "Operations" },
   { to: "/reading", label: "Reading room", icon: ScanLine, roles: ["radiologist", "medical_director", "admin"], section: "Operations" },
+  { to: "/portal", label: "My patients", icon: Users, roles: ["referrer"], section: "Operations" },
+  { to: "/portal/new", label: "New requisition", icon: FilePlus2, roles: ["referrer"], section: "Operations" },
   { to: "/my-reports", label: "My reports", icon: FileText, roles: ["referrer"], section: "Operations" },
   { to: "/requisitions", label: "Requisitions", icon: ClipboardList, roles: STAFF, section: "Intake pipeline" },
   { to: "/contrast", label: "Contrast checks", icon: Droplet, roles: ["technologist", "radiologist", "medical_director", "admin"], section: "Intake pipeline" },
@@ -108,7 +112,7 @@ export function Layout() {
             )}
             <NavLink
               to={item.to}
-              end={item.to === "/"}
+              end={item.to === "/" || item.to === "/portal"}
               className={({ isActive }) =>
                 clsx(
                   "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium",
@@ -131,7 +135,7 @@ export function Layout() {
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2.5 md:px-6">
           <nav className="flex gap-1 overflow-x-auto md:hidden" aria-label="Main mobile">
             {NAV.filter((item) => canSee(item, user.role)).map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.to === "/"} className={({ isActive }) => clsx("rounded-md p-2", isActive ? "bg-brand-50 text-brand-700" : "text-slate-500")} aria-label={item.label}>
+              <NavLink key={item.to} to={item.to} end={item.to === "/" || item.to === "/portal"} className={({ isActive }) => clsx("rounded-md p-2", isActive ? "bg-brand-50 text-brand-700" : "text-slate-500")} aria-label={item.label}>
                 <item.icon className="size-4" />
               </NavLink>
             ))}

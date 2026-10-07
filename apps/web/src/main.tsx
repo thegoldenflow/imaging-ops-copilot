@@ -11,6 +11,9 @@ import { CriticalPage } from "./features/critical/CriticalPage";
 import { DosePage } from "./features/dose/DosePage";
 import { InventoryPage } from "./features/inventory/InventoryPage";
 import { ReferralsPage } from "./features/referrals/ReferralsPage";
+import { NewRequisitionPage } from "./features/portal/NewRequisitionPage";
+import { PortalPage } from "./features/portal/PortalPage";
+import { PortalPatientPage } from "./features/portal/PortalPatientPage";
 import { PeerReviewPage } from "./features/peer-review/PeerReviewPage";
 import { ContrastPage } from "./features/contrast/ContrastPage";
 import { EvalsPage } from "./features/evals/EvalsPage";
@@ -67,6 +70,9 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/front-desk" element={<Guard path="/front-desk"><FrontDeskPage /></Guard>} />
               <Route path="/reading" element={<Guard path="/reading"><ReadingRoomPage /></Guard>} />
               <Route path="/reading/:reportId" element={<Guard path="/reading"><ReportReviewPage /></Guard>} />
+              <Route path="/portal" element={<Guard path="/portal"><PortalPage /></Guard>} />
+              <Route path="/portal/new" element={<Guard path="/portal/new"><NewRequisitionPage /></Guard>} />
+              <Route path="/portal/patients/:patientId" element={<Guard path="/portal"><PortalPatientPage /></Guard>} />
               <Route path="/my-reports" element={<Guard path="/my-reports"><ReferrerPage /></Guard>} />
               <Route path="/requisitions" element={<Guard path="/requisitions"><RequisitionsPage /></Guard>} />
               <Route path="/requisitions/:reqId" element={<Guard path="/requisitions"><RequisitionDetailPage /></Guard>} />

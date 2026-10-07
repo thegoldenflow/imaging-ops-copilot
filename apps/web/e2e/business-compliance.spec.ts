@@ -104,3 +104,44 @@ test("referral analytics: filters, visit list and an AI summary whose numbers ma
   await page.locator('[data-testid^="plan-R-"]').first().click();
   await expect(page.getByTestId("visit-list")).toContainText("planned by Jordan Lee");
 });
+
+test("referrer portal: online requisition reaches triage; another doctor's patient is 403 and audited (system 17)", async ({ page }) => {
+  await signInAs(page, "referrer");
+  await page.getByRole("link", { name: "My patients" }).click();
+  await expect(page.getByTestId("portal-patient-PT-DEMO1")).toBeVisible();
+  await page.getByRole("link", { name: "New requisition" }).first().click();
+  await page.getByLabel("New patient").check();
+  await page.getByLabel("First name").fill("Ana");
+  await page.getByLabel("Last name").fill("Example");
+  await page.getByLabel("Date of birth").fill("1958-02-11");
+  await page.getByLabel("Health card number").fill("1234567890");
+  await page.getByLabel("Version code").fill("AB");
+  await page.getByLabel("Exam requested").fill("CT abdomen and pelvis with contrast");
+  await page.getByLabel("Clinical information").fill("Right lower quadrant pain and 6 kg weight loss over 2 months.");
+  await page.getByLabel("Relevant history").fill("Type 2 diabetes on metformin");
+  await page.getByLabel("Urgent").check();
+  await shot(page, "p4-04-portal-form");
+  await page.getByTestId("submit-requisition").click();
+  await expect(page.getByTestId("requisition-sent")).toBeVisible();
+  const reqId = (await page.getByTestId("requisition-sent").textContent())!.match(/REQ-\d+/)![0];
+  await page.getByRole("link", { name: "My patients" }).first().click();
+  await expect(page.getByTestId(`portal-req-${reqId}`)).toContainText("With the radiologist for review", { timeout: 20_000 });
+
+  // Someone else's patient: refused and audited.
+  await page.getByLabel("Patient ID").fill("PT-00001");
+  await page.getByRole("button", { name: "Open patient" }).click();
+  await expect(page.getByTestId("portal-denied")).toBeVisible();
+  await shot(page, "p4-05-portal-denied");
+
+  // Staff see the AI triage and protocol suggestion for the portal requisition.
+  await signInAs(page, "radiologist");
+  await page.goto(`/requisitions/${reqId}`);
+  await expect(page.getByText("CT abdomen and pelvis with contrast").first()).toBeVisible();
+  await expect(page.getByText(/P[12]/).first()).toBeVisible();
+  await shot(page, "p4-06-portal-req-staff");
+
+  await signInAs(page, "admin");
+  await page.goto("/audit");
+  await page.getByRole("tab", { name: "Denied (403)" }).click();
+  await expect(page.getByRole("row").filter({ hasText: "PT-00001" }).first()).toContainText("Dr. Helen Park");
+});

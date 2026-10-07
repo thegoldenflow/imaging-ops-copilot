@@ -193,10 +193,10 @@ Plan (same shape as phase 3: module state in `store.module(...)`, a `seed(s, rng
 - [x] Referrers with a marked drop in volume form a visit list
 - [x] Weekly summary drafted by Claude from query results only: the model places numbers by fact key, the server fills them in and rejects any number it did not supply; each number links to its dashboard tile
 
-### System 17 · Referring Physician Portal
+### System 17 · Referring Physician Portal — done
 
-- [ ] Referrer sees only their own patients (appointments, requisition status, signed reports); anything else is 403 and audited
-- [ ] Online requisition (structured form plus free text) enters the phase 2 pipeline; staff see triage and protocol suggestions
+- [x] Referrer sees only their own patients (appointments, requisition status, signed reports); anything else is 403 and audited
+- [x] Online requisition (structured form plus free text) enters the phase 2 pipeline; staff see triage and protocol suggestions
 
 ### System 18 · Billing & Claims QA
 

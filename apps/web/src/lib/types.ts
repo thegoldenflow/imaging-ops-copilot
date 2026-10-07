@@ -676,3 +676,32 @@ export interface WeeklySummary {
   approved_at: string | null;
   error: string | null;
 }
+
+// ---------- System 17 referrer portal ----------
+
+export interface PortalRequisition {
+  id: string;
+  patient_id: string;
+  patient_name: string;
+  received_at: string;
+  channel: string;
+  status: string;
+  status_text: string;
+  requested_exam: string | null;
+  confirmed_priority: string | null;
+}
+
+export interface PortalPatientRow { id: string; name: string; dob: string; next_appointment: string | null; open_requisitions: number }
+
+export interface PortalPatient {
+  id: string;
+  name: string;
+  dob: string;
+  sex: string;
+  phone: string;
+  preferred_language: string;
+  health_card_last4: string;
+  appointments: { id: string; start: string; exam_name: string; site_name: string; status: string; protocol_name: string | null }[];
+  requisitions: PortalRequisition[];
+  reports: { id: string; signed_at: string | null; exam_name: string; impression: string }[];
+}
