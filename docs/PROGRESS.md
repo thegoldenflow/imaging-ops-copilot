@@ -284,8 +284,10 @@ Placement: a side panel on the requisition review page (next to triage and proto
 - [x] Requisition questions are audited (`knowledge_query` on the requisition) and that patient's identifiers are redacted by the gateway
 - [x] UI: side panel and page, AI or template answer marked, clickable fact citations, grouped fact list, "reference only, not a diagnosis" notice, recent questions
 - [x] Eval set `clinical_kg` (30 questions, English and Chinese: 19 disease questions with an expected cited fact, 3 symptom lists with plausible diseases, 2 requisition-style indications, 6 not covered). Mock baseline: 100% on every metric, optimistic because the rules and the set were written together
-- [x] Tests: `tests/test_clinical_kg.py` (16), `e2e/clinical-knowledge.spec.ts` (3)
+- [x] Tests: `tests/test_clinical_kg.py` (18), `e2e/clinical-knowledge.spec.ts` (3)
 - [ ] Run the eval with a real model (Claude or Gemini) and record the numbers
+- [x] Tooling for English terminology of graph nodes: `python -m app.modules.clinical_kg.terms export` lists untranslated names (priority 1: all diseases plus terms used by two or more diseases, 6,382 names; `--all`: 16,900), `terms check` validates `data/terminology_en.jsonl`; the glossary merges it (hand-written entries win, low-confidence entries are display-only, aliases under 3 letters or claimed by two nodes are not matched); English matching looks up word n-grams with a plural fallback. Translation prompt: `docs/prompts/translate-kg-terminology.md`
+- [ ] Generate `terminology_en.jsonl` locally with that prompt and commit it (backend restart needed to load it)
 
 Limits:
 

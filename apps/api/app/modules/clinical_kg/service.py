@@ -27,7 +27,7 @@ from app.core.store import Store
 from app.llm.gateway import get_gateway
 from app.llm.prompts import Prompt
 from app.llm.providers import mock_fixture
-from app.modules.clinical_kg.glossary import english_names, glossary
+from app.modules.clinical_kg.glossary import english_names, glossary, norm
 from app.modules.clinical_kg.graph import LIST_RELATIONS, RELATION_LABELS, RELATIONS, Fact, Graph, get_graph
 
 NOTICE = ("Reference only, not a diagnosis. Facts come from a research knowledge graph built from annotated Chinese "
@@ -71,7 +71,7 @@ def align(graph: Graph, term: str) -> dict:
     """Term (English or Chinese) -> graph node: exact, glossary alias, then fuzzy."""
     index = names(graph)
     raw = term.strip()
-    candidate = glossary().get(raw.lower(), raw)
+    candidate = glossary().get(norm(raw), raw)
     match = "exact" if candidate == raw else "glossary"
     if candidate in index:
         return {"text": raw, "name": candidate, "kinds": index[candidate], "match": match}
@@ -99,12 +99,20 @@ REL_WORDS = {
 
 
 def _scan_english(text: str) -> list[str]:
-    found, lowered = [], text.lower()
-    for term in sorted(glossary(), key=len, reverse=True):
-        m = re.search(rf"(?<![a-z]){re.escape(term)}(?![a-z])", lowered)
-        if m:
-            found.append(text[m.start():m.end()])
-            lowered = lowered[:m.start()] + " " * len(term) + lowered[m.end():]
+    """Longest glossary phrase first (up to 6 words), left to right; a plural falls back to its singular."""
+    terms = glossary()
+    words = re.findall(r"[a-z0-9][a-z0-9'+-]*", text.lower().replace("’", "'"))
+    found, i = [], 0
+    while i < len(words):
+        for size in range(min(6, len(words) - i), 0, -1):
+            phrase = " ".join(words[i:i + size])
+            hit = phrase if phrase in terms else phrase[:-1] if phrase.endswith("s") and phrase[:-1] in terms else None
+            if hit:
+                found.append(hit)
+                i += size
+                break
+        else:
+            i += 1
     return found
 
 
