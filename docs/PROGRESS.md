@@ -346,7 +346,7 @@ Order: WP0 → WP1 → WP2 → WP3 → WP4 → WP4b → WP5 → WP4c → WP6 →
 - [x] `docs/audit-baseline.md`: reusable components with paths and interfaces, the two sibling projects (warehouse, freight-arbiter-demo: both reusable as patterns only), naming map
 - [x] Extension spec moved to `docs/SPEC-hospital.md`; CLAUDE.md points to it
 
-### WP1 · Fake hospital EHR (6.2 setup)
+### WP1 · Fake hospital EHR (6.2 setup) — done
 
 - [x] Hospital generator (`app/ehr/seed/`): Location tree (ED 30, Medicine A/B 32 each, Surgery 32, Ortho 24, ICU 12 beds; unit → room → bed, plus 4 operating rooms), 60 practitioners with roles, 1,000 patients with MRN (`urn:demo-hospital:mrn`) and synthetic health card (`urn:demo-hospital:hcn`, 10 digits + version code, marked synthetic), GTA addresses, 30% `zh-CN`/`zh-TW` (Chinese names in a second `HumanName`), problem lists, home medications (DHDR stand-in), allergies, consents (some missing on purpose), outpatient labs; deterministic from the seed with one random stream per section
 - [x] 60-day hospital timeline (`simulate.py`): ED arrivals with census-dependent waits against the physician roster, admission by age/CTAS/complaint/vitals/recent admissions, beds as a real constraint (boarding, overflow units, housekeeping), ICU step-down transfers, ALC stays, elective OR blocks per surgeon and emergency add-ons with surgeon-specific durations, orders tapering off before discharge. These are the ground-truth signals the 7.1 models will learn
@@ -355,7 +355,7 @@ Order: WP0 → WP1 → WP2 → WP3 → WP4 → WP4b → WP5 → WP4c → WP6 →
 - [x] docker compose profile `ehr`: HAPI FHIR R4 (`hapiproject/hapi:v7.4.0`, 127.0.0.1:8080, own Postgres 16, subscriptions off, external and placeholder references allowed)
 - [x] `scripts/gen_locations.py`, `scripts/localize_synthea.py` (`app/ehr/synthea.py`; hand-written Synthea-format sample in `scripts/samples/synthea/`), `scripts/load_fhir.py` (organization and practitioners → locations → one PUT transaction bundle per patient, one retry, `load_errors.log`), `scripts/smoke_fhir.sh`
 - [x] Tests: `tests/test_ehr_store.py` (11: tree, patients, MRN lookup, ciphertext in SQL, every clinical resource has an existing encounter, census matches bed status, flow-model history, plan integrity, CRUD, determinism, reset), `tests/test_synthea_localize.py` (4)
-- [ ] Smoke test against HAPI with all 1,000 patients loaded; `load_errors.log` empty. Status 2026-10-08: HAPI v7.4.0 runs locally (ready in ~90 s); a trial load of 20 patients plus organization, practitioners and the Location tree went through with no errors (about 1 s per patient, so the full load takes 15–20 min); `smoke_fhir.sh` passes every check except the patient count (20 of 1,000). Next: `uv run python scripts/load_fhir.py` (no `--limit`), then `bash scripts/smoke_fhir.sh`
+- [x] Smoke test against HAPI with all 1,000 patients loaded (2026-10-08): `load_fhir.py` loaded organization, 120 practitioners and roles, 275 locations and 1,000 patient bundles in 576 s with no failed bundle (`load_errors.log` empty); `smoke_fhir.sh` passes all checks (1,000 patients, 1,628 inpatient encounters, conditions / medication requests / observations for a patient, three-level Location tree)
 
 Deviations and notes:
 
