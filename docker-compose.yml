@@ -48,5 +48,49 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Optional: HAPI FHIR R4 as the hospital EHR (docs/SPEC-hospital.md 6.2). Not needed for the demo,
+  # which keeps FHIR resources in PostgreSQL; start it with `docker compose --profile ehr up -d hapi`,
+  # load the hospital with `uv run python scripts/load_fhir.py` and check it with `scripts/smoke_fhir.sh`.
+  # FHIR_BACKEND=hapi makes the API read and write through it.
+  hapi-db:
+    image: postgres:16-alpine
+    profiles: ["ehr"]
+    environment:
+      POSTGRES_USER: hapi
+      POSTGRES_PASSWORD: hapi
+      POSTGRES_DB: hapi
+    volumes:
+      - hapidata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hapi -d hapi"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  hapi:
+    image: hapiproject/hapi:v7.4.0
+    profiles: ["ehr"]
+    ports:
+      - "127.0.0.1:${HAPI_PORT:-8080}:8080"
+    environment:
+      spring.datasource.url: jdbc:postgresql://hapi-db:5432/hapi
+      spring.datasource.username: hapi
+      spring.datasource.password: hapi
+      spring.datasource.driverClassName: org.postgresql.Driver
+      spring.jpa.properties.hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
+      hapi.fhir.fhir_version: R4
+      hapi.fhir.allow_external_references: "true"
+      hapi.fhir.allow_placeholder_references: "true"
+      hapi.fhir.enforce_referential_integrity_on_write: "false"
+      hapi.fhir.subscription.resthook_enabled: "false"
+      hapi.fhir.subscription.websocket_enabled: "false"
+      hapi.fhir.subscription.email_enabled: "false"
+    depends_on:
+      hapi-db:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata:
+  hapidata:

@@ -42,6 +42,7 @@ from app.core.models import (
     StaffUser,
     WaitlistEntry,
 )
+from app.ehr.fhirstore import FhirStore, fhir_resources
 
 # ---------- Connections ----------
 
@@ -140,6 +141,7 @@ class Store:
             setattr(self, name, (ListTable if spec.kind == "list" else EntityTable)(self, name))
         self.images = ImageTable(self)
         self.modules = ModuleSpace(self)
+        self.fhir = FhirStore(self)  # hospital EHR resources (app/ehr)
         self.audit = AuditLog(self)
 
     def __repr__(self) -> str:
@@ -159,7 +161,7 @@ class Store:
         return self._source.autonomous()
 
     def _collections(self) -> list:
-        return [*(getattr(self, name) for name in schema.STORE_ENTITIES), self.images, self.modules]
+        return [*(getattr(self, name) for name in schema.STORE_ENTITIES), self.images, self.modules, self.fhir]
 
     def flush(self) -> int:
         return sum(c.flush() for c in self._collections())
@@ -341,6 +343,7 @@ def persist(src: Store, into: Store) -> None:
     insert_rows(schema.module_state, src.modules.encoded_rows())
     insert_rows(schema.images, src.images.encoded_rows())
     insert_rows(schema.audit_events, src.audit.encoded_rows())
+    insert_rows(fhir_resources, src.fhir.encoded_rows())
     for prefix, n in src._counters.items():
         name = _ensure_sequence(prefix)
         conn.execute(text("SELECT setval(:seq, :n)"), {"seq": name, "n": n})

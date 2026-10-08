@@ -348,11 +348,21 @@ Order: WP0 → WP1 → WP2 → WP3 → WP4 → WP4b → WP5 → WP4c → WP6 →
 
 ### WP1 · Fake hospital EHR (6.2 setup)
 
-- [ ] Hospital generator: Location tree (ED 30, Medicine A/B 32 each, Surgery 32, Ortho 24, ICU 12 beds), practitioners and roles, 1,000 patients with MRN (`urn:demo-hospital:mrn`) and synthetic health card (`urn:demo-hospital:hcn`, marked synthetic), GTA addresses, 30% `zh-CN`/`zh-TW`, encounters (EMER/IMP/AMB) with history, conditions, medications, home medications, allergies, observations, procedures, reports; deterministic from the seed
-- [ ] FHIR store in PostgreSQL (`fhir_resources`: encrypted body, search columns, blind index on MRN) as `store.fhir`, seeded and reset with the rest of the demo data
-- [ ] docker compose profile `ehr`: HAPI FHIR R4 (port 8080, own Postgres 16, subscriptions off, external references allowed)
-- [ ] `scripts/gen_locations.py`, `scripts/localize_synthea.py` (+ small committed Synthea-format sample), `scripts/load_fhir.py` (hospital and practitioners → locations → patient bundles, `load_errors.log`, one retry), `scripts/smoke_fhir.sh`
-- [ ] Smoke test passes against HAPI; load errors empty
+- [x] Hospital generator (`app/ehr/seed/`): Location tree (ED 30, Medicine A/B 32 each, Surgery 32, Ortho 24, ICU 12 beds; unit → room → bed, plus 4 operating rooms), 60 practitioners with roles, 1,000 patients with MRN (`urn:demo-hospital:mrn`) and synthetic health card (`urn:demo-hospital:hcn`, 10 digits + version code, marked synthetic), GTA addresses, 30% `zh-CN`/`zh-TW` (Chinese names in a second `HumanName`), problem lists, home medications (DHDR stand-in), allergies, consents (some missing on purpose), outpatient labs; deterministic from the seed with one random stream per section
+- [x] 60-day hospital timeline (`simulate.py`): ED arrivals with census-dependent waits against the physician roster, admission by age/CTAS/complaint/vitals/recent admissions, beds as a real constraint (boarding, overflow units, housekeeping), ICU step-down transfers, ALC stays, elective OR blocks per surgeon and emergency add-ons with surgeon-specific durations, orders tapering off before discharge. These are the ground-truth signals the 7.1 models will learn
+- [x] Written as FHIR as of 07:00 on the hospital day (`materialize.py`): ~65k resources, ~119/132 inpatient beds occupied, an ED census, today's OR list with pre-op checklist tasks; the next 36 h are stored as the day simulator's plan (`hospital_plan`, ~1,800 events) for WP3
+- [x] FHIR store in PostgreSQL (`app/ehr/fhirstore.py`, table `fhir_resources`, migration 0002): encrypted JSON body, plain search columns (ids, references, codes, status, dates; no identifiers), blind indexes for MRN and health card; `store.fhir` inside the unit of work, so tests roll back; seeded and reset with the rest of the demo data (adds about 8 s)
+- [x] docker compose profile `ehr`: HAPI FHIR R4 (`hapiproject/hapi:v7.4.0`, 127.0.0.1:8080, own Postgres 16, subscriptions off, external and placeholder references allowed)
+- [x] `scripts/gen_locations.py`, `scripts/localize_synthea.py` (`app/ehr/synthea.py`; hand-written Synthea-format sample in `scripts/samples/synthea/`), `scripts/load_fhir.py` (organization and practitioners → locations → one PUT transaction bundle per patient, one retry, `load_errors.log`), `scripts/smoke_fhir.sh`
+- [x] Tests: `tests/test_ehr_store.py` (11: tree, patients, MRN lookup, ciphertext in SQL, every clinical resource has an existing encounter, census matches bed status, flow-model history, plan integrity, CRUD, determinism, reset), `tests/test_synthea_localize.py` (4)
+- [ ] Smoke test against HAPI with all 1,000 patients loaded; `load_errors.log` empty
+
+Deviations and notes:
+
+- Patients come from our own Synthea-style generator (owner decision), not Synthea; Synthea output can be localized and loaded with the scripts. Spec acceptance "1,000 localized patients loaded" therefore means the generated patients.
+- The hospital day starts at 07:00 on the seed date (the nearest weekday at a weekend, so the OR has a list). The hospital clock is separate from the wall clock and only moves when the day simulator runs (WP3).
+- The ED history is dense for a 1,000-patient population (about 52 visits a day over 60 days, ~3 visits per patient) so that ED crowding and the flow models have realistic volumes.
+- Local codes (`urn:demo-hospital:*`) are used where this demo has no standard code: CTAS is LOINC 11283-9 with an integer value; NEWS2, bed requests, pre-op checks, task and flag codes are local.
 
 ### WP2 · Data model + FhirGateway (6.1, 6.2 gateway)
 

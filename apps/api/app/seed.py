@@ -258,6 +258,15 @@ def populate(s: Store, seed: int | None = None) -> None:
     _add_requisitions(s, rng, now)
     _add_radiology_ops(s, rng, now)
     _add_business_compliance(s, rng, now)
+    _add_hospital(s, settings.seed if seed is None else seed, now)
+
+
+def _add_hospital(s: Store, seed: int, now: datetime) -> None:
+    """Phases 6-8: the synthetic hospital EHR (FHIR resources and the day simulator's plan).
+    It uses its own random streams, so the imaging data above does not change."""
+    from app.ehr.seed import generate
+
+    generate(s, seed, now)
 
 
 def _add_staff(s: Store) -> None:

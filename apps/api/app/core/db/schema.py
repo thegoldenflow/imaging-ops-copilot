@@ -143,6 +143,8 @@ BLOBS = {
     "extra_reminders_done",
     "daily_reset",  # date of the last automatic demo reset
     "seed_time",  # the "now" the demo data was generated for (it ages from there)
+    "hospital_plan",  # the day simulator's upcoming events (app/ehr)
+    "hospital_clock",  # the hospital's simulated clock (app/ehr)
 }
 
 # Derived per process from stored data; never written to the database.
@@ -196,7 +198,8 @@ app_meta = Table(
 )
 
 # Tables a demo reset empties. Sessions survive: staff ids are stable across resets.
-FIXED_DATA_TABLES = ("module_state", "images", "audit_events")
+# fhir_resources is defined in app/ehr/fhirstore.py (the hospital EHR's FHIR store).
+FIXED_DATA_TABLES = ("module_state", "images", "audit_events", "fhir_resources")
 
 
 # ---------- Pydantic model -> table ----------
@@ -303,6 +306,8 @@ def all_entity_names() -> list[str]:
 
 def get_metadata() -> MetaData:
     """Metadata with every table defined (imports all model classes)."""
+    import app.ehr.fhirstore  # noqa: F401  (defines fhir_resources)
+
     for name in all_entity_names():
         mapping(name)
     for name in CONFIGS:
