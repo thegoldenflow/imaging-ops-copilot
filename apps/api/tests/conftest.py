@@ -24,6 +24,7 @@ from sqlalchemy.engine import make_url  # noqa: E402
 from app.core.db.migrate import upgrade  # noqa: E402
 from app.core.db.repo import clear_process_cache  # noqa: E402
 from app.core.store import ConnectionSource, Store, get_engine, reset_store, set_ambient_store, unit_of_work  # noqa: E402
+from app.integrations.mocks import reset_adapters  # noqa: E402
 from app.llm.gateway import LlmGateway, set_gateway  # noqa: E402
 from app.llm.providers import MockProvider  # noqa: E402
 
@@ -50,6 +51,7 @@ def fresh_state(database):
     store = Store(ConnectionSource(conn))
     set_ambient_store(store)
     set_gateway(LlmGateway(MockProvider(latency_s=0)))
+    reset_adapters()  # circuit breakers are per process; each test starts with closed circuits
     yield store
     set_gateway(None)
     set_ambient_store(None)

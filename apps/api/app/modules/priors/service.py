@@ -13,15 +13,13 @@ from pydantic import BaseModel
 
 from app.core.models import Appointment, ImagingStudy
 from app.core.store import Store, get_store
-from app.integrations.mocks import MOCK_CONFIG, MockServiceConfig, MockServiceError, simulate_call
+from app.integrations.mocks import adapter
 from app.modules.scheduling import service as scheduling
 from app.phantom import chest_phantom
 
 FACILITIES = ["Northview General Hospital", "Riverside Health Centre", "Lakeview Diagnostics"]
 MAX_ATTEMPTS = 4
 BACKOFF_SECONDS = 3  # 3 s, 6 s, 12 s ... (compressed for the demo)
-
-MOCK_CONFIG.setdefault("outside_archive", MockServiceConfig(latency_ms=300, failure_rate=0.0))
 
 
 class RetrievalTask(BaseModel):
@@ -102,12 +100,14 @@ def _import(store: Store, task: RetrievalTask, studies: list[dict], now: datetim
 def attempt(store: Store, task: RetrievalTask, now: datetime | None = None) -> None:
     now = now or datetime.now()
     task.attempts += 1
-    try:
-        simulate_call("outside_archive")
-    except MockServiceError:
+    # One adapter call per attempt (correlation id = task id); this worker owns the retries.
+    archive, request = adapter("outside_archive"), {"patient_id": task.patient_id, "facility": task.facility}
+    result = archive.call("fetch", request, correlation_id=task.id, dead_letter=False)
+    if not result.ok:
         if task.attempts >= task.max_attempts:
             task.status, task.completed_at = "failed", now
             _log(task, f"Attempt {task.attempts}: archive unavailable. Gave up after {task.attempts} attempts.", now)
+            archive.dead_letter("fetch", request, task.id, result.error or "failed", task.attempts)
         else:
             delay = BACKOFF_SECONDS * 2 ** (task.attempts - 1)
             task.status, task.next_attempt_at = "retrying", now + timedelta(seconds=delay)

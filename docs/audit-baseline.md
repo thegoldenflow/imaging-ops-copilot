@@ -83,8 +83,14 @@ Java 21, Spring Boot, Temporal Java SDK 1.35, MySQL. Nothing is copyable into Py
 
 | Extension spec | Here |
 | --- | --- |
-| `fhir/` type definitions | `apps/api/app/fhir/` (`resources/<resource>.py`, `examples/<Resource>.json`) |
-| `FhirGateway`, `EventBus`, `DaySimulator` | `apps/api/app/ehr/` |
+| `fhir/` type definitions | `apps/api/app/fhir/` (`types/<resource>.py`, `examples/<Resource>.json`) |
+| `FhirGateway`, `EventBus`, `DaySimulator` | `apps/api/app/ehr/` (`gateway.py`; HAPI backend `hapi.py`) |
+| `getPatient(mrn)`, `searchEncounters`, `getBedBoard(unitId)`, ... | `FhirGateway.get_patient(mrn)`, `search_encounters(...)`, `get_bed_board(unit_id)`, ... (snake case) |
+| Exam → FHIR adapter | `apps/api/app/ehr/imaging.py` (`exam_to_fhir`, `exam_from_fhir`) |
+| De-identification field list for the resources | `apps/api/app/llm/fhir_deid.py` (`FhirDeidentifier`, `STRUCTURED`, `FREE_TEXT`) |
+| Non-FHIR adapter contract, real adapters (interfaces) | `apps/api/app/integrations/contract.py`, `interfaces.py`; mocks in `mocks.py` |
+| Bed manager role | `operations_manager` |
+| `demo/<name>.md` | repository root `demo/` |
 | `scripts/*.py`, `scripts/smoke_fhir.sh` | `apps/api/scripts/` |
 | `config/agents`, `config/tools`, `config/models.yaml`, `config/alerts.yaml`, `config/med_rules/` | `apps/api/config/...` (shipped in the API image) |
 | `prompts/<module>/<version>.md` | `apps/api/prompts/<agent>/<version>.md` |

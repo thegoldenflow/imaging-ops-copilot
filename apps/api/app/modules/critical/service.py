@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from app.core.models import MessageOutbox
 from app.core.store import Store
-from app.integrations.mocks import MOCK_CONFIG
+from app.integrations.mocks import adapter
 
 ACK_METHODS = {"phone": "Phone read-back", "fax": "Fax confirmation", "in_person": "In person",
                "portal": "Referrer portal", "secure_message": "Secure message"}
@@ -98,8 +98,10 @@ def queue_message(store: Store, *, channel: str, kind: str, to: str, body: str, 
     store.outbox[msg.id] = msg
 
 
-def _phone_ok() -> bool:
-    return random.random() >= MOCK_CONFIG["phone"].failure_rate
+def _phone_ok(case: CriticalCase, to: str) -> bool:
+    """One live call attempt (correlation id = case id); the escalation policy owns the retries."""
+    return adapter("phone").call("call", {"to": to, "kind": "critical_result"}, correlation_id=case.id,
+                                 attempts=1, dead_letter=False).ok
 
 
 def open_case(store: Store, report, finding: str, level: str, opened_by: str,
@@ -134,7 +136,7 @@ def advance(store: Store, case: CriticalCase, now: datetime) -> None:
     body = _message(store, case)
     if case.step == 0:
         queue_message(store, channel="phone", kind="critical_result", to=ref.phone, body=body, patient_id=case.patient_id, now=now)
-        if _phone_ok():
+        if _phone_ok(case, ref.phone):
             _log(case, "notify", f"Called {ref.name} at {ref.phone} (mock): message left with clinic staff", "system", now)
         else:
             _log(case, "notify", f"Call to {ref.name} failed (phone service unavailable); will retry", "system", now)

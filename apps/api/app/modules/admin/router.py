@@ -10,7 +10,8 @@ from app.core.auth import CLINICAL_STAFF, current_user, issue_token, require_rol
 from app.core.config import settings
 from app.core.models import Role, StaffUser
 from app.core.store import get_store, reset_store
-from app.integrations.mocks import MOCK_CONFIG, MockServiceConfig
+from app.integrations.contract import dead_letters
+from app.integrations.mocks import ADAPTERS, MOCK_CONFIG, MockServiceConfig, adapter
 from app.llm.gateway import get_gateway
 
 router = APIRouter(prefix="/api")
@@ -138,4 +139,14 @@ def update_mock(service: str, body: MockServiceConfig, user: StaffUser = Depends
     if service not in MOCK_CONFIG:
         raise HTTPException(status_code=404, detail="Unknown service")
     MOCK_CONFIG[service] = body
+    adapter(service).breaker.reset()  # a changed setting gets a fresh circuit
     return body.model_dump()
+
+
+@router.get("/admin/integrations")
+def integrations(user: StaffUser = Depends(require_roles(Role.ADMIN))):
+    """Adapter health (circuit state, policy) and the dead-letter queue, without message contents."""
+    letters = sorted(dead_letters(get_store()).values(), key=lambda d: d.ts, reverse=True)
+    return {"adapters": [a.health() for a in ADAPTERS.values()],
+            "dead_letters": [d.model_dump(mode="json", exclude={"payload"}) for d in letters[:100]],
+            "dead_letter_count": len(letters)}

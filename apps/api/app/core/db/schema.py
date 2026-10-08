@@ -115,6 +115,9 @@ MODULE_ENTITIES = {
         EntitySpec("backfill_cases", f"{M}.scheduling.service:BackfillCase"),
         EntitySpec("offers", f"{M}.scheduling.service:Offer"),
         EntitySpec("triage", f"{M}.triage.service:TriageRecord"),
+        # Messages to external systems that could not be delivered (app/integrations/contract.py)
+        EntitySpec("dead_letters", "app.integrations.contract:DeadLetter", encrypted=("payload",),
+                   indexes=(("adapter", "status"),)),
     ]
 }
 

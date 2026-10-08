@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from app.core.models import ACTIVE_STATUSES, Appointment, AppointmentStatus
 from app.core.store import Store, get_store
 from app.core.templates import format_when, render
-from app.integrations.mocks import CoverageResult, queue_message
+from app.integrations.mocks import CoverageResult, adapter, queue_message
 from app.llm.gateway import get_gateway
 from app.llm.prompts import CALL_SUMMARY
 from app.llm.providers import mock_fixture
@@ -99,6 +99,7 @@ class ReplyResult(BaseModel):
 
 def handle_reply(store: Store, message_id: str, text: str) -> ReplyResult:
     msg = store.outbox[message_id]
+    adapter(msg.channel).receive("reply", correlation_id=msg.id)  # inbound, under the outbound message's id
     answer = text.strip().upper()
     if msg.kind == "waitlist_offer":
         offer = next((o for o in scheduling.offers(store).values() if o.message_id == msg.id), None)

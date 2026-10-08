@@ -364,18 +364,42 @@ Deviations and notes:
 - The ED history is dense for a 1,000-patient population (about 52 visits a day over 60 days, ~3 visits per patient) so that ED crowding and the flow models have realistic volumes.
 - Local codes (`urn:demo-hospital:*`) are used where this demo has no standard code: CTAS is LOINC 11283-9 with an integer value; NEWS2, bed requests, pre-op checks, task and flag codes are local.
 
-### WP2 · Data model + FhirGateway (6.1, 6.2 gateway) — in progress
+### WP2 · Data model + FhirGateway (6.1, 6.2 gateway) — done
 
 - [x] `docs/data-model.md`: the resource table, relationship rules, id conventions, local codes and extensions, the hospital clock
 - [x] Type definitions `app/fhir/types/` (Pydantic, one module per resource, only the fields used; extra fields allowed so HAPI responses round-trip), including Provenance, Consent, EpisodeOfCare, Schedule, Slot, Organization; `validate(resource)`
 - [x] One example JSON per resource in `app/fhir/examples/` (18 taken from the seed, 7 hand-written for types the generator does not produce yet); `tests/test_fhir_types.py`: every example validates and round-trips unchanged, seeded resources of every type validate
-- [ ] Exam ↔ FHIR adapter (imaging `Appointment` + `ImagingStudy` + `Report` ↔ ServiceRequest + Encounter AMB + DiagnosticReport), both directions, round-trip test on 20 samples
-- [ ] `FhirGateway` (`app/ehr/gateway.py`): typed read methods (`get_patient(mrn)`, `search_encounters`, `get_active_encounter`, `get_bed_board(unit)`, `get_orders`, `get_medications`, `get_home_meds`, `get_observations`, `get_documents`), write allow-list (Task any; DocumentReference preliminary only; Communication; Flag; Appointment proposed only; Encounter.location append for bed managers), refusal + audit outside it, audit of every call (actor, type, id, purpose module); backends `local` (PostgreSQL store) and `hapi` (`FHIR_BASE_URL`, `FHIR_AUTH_MODE` none / smart_backend stub)
-- [ ] Mock adapter contract for non-FHIR systems (retry and timeout, circuit breaker, dead-letter queue, correlation id)
-- [ ] De-identification field list extended to every resource above (names, birth dates, addresses, phones, health card, MRN, staff names, free text: note, conclusion, presentedForm), one unit test per resource
-- [ ] Grep test: no direct FHIR HTTP calls outside the gateway's HAPI backend
+- [x] Exam ↔ FHIR adapter `app/ehr/imaging.py` (imaging `Appointment` + `ImagingStudy` + `Report` ↔ ServiceRequest + Encounter AMB + DiagnosticReport), both directions: standard elements where FHIR has one, typed `urn:demo-hospital:ext:imaging-*` extensions for the imaging-only workflow fields; `tests/test_fhir_imaging.py` round-trips 20 samples (every appointment status, no-show risk factors, booked from a requisition with a protocol, studies with and without reports, dictated reports, an AI draft and a signed AI report with edits and a deleted section, worklist studies, an outside prior) and also FHIR → exam → FHIR; checked once on all 19,468 seeded appointments and the 6 worklist studies (all lossless, all valid)
+- [x] `FhirGateway` (`app/ehr/gateway.py`): typed read methods (`get_patient(mrn)`, `search_encounters`, `get_active_encounter`, `get_bed_board(unit)`, `get_orders`, `get_medications`, `get_home_meds`, `get_observations`, `get_documents`, `read`), write allow-list (Task any; DocumentReference preliminary only; Communication; Flag; Appointment proposed only; `append_encounter_location` for bed managers), refusal + audit outside it (`FhirAccessDenied`), audit of every call (actor, type, id, purpose module); backends `local` (PostgreSQL store) and `hapi` (`app/ehr/hapi.py`: `FHIR_BASE_URL`, `FHIR_AUTH_MODE` none / smart_backend stub; same search semantics by matching on the store's index columns)
+- [x] Mock adapter contract for non-FHIR systems `app/integrations/contract.py` (timeout and retry with exponential backoff, non-retryable rejections, circuit breaker per adapter, dead-letter table `dead_letters` with encrypted payload, migration 0003, correlation id on every message in and out, logged without payloads); interfaces only for the real HL7 v2, PACS, telephony, SMS/email, fax and billing adapters (`interfaces.py`); existing mocks moved onto it: outbox dispatch (correlation id = message id), OHIP and insurance checks, outside-archive retrieval and critical-result calls (one attempt per call, their workers keep the durable retry), inbound SMS replies; `GET /api/admin/integrations` (circuit states, dead letters without contents)
+- [x] De-identification field list extended to every resource above (`app/llm/fhir_deid.py`: names incl. Chinese names, birth date → age, addresses, phones, health card, MRN → keyed hash, staff names and person reference displays, narrative dropped, free text: note, conclusion, presentedForm, document content, descriptions, comments, payloads), `tests/test_fhir_deid.py` with one test per resource type (25) that fails for every type when redaction is switched off
+- [x] Grep tests: no direct FHIR HTTP calls outside the gateway's HAPI backend (the HAPI loader `scripts/load_fhir.py` now goes through the same `HapiClient`); modules never touch `store.fhir` or a backend
+- [x] Demo script `demo/fhir_gateway.md` + `scripts/gateway_demo.py` (local and HAPI backend give the same output on the loaded data); data-model.md (gateway, de-identification, exam mapping), audit-baseline naming map, `.env.example` updated
 
-### WP3 · Event bus + day simulator (6.2)
+Tests: `tests/test_fhir_imaging.py` (4), `tests/test_fhir_gateway.py` (20, including `test_both_backends_answer_the_same` against the running HAPI server, skipped when it is down), `tests/test_fhir_deid.py` (29), `tests/test_adapter_contract.py` (16). Backend suite 2026-10-08: 265 passed (196 before WP2). Eval for this package: the 20-sample round trip and the per-resource de-identification tests (no model involved). No Playwright test: WP2 has no screen (the Control Tower in WP5 is the first).
+
+Playwright regression run (mock provider, API on 9001): 18 of 19 pass. The one failure, `business-compliance.spec.ts` "patient feedback ... in Chinese", is not caused by WP2: the feedback seed plants an open Chinese survey only when a Chinese-speaking patient is among the 40 most recently completed exams at seeding time, and the data seeded on 2026-10-08 afternoon has none (open surveys: one Punjabi, one English). The test depends on the time of seeding; to fix (separately): make the seed always plant one open `zh` survey, or let the test pick any open survey.
+
+Notes and deviations:
+
+- The spec's `getPatient(mrn)` etc. are snake case (`get_patient`). Read methods return the `app.fhir.types` models; `get_bed_board` returns a `BedBoard` view built from Location and Encounter.
+- Purpose module is written to the audit record's `reason` until WP4 extends the audit record with a `module` column (6.3).
+- Signing (DocumentReference → final) and booking (Appointment → booked) are not possible through the gateway yet: the signing service comes with WP4 (sign event, hospital roles), the approved booking with WP4b (privileged tools). Until then the gateway refuses both.
+- A bed move also sets the bed statuses (new bed occupied, old bed to housekeeping), as the EHR's own transfer would; the allow-list's "Encounter.location append" is the only module-facing write behind it.
+- The imaging adapter's references point at the imaging records (`Patient/PT-…`, `Practitioner/R-…`); linking imaging patients to hospital MRNs is the MPI roadmap card (8.1). Two round-trip samples are seeded records with fields set that no seeded exam has (an exam booked from a requisition with a protocol; an outside prior), since the seed books no exams from requisitions and imports no priors.
+- HAPI reuses the result of an identical search for 60 s by default, which made a just-admitted patient missing from the bed board (found by the parity test in a full run); the client sends `Cache-Control: no-cache` on every search.
+- httpx moved from the dev group to the runtime dependencies (already installed through the Anthropic and Gemini SDKs; the HAPI backend uses it directly).
+- Adapter policies: messaging 3 attempts (0.2 s, 0.8 s backoff, 5 s timeout), lookups 2 attempts (3 s timeout), outside archive 1 attempt (10 s); circuits open after 5 failures in a row for 30 s; changing a mock's settings (admin page, prior-retrieval board) closes its circuit. Messaging mocks still return at once (their configured latency was never applied); OHIP, insurers and archives wait their latency.
+
+Limits:
+
+- The LLM gateway does not take FHIR-redacted input yet: its own regex pass would also tokenise the ISO dates in a resource. The hook (pre-redacted content, agent registry) is WP4b; until then no Claude call uses FHIR resources.
+- HAPI searches the gateway cannot express in FHIR (unit of the current bed, active at a time, document status) are filtered after fetching; fine at demo size (bed board on the local HAPI: 0.2–0.3 s warm, about 3 s for the first call of a process), a real EHR would need server-side parameters or a different query.
+- Circuit breakers are per process (the API runs one worker); dead letters are parked for a person, there is no redrive yet (integration health is an 8.1 roadmap card).
+
+### WP3 · Event bus + day simulator (6.2) — next
+
+Start here after WP2: read `docs/SPEC-hospital.md` 6.2 (ADT event bus and day simulator), `docs/data-model.md` (hospital clock and plan: `hospital_plan`, `hospital_clock`; `app/ehr/clock.py`), `app/ehr/seed/__init__.py` (plan events), then list the tasks here. The simulator plays the EHR and writes the FHIR store directly; modules subscribe to domain events and read through `FhirGateway`.
 
 ### WP4 · Platform increments: RBAC, break-glass, consent, free-text de-identification, audit (6.3)
 
@@ -403,4 +427,4 @@ Deviations and notes:
 - The cloud network blocks Google's docs hosts (ai.google.dev, docs.cloud.google.com); the Gemini API host itself is reachable.
 - The cloud network policy blocks the chest X-ray dataset hosts (NIH ChestX-ray14, Open-i).
 - Deployment: two Docker images (API; web = nginx + static build) pulled from Docker Hub plus the official `postgres:16-alpine` image, on the server behind the host's Caddy, replacing the earlier smart_medical service on the same domain. Data, logins and in-flight background steps survive restarts (Docker volume `imaging-ops_pgdata`); the PHI keys live only in the server's `.env` and must be backed up separately. The API runs one worker. See docs/DEPLOY.md.
-- Local Windows machine: port 8000 is reserved, so the API runs on 9001 for Playwright (`PW_API_PORT=9001 VITE_API_PROXY_TARGET=http://127.0.0.1:9001`).
+- Local Windows machine: port 8000 is reserved, so the API runs on 9001 for Playwright (`PW_API_PORT=9001 VITE_API_PROXY_TARGET=http://127.0.0.1:9001`). Also set `LLM_PROVIDER=mock`: the local `apps/api/.env` selects Gemini with a real key, and the specs expect mock mode (a run without it on 2026-10-08 sent real requests to Vertex AI, which returned 504, and most specs timed out).

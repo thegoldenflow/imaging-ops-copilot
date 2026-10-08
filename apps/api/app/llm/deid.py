@@ -24,7 +24,12 @@ class Pseudonymizer:
         self._forward: dict[str, str] = {}
         self._reverse: dict[str, str] = {}
         self._counts: dict[str, int] = {}
-        self._patients = known_patients or []
+        self._known: dict[str, str] = {}  # identifier text -> kind, replaced wherever it appears
+        self._longest_first: list[str] | None = None
+        for patient in known_patients or []:
+            for value, kind in ((patient.full_name, "PERSON"), (patient.address, "ADDRESS"),
+                                (patient.health_card, "HEALTH_CARD"), (patient.email, "EMAIL")):
+                self.add_known(value, kind)
 
     def _token(self, kind: str, value: str) -> str:
         key = value.strip()
@@ -36,16 +41,33 @@ class Pseudonymizer:
         self._reverse[token] = key
         return token
 
+    def token(self, kind: str, value: str, *, same_as: str | None = None) -> str:
+        """The placeholder for an identifier. `same_as` gives a second spelling the same token
+        (a patient's Chinese name and English name are one person)."""
+        if same_as is not None:
+            token = self.token(kind, same_as)
+            self._forward.setdefault(value.strip().lower(), token)
+            return self._forward[value.strip().lower()]
+        return self._token(kind, value)
+
+    def register(self, value: str, token: str) -> None:
+        """Use a given token for a value (e.g. an MRN's keyed hash), restorable like the others."""
+        self._forward.setdefault(value.strip().lower(), token)
+        self._reverse.setdefault(token, value.strip())
+
+    def add_known(self, value: str | None, kind: str) -> None:
+        """An identifier to replace wherever it appears in free text."""
+        if value and value.strip() and value.strip() not in self._known:
+            self._known[value.strip()] = kind
+            self._longest_first = None
+
     def redact(self, text: str) -> str:
-        for patient in self._patients:
-            for value, kind in (
-                (patient.full_name, "PERSON"),
-                (patient.address, "ADDRESS"),
-                (patient.health_card, "HEALTH_CARD"),
-                (patient.email, "EMAIL"),
-            ):
-                if value and value.lower() in text.lower():
-                    text = re.sub(re.escape(value), self._token(kind, value), text, flags=re.IGNORECASE)
+        # Longest first, so "Fang Wang" is replaced before a shorter known value inside it.
+        if self._longest_first is None:
+            self._longest_first = sorted(self._known, key=len, reverse=True)
+        for value in self._longest_first:
+            if value.lower() in text.lower():
+                text = re.sub(re.escape(value), self._token(self._known[value], value), text, flags=re.IGNORECASE)
         text = EMAIL_RE.sub(lambda m: self._token("EMAIL", m.group()), text)
         text = HEALTH_CARD_RE.sub(lambda m: self._token("HEALTH_CARD", m.group()), text)
         text = ISO_DATE_RE.sub(lambda m: self._token("DATE", m.group()), text)

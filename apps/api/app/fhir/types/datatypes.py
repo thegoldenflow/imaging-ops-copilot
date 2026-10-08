@@ -46,6 +46,7 @@ class Extension(FhirModel):
     valueBoolean: bool | None = None
     valueInteger: int | None = None
     valueDecimal: float | None = None
+    valueDateTime: str | None = None
     valueReference: Reference | None = None
     valueAddress: dict[str, Any] | None = None
     extension: list[Extension] | None = None
@@ -76,6 +77,7 @@ class ContactPoint(FhirModel):
 
 class Address(FhirModel):
     use: str | None = None
+    text: str | None = None
     line: list[str] | None = None
     city: str | None = None
     state: str | None = None

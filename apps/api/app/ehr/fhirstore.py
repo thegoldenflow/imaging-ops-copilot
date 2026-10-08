@@ -402,21 +402,9 @@ class FhirStore:
 
     # ----- query building -----
 
-    @staticmethod
-    def _blind(params: dict) -> dict:
-        params = dict(params)
-        from app.core.db.crypto import cipher
-
-        for key, col in (("mrn", "mrn_bidx"), ("hcn", "hcn_bidx")):
-            if params.get(key) is not None:
-                params[col] = cipher().blind_index(params.pop(key))
-            else:
-                params.pop(key, None)
-        return params
-
     def _where(self, ids, params: dict) -> list:
         t = fhir_resources
-        params = self._blind(params)
+        params = blind_params(params)
         clauses = []
         if ids is not None:
             clauses.append(t.c.id.in_(list(ids)))
@@ -446,27 +434,51 @@ class FhirStore:
         return [t.c.seq]
 
     def _search_mem(self, resource_type, ids, order, limit, params) -> list[dict]:
-        params = self._blind(params)
+        params = blind_params(params)
         wanted = set(ids) if ids is not None else None
         rows = []
         for (rtype, rid), (resource, cols) in self._mem.items():
             if rtype != resource_type or (wanted is not None and rid not in wanted):
                 continue
-            if all(self._match(cols, k, v) for k, v in params.items() if v is not None):
+            if all(matches(cols, k, v) for k, v in params.items() if v is not None):
                 rows.append((resource, cols))
-        if order in ("date", "-date"):
-            rows.sort(key=lambda rc: (rc[1]["date"] is None, rc[1]["date"] or datetime.min), reverse=order == "-date")
-        out = [r for r, _ in rows]
+        out = [r for r, _ in order_rows(rows, order)]
         return out[:limit] if limit else out
 
-    @staticmethod
-    def _match(cols: dict, key: str, value: Any) -> bool:
-        if key == "date_from":
-            return cols["date"] is not None and cols["date"] >= value
-        if key == "date_to":
-            return cols["date"] is not None and cols["date"] < value
-        if key == "active_at":
-            return cols["date"] is not None and cols["date"] <= value and (cols["date_end"] is None or cols["date_end"] > value)
-        if key not in INDEX_COLUMNS:
-            raise ValueError(f"Unsupported FHIR search parameter {key!r}")
-        return cols[key] in _as_list(value)
+
+# ----- search semantics shared with the FHIR server backend (app/ehr/hapi.py) -----
+
+
+def blind_params(params: dict) -> dict:
+    """Search parameters with mrn / hcn replaced by their blind-index columns."""
+    params = dict(params)
+    from app.core.db.crypto import cipher
+
+    for key, col in (("mrn", "mrn_bidx"), ("hcn", "hcn_bidx")):
+        if params.get(key) is not None:
+            params[col] = cipher().blind_index(params.pop(key))
+        else:
+            params.pop(key, None)
+    return params
+
+
+def matches(cols: dict, key: str, value: Any) -> bool:
+    """Whether a resource's index columns match one search parameter (after blind_params)."""
+    if key == "date_from":
+        return cols["date"] is not None and cols["date"] >= value
+    if key == "date_to":
+        return cols["date"] is not None and cols["date"] < value
+    if key == "active_at":
+        return cols["date"] is not None and cols["date"] <= value and (cols["date_end"] is None or cols["date_end"] > value)
+    if key not in INDEX_COLUMNS:
+        raise ValueError(f"Unsupported FHIR search parameter {key!r}")
+    return cols[key] in _as_list(value)
+
+
+def order_rows(rows: list[tuple[dict, dict]], order: str | None) -> list[tuple[dict, dict]]:
+    """(resource, columns) pairs in search order: by date ("date" / "-date"), undated last, else as given."""
+    if order not in ("date", "-date"):
+        return rows
+    dated = sorted((rc for rc in rows if rc[1]["date"] is not None), key=lambda rc: rc[1]["date"],
+                   reverse=order == "-date")
+    return dated + [rc for rc in rows if rc[1]["date"] is None]

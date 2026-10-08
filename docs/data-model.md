@@ -41,7 +41,7 @@ Storage: the default backend keeps each resource as encrypted JSON in PostgreSQL
 - An admission from the ED: the ED Encounter (EMER) gets a bed request ServiceRequest `bedreq-<visit>`; the inpatient Encounter (IMP) has `basedOn` that request and `hospitalization.admitSource = emd`.
 - Patient identifiers: MRN `system = urn:demo-hospital:mrn` (8 digits); health card `system = urn:demo-hospital:hcn` (10 digits, version code in extension `hcn-version`, extension `synthetic = true`).
 - Code systems as Synthea writes them: SNOMED CT (conditions, procedures), LOINC (observations), RxNorm ingredients (medications). ICD-10-CA and CCI appear only in the 8.1 coding stub. Local concepts use `urn:demo-hospital:*` (`codes.py`): CTAS is LOINC 11283-9 with an integer value 1–5; NEWS2, bed requests, pre-op checks, task, flag and document codes are local.
-- Extensions are `urn:demo-hospital:ext:<name>`: `arrival-mode`, `ed-disposition`, `expected-los-days`, `asa-class`, `surgical-urgency`, `encounter` (on Appointment), `drug-class`, `synthetic`, `hcn-version`, `name-language`, `bed-capacity`, `unit-kind`.
+- Extensions are `urn:demo-hospital:ext:<name>`: `arrival-mode`, `ed-disposition`, `expected-los-days`, `asa-class`, `surgical-urgency`, `encounter` (on Appointment), `drug-class`, `synthetic`, `hcn-version`, `name-language`, `bed-capacity`, `unit-kind`; `imaging-appointment`, `imaging-study`, `imaging-report` (exam mapping below); `age-years` (de-identified Patient only).
 
 ## Ids from the generator
 
@@ -60,6 +60,48 @@ Generated ids are deterministic (same seed and hospital day → same ids), so ev
 
 The hospital day starts at 07:00 on the seed date (nearest weekday at a weekend). The state at that moment is in the FHIR store; the next 36 hours (ED arrivals and their steps, admissions, transfers, discharges, housekeeping, surgery start and end, orders and results) are in the `hospital_plan` module state for the day simulator (WP3). The hospital clock (`hospital_clock`) moves only when the simulator runs.
 
+## Access: FhirGateway (WP2)
+
+`app/ehr/gateway.py`. Modules never use the FHIR store or HTTP directly; two grep tests in `tests/test_fhir_gateway.py` enforce it. A gateway is opened for an actor (`Actor.of(user, request)`, later agents and system jobs) and a purpose module.
+
+- Typed reads (`app/fhir/types` models): `get_patient(mrn)`, `search_encounters(mrn=, patient_id=, cls=, status=, unit=, active_at=, since=, until=)` (newest first), `get_active_encounter(mrn)`, `get_bed_board(unit)` (beds with status, occupant encounter and since when, plus encounters waiting at the unit without a bed), `get_orders(encounter)` (ServiceRequest), `get_medications(encounter)` (MedicationRequest), `get_home_meds(mrn)` (active MedicationStatement), `get_observations(encounter, codes, since)` (a code also matches a vital-panel component), `get_documents(encounter)`, `read(type, id)`.
+- Write allow-list: Task (create, update, any status); DocumentReference (create as `docStatus=preliminary`, change only while preliminary; final goes through the signing service, WP4); Communication and Flag (create, update); Appointment (create as `status=proposed`, change only while proposed; booking needs a clerk, WP4b); `append_encounter_location(encounter, bed)` for bed managers (`operations_manager`): closes the current location entry, appends the bed, and, as the EHR's transfer does, marks the new bed occupied and the old one for housekeeping. Everything else, including any delete, raises `FhirAccessDenied` and leaves a `denied` audit record.
+- Audit: one record per call (actor, action, resource type, resource id or the scope: patient, encounter or unit) with the purpose module in `reason` until WP4 adds a module column.
+- Backends (`FHIR_BACKEND`): `local` (this PostgreSQL store, in the request's unit of work) and `hapi` (`app/ehr/hapi.py`, `FHIR_BASE_URL`, `FHIR_AUTH_MODE=none`; `smart_backend` is defined, not implemented). The HAPI backend narrows the server query only with parameters that map exactly or to a superset, then matches every result on the same index columns as the local store, so both return the same resources (checked against a running HAPI in `test_both_backends_answer_the_same`).
+- The day simulator (WP3) and the generator play the EHR itself and write the store directly; the allow-list is for the AI layer.
+
+## De-identification of resources (WP2)
+
+`app/llm/fhir_deid.py`, `FhirDeidentifier.redact_all(resources)` before anything goes into a prompt; `restore()` re-identifies model output on the server. Field list per resource type in `STRUCTURED` and `FREE_TEXT`:
+
+| What | Replaced by |
+| --- | --- |
+| Patient and contact names (every spelling, Chinese names included), staff names, reference displays naming a person | `[PERSON_n]` / `[STAFF_n]`, one token per person |
+| Birth date | extension `age-years` |
+| Address, phone, email | `[ADDRESS_n]`, `[PHONE_n]`, `[EMAIL_n]` |
+| Health card (and its version code), other patient identifiers | `[HEALTH_CARD_n]`, `[ID_n]` |
+| MRN | `[MRN_<keyed hash>]` (blind-index HMAC, so not reversible by hashing all 8-digit numbers) |
+| Free text: note, conclusion, presentedForm, document content, descriptions, comments, payloads, valueString, reaction descriptions, care plan activities | every learned identifier, then the regex layer (emails, 10-digit numbers, ISO and long dates, phone numbers); text attachments decoded and re-encoded, binary attachments dropped |
+| Narrative (`text`) | dropped |
+
+Codes, ids, references and clinical times stay. The free-text layer for partial names, mixed date formats and organisations, and the second model pass, are WP4 (6.3).
+
 ## Imaging exams (mapping, WP2)
 
-The imaging module's booked exam (`Appointment` + `ImagingStudy` + `Report`) maps to ServiceRequest + Encounter (class AMB) + DiagnosticReport; the old tables stay and the adapter is a two-way function with a round-trip test.
+The imaging module's booked exam (`Appointment` + its `ImagingStudy` + `Report`, or a study without an appointment such as the chest X-ray worklist) maps to ServiceRequest + Encounter (class AMB) + DiagnosticReport; the old tables stay. `app/ehr/imaging.py`: `exam_to_fhir(exam)`, `exam_from_fhir(sr, enc, dr)`, `load_exam(store, appointment_id= | study_id=)`.
+
+| Imaging field | FHIR |
+| --- | --- |
+| appointment id, study id, report id | `identifier` (`urn:demo-imaging:appointment` / `study` / `report`); resource ids `img-ord-<key>`, `img-enc-<key>`, `img-rpt-<report>` |
+| patient, referrer | `subject`, ServiceRequest `requester` (the imaging records: linking them to hospital MRNs is the 8.1 MPI card) |
+| exam code | ServiceRequest and DiagnosticReport `code` (`urn:demo-imaging:exam`) |
+| urgency P1–P4 | ServiceRequest `priority` stat / asap / urgent / routine |
+| booked at, slot | ServiceRequest `authoredOn`, `occurrenceDateTime`; Encounter `period` |
+| status | Encounter `status` (booked, confirmed → planned; completed → finished; cancelled, no-show → cancelled), ServiceRequest `status` (active / completed / revoked) |
+| site | Encounter `location` |
+| requisition, approved protocol | ServiceRequest `requisition`, `orderDetail` |
+| indication, DICOM study UID | ServiceRequest `reasonCode.text`, Encounter `identifier` (`urn:dicom:uid`) |
+| report status, signer, signed at, impression, full text | DiagnosticReport `status` (draft → preliminary, signed → final), `resultsInterpreter`, `issued`, `conclusion`, `presentedForm` |
+| everything else (no-show risk and factors, reminder state, scanner, image key, outside facility, AI draft sections, urgent findings, model and prompt version, edit ratio, ...) | complex extensions `urn:demo-hospital:ext:imaging-appointment` / `imaging-study` / `imaging-report`, one typed sub-extension per field |
+
+Empty text is left out (FHIR has no empty strings); an empty optional text comes back as None.

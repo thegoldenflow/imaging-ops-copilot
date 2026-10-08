@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from app.fhir.types.datatypes import CodeableConcept, Coding, FhirModel, Period, Reference, Resource
+from app.fhir.types.datatypes import CodeableConcept, Coding, FhirModel, Identifier, Period, Reference, Resource
 
 
 class StatusHistory(FhirModel):
@@ -29,6 +29,7 @@ class Participant(FhirModel):
 
 class Encounter(Resource):
     resourceType: Literal["Encounter"] = "Encounter"
+    identifier: list[Identifier] | None = None
     status: str
     class_: Coding = Field(alias="class")
     statusHistory: list[StatusHistory] | None = None
