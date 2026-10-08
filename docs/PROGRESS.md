@@ -335,6 +335,49 @@ Limits:
 - Fixed templates cannot answer combined questions (e.g. "diseases with fever that need a chest X-ray"); the full `apps/kg-qa` service can, and could be added later as an optional backend.
 - Questions are not kept across a reset (in-memory log), and there is no multi-turn conversation.
 
+## Hospital platform — phases 6–8 (`docs/SPEC-hospital.md`)
+
+Branch `feat/hospital-platform` (from `feat/postgres`). Owner decisions of 2026-10-08 and the reuse audit are in `docs/audit-baseline.md`: FHIR store in PostgreSQL with HAPI as a switchable backend, own deterministic Synthea-style generator plus an optional Synthea import, Temporal per the spec, all 14 work packages in the spec's 8.4 order, one commit each. A work package is done when it has code, tests, eval report, demo data and a demo script (spec rule 4). Baseline before the extension: 154 backend tests passing.
+
+Order: WP0 → WP1 → WP2 → WP3 → WP4 → WP4b → WP5 → WP4c → WP6 → WP7 → WP8 → WP10b → WP9 → WP10. Each package's task list is filled in below when it starts.
+
+### WP0 · Read-only audit — done
+
+- [x] `docs/audit-baseline.md`: reusable components with paths and interfaces, the two sibling projects (warehouse, freight-arbiter-demo: both reusable as patterns only), naming map
+- [x] Extension spec moved to `docs/SPEC-hospital.md`; CLAUDE.md points to it
+
+### WP1 · Fake hospital EHR (6.2 setup)
+
+- [ ] Hospital generator: Location tree (ED 30, Medicine A/B 32 each, Surgery 32, Ortho 24, ICU 12 beds), practitioners and roles, 1,000 patients with MRN (`urn:demo-hospital:mrn`) and synthetic health card (`urn:demo-hospital:hcn`, marked synthetic), GTA addresses, 30% `zh-CN`/`zh-TW`, encounters (EMER/IMP/AMB) with history, conditions, medications, home medications, allergies, observations, procedures, reports; deterministic from the seed
+- [ ] FHIR store in PostgreSQL (`fhir_resources`: encrypted body, search columns, blind index on MRN) as `store.fhir`, seeded and reset with the rest of the demo data
+- [ ] docker compose profile `ehr`: HAPI FHIR R4 (port 8080, own Postgres 16, subscriptions off, external references allowed)
+- [ ] `scripts/gen_locations.py`, `scripts/localize_synthea.py` (+ small committed Synthea-format sample), `scripts/load_fhir.py` (hospital and practitioners → locations → patient bundles, `load_errors.log`, one retry), `scripts/smoke_fhir.sh`
+- [ ] Smoke test passes against HAPI; load errors empty
+
+### WP2 · Data model + FhirGateway (6.1, 6.2 gateway)
+
+### WP3 · Event bus + day simulator (6.2)
+
+### WP4 · Platform increments: RBAC, break-glass, consent, free-text de-identification, audit (6.3)
+
+### WP4b · Agent runtime and tool gateway (6.4)
+
+### WP5 · Control Tower (7.1)
+
+### WP4c · Temporal workflows (6.5)
+
+### WP6 · Orders and medication safety (7.2)
+
+### WP7 · Documentation agent (7.3)
+
+### WP8 · Patient voice services (7.4)
+
+### WP10b · AI Ops (6.6)
+
+### WP9 · Hospital storyline (8.2)
+
+### WP10 · Roadmap cards and documentation (8.1, 8.3)
+
 ## Environment notes
 
 - `ANTHROPIC_API_KEY` and `GOOGLE_AGENT_PLATFORM_API_KEY` are not configured in the cloud environment; everything runs in mock mode there.
