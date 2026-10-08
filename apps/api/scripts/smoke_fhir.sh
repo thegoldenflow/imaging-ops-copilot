@@ -26,10 +26,12 @@ for type in Condition MedicationRequest Observation; do
 done
 
 # Location tree: bed -> room -> unit
-chain=$(get "Location?physicalType=bd&_count=1" | "$PY" -c "
+# (R4 has no physical-type search parameter, so pick a bed from the first page of Locations.)
+chain=$(get "Location?_count=500" | "$PY" -c "
 import json, sys, urllib.request
 base = sys.argv[1]
-bed = json.load(sys.stdin)['entry'][0]['resource']
+bed = next(e['resource'] for e in json.load(sys.stdin)['entry']
+           if e['resource']['physicalType']['coding'][0]['code'] == 'bd')
 def read(ref):
     req = urllib.request.Request(f'{base}/{ref}', headers={'Accept': 'application/fhir+json'})
     return json.load(urllib.request.urlopen(req))

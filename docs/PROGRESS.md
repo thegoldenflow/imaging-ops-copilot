@@ -355,7 +355,7 @@ Order: WP0 → WP1 → WP2 → WP3 → WP4 → WP4b → WP5 → WP4c → WP6 →
 - [x] docker compose profile `ehr`: HAPI FHIR R4 (`hapiproject/hapi:v7.4.0`, 127.0.0.1:8080, own Postgres 16, subscriptions off, external and placeholder references allowed)
 - [x] `scripts/gen_locations.py`, `scripts/localize_synthea.py` (`app/ehr/synthea.py`; hand-written Synthea-format sample in `scripts/samples/synthea/`), `scripts/load_fhir.py` (organization and practitioners → locations → one PUT transaction bundle per patient, one retry, `load_errors.log`), `scripts/smoke_fhir.sh`
 - [x] Tests: `tests/test_ehr_store.py` (11: tree, patients, MRN lookup, ciphertext in SQL, every clinical resource has an existing encounter, census matches bed status, flow-model history, plan integrity, CRUD, determinism, reset), `tests/test_synthea_localize.py` (4)
-- [ ] Smoke test against HAPI with all 1,000 patients loaded; `load_errors.log` empty
+- [ ] Smoke test against HAPI with all 1,000 patients loaded; `load_errors.log` empty. Status 2026-10-08: HAPI v7.4.0 runs locally (ready in ~90 s); a trial load of 20 patients plus organization, practitioners and the Location tree went through with no errors (about 1 s per patient, so the full load takes 15–20 min); `smoke_fhir.sh` passes every check except the patient count (20 of 1,000). Next: `uv run python scripts/load_fhir.py` (no `--limit`), then `bash scripts/smoke_fhir.sh`
 
 Deviations and notes:
 
