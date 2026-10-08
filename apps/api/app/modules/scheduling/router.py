@@ -104,6 +104,23 @@ def cancel_appointment(appointment_id: str, body: CancelRequest, request: Reques
     return {"appointment": appointment_view(store, appt), "backfill_case": case.model_dump(mode="json") if case else None}
 
 
+@router.post("/appointments/{appointment_id}/complete")
+def complete_appointment(appointment_id: str, request: Request,
+                         user: StaffUser = Depends(require_roles(Role.TECHNOLOGIST, Role.OPERATIONS_MANAGER, Role.ADMIN))):
+    store = service.get_store_ready()
+    appt = store.appointments.get(appointment_id)
+    if appt is None:
+        raise HTTPException(404, "Appointment not found")
+    ensure_site(request, user, appt.site_id, "appointment", appt.id)
+    if appt.status not in ACTIVE_STATUSES:
+        raise HTTPException(409, f"Appointment is {appt.status}")
+    if blockers := service.confirm_blockers(store, appt):
+        raise HTTPException(409, "; ".join(blockers))
+    study = service.complete(store, appt)
+    audit_phi(request, user, action="update", resource_type="appointment", resource_id=appt.id)
+    return {"appointment": appointment_view(store, appt), "study_id": study.id}
+
+
 @router.get("/waitlist")
 def waitlist(request: Request, user: StaffUser = Depends(VIEWERS)):
     store = service.get_store_ready()

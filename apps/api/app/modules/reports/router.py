@@ -51,7 +51,8 @@ def _can_view_report(user: StaffUser, report: service.Report) -> bool:
 @router.get("/worklist")
 def worklist(request: Request, user: StaffUser = Depends(READERS)):
     store = get_store()
-    studies = sorted(store.studies.values(), key=lambda s: s.performed_at)
+    # Studies with an image to draft from; other studies are read from the backlog board.
+    studies = sorted((s for s in store.studies.values() if s.image_key in store.images), key=lambda s: s.performed_at)
     audit_phi(request, user, action="read", resource_type="reading_worklist", resource_id=None)
     return {"studies": [study_view(store, s) for s in studies]}
 
@@ -109,16 +110,6 @@ def create_draft(study_id: str, request: Request, user: StaffUser = Depends(RADI
     return report_view(store, report)
 
 
-@router.get("/critical-results")
-def list_critical(user: StaffUser = Depends(READERS)):
-    store = get_store()
-    items = sorted(service.critical_results(store).values(), key=lambda c: c.created_at, reverse=True)
-    return {"critical_results": [
-        {**c.model_dump(mode="json"), "patient_name": store.patients[c.patient_id].full_name,
-         "referrer_name": store.referrers[c.referrer_id].name} for c in items
-    ]}
-
-
 @router.get("/mine")
 def referrer_reports(request: Request, user: StaffUser = Depends(require_roles(Role.REFERRER))):
     store = get_store()
@@ -173,6 +164,7 @@ def review_section(report_id: str, key: str, body: SectionAction, request: Reque
 
 class SignRequest(BaseModel):
     confirmed_urgent: list[int] = []
+    levels: dict[int, str] = {}  # finding index -> critical, urgent or significant
 
 
 @router.post("/{report_id}/sign")
@@ -188,7 +180,7 @@ def sign_report(report_id: str, body: SignRequest, request: Request, user: Staff
         raise HTTPException(422, f"Review every section before signing: {', '.join(pending)}")
     if not any(s.final_text.strip() for s in report.sections if s.key == "impression"):
         raise HTTPException(422, "Impression is required")
-    created = service.sign(store, report, user.name, body.confirmed_urgent)
+    created = service.sign(store, report, user.name, body.confirmed_urgent, user.id, body.levels)
     audit_phi(request, user, action="sign", resource_type="report", resource_id=report_id)
     return {"report": report_view(store, report), "critical_results": [c.model_dump(mode="json") for c in created]}
 

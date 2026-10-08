@@ -7,6 +7,7 @@ import { AiBadge, Badge, Button, Card, ErrorState, Loading } from "../../compone
 import { api, patch, post } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { dateTime, pct } from "../../lib/format";
+import { llmVendor } from "../../lib/llm";
 import type { Report, Section } from "../../lib/types";
 import { StudyImage } from "./StudyImage";
 
@@ -73,8 +74,9 @@ export function ReportReviewPage() {
   const queryClient = useQueryClient();
   const report = useQuery({ queryKey: ["report", reportId], queryFn: () => api<Report>(`/api/reports/${reportId}`) });
   const [confirmed, setConfirmed] = useState<number[]>([]);
+  const [levels, setLevels] = useState<Record<number, string>>({});
   const sign = useMutation({
-    mutationFn: () => post<{ report: Report; critical_results: unknown[] }>(`/api/reports/${reportId}/sign`, { confirmed_urgent: confirmed }),
+    mutationFn: () => post<{ report: Report; critical_results: unknown[] }>(`/api/reports/${reportId}/sign`, { confirmed_urgent: confirmed, levels }),
     onSuccess: (res) => {
       queryClient.setQueryData(["report", reportId], res.report);
       queryClient.invalidateQueries({ queryKey: ["worklist"] });
@@ -122,7 +124,7 @@ export function ReportReviewPage() {
         <div className="space-y-3">
           <div className="rounded-lg border border-ai-100 bg-ai-50 px-3 py-2 text-xs text-ai-700">
             <strong>AI-generated preliminary draft for radiologist review only. Not a diagnosis.</strong>{" "}
-            Model {r.model} · prompt {r.prompt_version} · {r.llm_mode === "mock" ? "mock output" : "Claude API"}
+            Model {r.model} · prompt {r.prompt_version} · {llmVendor(r.llm_mode) ? `${llmVendor(r.llm_mode)} API` : "mock output"}
           </div>
           {r.ai_status !== "ok" && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800" role="alert">
@@ -147,6 +149,14 @@ export function ReportReviewPage() {
                     <div>
                       <p className="font-medium text-slate-900">{f.finding} <AiBadge label="AI flagged" /></p>
                       <p className="text-xs text-slate-500">{f.reason}</p>
+                      {r.status === "draft" && confirmed.includes(i) && (
+                        <select value={levels[i] ?? "urgent"} onChange={(e) => setLevels({ ...levels, [i]: e.target.value })}
+                          className="mt-1 h-7 rounded-md border border-slate-300 px-1.5 text-xs" aria-label={`Level for ${f.finding}`}>
+                          <option value="critical">Critical (Level 1)</option>
+                          <option value="urgent">Urgent (Level 2)</option>
+                          <option value="significant">Significant unexpected (Level 3)</option>
+                        </select>
+                      )}
                     </div>
                   </li>
                 ))}

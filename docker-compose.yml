@@ -1,0 +1,52 @@
+# Imaging Ops Copilot: API + web on one host. See docs/DEPLOY.md.
+#   cp apps/api/.env.example apps/api/.env   # set the PHI keys, DEMO_PASSCODE and an API key
+#   docker compose up -d --build
+# The site is served on WEB_PORT (default 80); the API is reachable only through it.
+# Local development needs only the database: docker compose up -d postgres
+# (published on 127.0.0.1:${POSTGRES_PORT:-5433}, which is what DATABASE_URL defaults to).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ioc
+      POSTGRES_PASSWORD: ioc
+      POSTGRES_DB: ioc
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ioc -d ioc"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file:
+      - path: apps/api/.env
+        required: false # optional for `up -d postgres`; the API needs PHI_ENCRYPTION_KEY and PHI_BLIND_INDEX_KEY from it
+    environment:
+      DATABASE_URL: postgresql+psycopg://ioc:ioc@postgres:5432/ioc
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

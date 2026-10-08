@@ -116,12 +116,19 @@ def _no_show_probability(lead_days: float, prior_no_shows: int, weekday: int, ho
 
 
 def build_store(seed: int | None = None) -> Store:
+    """The demo data set, generated in memory (a detached store)."""
+    from app.core.store import build_store as build
+
+    return build(seed)
+
+
+def populate(s: Store, seed: int | None = None) -> None:
     from app.core.config import settings
 
     rng = random.Random(settings.seed if seed is None else seed)
-    s = Store()
     now = datetime.now().replace(minute=0, second=0, microsecond=0)
     today = now.date()
+    s.modules["seed_time"] = now
 
     for exam in EXAMS:
         s.exams[exam.code] = exam
@@ -240,23 +247,41 @@ def build_store(seed: int | None = None) -> Store:
             added_at=now - timedelta(days=rng.randint(1, 40), hours=rng.randint(0, 12)),
         )
 
+    # Phase 4 (system 16): a few referrers lose volume; before studies copy referrer ids.
+    from app.modules.referrals.service import seed_declines
+
+    seed_declines(s, now, (settings.seed if seed is None else seed) + 16)  # own stream: main rng untouched
     _add_staff(s)
     _add_demo_storyline(s, rng, now)
     _add_reading_worklist(s, rng, now)
     _add_clinical_records(s, rng, now)
     _add_requisitions(s, rng, now)
-    return s
+    _add_radiology_ops(s, rng, now)
+    _add_business_compliance(s, rng, now)
 
 
 def _add_staff(s: Store) -> None:
     users = [
         StaffUser(id="U-FD", name="Alex Morgan", role=Role.FRONT_DESK, site_ids=["LKS"]),
         StaffUser(id="U-TECH", name="Sam Rivera", role=Role.TECHNOLOGIST, site_ids=["LKS"]),
-        StaffUser(id="U-RAD", name="Dr. Priya Raman", role=Role.RADIOLOGIST, site_ids=[]),
+        StaffUser(id="U-RAD", name="Dr. Priya Raman", role=Role.RADIOLOGIST, site_ids=[],
+                  reading_modalities=[Modality.XR, Modality.CT, Modality.US, Modality.MRI]),
         StaffUser(id="U-OPS", name="Jordan Lee", role=Role.OPERATIONS_MANAGER, site_ids=[]),
         StaffUser(id="U-MD", name="Dr. Daniel Okafor", role=Role.MEDICAL_DIRECTOR, site_ids=[]),
         StaffUser(id="U-ADMIN", name="Casey Brooks", role=Role.ADMIN, site_ids=[]),
         StaffUser(id="U-REF", name="Dr. Helen Park", role=Role.REFERRER, site_ids=[], referrer_id="R-DEMO"),
+    ]
+    # The rest of the reading group: not on the demo login page, but they read
+    # studies, get reassigned work (system 11) and review each other (system 13).
+    users += [
+        StaffUser(id="U-RAD2", name="Dr. Marcus Webb", role=Role.RADIOLOGIST, site_ids=[], demo_login=False,
+                  reading_modalities=[Modality.MRI, Modality.CT]),
+        StaffUser(id="U-RAD3", name="Dr. Aisha Nwosu", role=Role.RADIOLOGIST, site_ids=[], demo_login=False,
+                  reading_modalities=[Modality.CT, Modality.US, Modality.XR]),
+        StaffUser(id="U-RAD4", name="Dr. Tomas Ferreira", role=Role.RADIOLOGIST, site_ids=[], demo_login=False,
+                  reading_modalities=[Modality.MRI, Modality.XR]),
+        StaffUser(id="U-RAD5", name="Dr. Grace Liu", role=Role.RADIOLOGIST, site_ids=[], demo_login=False,
+                  reading_modalities=[Modality.US, Modality.XR, Modality.CT]),
     ]
     for user in users:
         s.staff[user.id] = user
@@ -462,3 +487,44 @@ def _add_requisitions(s: Store, rng: random.Random, now: datetime) -> None:
     s.labs["LAB-DEMO2"] = LabResult(id="LAB-DEMO2", patient_id=english, code="egfr", value=58, unit="mL/min/1.73m2",
                                     taken_at=now - timedelta(days=150))
     archive.setdefault(english, []).append({"facility": "Lakeview Diagnostics", "description": "Ultrasound abdomen", "date": "2026-01-20"})
+
+
+def _add_radiology_ops(s: Store, rng: random.Random, now: datetime) -> None:
+    """Phase 3: reading history and backlog, critical results, peer review, CT dose."""
+    from app.modules.backlog import service as backlog
+    from app.modules.critical import service as critical
+    from app.modules.dose import service as dose
+    from app.modules.peer_review import service as peer_review
+
+    backlog.seed(s, rng, now)
+    critical.seed(s, rng, now)
+    peer_review.seed(s, rng, now)
+    dose.seed(s, rng, now)
+
+
+def _add_business_compliance(s: Store, rng: random.Random, now: datetime) -> None:
+    """Phase 4: inventory, referrals, portal, billing, feedback, access monitoring, inspection."""
+    from app.modules.billing import service as billing
+    from app.modules.feedback import service as feedback
+    from app.modules.inspection import service as inspection
+    from app.modules.inventory import service as inventory
+    from app.modules.phipa import service as phipa
+    from app.modules.portal import service as portal
+
+    inventory.seed(s, rng, now)
+    portal.seed(s, rng, now)
+    billing.seed(s, rng, now)
+    feedback.seed(s, rng, now)
+    phipa.seed(s, rng, now)  # adds site staff and an access history over the records created above
+    inspection.seed(s, rng, now)  # credentials for all staff, including those added for system 20
+
+
+if __name__ == "__main__":
+    # One command for a fresh database: apply migrations, then (re)generate the demo data.
+    from app.core.db.migrate import upgrade
+    from app.core.store import reset_store, unit_of_work
+
+    upgrade()
+    with unit_of_work():
+        reset_store()
+    print("Database migrated and demo data generated.")

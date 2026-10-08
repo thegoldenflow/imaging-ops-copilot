@@ -1,0 +1,236 @@
+{
+ "task": "feedback",
+ "run_at": "2026-10-07T00:23:49",
+ "mode": "mock",
+ "model": "rule-based baseline",
+ "n": 60,
+ "metrics": {
+  "sentiment_accuracy": 0.95,
+  "theme_exact_match": 0.833,
+  "theme_f1": 0.93,
+  "failed_calls": 0,
+  "both_correct_en": 0.6,
+  "both_correct_fr": 0.8,
+  "both_correct_pa": 0.867,
+  "both_correct_zh": 0.867
+ },
+ "errors": [
+  {
+   "id": "fb-01",
+   "language": "en",
+   "comment": "Waited 90 minutes past my appointment. Terrible.",
+   "expected": {
+    "sentiment": "negative",
+    "themes": [
+     "wait_time"
+    ]
+   },
+   "got": {
+    "sentiment": "negative",
+    "themes": [
+     "scheduling",
+     "wait_time"
+    ]
+   }
+  },
+  {
+   "id": "fb-07",
+   "language": "en",
+   "comment": "No one could tell me when my results would be ready.",
+   "expected": {
+    "sentiment": "negative",
+    "themes": [
+     "communication",
+     "results"
+    ]
+   },
+   "got": {
+    "sentiment": "negative",
+    "themes": [
+     "results"
+    ]
+   }
+  },
+  {
+   "id": "fb-09",
+   "language": "en",
+   "comment": "The waiting room was cold and dirty.",
+   "expected": {
+    "sentiment": "negative",
+    "themes": [
+     "environment"
+    ]
+   },
+   "got": {
+    "sentiment": "negative",
+    "themes": [
+     "environment",
+     "wait_time"
+    ]
+   }
+  },
+  {
+   "id": "fb-10",
+   "language": "en",
+   "comment": "Hard to find the entrance but staff were helpful.",
+   "expected": {
+    "sentiment": "neutral",
+    "themes": [
+     "parking_access",
+     "staff_attitude"
+    ]
+   },
+   "got": {
+    "sentiment": "positive",
+    "themes": [
+     "parking_access",
+     "staff_attitude"
+    ]
+   }
+  },
+  {
+   "id": "fb-11",
+   "language": "en",
+   "comment": "They rescheduled me three times without calling.",
+   "expected": {
+    "sentiment": "negative",
+    "themes": [
+     "communication",
+     "scheduling"
+    ]
+   },
+   "got": {
+    "sentiment": "negative",
+    "themes": [
+     "scheduling"
+    ]
+   }
+  },
+  {
+   "id": "fb-12",
+   "language": "en",
+   "comment": "Fast, friendly, easy. Thanks!",
+   "expected": {
+    "sentiment": "positive",
+    "themes": [
+     "staff_attitude",
+     "wait_time"
+    ]
+   },
+   "got": {
+    "sentiment": "positive",
+    "themes": [
+     "staff_attitude"
+    ]
+   }
+  },
+  {
+   "id": "fb-16",
+   "language": "fr",
+   "comment": "Attente de deux heures, aucune explication.",
+   "expected": {
+    "sentiment": "negative",
+    "themes": [
+     "communication",
+     "wait_time"
+    ]
+   },
+   "got": {
+    "sentiment": "negative",
+    "themes": [
+     "wait_time"
+    ]
+   }
+  },
+  {
+   "id": "fb-18",
+   "language": "fr",
+   "comment": "Salle d'attente propre et calme.",
+   "expected": {
+    "sentiment": "positive",
+    "themes": [
+     "environment"
+    ]
+   },
+   "got": {
+    "sentiment": "positive",
+    "themes": [
+     "environment",
+     "wait_time"
+    ]
+   }
+  },
+  {
+   "id": "fb-28",
+   "language": "fr",
+   "comment": "Mon rendez-vous a été reporté sans prévenir.",
+   "expected": {
+    "sentiment": "negative",
+    "themes": [
+     "scheduling"
+    ]
+   },
+   "got": {
+    "sentiment": "negative",
+    "themes": [
+     "results",
+     "scheduling"
+    ]
+   }
+  },
+  {
+   "id": "fb-40",
+   "language": "zh",
+   "comment": "检查还行，就是候诊室有点冷。",
+   "expected": {
+    "sentiment": "neutral",
+    "themes": [
+     "environment"
+    ]
+   },
+   "got": {
+    "sentiment": "negative",
+    "themes": [
+     "environment"
+    ]
+   }
+  },
+  {
+   "id": "fb-41",
+   "language": "zh",
+   "comment": "改期了两次也没人通知我。",
+   "expected": {
+    "sentiment": "negative",
+    "themes": [
+     "communication",
+     "scheduling"
+    ]
+   },
+   "got": {
+    "sentiment": "negative",
+    "themes": [
+     "scheduling"
+    ]
+   }
+  },
+  {
+   "id": "fb-55",
+   "language": "pa",
+   "comment": "ਸਕੈਨ ਠੀਕ ਸੀ ਪਰ ਕਮਰੇ ਵਿੱਚ ਠੰਡ ਸੀ।",
+   "expected": {
+    "sentiment": "neutral",
+    "themes": [
+     "environment"
+    ]
+   },
+   "got": {
+    "sentiment": "negative",
+    "themes": [
+     "environment"
+    ]
+   }
+  }
+ ],
+ "seconds": 1.1,
+ "notes": "60 comments, 15 per language (EN, FR, ZH, PA), with star rating. Sentiment accuracy, exact theme-set match and micro-F1 over themes."
+}

@@ -24,3 +24,6 @@ test-results/
 .DS_Store
 *.log
 *.tsbuildinfo
+
+# Derived list for translators (python -m app.modules.clinical_kg.terms export)
+apps/api/app/modules/clinical_kg/data/terms_to_translate.jsonl

@@ -1,0 +1,422 @@
+[
+ {
+  "id": "kg-00",
+  "question": "What tests are used for pulmonary embolism?",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "肺栓塞"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "肺栓塞",
+   "check",
+   "胸部增强CT"
+  ]
+ },
+ {
+  "id": "kg-01",
+  "question": "肺栓塞需要做哪些检查？",
+  "language": "zh",
+  "intent": "disease_facts",
+  "entities": [
+   "肺栓塞"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "肺栓塞",
+   "check",
+   "胸部增强CT"
+  ]
+ },
+ {
+  "id": "kg-02",
+  "question": "Symptoms of pneumonia",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "肺炎"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "肺炎",
+   "symptom",
+   "咳嗽"
+  ]
+ },
+ {
+  "id": "kg-03",
+  "question": "肺炎有哪些并发症",
+  "language": "zh",
+  "intent": "disease_facts",
+  "entities": [
+   "肺炎"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "肺炎",
+   "acompany",
+   "脓胸"
+  ]
+ },
+ {
+  "id": "kg-04",
+  "question": "Which imaging is used for kidney stones?",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "肾结石"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "肾结石",
+   "check",
+   "B型超声"
+  ]
+ },
+ {
+  "id": "kg-05",
+  "question": "肾结石怎么治疗",
+  "language": "zh",
+  "intent": "disease_facts",
+  "entities": [
+   "肾结石"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "肾结石",
+   "treat",
+   "多饮水"
+  ]
+ },
+ {
+  "id": "kg-06",
+  "question": "What exams are used to diagnose epilepsy?",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "癫痫"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "癫痫",
+   "check",
+   "脑电图"
+  ]
+ },
+ {
+  "id": "kg-07",
+  "question": "癫痫用什么药",
+  "language": "zh",
+  "intent": "disease_facts",
+  "entities": [
+   "癫痫"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "癫痫",
+   "drug",
+   "苯巴比妥"
+  ]
+ },
+ {
+  "id": "kg-08",
+  "question": "What tests are used for gallstones?",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "胆石症"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "胆石症",
+   "check",
+   "超声"
+  ]
+ },
+ {
+  "id": "kg-09",
+  "question": "Complications of cirrhosis",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "肝硬化"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "肝硬化",
+   "acompany",
+   "腹水"
+  ]
+ },
+ {
+  "id": "kg-10",
+  "question": "肝硬化需要做哪些检查",
+  "language": "zh",
+  "intent": "disease_facts",
+  "entities": [
+   "肝硬化"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "肝硬化",
+   "check",
+   "多普勒超声"
+  ]
+ },
+ {
+  "id": "kg-11",
+  "question": "Drugs for heart failure",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "心力衰竭"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "心力衰竭",
+   "drug",
+   "利尿剂"
+  ]
+ },
+ {
+  "id": "kg-12",
+  "question": "What tests are used for tuberculosis?",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "肺结核"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "肺结核",
+   "check",
+   "胸片"
+  ]
+ },
+ {
+  "id": "kg-13",
+  "question": "急性胰腺炎做什么检查",
+  "language": "zh",
+  "intent": "disease_facts",
+  "entities": [
+   "急性胰腺炎"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "急性胰腺炎",
+   "check",
+   "腹部/盆腔 CT 扫描"
+  ]
+ },
+ {
+  "id": "kg-14",
+  "question": "What tests for COPD?",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "慢性阻塞性肺疾病"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "慢性阻塞性肺疾病",
+   "check",
+   "胸部 CT 扫描"
+  ]
+ },
+ {
+  "id": "kg-15",
+  "question": "Symptoms of optic neuritis",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "视神经炎"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "视神经炎",
+   "symptom",
+   "单眼视力下降"
+  ]
+ },
+ {
+  "id": "kg-16",
+  "question": "Tests for endometrial cancer",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "子宫内膜癌"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "子宫内膜癌",
+   "check",
+   "盆腔超声"
+  ]
+ },
+ {
+  "id": "kg-17",
+  "question": "缺铁性贫血需要做哪些检查",
+  "language": "zh",
+  "intent": "disease_facts",
+  "entities": [
+   "缺铁性贫血"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "缺铁性贫血",
+   "check",
+   "血清铁蛋白"
+  ]
+ },
+ {
+  "id": "kg-18",
+  "question": "What drugs are used for asthma?",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "哮喘"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "哮喘",
+   "drug",
+   "糖皮质激素"
+  ]
+ },
+ {
+  "id": "kg-19",
+  "question": "What could cause fever, cough and dyspnea?",
+  "language": "en",
+  "intent": "symptoms_to_diseases",
+  "entities": [
+   "发热",
+   "咳嗽",
+   "呼吸困难"
+  ],
+  "expected_diseases": [
+   "支气管炎",
+   "肺炎",
+   "肺炎支原体肺炎"
+  ],
+  "expected_fact": null
+ },
+ {
+  "id": "kg-20",
+  "question": "头痛和呕吐可能是什么病",
+  "language": "zh",
+  "intent": "symptoms_to_diseases",
+  "entities": [
+   "头痛",
+   "呕吐"
+  ],
+  "expected_diseases": [
+   "颅内压增高症",
+   "脑膜炎",
+   "隐球菌脑膜炎"
+  ],
+  "expected_fact": null
+ },
+ {
+  "id": "kg-21",
+  "question": "Which diseases could present with chest pain and dyspnea?",
+  "language": "en",
+  "intent": "symptoms_to_diseases",
+  "entities": [
+   "胸痛",
+   "呼吸困难"
+  ],
+  "expected_diseases": [
+   "肺栓塞"
+  ],
+  "expected_fact": null
+ },
+ {
+  "id": "kg-22",
+  "question": "Left flank pain radiating to groin with microscopic hematuria, query kidney stone.",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "肾结石"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "肾结石",
+   "symptom",
+   "血尿"
+  ]
+ },
+ {
+  "id": "kg-23",
+  "question": "Swollen painful left calf for 2 days, query DVT.",
+  "language": "en",
+  "intent": "disease_facts",
+  "entities": [
+   "深静脉血栓"
+  ],
+  "expected_diseases": [],
+  "expected_fact": [
+   "深静脉血栓",
+   "symptom",
+   "下肢静脉淤滞"
+  ]
+ },
+ {
+  "id": "kg-24",
+  "question": "What tests are used for interstitial lung disease?",
+  "language": "en",
+  "intent": null,
+  "entities": [],
+  "expected_diseases": [],
+  "expected_fact": null
+ },
+ {
+  "id": "kg-25",
+  "question": "Treatment for melanoma",
+  "language": "en",
+  "intent": null,
+  "entities": [
+   "黑色素瘤"
+  ],
+  "expected_diseases": [],
+  "expected_fact": null
+ },
+ {
+  "id": "kg-26",
+  "question": "甲状腺肿有哪些症状",
+  "language": "zh",
+  "intent": null,
+  "entities": [
+   "甲状腺肿"
+  ],
+  "expected_diseases": [],
+  "expected_fact": null
+ },
+ {
+  "id": "kg-27",
+  "question": "What is the weather today?",
+  "language": "en",
+  "intent": null,
+  "entities": [],
+  "expected_diseases": [],
+  "expected_fact": null
+ },
+ {
+  "id": "kg-28",
+  "question": "How do I book a parking spot?",
+  "language": "en",
+  "intent": null,
+  "entities": [],
+  "expected_diseases": [],
+  "expected_fact": null
+ },
+ {
+  "id": "kg-29",
+  "question": "Symptoms of a meniscal tear",
+  "language": "en",
+  "intent": null,
+  "entities": [],
+  "expected_diseases": [],
+  "expected_fact": null
+ }
+]

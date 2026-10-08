@@ -18,6 +18,6 @@ def results(user: StaffUser = Depends(require_roles(*CLINICAL_STAFF))):
     out = {}
     if RESULTS.exists():
         for path in sorted(RESULTS.glob("*.json")):
-            out[path.stem] = json.loads(path.read_text())
+            out[path.stem] = json.loads(path.read_text(encoding="utf-8"))
     return {"results": out, "live_triage_agreement": triage.agreement(get_store()),
             "command": "cd apps/api && uv run python -m app.modules.evals.run"}

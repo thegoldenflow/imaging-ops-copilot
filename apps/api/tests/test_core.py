@@ -4,9 +4,8 @@ from datetime import date
 
 from pydantic import BaseModel
 
-from app.core.audit import AuditLog
 from app.core.models import Patient
-from app.core.store import get_store
+from app.core.store import Store, get_store
 from app.llm.deid import Pseudonymizer
 from app.llm.gateway import LlmGateway
 from app.llm.prompts import Prompt
@@ -33,12 +32,12 @@ def test_site_scoped_user_cannot_cancel_other_site(client, login):
 
 
 def test_audit_chain_detects_tampering():
-    log = AuditLog()
+    log = Store().audit  # detached store: the chain logic without the database
     for i in range(3):
         log.record(user_id="u", user_name="U", role="admin", action="read", resource_type="patient",
                    resource_id=str(i), reason="test")
     assert log.verify() == (True, None)
-    log._events[1].resource_id = "changed"
+    log._pending[1].resource_id = "changed"
     assert log.verify() == (False, 2)
 
 
@@ -118,3 +117,5 @@ def test_reset_rebuilds_demo_data(client, login):
     get_store().appointments.clear()
     client.post("/api/demo/reset", headers=headers)
     assert len(get_store().appointments) > 10000
+    # Login sessions are not part of the demo data: the same token still works.
+    assert client.get("/api/scheduling/dashboard", headers=headers).status_code == 200

@@ -6,8 +6,24 @@ import { canSee, Layout, NAV } from "./components/Layout";
 import { EmptyState, Loading } from "./components/ui";
 import { AiUsagePage } from "./features/admin/AiUsagePage";
 import { AuditPage } from "./features/admin/AuditPage";
+import { BacklogPage } from "./features/backlog/BacklogPage";
+import { CriticalPage } from "./features/critical/CriticalPage";
+import { DosePage } from "./features/dose/DosePage";
+import { InventoryPage } from "./features/inventory/InventoryPage";
+import { ReferralsPage } from "./features/referrals/ReferralsPage";
+import { BillingPage } from "./features/billing/BillingPage";
+import { FeedbackPage } from "./features/feedback/FeedbackPage";
+import { PhipaPage } from "./features/phipa/PhipaPage";
+import { DocumentPage } from "./features/inspection/DocumentPage";
+import { InspectionPage } from "./features/inspection/InspectionPage";
+import { FeedbackSurveyPage } from "./features/patient/FeedbackSurveyPage";
+import { NewRequisitionPage } from "./features/portal/NewRequisitionPage";
+import { PortalPage } from "./features/portal/PortalPage";
+import { PortalPatientPage } from "./features/portal/PortalPatientPage";
+import { PeerReviewPage } from "./features/peer-review/PeerReviewPage";
 import { ContrastPage } from "./features/contrast/ContrastPage";
 import { EvalsPage } from "./features/evals/EvalsPage";
+import { ClinicalKnowledgePage } from "./features/clinical-kg/ClinicalKnowledge";
 import { MriSafetyPage } from "./features/mri-safety/MriSafetyPage";
 import { MriQuestionnairePage } from "./features/patient/MriQuestionnairePage";
 import { PrepPage } from "./features/prep/PrepPage";
@@ -55,19 +71,35 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/login" element={<LoginPage />} />
             <Route path="/prereg/:token" element={<PreRegPage />} />
             <Route path="/mri-screening/:token" element={<MriQuestionnairePage />} />
+            <Route path="/feedback/:token" element={<FeedbackSurveyPage />} />
             <Route element={<RequireAuth><Layout /></RequireAuth>}>
               <Route index element={<HomePage />} />
               <Route path="/scheduling" element={<Guard path="/scheduling"><SchedulingPage /></Guard>} />
               <Route path="/front-desk" element={<Guard path="/front-desk"><FrontDeskPage /></Guard>} />
               <Route path="/reading" element={<Guard path="/reading"><ReadingRoomPage /></Guard>} />
               <Route path="/reading/:reportId" element={<Guard path="/reading"><ReportReviewPage /></Guard>} />
+              <Route path="/portal" element={<Guard path="/portal"><PortalPage /></Guard>} />
+              <Route path="/portal/new" element={<Guard path="/portal/new"><NewRequisitionPage /></Guard>} />
+              <Route path="/portal/patients/:patientId" element={<Guard path="/portal"><PortalPatientPage /></Guard>} />
               <Route path="/my-reports" element={<Guard path="/my-reports"><ReferrerPage /></Guard>} />
               <Route path="/requisitions" element={<Guard path="/requisitions"><RequisitionsPage /></Guard>} />
               <Route path="/requisitions/:reqId" element={<Guard path="/requisitions"><RequisitionDetailPage /></Guard>} />
+              <Route path="/clinical-knowledge" element={<Guard path="/clinical-knowledge"><ClinicalKnowledgePage /></Guard>} />
               <Route path="/contrast" element={<Guard path="/contrast"><ContrastPage /></Guard>} />
               <Route path="/mri-safety" element={<Guard path="/mri-safety"><MriSafetyPage /></Guard>} />
               <Route path="/prep" element={<Guard path="/prep"><PrepPage /></Guard>} />
               <Route path="/priors" element={<Guard path="/priors"><PriorsPage /></Guard>} />
+              <Route path="/backlog" element={<Guard path="/backlog"><BacklogPage /></Guard>} />
+              <Route path="/critical" element={<Guard path="/critical"><CriticalPage /></Guard>} />
+              <Route path="/peer-review" element={<Guard path="/peer-review"><PeerReviewPage /></Guard>} />
+              <Route path="/dose" element={<Guard path="/dose"><DosePage /></Guard>} />
+              <Route path="/inventory" element={<Guard path="/inventory"><InventoryPage /></Guard>} />
+              <Route path="/referrals" element={<Guard path="/referrals"><ReferralsPage /></Guard>} />
+              <Route path="/billing" element={<Guard path="/billing"><BillingPage /></Guard>} />
+              <Route path="/feedback" element={<Guard path="/feedback"><FeedbackPage /></Guard>} />
+              <Route path="/phipa" element={<Guard path="/phipa"><PhipaPage /></Guard>} />
+              <Route path="/inspection" element={<Guard path="/inspection"><InspectionPage /></Guard>} />
+              <Route path="/inspection/documents/:docId" element={<Guard path="/inspection"><DocumentPage /></Guard>} />
               <Route path="/evals" element={<Guard path="/evals"><EvalsPage /></Guard>} />
               <Route path="/ai-usage" element={<Guard path="/ai-usage"><AiUsagePage /></Guard>} />
               <Route path="/audit" element={<Guard path="/audit"><AuditPage /></Guard>} />

@@ -145,6 +145,11 @@ class ImagingStudy(BaseModel):  # FHIR ImagingStudy
     indication: str = ""
     source_facility: str | None = None  # set for priors imported from outside archives
     prior_for_appointment_id: str | None = None
+    # Copied from the appointment when the exam is completed (used by systems 11 and 14).
+    site_id: str | None = None
+    scanner_id: str | None = None
+    priority: str = "P3"
+    protocol_id: str | None = None
 
 
 class Requisition(BaseModel):  # FHIR ServiceRequest
@@ -183,6 +188,8 @@ class StaffUser(BaseModel):  # FHIR PractitionerRole
     role: Role
     site_ids: list[str]  # empty = all sites
     referrer_id: str | None = None
+    reading_modalities: list[Modality] = Field(default_factory=list)  # radiologist credentials
+    demo_login: bool = True  # shown on the demo login page (one user per role)
 
 
 class MessageOutbox(BaseModel):  # FHIR Communication
@@ -221,7 +228,7 @@ class LlmCall(BaseModel):
     ts: datetime
     task: str
     model: str
-    mode: str  # anthropic or mock
+    mode: str  # anthropic, gemini or mock
     prompt_version: str
     input_tokens: int
     output_tokens: int

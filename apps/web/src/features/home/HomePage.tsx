@@ -20,8 +20,8 @@ const STORY: Step[] = [
     role: "radiologist", userId: "U-RAD", to: "/reading", system: "Report Generator",
   },
   {
-    title: "Referring physician sees the signed report",
-    detail: "Dr. Helen Park can read the report only after it is signed. Drafts return 403.",
+    title: "Referring physician sees the report and acknowledges the finding",
+    detail: "Dr. Helen Park can read the report only after it is signed (drafts return 403). The confirmed nodule opened a critical-result case; she acknowledges it in the portal.",
     role: "referrer", userId: "U-REF", to: "/my-reports", system: "Report Generator",
   },
   {
@@ -79,6 +79,77 @@ const PIPELINE: Step[] = [
   },
 ];
 
+const OPERATIONS: Step[] = [
+  {
+    title: "An exam finishes and lands in the reading backlog",
+    detail: "Mark one of today's or tomorrow's exams done. A study is created and assigned to a credentialed radiologist; CT exams also get a dose record from the scanner.",
+    role: "technologist", userId: "U-TECH", to: "/scheduling?tab=appointments", system: "Backlog · CT dose",
+  },
+  {
+    title: "Balance the reading backlog",
+    detail: "Dr. Liu is off shift and Dr. Webb's MRI queue is long. Review turnaround against target and apply the suggested reassignments; each one is audited.",
+    role: "operations_manager", userId: "U-OPS", to: "/backlog", system: "Reporting backlog",
+  },
+  {
+    title: "Read and sign from your queue",
+    detail: "Open a study from your queue, edit the normal template and sign. Add a finding that needs communication to open a critical-result case.",
+    role: "radiologist", userId: "U-RAD", to: "/backlog", system: "Reporting backlog",
+  },
+  {
+    title: "A critical result nobody acknowledges",
+    detail: "A pulmonary embolism case opened when the demo started. Nobody answers, so it is re-notified and escalated to you within a minute. Record who acknowledged, how and when, then close it.",
+    role: "medical_director", userId: "U-MD", to: "/critical", system: "Critical results",
+  },
+  {
+    title: "Blind peer review",
+    detail: "Sampled reports from colleagues wait for your second read. The original reader is hidden and your own reports are never assigned to you.",
+    role: "radiologist", userId: "U-RAD", to: "/peer-review", system: "Peer review",
+  },
+  {
+    title: "QA report and CT dose",
+    detail: "As QA lead, see discrepancy rates by radiologist and exam type and export them. Then open CT dose: EVW-CT1 has drifted above its usual level over the last three weeks.",
+    role: "medical_director", userId: "U-MD", to: "/peer-review", system: "QA · CT dose",
+  },
+];
+
+const BUSINESS: Step[] = [
+  {
+    title: "A contrast CT finishes and stock goes down",
+    detail: "Mark a contrast CT done at Lakeshore. Iohexol and the injector kit are deducted from the first-expiring lot; iohexol reaches its reorder point and a purchase order is drafted.",
+    role: "technologist", userId: "U-TECH", to: "/inventory", system: "Inventory",
+  },
+  {
+    title: "The patient rates the visit on her phone",
+    detail: "Every completed exam sends a survey in the patient's language. Open one from “Surveys sent”, give one star: the site manager is alerted at once and AI labels the comment's sentiment and themes for staff to confirm.",
+    role: "operations_manager", userId: "U-OPS", to: "/feedback", system: "Patient feedback",
+  },
+  {
+    title: "Dr. Park orders online and only sees her own patients",
+    detail: "Submit a requisition in the portal; it is triaged and given a protocol within seconds. Try opening patient PT-00001: refused and written to the audit log.",
+    role: "referrer", userId: "U-REF", to: "/portal/new", system: "Referrer portal",
+  },
+  {
+    title: "Referral trends and an AI weekly summary",
+    detail: "Filter by specialty, modality or site. Six referrers dropped sharply and form the visit list. Draft the weekly summary: every number is filled in from the queries; click one to see its tile.",
+    role: "operations_manager", userId: "U-OPS", to: "/referrals", system: "Referral analytics",
+  },
+  {
+    title: "Billing QA work queue",
+    detail: "Completed exams reconciled against claims: not submitted, duplicates, wrong codes, wrong amounts, rejections and claims for exams never performed. Work an item and export the list.",
+    role: "admin", userId: "U-ADMIN", to: "/billing", system: "Billing QA",
+  },
+  {
+    title: "Privacy officer reviews unusual access",
+    detail: "Rules over the audit log caught a bulk lookup, after-hours access, a possible relative, a self-lookup, cross-site access and repeated refusals. Investigate one; every step is recorded.",
+    role: "admin", userId: "U-ADMIN", to: "/phipa", system: "PHIPA monitoring",
+  },
+  {
+    title: "Get ready for an inspection",
+    detail: "The checklist shows what is out of date (an overdue scanner service, an expired BLS). Ask the policies a question: the answer quotes the policy with a link to the exact section, or says it is not covered.",
+    role: "operations_manager", userId: "U-OPS", to: "/inspection", system: "Inspection hub",
+  },
+];
+
 function StoryCard({ title, steps, onGo, userId }: { title: string; steps: Step[]; onGo: (s: Step) => void; userId: string }) {
   return (
     <Card title={title} className="mb-4">
@@ -122,6 +193,8 @@ export function HomePage() {
       />
       <StoryCard title="Storyline 1 · one patient through scheduling, reporting and the front desk" steps={STORY} onGo={go} userId={user.id} />
       <StoryCard title="Storyline 2 · the requisition intake pipeline" steps={PIPELINE} onGo={go} userId={user.id} />
+      <StoryCard title="Storyline 3 · radiology operations" steps={OPERATIONS} onGo={go} userId={user.id} />
+      <StoryCard title="Storyline 4 · business and compliance" steps={BUSINESS} onGo={go} userId={user.id} />
       <p className="flex items-center gap-1.5 text-xs text-slate-500">
         <CheckCircle2 className="size-3.5" /> Use “Reset demo” in the header to start over.
       </p>

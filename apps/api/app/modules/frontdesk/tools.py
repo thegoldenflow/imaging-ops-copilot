@@ -26,7 +26,7 @@ class CallSession(BaseModel):
     id: str
     started_at: datetime
     ended_at: datetime | None = None
-    agent_mode: str  # claude, scripted
+    agent_mode: str  # claude, gemini (LLM tool use) or scripted
     verified_patient_id: str | None = None
     failed_verifications: int = 0
     transcript: list[Turn] = []
@@ -99,10 +99,12 @@ def _own_appointment(store: Store, session: CallSession, appointment_id: str) ->
 
 def verify_identity(store: Store, session: CallSession, full_name: str, date_of_birth: str) -> dict:
     dob = parse_dob(date_of_birth)
-    matches = [pid for pid in find_named_patients(store, full_name) if store.patients[pid].dob == dob]
+    # Names and birth dates are encrypted at rest: look up by the birth date's blind index, then compare names.
+    said = full_name.lower()
+    matches = [p for p in store.patients.find_by("dob", dob) if p.full_name.lower() in said] if dob else []
     if len(matches) == 1:
-        session.verified_patient_id = matches[0]
-        return {"verified": True, "first_name": store.patients[matches[0]].given_name}
+        session.verified_patient_id = matches[0].id
+        return {"verified": True, "first_name": matches[0].given_name}
     session.failed_verifications += 1
     return {"verified": False, "attempts_left": max(0, 3 - session.failed_verifications)}
 

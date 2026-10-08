@@ -68,34 +68,26 @@ class ReportUrgentFinding(BaseModel):
     confirmed: bool | None = None
 
 
-class CriticalResult(BaseModel):
-    id: str
-    report_id: str
-    patient_id: str
-    referrer_id: str
-    finding: str
-    created_at: datetime
-    status: str = "awaiting_notification"
-
-
 class Report(BaseModel):
     id: str
     study_id: str
     patient_id: str
     referrer_id: str
     status: str = "draft"  # draft, signed
-    ai_status: str  # ok, needs_human, unavailable
+    source: str = "ai_draft"  # ai_draft (system 3) or dictated (no AI involved)
+    ai_status: str = "not_used"  # ok, needs_human, unavailable, not_used
     ai_error: str | None = None
     image_quality: ImageQuality | None = None
     sections: list[Section]
     urgent_findings: list[ReportUrgentFinding] = []
     uncertainties: list[str] = []
-    model: str
-    prompt_version: str
-    llm_mode: str
-    llm_call_id: str
+    model: str = ""
+    prompt_version: str = ""
+    llm_mode: str = ""
+    llm_call_id: str = ""
     created_at: datetime
     signed_by: str | None = None
+    signed_by_id: str | None = None
     signed_at: datetime | None = None
     edit_ratio: float | None = None
     sent_to_referrer_at: datetime | None = None
@@ -105,12 +97,18 @@ def reports(store: Store) -> dict[str, Report]:
     return store.module("reports", dict)
 
 
-def critical_results(store: Store) -> dict[str, CriticalResult]:
-    return store.module("critical_results", dict)
+def _by_study(store: Store) -> dict[str, str]:
+    return store.module("report_by_study", dict)  # study id -> report id
+
+
+def save(store: Store, report: Report) -> None:
+    reports(store)[report.id] = report
+    _by_study(store)[report.study_id] = report.id
 
 
 def report_for_study(store: Store, study_id: str) -> Report | None:
-    return next((r for r in reports(store).values() if r.study_id == study_id), None)
+    rid = _by_study(store).get(study_id)
+    return reports(store).get(rid) if rid else None
 
 
 def generate_draft(store: Store, study: ImagingStudy) -> Report:
@@ -148,7 +146,7 @@ def generate_draft(store: Store, study: ImagingStudy) -> Report:
         model=outcome.model, prompt_version=outcome.prompt_version, llm_mode=outcome.mode,
         llm_call_id=outcome.call_id, created_at=datetime.now(),
     )
-    reports(store)[report.id] = report
+    save(store, report)
     store.touch()
     return report
 
@@ -159,21 +157,20 @@ def edit_ratio(report: Report) -> float:
     return round(1 - difflib.SequenceMatcher(None, ai, final).ratio(), 3)
 
 
-def sign(store: Store, report: Report, signer_name: str, confirmed_urgent: list[int]) -> list[CriticalResult]:
+def sign(store: Store, report: Report, signer_name: str, confirmed_urgent: list[int],
+         signer_id: str | None = None, levels: dict[int, str] | None = None) -> list:
+    from app.modules.critical import service as critical  # System 12
+
     for i, finding in enumerate(report.urgent_findings):
         finding.confirmed = i in confirmed_urgent
     report.status = "signed"
     report.signed_by = signer_name
+    report.signed_by_id = signer_id
     report.signed_at = datetime.now()
     report.edit_ratio = edit_ratio(report)
-    created = []
-    # Confirmed urgent findings are handed to the Critical Results Tracker (System 12).
-    for finding in report.urgent_findings:
-        if finding.confirmed:
-            cr = CriticalResult(id=store.next_id("CR"), report_id=report.id, patient_id=report.patient_id,
-                                referrer_id=report.referrer_id, finding=finding.finding, created_at=datetime.now())
-            critical_results(store)[cr.id] = cr
-            created.append(cr)
+    # Confirmed urgent findings open a case in the Critical Results Tracker.
+    created = [critical.open_case(store, report, f.finding, (levels or {}).get(i, "urgent"), opened_by=signer_name)
+               for i, f in enumerate(report.urgent_findings) if f.confirmed]
     store.touch()
     return created
 

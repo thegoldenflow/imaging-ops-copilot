@@ -127,7 +127,7 @@ def attempt(store: Store, task: RetrievalTask, now: datetime | None = None) -> N
 def process_due(store: Store | None = None, now: datetime | None = None) -> int:
     store = store or get_store()
     now = now or datetime.now()
-    due = [t for t in tasks(store).values() if t.status in ("requested", "retrying") and t.next_attempt_at <= now]
+    due = tasks(store).claim_due("next_attempt_at", now, statuses=("requested", "retrying"))
     for task in due:
         attempt(store, task, now)
     if due:

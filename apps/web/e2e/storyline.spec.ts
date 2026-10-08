@@ -58,6 +58,9 @@ test("storyline: report, phone cancellation, backfill, pre-registration, audit",
   await page.getByTestId("login-referrer").click();
   await page.getByRole("link", { name: "My reports" }).click();
   await expect(page.getByText("Mei Chen · X-ray Chest")).toBeVisible();
+  // ... and acknowledges the critical result in the portal (System 12).
+  await page.getByRole("button", { name: "I have received this result" }).click();
+  await expect(page.getByTestId(/^my-critical-/).first()).toContainText("Acknowledged");
 
   // 3. Robert Taylor calls to cancel his CT.
   await page.getByRole("button", { name: "Switch role" }).click();
@@ -78,6 +81,7 @@ test("storyline: report, phone cancellation, backfill, pre-registration, audit",
   // 4. Operations manager backfills the slot with Mei Chen.
   await page.getByRole("button", { name: "Switch role" }).click();
   await page.getByTestId("login-operations_manager").click();
+  await expect(page.getByTestId("current-user")).toHaveText("Jordan Lee"); // token stored before navigating
   await page.goto("/scheduling?tab=backfill");
   const mei = page.getByTestId("candidate-PT-DEMO1");
   await expect(mei).toBeVisible();

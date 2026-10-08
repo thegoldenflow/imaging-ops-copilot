@@ -2,19 +2,32 @@ import clsx from "clsx";
 import {
   Activity,
   CalendarClock,
+  ClipboardCheck,
   ClipboardList,
   Droplet,
   FileText,
   FlaskConical,
   History,
   Home,
+  Inbox,
   Languages,
   LogOut,
   Magnet,
+  Package,
+  BookOpenCheck,
+  ShieldAlert,
+  MessageSquareHeart,
+  Network,
+  Receipt,
+  FilePlus2,
+  Users,
+  TrendingUp,
+  Radiation,
   PhoneCall,
   RotateCcw,
   ScanLine,
   ShieldCheck,
+  Siren,
   Sparkles,
 } from "lucide-react";
 import { useState } from "react";
@@ -22,6 +35,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { isLiveLlm, llmVendor } from "../lib/llm";
 import { ROLE_LABEL, type Meta, type Role } from "../lib/types";
 import { Badge, Button } from "./ui";
 
@@ -30,7 +44,7 @@ interface NavItem {
   label: string;
   icon: typeof Home;
   roles: Role[] | "all";
-  section: "" | "Operations" | "Intake pipeline" | "Oversight";
+  section: "" | "Operations" | "Intake pipeline" | "Radiology ops" | "Business & compliance" | "Oversight";
 }
 
 const STAFF: Role[] = ["front_desk", "technologist", "radiologist", "operations_manager", "medical_director", "admin"];
@@ -40,12 +54,25 @@ export const NAV: NavItem[] = [
   { to: "/scheduling", label: "Scheduling", icon: CalendarClock, roles: ["front_desk", "technologist", "operations_manager", "medical_director", "admin"], section: "Operations" },
   { to: "/front-desk", label: "Front desk", icon: PhoneCall, roles: ["front_desk", "operations_manager", "admin"], section: "Operations" },
   { to: "/reading", label: "Reading room", icon: ScanLine, roles: ["radiologist", "medical_director", "admin"], section: "Operations" },
+  { to: "/portal", label: "My patients", icon: Users, roles: ["referrer"], section: "Operations" },
+  { to: "/portal/new", label: "New requisition", icon: FilePlus2, roles: ["referrer"], section: "Operations" },
   { to: "/my-reports", label: "My reports", icon: FileText, roles: ["referrer"], section: "Operations" },
   { to: "/requisitions", label: "Requisitions", icon: ClipboardList, roles: STAFF, section: "Intake pipeline" },
+  { to: "/clinical-knowledge", label: "Clinical knowledge", icon: Network, roles: ["technologist", "radiologist", "medical_director", "admin"], section: "Intake pipeline" },
   { to: "/contrast", label: "Contrast checks", icon: Droplet, roles: ["technologist", "radiologist", "medical_director", "admin"], section: "Intake pipeline" },
   { to: "/mri-safety", label: "MRI safety", icon: Magnet, roles: ["technologist", "radiologist", "medical_director", "admin"], section: "Intake pipeline" },
   { to: "/prep", label: "Prep instructions", icon: Languages, roles: ["front_desk", "radiologist", "medical_director", "admin"], section: "Intake pipeline" },
   { to: "/priors", label: "Prior imaging", icon: History, roles: ["front_desk", "technologist", "radiologist", "operations_manager", "admin"], section: "Intake pipeline" },
+  { to: "/backlog", label: "Reading backlog", icon: Inbox, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Radiology ops" },
+  { to: "/critical", label: "Critical results", icon: Siren, roles: ["front_desk", "radiologist", "operations_manager", "medical_director", "admin"], section: "Radiology ops" },
+  { to: "/peer-review", label: "Peer review", icon: ClipboardCheck, roles: ["radiologist", "medical_director"], section: "Radiology ops" },
+  { to: "/dose", label: "CT dose", icon: Radiation, roles: ["technologist", "radiologist", "operations_manager", "medical_director", "admin"], section: "Radiology ops" },
+  { to: "/inventory", label: "Inventory", icon: Package, roles: ["technologist", "operations_manager", "medical_director", "admin"], section: "Business & compliance" },
+  { to: "/referrals", label: "Referral analytics", icon: TrendingUp, roles: ["operations_manager", "medical_director", "admin"], section: "Business & compliance" },
+  { to: "/billing", label: "Billing QA", icon: Receipt, roles: ["operations_manager", "admin"], section: "Business & compliance" },
+  { to: "/feedback", label: "Patient feedback", icon: MessageSquareHeart, roles: ["front_desk", "operations_manager", "medical_director", "admin"], section: "Business & compliance" },
+  { to: "/phipa", label: "Access monitoring", icon: ShieldAlert, roles: ["medical_director", "admin"], section: "Business & compliance" },
+  { to: "/inspection", label: "Inspection hub", icon: BookOpenCheck, roles: STAFF, section: "Business & compliance" },
   { to: "/ai-usage", label: "AI usage", icon: Activity, roles: ["operations_manager", "medical_director", "admin"], section: "Oversight" },
   { to: "/evals", label: "AI evaluations", icon: FlaskConical, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Oversight" },
   { to: "/audit", label: "Audit log", icon: ShieldCheck, roles: ["medical_director", "admin"], section: "Oversight" },
@@ -96,7 +123,7 @@ export function Layout() {
             )}
             <NavLink
               to={item.to}
-              end={item.to === "/"}
+              end={item.to === "/" || item.to === "/portal"}
               className={({ isActive }) =>
                 clsx(
                   "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium",
@@ -119,16 +146,16 @@ export function Layout() {
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2.5 md:px-6">
           <nav className="flex gap-1 overflow-x-auto md:hidden" aria-label="Main mobile">
             {NAV.filter((item) => canSee(item, user.role)).map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.to === "/"} className={({ isActive }) => clsx("rounded-md p-2", isActive ? "bg-brand-50 text-brand-700" : "text-slate-500")} aria-label={item.label}>
+              <NavLink key={item.to} to={item.to} end={item.to === "/" || item.to === "/portal"} className={({ isActive }) => clsx("rounded-md p-2", isActive ? "bg-brand-50 text-brand-700" : "text-slate-500")} aria-label={item.label}>
                 <item.icon className="size-4" />
               </NavLink>
             ))}
           </nav>
           <div className="hidden md:block">
             {meta.data && (
-              <Badge tone={meta.data.llm_mode === "anthropic" ? "ai" : "slate"}>
+              <Badge tone={isLiveLlm(meta.data.llm_mode) ? "ai" : "slate"}>
                 <Sparkles className="size-3" />
-                {meta.data.llm_mode === "anthropic" ? "AI: Claude API" : "AI: mock mode (no API key)"}
+                <span data-testid="llm-mode">{isLiveLlm(meta.data.llm_mode) ? `AI: ${llmVendor(meta.data.llm_mode)} API` : "AI: mock mode (no API key)"}</span>
               </Badge>
             )}
           </div>
