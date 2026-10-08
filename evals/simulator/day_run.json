@@ -1,0 +1,189 @@
+{
+  "what": "WP3 day simulator: a full planned day (07:00 to 08:00 the next day) with and without the ICU surge scenario; no model involved",
+  "generated_at": "2026-10-08T19:17:38",
+  "hospital_day": "2026-10-08T07:00:00",
+  "criteria": {
+    "event_types": ">= 6",
+    "order": "subscriber sees events in timeline order; per encounter admitted first, discharged last",
+    "consistency": "one patient per bed; bed status matches occupancy; finished encounters closed; every clinical resource has its encounter",
+    "resources": "every resource the simulator wrote validates against app/fhir/types"
+  },
+  "passed": true,
+  "runs": [
+    {
+      "scenario": null,
+      "start": "2026-10-08T07:00:00",
+      "end": "2026-10-09T08:00:00",
+      "seconds": 11.2,
+      "plan_events_applied": {
+        "admit": 26,
+        "bed_clean": 21,
+        "day_surgery_arrival": 3,
+        "day_surgery_leave": 3,
+        "discharge": 21,
+        "ed_arrival": 61,
+        "ed_decision": 60,
+        "ed_depart": 39,
+        "ed_seen": 61,
+        "ed_triage": 61,
+        "order": 412,
+        "result": 389,
+        "surgery_cancel": 1,
+        "surgery_end": 13,
+        "surgery_start": 17
+      },
+      "domain_events": {
+        "appointment.cancelled": 1,
+        "appointment.updated": 30,
+        "bed.status_changed": 21,
+        "encounter.updated": 182,
+        "order.placed": 412,
+        "patient.admitted": 90,
+        "patient.discharged": 80,
+        "result.available": 801
+      },
+      "hl7_messages": {
+        "ADT^A01": 90,
+        "ADT^A03": 80,
+        "ADT^A08": 182,
+        "ADT^A20": 21,
+        "ORM^O01": 412,
+        "ORU^R01": 801,
+        "SIU^S14": 30,
+        "SIU^S15": 1
+      },
+      "event_types": 8,
+      "delivered_to_subscriber": 1617,
+      "deferred_for_want_of_a_bed": 0,
+      "ward_vital_sign_panels": 412,
+      "resources_written": 1967,
+      "resources_invalid": [],
+      "order_problems": [],
+      "consistency_problems": []
+    },
+    {
+      "scenario": "icu_surge",
+      "start": "2026-10-08T07:00:00",
+      "end": "2026-10-09T08:00:00",
+      "seconds": 13.3,
+      "plan_events_applied": {
+        "admit": 35,
+        "bed_clean": 21,
+        "day_surgery_arrival": 3,
+        "day_surgery_leave": 3,
+        "discharge": 21,
+        "ed_arrival": 72,
+        "ed_decision": 71,
+        "ed_depart": 39,
+        "ed_seen": 72,
+        "ed_triage": 72,
+        "order": 517,
+        "result": 490,
+        "surgery_cancel": 1,
+        "surgery_end": 13,
+        "surgery_start": 17
+      },
+      "domain_events": {
+        "appointment.cancelled": 1,
+        "appointment.updated": 30,
+        "bed.status_changed": 21,
+        "encounter.updated": 215,
+        "order.placed": 517,
+        "patient.admitted": 110,
+        "patient.discharged": 90,
+        "result.available": 932
+      },
+      "hl7_messages": {
+        "ADT^A01": 110,
+        "ADT^A03": 90,
+        "ADT^A08": 215,
+        "ADT^A20": 21,
+        "ORM^O01": 517,
+        "ORU^R01": 932,
+        "SIU^S14": 30,
+        "SIU^S15": 1
+      },
+      "event_types": 8,
+      "delivered_to_subscriber": 1916,
+      "deferred_for_want_of_a_bed": 52,
+      "ward_vital_sign_panels": 442,
+      "resources_written": 2330,
+      "resources_invalid": [],
+      "order_problems": [],
+      "consistency_problems": [],
+      "injected": {
+        "correlation_id": "4e81558602c649aa86c8d50d4dee01eb",
+        "patients": [
+          {
+            "visit": "ed-x0001",
+            "stay": "stay-x0001",
+            "arrival": "2026-10-08 07:01:39",
+            "ctas": 2
+          },
+          {
+            "visit": "ed-x0002",
+            "stay": "stay-x0002",
+            "arrival": "2026-10-08 07:04:24",
+            "ctas": 1
+          },
+          {
+            "visit": "ed-x0003",
+            "stay": "stay-x0003",
+            "arrival": "2026-10-08 07:07:43",
+            "ctas": 2
+          },
+          {
+            "visit": "ed-x0004",
+            "stay": "stay-x0004",
+            "arrival": "2026-10-08 07:10:09",
+            "ctas": 2
+          },
+          {
+            "visit": "ed-x0005",
+            "stay": "stay-x0005",
+            "arrival": "2026-10-08 07:13:03",
+            "ctas": 1
+          },
+          {
+            "visit": "ed-x0006",
+            "stay": "stay-x0006",
+            "arrival": "2026-10-08 07:16:18",
+            "ctas": 2
+          },
+          {
+            "visit": "ed-x0007",
+            "stay": "stay-x0007",
+            "arrival": "2026-10-08 07:19:06",
+            "ctas": 2
+          },
+          {
+            "visit": "ed-x0008",
+            "stay": "stay-x0008",
+            "arrival": "2026-10-08 07:22:21",
+            "ctas": 1
+          },
+          {
+            "visit": "ed-x0009",
+            "stay": "stay-x0009",
+            "arrival": "2026-10-08 07:25:08",
+            "ctas": 2
+          },
+          {
+            "visit": "ed-x0010",
+            "stay": "stay-x0010",
+            "arrival": "2026-10-08 07:28:28",
+            "ctas": 2
+          },
+          {
+            "visit": "ed-x0011",
+            "stay": "stay-x0011",
+            "arrival": "2026-10-08 07:31:47",
+            "ctas": 1
+          }
+        ],
+        "icu_free_beds_now": 10
+      },
+      "events_with_scenario_correlation_id": 270
+    }
+  ]
+}

@@ -150,11 +150,16 @@ def test_generation_is_deterministic(fresh_state):
 
 def test_reset_rewrites_the_fhir_store(fresh_state):
     from app.core.store import reset_store
+    from app.ehr import simulator
+    from app.ehr.events import bus
 
     fresh_state.fhir.create({"resourceType": "Flag", "id": "flag-temp", "status": "active",
                              "code": {"text": "temp"}, "subject": {"reference": "Patient/pat-0001"}})
+    simulator.advance_by(fresh_state, 30)  # moves the clock and fills the event log (WP3)
+    assert bus.counts(fresh_state)
     reset_store()
     assert fresh_state.fhir.read("Flag", "flag-temp") is None
+    assert bus.counts(fresh_state) == {} and parse(fresh_state.modules["hospital_clock"]["now"]).hour == 7
     count = fresh_state.conn().execute(text("SELECT count(*) FROM fhir_resources WHERE resource_type = 'Patient'")).scalar()
     assert count == 1000
     assert isinstance(fresh_state.modules["seed_time"], datetime)

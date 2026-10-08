@@ -52,13 +52,36 @@ Generated ids are deterministic (same seed and hospital day → same ids), so ev
 | Patient | `pat-0001` … `pat-1000` |
 | ED visit (Encounter EMER) | `ed-NNNNN`; CTAS `ctas-ed-NNNNN`, first vitals `vit-ed-NNNNN`, bed request `bedreq-ed-NNNNN` |
 | Admission (Encounter IMP) | `stay-NNNNN` |
-| Surgery | Appointment `surg-NNNNN`, Procedure `proc-surg-NNNNN`, request `orreq-surg-NNNNN`, day-surgery Encounter `amb-surg-NNNNN` |
+| Surgery | case `surg-NNNNN`: Appointment `appt-NNNNNN` (basedOn the request), Procedure `proc-surg-NNNNN`, request `orreq-surg-NNNNN`, day-surgery Encounter `amb-surg-NNNNN` |
 | Orders | ServiceRequest `ord-<encounter>-NN`, lab result Observation `obs-ord-<encounter>-NN` |
 | Practitioners | `prac-doc-NN`, `prac-nurs-NN`, `prac-phar-NN`, `prac-cler-NN`, `prac-ops-NN`, surgeons `prac-surg-NN`; roles `role-<suffix>` |
+| Written by the day simulator | planned entities keep their plan ids; resources the generator would number from a counter get ids scoped to the plan event (`cond-ed-03250-dec-1`, `medrx-stay-01190-adm-3`, `appt-surg-00450-book-1`); ward vital signs `vit-<stay>-<YYYYMMDDHH>`; patients added by a scenario `ed-x0001`, `stay-x0001`, `surg-x0001` |
 
 ## The hospital clock and plan
 
-The hospital day starts at 07:00 on the seed date (nearest weekday at a weekend). The state at that moment is in the FHIR store; the next 36 hours (ED arrivals and their steps, admissions, transfers, discharges, housekeeping, surgery start and end, orders and results) are in the `hospital_plan` module state for the day simulator (WP3). The hospital clock (`hospital_clock`) moves only when the simulator runs.
+The hospital day starts at 07:00 on the seed date (nearest weekday at a weekend). The state at that moment is in the FHIR store; the next 36 hours (ED arrivals and their steps, admissions, ALC designations, transfers, discharges, housekeeping, OR bookings, cancellations, day-surgery visits, surgery start and end, orders and results) are in the `hospital_plan` module state for the day simulator (WP3). Events at the same minute are ordered so a bed is cleaned and patients leave before others arrive (`plan_order`). The hospital clock (`hospital_clock`: `now`, `rate`, `running`, `last_wall`, `applied`, `stopped`) moves only when the simulator runs; `app/ehr/clock.py` `hospital_now()` reads it.
+
+## Events and the day simulator (WP3)
+
+`app/ehr/simulator.py` plays the EHR: as the clock passes a planned event it writes the change into the FHIR store and sends the HL7 v2 message an EHR would send. `app/ehr/hl7.py` (the interface engine's converter) maps each message to a domain event; `app/ehr/events.py` publishes it. Subscribers see domain events only and read content through `FhirGateway`.
+
+| HL7 v2 | Domain event | Simulator source | Event refs and attributes |
+| --- | --- | --- | --- |
+| ADT^A01 | `patient.admitted` | ED arrival (class EMER), admission (IMP), day-surgery check-in (AMB) | patient, encounter, location; `encounter_class` |
+| ADT^A02 | `patient.transferred` | bed move (ICU step-down) | from_location, location |
+| ADT^A03 | `patient.discharged` | end of an ED visit (home, lwbs, admitted), stay, day-surgery visit | from_location; `encounter_class`, `disposition` |
+| ADT^A08 | `encounter.updated` | ED triage, seen by a physician, disposition decided, ALC designation | location; `change` (triaged, seen, decision, alc), `disposition` |
+| ADT^A20 | `bed.status_changed` | housekeeping done (K → U) | location; `status` |
+| ORM^O01 | `order.placed` | lab, imaging and consult orders | order (ServiceRequest); `category` |
+| ORU^R01 | `result.available` | lab and imaging results, consult done, ward vital signs every 6 h | order, results (Observation / DiagnosticReport); `category` |
+| SIU^S12 / S14 / S15 | `appointment.scheduled` / `updated` / `cancelled` | OR case booked, started or finished, cancelled | appointment, location (OR); `status` |
+| (none) | `consent.revoked` | scripted scenario (WP4 consent management later) | patient, consent; `category` |
+
+Every event has `event_id` (stable per source message, so a resent HL7 message is the same event), `correlation_id`, `actor` (`system:demo-ehr`, or `user:<id>` when a person triggered it, e.g. a scripted scenario) and `occurred_at` (hospital time). Events carry references and codes only: no names, no MRN, no clinical text.
+
+Storage (migration 0004, emptied by a demo reset): `domain_events` (the outbox; written in the same transaction as the FHIR changes), `event_consumers` (each subscriber's cursor), `event_deliveries` (per subscriber and `event_id`: done, failed, parked; the deduplication record).
+
+The plan is the intent and the FHIR store is the truth: a planned bed that is taken (a scenario's patients, a bed manager's move) means another free bed in the unit or its overflow units, and if there is none the patient keeps boarding in the ED (bed request active) and the stay's events move 30 minutes later. A bed left for housekeeping without a planned cleaning gets one. The simulator writes the local FHIR store only; with `FHIR_BACKEND=hapi` the simulated day does not reach the HAPI server.
 
 ## Access: FhirGateway (WP2)
 

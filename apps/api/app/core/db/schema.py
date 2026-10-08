@@ -201,8 +201,10 @@ app_meta = Table(
 )
 
 # Tables a demo reset empties. Sessions survive: staff ids are stable across resets.
-# fhir_resources is defined in app/ehr/fhirstore.py (the hospital EHR's FHIR store).
-FIXED_DATA_TABLES = ("module_state", "images", "audit_events", "fhir_resources")
+# fhir_resources is defined in app/ehr/fhirstore.py (the hospital EHR's FHIR store), the event
+# log and its consumer cursors in app/ehr/events.py (a reset restarts the sequence, so they go together).
+FIXED_DATA_TABLES = ("module_state", "images", "audit_events", "fhir_resources", "domain_events", "event_consumers",
+                     "event_deliveries")
 
 
 # ---------- Pydantic model -> table ----------
@@ -309,6 +311,7 @@ def all_entity_names() -> list[str]:
 
 def get_metadata() -> MetaData:
     """Metadata with every table defined (imports all model classes)."""
+    import app.ehr.events  # noqa: F401  (defines the event log tables)
     import app.ehr.fhirstore  # noqa: F401  (defines fhir_resources)
 
     for name in all_entity_names():

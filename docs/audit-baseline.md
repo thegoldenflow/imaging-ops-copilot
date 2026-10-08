@@ -84,7 +84,9 @@ Java 21, Spring Boot, Temporal Java SDK 1.35, MySQL. Nothing is copyable into Py
 | Extension spec | Here |
 | --- | --- |
 | `fhir/` type definitions | `apps/api/app/fhir/` (`types/<resource>.py`, `examples/<Resource>.json`) |
-| `FhirGateway`, `EventBus`, `DaySimulator` | `apps/api/app/ehr/` (`gateway.py`; HAPI backend `hapi.py`) |
+| `FhirGateway`, `EventBus`, `DaySimulator` | `apps/api/app/ehr/`: `gateway.py` (HAPI backend `hapi.py`), `events.py` (`InProcessEventBus`, `bus`; `RedisPubSubBus` interface), `simulator.py` (module functions `advance`, `fast_forward`, `run`, `pause`, `tick` rather than a class), scripted events `scenarios.py`, API `router.py` (`/api/hospital/...`) |
+| HL7 → domain event mapping "in the adapter" | `apps/api/app/ehr/hl7.py` (`Hl7EventAdapter`, `ROUTES`); `ADT_A01` etc. are written `ADT^A01` as in MSH-9 |
+| `subscribe(eventType, handler)` | `bus.subscribe(event_type, handler, consumer=...)`: a stable consumer name keeps the cursor and the deduplication records |
 | `getPatient(mrn)`, `searchEncounters`, `getBedBoard(unitId)`, ... | `FhirGateway.get_patient(mrn)`, `search_encounters(...)`, `get_bed_board(unit_id)`, ... (snake case) |
 | Exam → FHIR adapter | `apps/api/app/ehr/imaging.py` (`exam_to_fhir`, `exam_from_fhir`) |
 | De-identification field list for the resources | `apps/api/app/llm/fhir_deid.py` (`FhirDeidentifier`, `STRUCTURED`, `FREE_TEXT`) |

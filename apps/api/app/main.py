@@ -13,6 +13,9 @@ from app.core.config import settings
 from app.core.db.migrate import init_db
 from app.core.store import unit_of_work
 from app.core.unit_of_work import UnitOfWorkMiddleware
+from app.ehr import simulator
+from app.ehr.events import bus
+from app.ehr.router import router as hospital_router
 from app.integrations.mocks import dispatch_due
 from app.modules.admin import service as admin
 from app.modules.admin.router import router as admin_router
@@ -88,13 +91,30 @@ async def _intake_loop() -> None:
             await asyncio.to_thread(_step, name, fn)
 
 
+def _drain_events() -> None:
+    try:
+        bus.drain()  # one transaction per delivered event
+    except Exception:
+        log.exception("event delivery failed")
+
+
+async def _hospital_loop() -> None:
+    """Moves the hospital clock while the day simulator runs, then delivers the domain events it
+    published to the subscribers. Every second, so a running simulation reaches the screens quickly."""
+    while True:
+        await asyncio.sleep(1)
+        await asyncio.to_thread(_step, "day simulator", simulator.tick)
+        await asyncio.to_thread(_drain_events)
+
+
 @contextlib.asynccontextmanager
 async def lifespan(_: FastAPI):
     # Requests copy thousands of cached rows; with the default thresholds the cyclic GC keeps
     # rescanning the large, long-lived row cache (app/core/db/repo.py). Measured ~30% faster.
     gc.set_threshold(50_000, 50, 100)
     await asyncio.to_thread(init_db)  # migrate; generate the demo data on first start
-    tasks = [asyncio.create_task(_dispatch_loop()), asyncio.create_task(_intake_loop())] if settings.background_workers else []
+    loops = (_dispatch_loop, _intake_loop, _hospital_loop)
+    tasks = [asyncio.create_task(loop()) for loop in loops] if settings.background_workers else []
     yield
     for task in tasks:
         task.cancel()
@@ -131,3 +151,4 @@ app.include_router(feedback_router)
 app.include_router(phipa_router)
 app.include_router(inspection_router)
 app.include_router(clinical_kg_router)
+app.include_router(hospital_router)

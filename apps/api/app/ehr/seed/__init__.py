@@ -18,6 +18,13 @@ from app.ehr.seed.builder import Builder
 from app.ehr.seed.simulate import WINDOW_DAYS, simulate
 
 DAY_START_HOUR = 7
+# Events at the same minute: a bed is cleaned and patients leave before others arrive in it.
+KIND_ORDER = {"bed_clean": 0, "discharge": 1, "ed_depart": 2, "surgery_end": 3, "day_surgery_leave": 4, "transfer": 5}
+
+
+def plan_order(event: dict) -> tuple[str, int]:
+    """Sort key of plan events (`at` is an ISO timestamp, so it sorts as text)."""
+    return event["at"], KIND_ORDER.get(event["kind"], 9)
 
 
 def hospital_day_start(wall_now: datetime) -> datetime:
@@ -100,6 +107,8 @@ def generate(store: Store, seed: int, wall_now: datetime) -> dict:
             event(s.admit, "admit", stay=s.id)
             for bed, since, _until in s.beds[1:]:
                 event(since, "transfer", stay=s.id, bed=bed)
+            if s.alc_from and s.alc_from < s.discharge:
+                event(s.alc_from, "alc", stay=s.id)
             event(s.discharge, "discharge", stay=s.id)
             for order in future_orders:
                 plan_orders[order.id] = M.plan_dict(order)
@@ -109,8 +118,20 @@ def generate(store: Store, seed: int, wall_now: datetime) -> dict:
     # Surgeries
     for sg in tl.surgeries:
         M.write_surgery(b, sg, by_id[sg.patient], now, tl.horizon, tl.stay(sg.stay) if sg.stay else None)
-        if sg.status != "cancelled" and sg.end > now and sg.booked_start <= tl.horizon:
+        if sg.booked_start > tl.horizon:
+            continue
+        if sg.status == "cancelled":
+            cancel_at = sg.booked_start - timedelta(hours=1)
+            if sg.booked_at <= now < cancel_at:  # on today's list now, cancelled an hour before the start
+                plan_surgeries[sg.id] = M.plan_dict(sg)
+                event(cancel_at, "surgery_cancel", surgery=sg.id)
+            continue
+        if sg.end > now:
             plan_surgeries[sg.id] = M.plan_dict(sg)
+            event(sg.booked_at, "surgery_booked", surgery=sg.id)  # emergency cases booked from the ED later on
+            if sg.day_surgery:
+                event(sg.booked_start - timedelta(hours=1, minutes=30), "day_surgery_arrival", surgery=sg.id)
+                event(sg.end + timedelta(hours=4), "day_surgery_leave", surgery=sg.id)
             event(sg.start, "surgery_start", surgery=sg.id)
             event(sg.end, "surgery_end", surgery=sg.id)
 
@@ -129,8 +150,8 @@ def generate(store: Store, seed: int, wall_now: datetime) -> dict:
             loc["operationalStatus"] = C.coding(C.BED_STATUS, status, {"O": "Occupied", "K": "Contaminated"}[status])
             store.fhir.update(loc)
 
-    events.sort(key=lambda e: e["at"])
-    store.modules["hospital_plan"] = {"generated_for": now.isoformat(), "horizon": tl.horizon.isoformat(),
+    events.sort(key=plan_order)
+    store.modules["hospital_plan"] = {"generated_for": now.isoformat(), "horizon": tl.horizon.isoformat(), "seed": seed,
                                       "events": events, "visits": plan_visits, "stays": plan_stays,
                                       "surgeries": plan_surgeries, "orders": plan_orders}
     store.modules["hospital_clock"] = {"now": now.isoformat(), "rate": 0, "running": False}
