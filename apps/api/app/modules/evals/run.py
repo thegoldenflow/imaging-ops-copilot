@@ -255,7 +255,7 @@ def eval_referral_summary(gateway: LlmGateway) -> dict:
     """Drafts the weekly summary for three seeded data sets and checks every number against the facts."""
     from app.llm.gateway import set_gateway
     from app.modules.referrals import service as referrals
-    from app.seed import build_store
+    from app.core.store import build_store
 
     started = time.monotonic()
     set_gateway(gateway)
@@ -345,9 +345,13 @@ TASKS = {"extraction": eval_extraction, "triage": eval_triage, "protocol": eval_
 
 
 def main(names: list[str]) -> None:
+    from app.core.store import build_store, use_store
+
     gateway = _gateway()
-    for name in names or list(TASKS):
-        TASKS[name](gateway)
+    # Evals run on a freshly generated data set in memory: no database needed, demo data untouched.
+    with use_store(build_store()):
+        for name in names or list(TASKS):
+            TASKS[name](gateway)
 
 
 if __name__ == "__main__":

@@ -18,6 +18,8 @@ from app.core.models import Role, StaffUser
 from app.core.store import Store
 from app.modules.reports.service import Report, reports
 
+_SCHEDULE_LOCK = 0x10C_5A3B  # advisory lock key: one process runs the scheduled sampling
+
 SCORES = {
     "concur": "Concur with interpretation",
     "minor": "Minor discrepancy, unlikely to be clinically significant",
@@ -146,8 +148,11 @@ def run_sampling(store: Store, *, now: datetime, trigger: str, by: str, rng: ran
 def maybe_run_scheduled(store: Store, now: datetime | None = None) -> SamplingRun | None:
     """Called by the worker loop: one scheduled run per day once the run hour has passed."""
     now = now or datetime.now()
-    cfg, st = config(store), state(store)
-    if not cfg.enabled or now.hour < cfg.run_hour or st.get("last_scheduled_date") == now.date():
+    cfg = config(store)
+    if not cfg.enabled or now.hour < cfg.run_hour or not store.try_lock(_SCHEDULE_LOCK):
+        return None
+    st = state(store)  # read under the lock: another process may have just run today's sampling
+    if st.get("last_scheduled_date") == now.date():
         return None
     st["last_scheduled_date"] = now.date()
     return run_sampling(store, now=now, trigger="schedule", by="scheduler")

@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import gc
 import logging
 from datetime import datetime
 
@@ -9,8 +10,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.core.store import get_store
+from app.core.db.migrate import init_db
+from app.core.store import unit_of_work
+from app.core.unit_of_work import UnitOfWorkMiddleware
 from app.integrations.mocks import dispatch_due
+from app.modules.admin import service as admin
 from app.modules.admin.router import router as admin_router
 from app.modules.backlog.router import router as backlog_router
 from app.modules.billing.router import router as billing_router
@@ -46,45 +50,58 @@ log = logging.getLogger("app")
 logging.getLogger("httpx2").setLevel(logging.WARNING)
 
 
+def _step(name: str, fn, *args) -> None:
+    """One background step in its own transaction, so a failure rolls back only that step."""
+    try:
+        with unit_of_work() as store:
+            fn(store, *args)
+    except Exception:  # keep the loop alive; log without payloads (may contain PHI)
+        log.exception("%s failed", name)
+
+
 async def _dispatch_loop() -> None:
     """Sends scheduled reminders and other messages when they come due."""
     while True:
         await asyncio.sleep(5)
-        try:
-            dispatch_due()
-        except Exception:  # keep the loop alive; log without payloads (may contain PHI)
-            log.exception("dispatch failed")
+        await asyncio.to_thread(_step, "dispatch", lambda store: dispatch_due())
 
 
 async def _intake_loop() -> None:
     """Runs new requisitions through the AI pipeline, works prior-imaging retrievals,
     moves critical-result cases through notification and escalation, starts the
     nightly peer-review sampling run, classifies new patient feedback and sends
-    inspection reminders as items come due.
+    inspection reminders as items come due. Each step claims its due rows with
+    SELECT ... FOR UPDATE SKIP LOCKED, so a second API process would not repeat it.
     Runs in a thread so slow LLM or mock-archive calls never block requests."""
+    steps = [
+        ("requisition intake", requisitions.process_pending),
+        ("prior retrieval", lambda store: priors.process_due(store)),
+        ("critical escalation", critical.process_due),
+        ("peer review sampling", peer_review.maybe_run_scheduled),
+        ("feedback classification", feedback.process_pending),
+        ("inspection reminders", lambda store: inspection.process_reminders(store, datetime.now())),
+        ("daily demo reset", admin.maybe_daily_reset),
+    ]
     while True:
         await asyncio.sleep(2)
-        try:
-            await asyncio.to_thread(requisitions.process_pending, get_store())
-            await asyncio.to_thread(priors.process_due)
-            await asyncio.to_thread(critical.process_due, get_store())
-            await asyncio.to_thread(peer_review.maybe_run_scheduled, get_store())
-            await asyncio.to_thread(feedback.process_pending, get_store())
-            await asyncio.to_thread(inspection.process_reminders, get_store(), datetime.now())
-        except Exception:
-            log.exception("intake worker failed")
+        for name, fn in steps:
+            await asyncio.to_thread(_step, name, fn)
 
 
 @contextlib.asynccontextmanager
 async def lifespan(_: FastAPI):
-    get_store()  # build the synthetic data set up front
-    tasks = [asyncio.create_task(_dispatch_loop()), asyncio.create_task(_intake_loop())]
+    # Requests copy thousands of cached rows; with the default thresholds the cyclic GC keeps
+    # rescanning the large, long-lived row cache (app/core/db/repo.py). Measured ~30% faster.
+    gc.set_threshold(50_000, 50, 100)
+    await asyncio.to_thread(init_db)  # migrate; generate the demo data on first start
+    tasks = [asyncio.create_task(_dispatch_loop()), asyncio.create_task(_intake_loop())] if settings.background_workers else []
     yield
     for task in tasks:
         task.cancel()
 
 
 app = FastAPI(title="Imaging Ops Copilot API", version="0.1.0", lifespan=lifespan)
+app.add_middleware(UnitOfWorkMiddleware)  # one transaction per request
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,

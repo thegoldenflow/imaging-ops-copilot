@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 from app.core.models import ACTIVE_STATUSES
 from app.core.store import get_store
+from app.modules.billing import service as billing
 from app.modules.inventory import service as inventory
 
 
@@ -28,16 +29,20 @@ def test_completing_a_contrast_ct_deducts_stock_and_raises_low_stock(client, log
     item = store.modules["inventory_items"]["INV-LKS-IOHEXOL-350"]
     kit = store.modules["inventory_items"]["INV-LKS-INJECTOR-KIT"]
     before, kits_before = item.quantity, kit.quantity
-    first_lot = min(item.lots, key=lambda x: x.expiry)
-    first_lot_before = first_lot.quantity
+    first_lot = min(item.lots, key=lambda x: x.expiry).lot
+    first_lot_before = next(x.quantity for x in item.lots if x.lot == first_lot)
     assert before == item.reorder_point + 1 and inventory.open_order(store, item) is None
 
     appt = _next_appointment("LKS", ("CT_CHEST_C", "CT_ABD_PEL"))
     appt.protocol_id = None  # use the exam's own contrast flag
     r = client.post(f"/api/scheduling/appointments/{appt.id}/complete", headers=login("U-TECH"))
     assert r.status_code == 200, r.text
+    # Objects loaded before a request are stale after it: read them again.
+    item = store.modules["inventory_items"]["INV-LKS-IOHEXOL-350"]
+    kit = store.modules["inventory_items"]["INV-LKS-INJECTOR-KIT"]
     assert item.quantity == before - 1 and kit.quantity == kits_before - 1
-    assert first_lot.quantity == first_lot_before - 1  # first-expiring lot used first
+    # first-expiring lot used first
+    assert next(x.quantity for x in item.lots if x.lot == first_lot) == first_lot_before - 1
     assert any(m.appointment_id == appt.id and m.item_id == item.id for m in inventory.movements(store))
 
     data = client.get("/api/inventory", headers=login("U-TECH")).json()
@@ -45,7 +50,7 @@ def test_completing_a_contrast_ct_deducts_stock_and_raises_low_stock(client, log
     low = [a for a in data["alerts"] if a["kind"] == "low_stock" and a["item_id"] == item.id]
     assert low and low[0]["order_id"]
     po = store.modules["inventory_orders"][low[0]["order_id"]]
-    assert po.status == "draft" and po.quantity == item.reorder_qty
+    assert po.status == "draft" and po.quantity == item.reorder_qty  # read after the request
     assert any(m.kind == "inventory_low" and po.id in m.body for m in store.outbox.values())
 
 
@@ -83,8 +88,10 @@ def test_order_submit_receive_and_count_correction(client, login):
     po = inventory.open_order(store, gel)
     assert po.status == "draft"
     assert client.post(f"/api/inventory/orders/{po.id}/submit", json={"quantity": 250}, headers=ops).status_code == 200
-    before = gel.quantity
+    before = inventory.items(store)[gel.id].quantity
     r = client.post(f"/api/inventory/orders/{po.id}/receive", headers=ops)
+    # Objects loaded before a request are stale after it: read them again.
+    gel, po = inventory.items(store)[gel.id], store.modules["inventory_orders"][po.id]
     assert r.status_code == 200 and gel.quantity == before + 250 and po.status == "received"
     assert not any(a["kind"] == "low_stock" and a["item_id"] == gel.id
                    for a in client.get("/api/inventory", headers=ops).json()["alerts"])
@@ -92,7 +99,7 @@ def test_order_submit_receive_and_count_correction(client, login):
     lot = gel.lots[-1].lot
     r = client.post(f"/api/inventory/items/{gel.id}/adjust", json={"lot": lot, "counted": 240, "reason": "Monthly count"},
                     headers=ops)
-    assert r.status_code == 200 and gel.lots[-1].quantity == 240
+    assert r.status_code == 200 and inventory.items(store)[gel.id].lots[-1].quantity == 240
     assert _audit("update", "inventory_item")
 
 
@@ -233,10 +240,15 @@ def test_referrer_cannot_order_for_someone_elses_patient(client, login):
 def test_reconciliation_finds_every_planted_discrepancy(client, login):
     data = client.get("/api/billing/overview", headers=login("U-ADMIN")).json()
     found = {(r["kind"], r["appointment_id"]) for r in data["discrepancies"]}
-    planted = set(get_store().modules["billing_planted"])
+    store = get_store()
+    planted = set(store.modules["billing_planted"])
     assert {k for k, _ in planted} == set(data["kinds"])  # every kind is seeded
     assert planted <= found
-    assert found == planted  # and nothing else is flagged in the seeded data
+    # The data persists and ages: exams that came due for a claim after it was generated
+    # are rightly flagged as missing. Nothing else may be.
+    cutoff = store.modules["seed_time"] - timedelta(days=billing.SUBMISSION_DAYS)
+    late = {(k, a) for k, a in found if k == "missing" and store.appointments[a].end >= cutoff}
+    assert found - late == planted
     assert data["kinds"]["missing"]["resolved"] == 1
 
 
@@ -296,6 +308,7 @@ def test_completion_sends_survey_in_patient_language_and_low_rating_alerts(clien
     assert client.post(f"/api/public/feedback/{survey.token}", json={"rating": 5}).status_code == 409
 
     feedback.process_pending(store)
+    resp = feedback.responses(store)[resp.id]  # loaded before the last request: read it again
     assert resp.ai_status == "ok" and resp.ai_sentiment == "negative"
     assert {"wait_time", "staff_attitude"} <= set(resp.ai_themes)
     assert any(c.task == "feedback_classify" for c in store.llm_calls)

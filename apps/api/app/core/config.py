@@ -45,6 +45,11 @@ class Settings:
     # When set, demo login requires this passcode (for public deployments).
     demo_passcode: str | None
     cors_origins: list[str]
+    database_url: str
+    # Run the background workers (message dispatch, intake pipeline, escalations). Tests turn them off.
+    background_workers: bool
+    # Hour of day (0-23) at which the demo data is regenerated once a day; unset: never.
+    demo_daily_reset_hour: int | None
 
 
 def load_settings() -> Settings:
@@ -70,6 +75,9 @@ def load_settings() -> Settings:
         seed=int(os.getenv("SEED", "42")),
         demo_passcode=os.getenv("DEMO_PASSCODE") or None,
         cors_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173").split(","),
+        database_url=os.getenv("DATABASE_URL", "postgresql+psycopg://ioc:ioc@127.0.0.1:5433/ioc"),
+        background_workers=os.getenv("BACKGROUND_WORKERS", "1") != "0",
+        demo_daily_reset_hour=int(h) if (h := os.getenv("DEMO_DAILY_RESET_HOUR", "").strip()) else None,
     )
 
 

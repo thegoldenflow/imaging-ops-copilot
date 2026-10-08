@@ -44,7 +44,10 @@ export function PhoneAgent() {
   const recognition = useRef<Recognition | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), [session?.transcript.length]);
+  // Block body: newer Chromium returns a Promise from scrollIntoView, which React would call as a cleanup.
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [session?.transcript.length]);
   useEffect(() => () => window.speechSynthesis?.cancel(), []);
 
   const say = (line: string) => {

@@ -157,7 +157,7 @@ def advance(store: Store, case: CriticalCase, now: datetime) -> None:
 def process_due(store: Store, now: datetime | None = None) -> int:
     now = now or datetime.now()
     done = 0
-    for case in list(cases(store).values()):
+    for case in cases(store).claim_due("next_action_at", now, statuses=("open", "escalated")):
         while case.status in ("open", "escalated") and case.next_action_at and case.next_action_at <= now:
             advance(store, case, now)
             done += 1

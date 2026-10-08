@@ -2,13 +2,13 @@
 
 ## Demo-scope decisions (agreed with the owner)
 
-Time is short and the goal is a working demo, so the first batch deviates from the spec's stack in these ways:
+Time is short and the goal is a working demo, so the first batch deviates from the spec's stack in these ways (the database rows were closed on branch `feat/postgres`):
 
 | Spec | Demo build | Why / how to upgrade |
 | --- | --- | --- |
-| PostgreSQL + SQLAlchemy + Alembic | In-memory store (`app/core/store.py`) rebuilt from a seeded generator on start and on "Reset demo" | All reads and writes go through the store object; a database repository can replace it later |
-| Field-level PHI encryption | Not implemented (nothing is persisted) | Needed once a database is added |
-| Temporal workflows | In-process loops: message dispatch every 5 s; a worker every 2 s for requisitions, prior retrieval (10), critical-result escalation (12) and nightly peer-review sampling (13) | State lives in the store, so a restart loses in-flight steps; move these to Temporal with the database |
+| PostgreSQL + SQLAlchemy + Alembic | Done: PostgreSQL 16, SQLAlchemy 2 Core, Alembic. Tables are generated from the Pydantic models; modules keep their dict-style access through a unit-of-work repository (`app/core/db/repo.py`) | ORM models and SQL-side filtering only where an endpoint needs it |
+| Field-level PHI encryption | Done: AES-GCM per field plus HMAC blind indexes for birth date and health card | Single key id, no rotation tool (see limits below) |
+| Temporal workflows | Database polling: message dispatch every 5 s; a worker every 2 s for requisitions, prior retrieval (10), critical-result escalation (12), nightly peer-review sampling (13), feedback and inspection reminders. Due rows are claimed with `FOR UPDATE SKIP LOCKED`, scheduled runs take advisory locks, so a restart resumes in-flight steps | Temporal deferred by the owner (rationale option b); see `docs/RATIONALE-db-temporal.md` |
 | Orthanc + DICOM | Synthetic PNG "phantom" chest images; PNG/JPEG upload | Real DICOM support and de-identification of DICOM tags later |
 | STT/TTS services, Twilio | Browser Web Speech API (Chrome) plus typed input | Pluggable STT/TTS later; latency target must be measured locally |
 | shadcn/ui, OpenAPI type generation | Small hand-written component set, hand-written types | Fine for demo size |
@@ -27,14 +27,52 @@ Status: done (demo scope)
 - [x] Claude call layer: de-identification with re-identification of tool inputs, versioned prompts, Pydantic schema with one retry then "needs human review", degradation on timeout/API failure, call log without PHI (task, model, prompt version, tokens, latency, cost, input hash)
 - [x] Mock SMS, email, phone, OHIP and private insurance with configurable latency and failure rate
 - [x] AI usage dashboard and audit log viewer
-- [ ] Field-level PHI encryption (deferred with the database)
+- [x] Field-level PHI encryption (PostgreSQL, see below)
 
 Acceptance:
 
-- [x] One command per app starts the demo; login and role switching work
+- [x] `docker compose up` plus one seed command starts the demo (the API also seeds an empty database on start); login and role switching work
 - [x] Unauthorized access returns 403 and leaves an audit record
-- [ ] PHI ciphertext in the database (no database in demo scope)
+- [x] PHI ciphertext in the database (`tests/test_db.py` reads the columns with plain SQL)
 - [x] Call layer unit tests: de-identification, retry after schema failure, timeout degradation
+
+### Phase 0 completion: PostgreSQL + PHI encryption — done (branch `feat/postgres`)
+
+Owner approved step 1 of `docs/RATIONALE-db-temporal.md` on 2026-10-07; Temporal deferred (option b). Decisions taken as recommended: stateful module data in real tables, configs and small state as JSON in `module_state`; no in-memory runtime backend (local dev needs `docker compose up -d postgres`); optional daily reset via `DEMO_DAILY_RESET_HOUR`, off by default.
+
+Done so far:
+
+- [x] Postgres 16 service in `docker-compose.yml` (host port 127.0.0.1:5433); deps: SQLAlchemy 2, Alembic, psycopg 3, cryptography
+- [x] `app/core/db/schema.py`: tables generated from the Pydantic models, registry of module state (tables / configs / blobs / per-process caches)
+- [x] `app/core/db/repo.py`: dict/list-like collections with identity map, snapshot diff (only changed columns written), upsert, `claim_due` (FOR UPDATE SKIP LOCKED), `find_by` (blind index for encrypted fields)
+- [x] `app/core/db/crypto.py`: AES-GCM field encryption + HMAC blind index; keys `PHI_ENCRYPTION_KEY`, `PHI_BLIND_INDEX_KEY` (generated into the local `apps/api/.env`)
+- [x] `app/core/store.py` rewritten as a unit of work; detached in-memory mode for the seed generator and evals; `persist()` / `reset_store()`; sessions, id sequences and change counter in the database
+- [x] Audit log in `audit_events`, written in its own short transaction under an advisory lock; migration trigger refuses UPDATE/DELETE
+- [x] Alembic initial migration `0001`; `uv run python -m app.seed` migrates and seeds; API start migrates and seeds an empty database
+- [x] `UnitOfWorkMiddleware`: one transaction per request, commit before the response starts (status < 500)
+- [x] Background loops: each step in its own transaction; critical escalation, prior retrieval and message dispatch claim due rows with SKIP LOCKED
+- [x] Phone-agent identity check uses the birth-date blind index; portal looks up health cards the same way
+- [x] Tests run on Postgres (`tests/conftest.py`: test database created per session, each test rolled back)
+
+Finishing work:
+
+- [x] Performance. Single-row reads are capped (16 per table and unit of work, then the whole table is read). Rows are decoded in batches (one `TypeAdapter` call per query, about 3× faster than one `model_validate` per row). The flush diff reads attributes instead of `model_dump()` (about 3× faster). A per-process row cache keyed by `(row_key, xmin)` means a full-table load reads only keys and xmin, then fetches, decrypts and validates just the rows that changed; the others are copied from the cache (scalar values shared, JSON values copied per field type). The cyclic GC thresholds are raised at startup because the cache makes the heap large. Warm request times, local Windows machine, 19k appointments (first number: batch decode and cheaper diff only; second: plus row cache and GC thresholds): scheduling dashboard 0.85 → 0.3 s, dose overview 1.5 → 0.6 s, referrals 1.7 → 0.5 s, contrast checks 1.2 → 0.4 s, PHIPA alerts 1.4 → 0.5 s. Backend suite: 6 min (8 failing) → 2.5 min (154 passing)
+- [x] Failing tests fixed. The dashboard change counter was not advanced in tests (the shared test store only flushed; `Store.save()` now flushes and advances it, and `commit()` uses it). Four tests held model objects across requests; the shared test store drops loaded objects after each request so later reads come from the database, so those tests now read the object again. Billing reconciliation: the seeded data ages, so exams that came due for a claim after the seed was generated are now (correctly) flagged as missing; the seed records its clock (`seed_time`) and the test excludes those. The backfill timing test passed once the suite was no longer slow
+- [x] New tests (`tests/test_db.py`): changes survive a new unit of work; PHI columns are ciphertext in SQL and the blind index matches; the audit table refuses UPDATE and DELETE; a due row claimed by one worker is skipped by another (`SKIP LOCKED`); `alembic check` finds no difference between migrations and models; the row cache never serves an old row version (write from outside the store; two writes in one transaction); objects copied from the row cache share nothing mutable. `test_reset_rebuilds_demo_data` also checks that a login survives a reset
+- [x] Scheduled steps safe with more than one process: peer-review sampling and the daily reset take an advisory lock and read their "already ran today" marker after taking it
+- [x] Startup fails at once with a clear message when the PHI keys are missing
+- [x] Playwright against the Postgres-backed API: all 19 tests in the 6 specs pass (local Windows, API on port 9001, mock provider, background workers on). Two fixes on the way, neither caused by the database: `PhoneAgent.tsx` returned `scrollIntoView(...)` from a `useEffect`, and the newer local Chromium returns a Promise there, which React then called as a cleanup and crashed the phone agent after the first reply; the storyline spec navigated right after clicking a login button, before the token was stored, which the slower database login exposed (it now waits for the signed-in name)
+- [x] `docker compose up -d --build` checked locally: images build, the API migrates and seeds, a login token and the data survive `docker compose restart api`, and `psql` shows `k1:` ciphertext in the patient columns
+- [x] `docker-compose.prod.yml` with a Postgres service and volume (no published port); Dockerfile comment; `.env.example` (DATABASE_URL, PHI keys, DEMO_DAILY_RESET_HOUR, BACKGROUND_WORKERS); `docs/DEPLOY.md` (architecture, `.env`, backup and restore with `pg_dump`, keys kept apart from backups, migrations and rollback, troubleshooting)
+- [x] Deviation table, Phase 0 acceptance boxes, README and rationale status updated
+
+Limits:
+
+- Encrypted: patient identifiers (name, birth date, phone, email, address, health card), requisition text, outgoing message recipient and body, call transcripts, state and summaries, pre-registration contact details. Other free text (report text, feedback comments, notes on cases and reviews) is plaintext; the synthetic data puts no identifiers there, but a real deployment would need to review each field.
+- One PHI key id (`k1`); changing keys means regenerating the demo data (DEPLOY.md). The blind index reveals which rows share a birth date or health card.
+- The row cache holds a decoded copy of every table read in that process (roughly the memory the in-memory store used). Per-process caches (row cache, no-show model, search indexes) are not shared between workers; the API runs one worker.
+- Most dashboards still read whole tables and filter in Python (the cache makes that cheap); SQL-side filters would be the next step if the data grew well beyond the demo size.
+- The data persists, so the seeded timeline ages: bookings run out after two weeks, completed exams without claims are flagged as missing after two days. "Reset demo" or `DEMO_DAILY_RESET_HOUR` regenerate it; a reset also clears the audit log.
 
 ## Phase 1 — Flagship systems
 
@@ -302,4 +340,5 @@ Limits:
 - `ANTHROPIC_API_KEY` and `GOOGLE_AGENT_PLATFORM_API_KEY` are not configured in the cloud environment; everything runs in mock mode there.
 - The cloud network blocks Google's docs hosts (ai.google.dev, docs.cloud.google.com); the Gemini API host itself is reachable.
 - The cloud network policy blocks the chest X-ray dataset hosts (NIH ChestX-ray14, Open-i).
-- Public deployment target is not decided yet.
+- Deployment: two Docker images (API; web = nginx + static build) pulled from Docker Hub plus the official `postgres:16-alpine` image, on the server behind the host's Caddy, replacing the earlier smart_medical service on the same domain. Data, logins and in-flight background steps survive restarts (Docker volume `imaging-ops_pgdata`); the PHI keys live only in the server's `.env` and must be backed up separately. The API runs one worker. See docs/DEPLOY.md.
+- Local Windows machine: port 8000 is reserved, so the API runs on 9001 for Playwright (`PW_API_PORT=9001 VITE_API_PROXY_TARGET=http://127.0.0.1:9001`).

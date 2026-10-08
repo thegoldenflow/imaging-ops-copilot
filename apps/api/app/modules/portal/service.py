@@ -109,7 +109,7 @@ class PortalRequisition(BaseModel):
 
 
 def find_or_create_patient(store: Store, data: NewPatient) -> Patient:
-    existing = next((p for p in store.patients.values() if p.health_card == data.health_card), None)
+    existing = next(iter(store.patients.find_by("health_card", data.health_card)), None)  # blind index
     if existing:
         return existing
     pid = store.next_id("PT-P")

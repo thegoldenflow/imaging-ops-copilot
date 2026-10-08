@@ -1,0 +1,19 @@
+# Build context is the repository root; send only what the two Dockerfiles copy.
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.log
+**/dist
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+.git
+apps/api/app/modules/clinical_kg/data/terms_to_translate.jsonl
+
+# The kg-qa sub-project is not part of the image; only its graph and terminology data are.
+apps/kg-qa/*
+!apps/kg-qa/data
+apps/kg-qa/data/annotated_data

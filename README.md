@@ -60,13 +60,18 @@ The home page walks through four storylines. The first: a chest X-ray flags a po
 
 ## Run it
 
-Requirements: Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 20+.
+Requirements: Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 20+, Docker (for PostgreSQL).
 
 ```bash
+# database (PostgreSQL 16 on 127.0.0.1:5433), from the repository root
+docker compose up -d postgres
+
 # backend (http://127.0.0.1:8000)
 cd apps/api
+cp .env.example .env
+uv run python -m app.core.db.crypto      # prints the two PHI keys: paste them into .env
 uv sync
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8000   # migrates and seeds an empty database on start
 
 # frontend (http://localhost:5173), in a second terminal
 cd apps/web
@@ -74,9 +79,9 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 and pick a role. "Reset demo" in the header regenerates all data.
+Open http://localhost:5173 and pick a role. Data and logins persist across restarts; "Reset demo" in the header regenerates all data (`uv run python -m app.seed` does the same from the command line).
 
-Without an API key every AI feature runs on built-in mock outputs, so the whole demo works offline. To use Claude, copy `apps/api/.env.example` to `apps/api/.env` and set `ANTHROPIC_API_KEY`, then restart the backend.
+Without an API key every AI feature runs on built-in mock outputs, so the whole demo works offline. To use Claude, set `ANTHROPIC_API_KEY` in `apps/api/.env` and restart the backend.
 
 ### Switching to Gemini on Google Cloud Agent Platform
 
@@ -93,18 +98,22 @@ GOOGLE_AGENT_PLATFORM_API_KEY=your-agent-platform-key
 
 `LLM_PROVIDER` takes `anthropic`, `gemini` or `mock`. Left unset, the app uses Claude when `ANTHROPIC_API_KEY` is set and mock outputs otherwise; a provider without its key also falls back to mock. Gemini uses the Google Gen AI SDK in Agent Platform / Vertex AI mode (not Google AI Studio or the Gemini Developer API), while retaining the same call layer for de-identification, schema validation, call logging and degradation. The header shows "AI: Gemini via Vertex AI API", and `uv run python -m app.modules.evals.run` records Gemini results as mode `gemini`. See [docs/PROGRESS.md](docs/PROGRESS.md) for limits.
 
+### Docker / server
+
+`docker compose up -d --build` runs PostgreSQL, the API and the web front end (nginx serving the build and proxying `/api`) on http://localhost, reading `apps/api/.env` (the PHI keys are required). For the server (Docker Hub images behind the host's Caddy) see [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ### Tests
 
 ```bash
-cd apps/api && uv run pytest -q          # 147 backend tests
+cd apps/api && uv run pytest -q          # backend tests; need the database container (they use their own ioc_test database)
 cd apps/web && npx playwright test       # 6 end-to-end specs: one per phase, the model-provider badge and clinical knowledge (starts both servers if needed)
 ```
 
 ## Tech stack
 
-React + TypeScript (Vite, Tailwind, TanStack Query) · Python 3.12 FastAPI · Pydantic · scikit-learn · Anthropic Python SDK (optional Google Gen AI SDK for Gemini) · Playwright
+React + TypeScript (Vite, Tailwind, TanStack Query) · Python 3.12 FastAPI · Pydantic · PostgreSQL 16 with SQLAlchemy 2 and Alembic · scikit-learn · Anthropic Python SDK (optional Google Gen AI SDK for Gemini) · Playwright
 
-For the demo, data lives in memory and is regenerated from a seeded generator; external systems are mocked in process. See [docs/PROGRESS.md](docs/PROGRESS.md) for how this differs from the full spec.
+Data lives in PostgreSQL. Patient identifiers and the free text that repeats them (requisition letters, outgoing messages, call transcripts) are encrypted per field with AES-GCM before they reach the database; lookups by birth date or health card use a keyed blind index. The audit log is a hash chain in a table that refuses UPDATE and DELETE. Background steps (message dispatch, critical-result escalation, prior retrieval) claim due rows with `SELECT ... FOR UPDATE SKIP LOCKED`, so they continue after a restart. The demo data comes from a seeded generator; external systems are mocked in process, and there is no Temporal or Orthanc. See [docs/PROGRESS.md](docs/PROGRESS.md) for how this differs from the full spec.
 
 ## Repository layout
 

@@ -30,6 +30,7 @@ def test_completing_an_exam_creates_a_study_and_assigns_a_credentialed_reader(cl
     r = client.post(f"/api/scheduling/appointments/{appt.id}/complete", headers=login("U-TECH"))
     assert r.status_code == 200, r.text
     store = get_store()
+    appt = store.appointments[appt.id]  # objects loaded before a request are stale after it
     study = store.studies[r.json()["study_id"]]
     assert appt.status == AppointmentStatus.COMPLETED
     assert study.appointment_id == appt.id and study.priority == appt.urgency and study.site_id == "LKS"

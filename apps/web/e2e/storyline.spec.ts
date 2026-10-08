@@ -81,6 +81,7 @@ test("storyline: report, phone cancellation, backfill, pre-registration, audit",
   // 4. Operations manager backfills the slot with Mei Chen.
   await page.getByRole("button", { name: "Switch role" }).click();
   await page.getByTestId("login-operations_manager").click();
+  await expect(page.getByTestId("current-user")).toHaveText("Jordan Lee"); // token stored before navigating
   await page.goto("/scheduling?tab=backfill");
   const mei = page.getByTestId("candidate-PT-DEMO1");
   await expect(mei).toBeVisible();

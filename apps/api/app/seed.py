@@ -116,12 +116,19 @@ def _no_show_probability(lead_days: float, prior_no_shows: int, weekday: int, ho
 
 
 def build_store(seed: int | None = None) -> Store:
+    """The demo data set, generated in memory (a detached store)."""
+    from app.core.store import build_store as build
+
+    return build(seed)
+
+
+def populate(s: Store, seed: int | None = None) -> None:
     from app.core.config import settings
 
     rng = random.Random(settings.seed if seed is None else seed)
-    s = Store()
     now = datetime.now().replace(minute=0, second=0, microsecond=0)
     today = now.date()
+    s.modules["seed_time"] = now
 
     for exam in EXAMS:
         s.exams[exam.code] = exam
@@ -251,7 +258,6 @@ def build_store(seed: int | None = None) -> Store:
     _add_requisitions(s, rng, now)
     _add_radiology_ops(s, rng, now)
     _add_business_compliance(s, rng, now)
-    return s
 
 
 def _add_staff(s: Store) -> None:
@@ -511,3 +517,14 @@ def _add_business_compliance(s: Store, rng: random.Random, now: datetime) -> Non
     feedback.seed(s, rng, now)
     phipa.seed(s, rng, now)  # adds site staff and an access history over the records created above
     inspection.seed(s, rng, now)  # credentials for all staff, including those added for system 20
+
+
+if __name__ == "__main__":
+    # One command for a fresh database: apply migrations, then (re)generate the demo data.
+    from app.core.db.migrate import upgrade
+    from app.core.store import reset_store, unit_of_work
+
+    upgrade()
+    with unit_of_work():
+        reset_store()
+    print("Database migrated and demo data generated.")

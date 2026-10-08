@@ -12,16 +12,13 @@ from fastapi import Depends, HTTPException, Request
 from app.core.models import Role, StaffUser
 from app.core.store import get_store
 
-# token -> staff user id. Tokens live in memory and are dropped on restart.
-_sessions: dict[str, str] = {}
-
 ALL_ROLES = set(Role)
 CLINICAL_STAFF = ALL_ROLES - {Role.REFERRER}
 
 
 def issue_token(user_id: str) -> str:
     token = secrets.token_urlsafe(24)
-    _sessions[token] = user_id
+    get_store().add_session(token, user_id)  # stored in auth_sessions: survives restarts and resets
     return token
 
 
@@ -36,8 +33,9 @@ def access_reason(request: Request) -> str:
 def current_user(request: Request) -> StaffUser:
     header = request.headers.get("Authorization", "")
     token = header.removeprefix("Bearer ").strip()
-    user_id = _sessions.get(token)
-    user = get_store().staff.get(user_id) if user_id else None
+    store = get_store()
+    user_id = store.session_user(token)
+    user = store.staff.get(user_id) if user_id else None
     if user is None:
         raise HTTPException(status_code=401, detail="Not signed in")
     return user

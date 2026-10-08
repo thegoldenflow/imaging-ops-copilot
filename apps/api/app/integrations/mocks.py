@@ -64,9 +64,7 @@ def dispatch_due(now: datetime | None = None) -> int:
     """Send every scheduled message whose time has come. Returns the count sent."""
     now = now or datetime.now()
     sent = 0
-    for msg in get_store().outbox.values():
-        if msg.status != "scheduled" or msg.scheduled_for > now:
-            continue
+    for msg in get_store().outbox.claim_due("scheduled_for", now, statuses=("scheduled",)):
         # No latency here: dispatch runs in a background loop over many messages.
         if random.random() < MOCK_CONFIG[msg.channel].failure_rate:
             msg.status = "failed"
