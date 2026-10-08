@@ -1,0 +1,41 @@
+{
+  "resourceType": "PractitionerRole",
+  "id": "role-doc-01",
+  "active": true,
+  "practitioner": {
+    "reference": "Practitioner/prac-doc-01",
+    "display": "Dr. Dmitri Salazar"
+  },
+  "organization": {
+    "reference": "Organization/org-demo-hospital"
+  },
+  "code": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/practitioner-role",
+          "code": "doctor",
+          "display": "doctor"
+        }
+      ],
+      "text": "doctor"
+    }
+  ],
+  "specialty": [
+    {
+      "coding": [
+        {
+          "system": "urn:demo-hospital:code",
+          "code": "emergency-medicine",
+          "display": "emergency-medicine"
+        }
+      ],
+      "text": "emergency-medicine"
+    }
+  ],
+  "location": [
+    {
+      "reference": "Location/ED"
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "resourceType": "Encounter",
+  "id": "stay-00912",
+  "status": "in-progress",
+  "class": {
+    "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+    "code": "IMP",
+    "display": "inpatient encounter"
+  },
+  "subject": {
+    "reference": "Patient/pat-0388"
+  },
+  "period": {
+    "start": "2026-09-25T17:34:32-04:00"
+  },
+  "serviceType": {
+    "coding": [
+      {
+        "system": "urn:demo-hospital:code",
+        "code": "Medicine B",
+        "display": "Medicine B"
+      }
+    ],
+    "text": "Medicine B"
+  },
+  "reasonCode": [
+    {
+      "coding": [
+        {
+          "system": "http://snomed.info/sct",
+          "code": "29857009",
+          "display": "Chest pain"
+        }
+      ],
+      "text": "Chest pain"
+    }
+  ],
+  "participant": [
+    {
+      "individual": {
+        "reference": "Practitioner/prac-doc-13"
+      }
+    }
+  ],
+  "location": [
+    {
+      "location": {
+        "reference": "Location/MEDA-14-A"
+      },
+      "status": "active",
+      "period": {
+        "start": "2026-09-25T17:34:32-04:00"
+      }
+    }
+  ],
+  "hospitalization": {
+    "admitSource": {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/admit-source",
+          "code": "emd"
+        }
+      ]
+    }
+  },
+  "basedOn": [
+    {
+      "reference": "ServiceRequest/bedreq-ed-02551"
+    }
+  ],
+  "extension": [
+    {
+      "url": "urn:demo-hospital:ext:expected-los-days",
+      "valueDecimal": 2
+    }
+  ],
+  "serviceProvider": {
+    "reference": "Organization/org-demo-hospital"
+  }
+}

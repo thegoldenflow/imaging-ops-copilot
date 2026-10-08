@@ -364,7 +364,16 @@ Deviations and notes:
 - The ED history is dense for a 1,000-patient population (about 52 visits a day over 60 days, ~3 visits per patient) so that ED crowding and the flow models have realistic volumes.
 - Local codes (`urn:demo-hospital:*`) are used where this demo has no standard code: CTAS is LOINC 11283-9 with an integer value; NEWS2, bed requests, pre-op checks, task and flag codes are local.
 
-### WP2 · Data model + FhirGateway (6.1, 6.2 gateway)
+### WP2 · Data model + FhirGateway (6.1, 6.2 gateway) — in progress
+
+- [x] `docs/data-model.md`: the resource table, relationship rules, id conventions, local codes and extensions, the hospital clock
+- [x] Type definitions `app/fhir/types/` (Pydantic, one module per resource, only the fields used; extra fields allowed so HAPI responses round-trip), including Provenance, Consent, EpisodeOfCare, Schedule, Slot, Organization; `validate(resource)`
+- [x] One example JSON per resource in `app/fhir/examples/` (18 taken from the seed, 7 hand-written for types the generator does not produce yet); `tests/test_fhir_types.py`: every example validates and round-trips unchanged, seeded resources of every type validate
+- [ ] Exam ↔ FHIR adapter (imaging `Appointment` + `ImagingStudy` + `Report` ↔ ServiceRequest + Encounter AMB + DiagnosticReport), both directions, round-trip test on 20 samples
+- [ ] `FhirGateway` (`app/ehr/gateway.py`): typed read methods (`get_patient(mrn)`, `search_encounters`, `get_active_encounter`, `get_bed_board(unit)`, `get_orders`, `get_medications`, `get_home_meds`, `get_observations`, `get_documents`), write allow-list (Task any; DocumentReference preliminary only; Communication; Flag; Appointment proposed only; Encounter.location append for bed managers), refusal + audit outside it, audit of every call (actor, type, id, purpose module); backends `local` (PostgreSQL store) and `hapi` (`FHIR_BASE_URL`, `FHIR_AUTH_MODE` none / smart_backend stub)
+- [ ] Mock adapter contract for non-FHIR systems (retry and timeout, circuit breaker, dead-letter queue, correlation id)
+- [ ] De-identification field list extended to every resource above (names, birth dates, addresses, phones, health card, MRN, staff names, free text: note, conclusion, presentedForm), one unit test per resource
+- [ ] Grep test: no direct FHIR HTTP calls outside the gateway's HAPI backend
 
 ### WP3 · Event bus + day simulator (6.2)
 

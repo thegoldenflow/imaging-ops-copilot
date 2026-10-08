@@ -1,0 +1,60 @@
+{
+  "resourceType": "Procedure",
+  "id": "proc-surg-00001",
+  "status": "completed",
+  "code": {
+    "coding": [
+      {
+        "system": "http://snomed.info/sct",
+        "code": "609588000",
+        "display": "Total knee replacement"
+      }
+    ],
+    "text": "Total knee replacement"
+  },
+  "subject": {
+    "reference": "Patient/pat-0919"
+  },
+  "performedPeriod": {
+    "start": "2026-08-10T08:00:00-04:00",
+    "end": "2026-08-10T09:46:00-04:00"
+  },
+  "encounter": {
+    "reference": "Encounter/stay-00014"
+  },
+  "performer": [
+    {
+      "actor": {
+        "reference": "Practitioner/prac-surg-01"
+      },
+      "function": {
+        "coding": [
+          {
+            "system": "http://snomed.info/sct",
+            "code": "304292004",
+            "display": "Surgeon"
+          }
+        ],
+        "text": "Surgeon"
+      }
+    }
+  ],
+  "location": {
+    "reference": "Location/OR-01"
+  },
+  "basedOn": [
+    {
+      "reference": "ServiceRequest/orreq-surg-00001"
+    }
+  ],
+  "extension": [
+    {
+      "url": "urn:demo-hospital:ext:asa-class",
+      "valueInteger": 2
+    },
+    {
+      "url": "urn:demo-hospital:ext:surgical-urgency",
+      "valueCode": "elective"
+    }
+  ]
+}

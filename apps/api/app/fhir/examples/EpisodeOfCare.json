@@ -1,0 +1,22 @@
+{
+  "resourceType": "EpisodeOfCare",
+  "id": "eoc-example",
+  "status": "active",
+  "patient": {
+    "reference": "Patient/pat-0388"
+  },
+  "period": {
+    "start": "2026-09-25T17:34:32-04:00"
+  },
+  "diagnosis": [
+    {
+      "condition": {
+        "reference": "Condition/cond-000001"
+      },
+      "rank": 1
+    }
+  ],
+  "managingOrganization": {
+    "reference": "Organization/org-demo-hospital"
+  }
+}
