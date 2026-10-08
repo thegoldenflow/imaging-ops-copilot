@@ -211,8 +211,9 @@ def confirm(resp: FeedbackResponse, sentiment: str, themes: list[str], by: str, 
 def seed(s: Store, rng: random.Random, now: datetime) -> None:
     """About 300 answered surveys over 90 days, pre-labelled with the baseline;
     Westbrook's waits get worse over the last month. Two responses arrive
-    unclassified (the worker labels them through the gateway at startup) and a
-    few surveys are still waiting for an answer."""
+    unclassified (the worker labels them through the gateway at startup) and
+    three surveys are still waiting for an answer, always one of them in
+    Chinese (the end-to-end test opens it from the 15 newest)."""
     done = sorted((a for a in s.appointments.values() if a.status == AppointmentStatus.COMPLETED and a.end < now),
                   key=lambda a: a.id)
     by_lang: dict[str, list[tuple]] = {}
@@ -266,5 +267,12 @@ def seed(s: Store, rng: random.Random, now: datetime) -> None:
         if rating <= LOW_RATING:
             _alert(s, resp, f"{rating}-star rating", resp.submitted_at)
     zh = [a for a in fresh if s.patients[a.patient_id].preferred_language == "zh"][:1]
+    late = not zh
+    if late:
+        # None of the latest patients speaks Chinese: take the latest earlier exam of one who does and send its
+        # survey now (a clinic waits a few hours anyway), so it tops the list of recent surveys. No rng used.
+        surveyed = {sv.appointment_id for sv in surveys(s).values()}
+        zh = sorted((a for a in done if a.id not in surveyed and s.patients[a.patient_id].preferred_language == "zh"),
+                    key=lambda a: a.end)[-1:]
     for appt in zh + [a for a in fresh if a not in zh][-2:]:
-        send_survey(s, appt, appt.end)
+        send_survey(s, appt, now if late and appt in zh else appt.end)

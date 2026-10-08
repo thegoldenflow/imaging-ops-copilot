@@ -368,6 +368,28 @@ def test_feedback_dashboard_confirm_and_follow_up(client, login):
     assert {s["site_id"] for s in fd["by_site"]} == {"LKS"}
 
 
+def test_seed_plants_an_open_chinese_survey_even_without_a_recent_chinese_patient():
+    # Whether one of the latest patients speaks Chinese depends on the time of seeding: force the case without.
+    import random
+
+    from app.core.models import AppointmentStatus
+    from app.core.store import Store
+    from app.modules.feedback import service as feedback
+
+    db, s, now = get_store(), Store(), datetime.now()
+    for table in ("sites", "exams", "patients", "appointments"):
+        getattr(s, table).update(dict(getattr(db, table).items()))
+    done = sorted((a for a in s.appointments.values() if a.status == AppointmentStatus.COMPLETED and a.end < now),
+                  key=lambda a: a.end)
+    for a in done[-40:]:
+        s.patients[a.patient_id] = s.patients[a.patient_id].model_copy(update={"preferred_language": "en"})
+    feedback.seed(s, random.Random(7), now)
+    newest = sorted(feedback.surveys(s).values(), key=lambda v: v.sent_at, reverse=True)[:15]  # what the page lists
+    zh = [v for v in newest if v.language == "zh"]
+    assert zh and zh[0].status == "sent" and zh[0].sent_at == now
+    assert sum(v.status == "sent" for v in feedback.surveys(s).values()) == 3
+
+
 # ---------- System 20 · PHIPA access monitoring ----------
 
 def test_every_planted_anomaly_is_caught_with_evidence(client, login):
