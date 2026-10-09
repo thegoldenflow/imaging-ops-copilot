@@ -176,7 +176,8 @@ class _Injector:
     # ----- scenarios -----
 
     def icu_surge(self, count: int | None = None) -> dict:
-        free_icu = len(self.store.fhir.ids("Location", unit="ICU", code="bd", status="U"))
+        # beds free or in housekeeping: a bed being cleaned is free again within the hour
+        free_icu = sum(len(self.store.fhir.ids("Location", unit="ICU", code="bd", status=s)) for s in ("U", "K"))
         n = count or max(3, free_icu + 1)
         patients = self._patients(n, 55, 88)
         added = []

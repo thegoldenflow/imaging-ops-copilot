@@ -101,13 +101,14 @@ def status(store: Store, upcoming: int = 8) -> dict:
     now = parse(c["now"])
     events = plan["events"]
     i = _first_after(events, now)
+    end = _first_after(events, parse(plan["horizon"]))  # a retry or cleaning moved past the horizon never runs
     return {
         "now": now, "rate": c.get("rate") or 0, "running": bool(c.get("running")),
         "day_start": parse(plan["generated_for"]), "horizon": parse(plan["horizon"]),
-        "applied": c.get("applied", 0), "remaining": len(events) - i, "stopped": c.get("stopped"),
+        "applied": c.get("applied", 0), "remaining": end - i, "stopped": c.get("stopped"),
         "upcoming": [{"at": parse(e["at"]), "kind": e["kind"],
                       "ref": next((e[k] for k in ("visit", "stay", "surgery", "order", "bed", "patient") if k in e), None)}
-                     for e in events[i:i + upcoming]],
+                     for e in events[i:min(i + upcoming, end)]],
     }
 
 

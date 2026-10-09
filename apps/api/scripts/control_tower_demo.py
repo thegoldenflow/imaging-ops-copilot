@@ -104,8 +104,8 @@ def main() -> None:
         audit = [e for e in store.audit.query(event_type="approve") if e.resource_id == exc.review_task_id]
         print(f"  audit: {audit[0].event_type}/{audit[0].action} by {audit[0].user_id} on Task {audit[0].resource_id}")
 
-        heading("3. Inject an ICU surge of 10 critically ill arrivals, run 3.5 hours")
-        added = scenarios.inject(store, "icu_surge", operator="U-OPS", count=10)
+        heading("3. Inject an ICU surge of 6 critically ill arrivals, run 3.5 hours")
+        added = scenarios.inject(store, "icu_surge", operator="U-OPS", count=6)
         print(f"injected {len(added['patients'])} patients (ICU had {added['icu_free_beds_now']} free beds), "
               f"correlation {added['correlation_id'][:12]}")
         for minutes in (60, 90, 60):

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 // Hospital flow Control Tower (spec 7.1): the three boards following the day simulator, the drill-down
 // unit -> bed grid -> patient card with fields hidden by role, and an exception narrated by the AI, approved by
@@ -16,6 +16,20 @@ async function login(page: Page, role: string) {
   await page.goto("/login");
   await page.getByTestId(`login-${role}`).click();
   await expect(page.getByTestId("current-user")).toBeVisible();
+}
+
+// An occupied ICU bed whose patient is outside the Medicine A physician's scope. Some ICU stays are Medicine A
+// admissions under the demo physician (ICU first, then the ward), whose card opens without break-glass.
+async function icuBedOutsideScope(request: APIRequestContext): Promise<string> {
+  const doc = await (await request.post("/api/auth/login", { data: { user_id: "U-DOC-09" } })).json();
+  const headers = { Authorization: `Bearer ${doc.token}` };
+  const unit = await (await request.get("/api/control-tower/units/ICU", { headers })).json();
+  for (const bed of unit.beds as { id: string; encounter_id: string | null }[]) {
+    if (!bed.encounter_id) continue;
+    const r = await request.get(`/api/control-tower/patients/${bed.encounter_id}`, { headers });
+    if (r.status() === 403) return bed.id;
+  }
+  throw new Error("no ICU patient outside the physician's scope");
 }
 
 test.beforeAll(async ({ request }) => {
@@ -106,7 +120,7 @@ test("drill-down: unit, bed grid, patient card with fields hidden by role", asyn
   await login(page, "physician");
   await page.goto("/control-tower");
   await page.getByTestId("unit-ICU").click();
-  await page.getByTestId("bed-ICU-01-A").click();
+  await page.getByTestId(`bed-${await icuBedOutsideScope(page.request)}`).click();
   await expect(page.getByTestId("card-restricted")).toContainText("Outside your units");
   await shot(page, "ct-05-card-restricted");
 });

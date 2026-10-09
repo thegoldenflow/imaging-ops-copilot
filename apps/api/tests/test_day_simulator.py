@@ -129,7 +129,9 @@ def test_planned_transfer_moves_the_patient_and_leaves_the_old_bed_dirty(fresh_s
     stay = next(e for e in fresh_state.fhir.search("Encounter", cls="IMP", status="in-progress")
                 if e["id"] in plan["stays"] and ref_id(e["location"][-1]["location"]).startswith("MEDA"))
     old_bed = ref_id(stay["location"][-1]["location"])
-    target = fresh_state.fhir.ids("Location", unit="SURG", code="bd", status="U")[0]
+    # a free bed anywhere: which units have one at 07:00 depends on the day of seeding (Surgery is full on a Friday)
+    target = next(b for unit in ("SURG", "MEDB", "ORTH", "MEDA", "ICU")
+                  for b in fresh_state.fhir.ids("Location", unit=unit, code="bd", status="U"))
     at = start + timedelta(minutes=10)
     plan["events"].append({"at": at.isoformat(), "kind": "transfer", "stay": stay["id"], "bed": target})
     plan["events"].sort(key=lambda e: e["at"])

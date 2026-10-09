@@ -1,16 +1,16 @@
 {
-  "trained_at": "2026-10-09T05:03:06",
+  "trained_at": "2026-10-09T15:53:08",
   "sklearn": "1.9.1",
   "data_as_of": "2026-10-09T05:30",
   "test_share": 0.2,
   "models": {
     "admission": {
       "metric": "auroc",
-      "model": 0.8634,
-      "baseline": 0.7296,
-      "lift": 0.1338,
+      "model": 0.8516,
+      "baseline": 0.717,
+      "lift": 0.1346,
       "passed": true,
-      "positive_rate_test": 0.2712,
+      "positive_rate_test": 0.2818,
       "n_train": 2591,
       "n_test": 660,
       "train_dates": [
@@ -22,30 +22,30 @@
         "2026-10-09"
       ],
       "importance": {
-        "ctas": 0.9933,
-        "complaint": 0.4583,
-        "age": 0.4304,
-        "admissions_12m": 0.2995,
-        "resp_rate": 0.2272,
-        "spo2": 0.2036,
-        "arrival_mode": 0.1937,
-        "heart_rate": 0.1796,
-        "temperature": 0.1533,
-        "systolic_bp": 0.1464,
-        "pain": 0.1101,
-        "gcs": 0.0614
+        "ctas": 1.0023,
+        "age": 0.5554,
+        "complaint": 0.3758,
+        "admissions_12m": 0.3136,
+        "spo2": 0.3125,
+        "systolic_bp": 0.1574,
+        "heart_rate": 0.1408,
+        "arrival_mode": 0.1271,
+        "temperature": 0.0978,
+        "resp_rate": 0.0894,
+        "pain": 0.0874,
+        "gcs": 0.0454
       },
-      "example": "Admission probability 0.67: age 93, fall, 7 admissions in 12 months"
+      "example": "Admission probability 0.14: SpO\u2082 89%, CTAS 4, age 59"
     },
     "discharge": {
       "metric": "auroc",
-      "model": 0.859,
-      "baseline": 0.6172,
-      "lift": 0.2418,
+      "model": 0.8686,
+      "baseline": 0.6228,
+      "lift": 0.2458,
       "passed": true,
-      "positive_rate_test": 0.1894,
-      "n_train": 8875,
-      "n_test": 2424,
+      "positive_rate_test": 0.1964,
+      "n_train": 9133,
+      "n_test": 2327,
       "train_dates": [
         "2026-08-10",
         "2026-09-26"
@@ -55,52 +55,52 @@
         "2026-10-08"
       ],
       "importance": {
-        "los_ratio": 1.8277,
-        "expected_los": 0.5471,
-        "alc": 0.3951,
-        "orders_24h": 0.2799,
-        "days_in": 0.1619,
-        "open_orders": 0.1327,
-        "reason": 0.1251,
-        "pending_results": 0.1113
+        "los_ratio": 1.9506,
+        "expected_los": 0.5254,
+        "orders_24h": 0.2957,
+        "alc": 0.2314,
+        "days_in": 0.1946,
+        "open_orders": 0.1686,
+        "reason": 0.1465,
+        "pending_results": 0.0448
       },
-      "example": "Discharge within 24 h 0.38: 237% of the expected stay, 7 days expected, 0 new orders in 24 h"
+      "example": "Discharge within 24 h 0.29: 383% of the expected stay, ALC, day 15.3 in hospital"
     },
     "or_duration": {
       "metric": "mae",
-      "model": 14.01,
-      "baseline": 24.82,
-      "improvement": 0.4356,
+      "model": 15.62,
+      "baseline": 27.77,
+      "improvement": 0.4375,
       "passed": true,
-      "mean_label_test": 135.6,
-      "n_train": 417,
-      "n_test": 116,
+      "mean_label_test": 137.2,
+      "n_train": 438,
+      "n_test": 113,
       "train_dates": [
         "2026-08-10",
-        "2026-09-26"
+        "2026-09-27"
       ],
       "test_dates": [
-        "2026-09-27",
-        "2026-10-08"
+        "2026-09-28",
+        "2026-10-09"
       ],
       "importance": {
-        "procedure": 36.5511,
-        "surgeon": 17.5954,
-        "asa": 10.6696,
-        "age": 6.7521,
-        "emergent": 5.1117,
-        "start_hour": 2.8675
+        "procedure": 38.5367,
+        "surgeon": 17.2144,
+        "asa": 11.4966,
+        "age": 6.7691,
+        "emergent": 5.3819,
+        "start_hour": 2.5003
       },
-      "example": "Predicted 144 min (booked 105): Dr. Elena Marsh, ASA 4, emergent"
+      "example": "Predicted 101 min (booked 75): Laparoscopic cholecystectomy, Dr. Samuel Achebe, ASA 4"
     },
     "ed_wait": {
       "metric": "mae",
-      "model": 21.83,
-      "baseline": 25.49,
-      "improvement": 0.1434,
+      "model": 20.67,
+      "baseline": 24.55,
+      "improvement": 0.1578,
       "passed": true,
-      "mean_label_test": 54.1,
-      "n_train": 1900,
+      "mean_label_test": 54.5,
+      "n_train": 1907,
       "n_test": 497,
       "train_dates": [
         "2026-08-10",
@@ -111,17 +111,17 @@
         "2026-10-09"
       ],
       "importance": {
-        "census": 4.6982,
-        "physicians": 4.6111,
-        "hour": 2.2265,
-        "ctas_4_5": 1.9346,
-        "weekday": 1.7962,
-        "ctas_1_2": 1.6428,
-        "ctas_3": 1.3848,
-        "waiting": 1.3361,
-        "boarders": 1.0438
+        "census": 3.1145,
+        "physicians": 2.9802,
+        "hour": 2.7086,
+        "weekday": 2.0993,
+        "ctas_3": 1.7318,
+        "ctas_4_5": 1.635,
+        "ctas_1_2": 1.6287,
+        "boarders": 1.5116,
+        "waiting": 1.0047
       },
-      "example": "Predicted wait 56 min: 2 physicians on duty, 2 in the ED, 1 at CTAS 4-5"
+      "example": "Predicted wait 47 min: 1 in the ED, 2 physicians on duty, 0 boarding"
     }
   },
   "passed": true

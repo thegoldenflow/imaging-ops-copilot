@@ -16,37 +16,38 @@ Setup: `docker compose up -d postgres` and the API's demo data (start the API on
    - The scenario's events share one correlation id, and the actor is the user who injected them. "The audit log has the injection under the same id, so you can trace a scripted scenario end to end."
 
 3. Fast-forward to 08:00 tomorrow.
-   - "25 hospital hours in about ten seconds: some 1,600 events of eight kinds, still in timeline order. The consistency check afterwards finds one patient per bed, and every bed's status matches its occupancy. Every resource the simulator wrote validates against our FHIR types."
+   - "25 hospital hours in about ten seconds: some 1,600 events of eight or nine kinds, still in timeline order. The consistency check afterwards finds one patient per bed, and every bed's status matches its occupancy. Every resource the simulator wrote validates against our FHIR types."
 
 4. Optional: the same in the API (operations manager or admin), e.g. from the API docs page `/docs`:
    - `GET /api/hospital/simulator` (clock, next events, scenarios), `POST /api/hospital/simulator/advance {"minutes": 60}`, `/fast-forward`, `/run {"rate": 60}` (one hospital hour per minute; the API's background loop ticks every second), `/pause`, `/inject {"scenario": "ed_surge"}`.
    - `GET /api/hospital/events` (the log) and `/events/consumers` (each subscriber's cursor, backlog, failing and parked deliveries).
    - As admin, `POST /api/hospital/hl7` with a raw ER7 message: the same adapter answers with an HL7 ACK (`AA`); a message it cannot map gets `AE` and is parked as a dead letter on the integrations page.
 
-## Expected output (abridged, hospital day Thu 2026-10-08)
+## Expected output (abridged, hospital day Fri 2026-10-09)
 
 ```text
-== Hospital clock Thu 2026-10-08 07:00 (plan until Fri 19:00), 1784 planned events left ==
-census: ED 2/30 bays + 1 waiting | MEDA 29/32 (dirty 0) | MEDB 32/32 (dirty 0) | SURG 29/32 (dirty 0) | ORTH 24/24 (dirty 0) | ICU 2/12 (dirty 0) | ED boarders 0
+== Hospital clock Fri 2026-10-09 07:00 (plan until Sat 19:00), 1741 planned events left ==
+census: ED 2/30 bays + 1 waiting | MEDA 31/32 (dirty 0) | MEDB 31/32 (dirty 0) | SURG 32/32 (dirty 0) | ORTH 24/24 (dirty 0) | ICU 11/12 (dirty 0) | ED boarders 0
 == Advance 1 hour(s): the simulator writes FHIR, the HL7 adapter publishes events ==
-applied 31 plan events -> 31 domain events {'order.placed': 15, 'result.available': 11, 'encounter.updated': 2, 'appointment.updated': 2, 'patient.admitted': 1}
-  Thu 07:01  ORU^R01  -> result.available       ed-03238     ord-ed-03238-01  category=laboratory, encounter_class=EMER
+applied 39 plan events -> 39 domain events {'result.available': 16, 'order.placed': 15, 'appointment.updated': 4, 'patient.admitted': 2, 'encounter.updated': 2}
+  Fri 07:00  ORU^R01  -> result.available       stay-01164   ord-stay-01164-04 category=laboratory, encounter_class=IMP
 == What the interface engine received for the first arrival (ids and codes only) ==
-MSH|^~\&|DEMO-EHR|DEMO-HOSPITAL|IOC|IOC|20261008075056||ADT^A01^ADT_A01|SIMAD994BF5230E49E9F|P|2.5.1
-EVN|A01|20261008075056||||20261008075056
-PID|1||pat-0583^^^DEMO-HOSPITAL^PI
-PV1|1|E|ED^^^DEMO-HOSPITAL||||||||||||||||ed-03240^^^DEMO-HOSPITAL^VN
+MSH|^~\&|DEMO-EHR|DEMO-HOSPITAL|IOC|IOC|20261009073343||ADT^A01^ADT_A01|SIM06B3023EAA6275A4E|P|2.5.1
+EVN|A01|20261009073343||||20261009073343
+PID|1||pat-0651^^^DEMO-HOSPITAL^PI
+PV1|1|E|ED^^^DEMO-HOSPITAL||||||||||||||||ed-03255^^^DEMO-HOSPITAL^VN
 == Inject scenario icu_surge: ... ==
-11 patients ed-x0001 .. ed-x0011, arriving 08:01-08:31; ...; ICU beds free now: 10
-2.5 hours later: 126 events carry the scenario's correlation id, actor user:U-OPS; 2 admissions or transfers waited for a bed
-census: ED 9/30 bays + 3 waiting | ... | ICU 12/12 (dirty 0) | ED boarders 1
+3 patients ed-x0001 .. ed-x0003, arriving 08:01-08:07; ...; ICU beds free now: 1
+2.5 hours later: 30 events carry the scenario's correlation id, actor user:U-OPS; 6 admissions or transfers waited for a bed
+census: ED 7/30 bays + 3 waiting | ... | ICU 12/12 (dirty 0) | ED boarders 2
 == Fast-forward to 08:00 tomorrow ==
+13.6 s: 1596 events {...}
 order problems: none
-census: ED 8/30 bays + 1 waiting | MEDA 32/32 (dirty 0) | MEDB 32/32 (dirty 0) | SURG 30/32 (dirty 0) | ORTH 24/24 (dirty 0) | ICU 12/12 (dirty 0) | ED boarders 3
+census: ED 7/30 bays + 0 waiting | MEDA 30/32 (dirty 0) | MEDB 32/32 (dirty 0) | SURG 27/32 (dirty 0) | ORTH 22/24 (dirty 0) | ICU 12/12 (dirty 0) | ED boarders 3
 consistency problems: none
 ```
 
-Numbers depend on the day the demo data was generated (the hospital day starts at 07:00 on the seed date). The wards start nearly full and ICU nearly empty on this data, which is why the ICU surge fills ICU by default.
+Numbers depend on the day the demo data was generated (the hospital day starts at 07:00 on the seed date). The wards start nearly full and ICU at 11 of its 12 beds on this data (on a weekday morning the generated ICU holds about 8 patients), so the default surge, enough to fill ICU plus one but at least three, sends three patients and the last of them boards in the ED.
 
 ## Report
 

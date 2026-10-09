@@ -30,7 +30,7 @@ export function ControlBar({ board, theme, onTheme, onChanged }: {
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [rate, setRate] = useState(60);
   const [scenario, setScenario] = useState("icu_surge");
-  const [size, setSize] = useState(10);
+  const [size, setSize] = useState(6); // ICU holds 8 to 11 of 12 at 07:00 on a weekday: 6 fill it and leave a few boarding
   const clock = board?.clock;
   const job = board?.job?.status === "running" ? board.job : null;
   const control = board?.can_control ?? false;

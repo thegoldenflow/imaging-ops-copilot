@@ -14,7 +14,7 @@ Two evals for the hospital flow Control Tower: the rule engine that finds except
   code as the live snapshot. The scenarios sit on every threshold edge (94% / 95% occupancy, 2 / 3 boarders,
   exactly 120 minutes, 29 / 30 minutes over, 4 hours to the start, a started case, cancelled and finished cases).
 - Narrator: 30 exceptions from the seeded hospital, collected while the day simulator plays two scripted walks
-  (ICU surge of 9 and 10, ED surges, OR overrun, hours of the planned day) inside rolled-back transactions. Their
+  (ICU surges of 6 and 7, ED surges, OR overrun, hours of the planned day) inside rolled-back transactions. Their
   facts, menus and FHIR references are in `narrator/cases.jsonl`. The agent reads the unit's bed board and up to
   three of the named encounters through its read tools (de-identified by the runtime).
 

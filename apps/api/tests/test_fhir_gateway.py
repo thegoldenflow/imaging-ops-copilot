@@ -224,16 +224,23 @@ def test_refused_updates_and_deletes_are_audited(fresh_state):
 # ---------- bed moves ----------
 
 
-def _free_bed(store, unit, but=None):
-    return next(b for b in _gateway(store).get_bed_board(unit).beds if b.status == "U" and b.id != but)
+def _movable_inpatient(store) -> tuple[dict, str, str]:
+    """(encounter, unit, free bed) of a current inpatient whose unit has a free bed; which units have one at 07:00
+    depends on the day of seeding."""
+    for enc in store.fhir.search("Encounter", cls="IMP", status="in-progress"):
+        current = gw._current_location(enc)
+        if current and current["location"]["reference"].count("-") == 2:
+            unit = current["location"]["reference"].split("/")[1].split("-")[0]
+            free = next((b.id for b in _gateway(store).get_bed_board(unit).beds if b.status == "U"), None)
+            if free:
+                return enc, unit, free
+    raise AssertionError("no inpatient on a unit with a free bed")
 
 
 def test_bed_manager_moves_a_patient(fresh_state):
     store = fresh_state
-    enc, _patient = _inpatient(store)
+    enc, unit, new_bed = _movable_inpatient(store)
     old_bed = gw._current_location(enc)["location"]["reference"].split("/")[1]
-    unit = old_bed.split("-")[0]
-    new_bed = _free_bed(store, unit).id
     moved = _gateway(store, actor=OPS).append_encounter_location(enc["id"], new_bed)
     history = moved.location
     assert history[-1].location.reference == f"Location/{new_bed}" and history[-1].status == "active"
@@ -249,9 +256,7 @@ def test_bed_manager_moves_a_patient(fresh_state):
 
 def test_bed_moves_are_refused_for_other_roles_and_states(fresh_state):
     store = fresh_state
-    enc, _patient = _inpatient(store)
-    unit = gw._current_location(enc)["location"]["reference"].split("/")[1].split("-")[0]
-    free = _free_bed(store, unit).id
+    enc, unit, free = _movable_inpatient(store)
     with pytest.raises(FhirAccessDenied):
         _gateway(store, actor=RAD).append_encounter_location(enc["id"], free)
     assert _audit_tail(store, 1)[0].outcome == "denied"

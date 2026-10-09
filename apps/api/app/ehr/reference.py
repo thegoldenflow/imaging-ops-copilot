@@ -51,22 +51,24 @@ def ed_physicians_on_duty(at: datetime) -> int:
     return max(2, n - (1 if weekend else 0))
 
 
-# Admission diagnosis per ED complaint: (SNOMED code, weight, unit, ICU share, surgery code or None)
+# Admission diagnosis per ED complaint: (SNOMED code, weight, unit, ICU share, surgery code or None).
+# ICU shares: myocardial infarction 0.5, sepsis 0.6, stroke 0.2, pneumonia and heart failure 0.15, COPD 0.12, plus
+# elective CABG; the 12-bed ICU then holds about 8 patients at 07:00 on a weekday (docs/data-model.md).
 ADMIT_DX: dict[str, list[tuple[str, float, str, float, str | None]]] = {
-    "chest pain": [("22298006", 0.35, "MEDA", 0.3, None), ("29857009", 0.65, "MEDB", 0.0, None)],
-    "shortness of breath": [("233604007", 0.4, "MEDA", 0.08, None), ("42343007", 0.3, "MEDB", 0.05, None),
-                            ("195951007", 0.3, "MEDA", 0.08, None)],
+    "chest pain": [("22298006", 0.35, "MEDA", 0.5, None), ("29857009", 0.65, "MEDB", 0.0, None)],
+    "shortness of breath": [("233604007", 0.4, "MEDA", 0.15, None), ("42343007", 0.3, "MEDB", 0.15, None),
+                            ("195951007", 0.3, "MEDA", 0.12, None)],
     "abdominal pain": [("74400008", 0.3, "SURG", 0.0, "80146002"), ("65275009", 0.3, "SURG", 0.0, "45595009"),
                        ("21522001", 0.4, "MEDB", 0.0, None)],
     "fall": [("5913000", 0.55, "ORTH", 0.0, "52734007"), ("125605004", 0.25, "ORTH", 0.0, None),
              ("1912002", 0.2, "MEDB", 0.0, None)],
-    "fever": [("91302008", 0.3, "MEDA", 0.4, None), ("68566005", 0.4, "MEDB", 0.0, None),
-              ("233604007", 0.3, "MEDA", 0.05, None)],
-    "headache": [("230690007", 0.5, "MEDA", 0.15, None), ("25064002", 0.5, "MEDB", 0.0, None)],
+    "fever": [("91302008", 0.3, "MEDA", 0.6, None), ("68566005", 0.4, "MEDB", 0.0, None),
+              ("233604007", 0.3, "MEDA", 0.15, None)],
+    "headache": [("230690007", 0.5, "MEDA", 0.2, None), ("25064002", 0.5, "MEDB", 0.0, None)],
     "back pain": [("161891005", 1.0, "MEDB", 0.0, None)],
     "injury": [("125605004", 1.0, "ORTH", 0.0, None)],
-    "confusion": [("68566005", 0.4, "MEDB", 0.0, None), ("230690007", 0.3, "MEDA", 0.15, None),
-                  ("91302008", 0.3, "MEDA", 0.4, None)],
+    "confusion": [("68566005", 0.4, "MEDB", 0.0, None), ("230690007", 0.3, "MEDA", 0.2, None),
+                  ("91302008", 0.3, "MEDA", 0.6, None)],
     "rash": [("396230008", 1.0, "MEDB", 0.0, None)],
 }
 

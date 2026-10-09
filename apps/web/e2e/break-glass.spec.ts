@@ -15,10 +15,20 @@ let icuMrn = "";
 test.beforeAll(async ({ request }) => {
   const admin = await (await request.post("/api/auth/login", { data: { user_id: "U-ADMIN" } })).json();
   await request.post("/api/demo/reset", { headers: { Authorization: `Bearer ${admin.token}` } });
-  // The bed manager's ICU census lists MRNs (no names): pick an ICU patient for the physician.
+  // The bed manager's ICU census lists MRNs (no names): pick an ICU patient outside the physician's scope. Some ICU
+  // stays are Medicine A admissions under the demo physician (ICU first, then the ward), which open without break-glass.
   const ops = await (await request.post("/api/auth/login", { data: { user_id: "U-OPS" } })).json();
   const census = await (await request.get("/api/hospital/census?unit=ICU", { headers: { Authorization: `Bearer ${ops.token}` } })).json();
-  icuMrn = census.patients.find((p: { mrn: string | null; bed_id: string | null }) => p.mrn && p.bed_id).mrn;
+  const doc = await (await request.post("/api/auth/login", { data: { user_id: "U-DOC-09" } })).json();
+  for (const p of census.patients as { mrn: string | null; bed_id: string | null }[]) {
+    if (!p.mrn || !p.bed_id) continue;
+    const r = await request.get(`/api/hospital/patients/${p.mrn}`, { headers: { Authorization: `Bearer ${doc.token}` } });
+    if (r.status() === 403 && (await r.json()).code === "break_glass_required") {
+      icuMrn = p.mrn;
+      break;
+    }
+  }
+  expect(icuMrn, "an ICU inpatient outside the physician's scope").not.toBe("");
 });
 
 test("break-glass: reason dialog, banner, admin review, audit", async ({ page }) => {

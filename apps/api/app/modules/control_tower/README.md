@@ -47,8 +47,10 @@ API's hospital loop refreshes after every event drain (every second).
   raised, and a condition that flips around a threshold opens a new exception each time it returns.
 - Facts are stored when an exception opens or changes severity; the narrative quotes those numbers ("facts as of
   HH:MM") while the board shows the live ones.
-- The generated ICU runs at about 45% before a surge; ICU exceptions come from the `icu_surge` scenario (10
-  patients also leave about four boarding in the ED for over 2 hours).
+- A 12-bed ICU swings by about three beds from day to day: the generated ICU holds about 8 patients on a weekday
+  morning and fills on its own on some planned days only, so whether the ICU exception shows up without a scenario
+  depends on the seeded day. The `icu_surge` scenario forces it (the control bar's default of 6 patients also leaves
+  a few boarding in the ED for over 2 hours).
 - Pre-op checks stay open until the case starts (the simulator closes them at the start), so a gap exception
   lasts until then unless a nurse completes the Task.
 - Approved Tasks are not tracked to completion here; checking the effect an hour later is the

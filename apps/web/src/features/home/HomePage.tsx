@@ -194,7 +194,7 @@ const FLOW: Step[] = [
   },
   {
     title: "Inject an ICU surge and let the day run",
-    detail: "From the control bar: an ICU surge of 8 patients, then run the clock. ICU fills, patients board in the ED and new exceptions appear within seconds. Fast-forward to 08:00 tomorrow runs in the background.",
+    detail: "From the control bar: an ICU surge of 6 patients, then run the clock. ICU fills, patients board in the ED and new exceptions appear within seconds. Fast-forward to 08:00 tomorrow runs in the background.",
     role: "operations_manager", userId: "U-OPS", to: "/control-tower", system: "Day simulator",
   },
   {

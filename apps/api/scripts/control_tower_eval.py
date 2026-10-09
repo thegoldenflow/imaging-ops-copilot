@@ -30,11 +30,12 @@ from app.modules.control_tower import evals  # noqa: E402
 
 TARGET = 30
 # Two walks through the planned day, each in its own rolled-back transaction: (scenario and its size or None,
-# hospital minutes to advance afterwards). An ICU surge of 9 fills ICU and leaves about 4 patients boarding.
+# hospital minutes to advance afterwards). ICU has 8 to 11 of its 12 beds taken at 07:00 on most days, so an ICU
+# surge of 6 fills it and leaves a few patients boarding.
 WALKS = [
-    [(None, None, 0), ("icu_surge", 9, 60), (None, None, 90), ("ed_surge", None, 60), (None, None, 60),
+    [(None, None, 0), ("icu_surge", 6, 60), (None, None, 90), ("ed_surge", None, 60), (None, None, 60),
      ("or_overrun", None, 30), (None, None, 120), (None, None, 180), (None, None, 240), (None, None, 240)],
-    [("ed_surge", None, 30), ("ed_surge", None, 60), ("icu_surge", 10, 120), (None, None, 90), ("or_overrun", None, 60),
+    [("ed_surge", None, 30), ("ed_surge", None, 60), ("icu_surge", 7, 120), (None, None, 90), ("or_overrun", None, 60),
      (None, None, 120), (None, None, 240), (None, None, 240), (None, None, 300)],
 ]
 

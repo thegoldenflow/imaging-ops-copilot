@@ -1,6 +1,6 @@
 # Control Tower evals
 
-Run 2026-10-09T05:03:42. Synthetic data only.
+Run 2026-10-09T15:49:54. Synthetic data only.
 
 ## Rule engine
 
@@ -31,7 +31,7 @@ Run 2026-10-09T05:03:42. Synthetic data only.
 
 ## Narrator
 
-Model: mock. 30 exceptions from the seeded hospital while the simulator played the ICU surge, the ED surge and the OR overrun (ed_boarding 2, or_overrun 10, preop_gap 10, unit_occupancy 8).
+Model: mock. 30 exceptions from the seeded hospital while the simulator played the ICU surge, the ED surge and the OR overrun (ed_boarding 1, or_overrun 18, preop_gap 5, unit_occupancy 6).
 
 | Metric | Result | Gate |
 | --- | --- | --- |

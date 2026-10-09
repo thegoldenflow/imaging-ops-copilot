@@ -1,7 +1,7 @@
 {
   "what": "WP3 day simulator: a full planned day (07:00 to 08:00 the next day) with and without the ICU surge scenario; no model involved",
-  "generated_at": "2026-10-08T19:17:38",
-  "hospital_day": "2026-10-08T07:00:00",
+  "generated_at": "2026-10-09T15:52:38",
+  "hospital_day": "2026-10-09T07:00:00",
   "criteria": {
     "event_types": ">= 6",
     "order": "subscriber sees events in timeline order; per encounter admitted first, discharged last",
@@ -12,178 +12,138 @@
   "runs": [
     {
       "scenario": null,
-      "start": "2026-10-08T07:00:00",
-      "end": "2026-10-09T08:00:00",
-      "seconds": 11.2,
+      "start": "2026-10-09T07:00:00",
+      "end": "2026-10-10T08:00:00",
+      "seconds": 24.1,
       "plan_events_applied": {
-        "admit": 26,
-        "bed_clean": 21,
-        "day_surgery_arrival": 3,
-        "day_surgery_leave": 3,
-        "discharge": 21,
-        "ed_arrival": 61,
-        "ed_decision": 60,
-        "ed_depart": 39,
-        "ed_seen": 61,
-        "ed_triage": 61,
-        "order": 412,
-        "result": 389,
+        "admit": 18,
+        "bed_clean": 27,
+        "discharge": 25,
+        "ed_arrival": 62,
+        "ed_decision": 64,
+        "ed_depart": 42,
+        "ed_seen": 63,
+        "ed_triage": 62,
+        "order": 447,
+        "result": 439,
+        "surgery_booked": 2,
         "surgery_cancel": 1,
-        "surgery_end": 13,
-        "surgery_start": 17
+        "surgery_end": 10,
+        "surgery_start": 10,
+        "transfer": 2
       },
       "domain_events": {
         "appointment.cancelled": 1,
-        "appointment.updated": 30,
-        "bed.status_changed": 21,
-        "encounter.updated": 182,
-        "order.placed": 412,
-        "patient.admitted": 90,
-        "patient.discharged": 80,
-        "result.available": 801
+        "appointment.scheduled": 2,
+        "appointment.updated": 20,
+        "bed.status_changed": 27,
+        "encounter.updated": 189,
+        "order.placed": 447,
+        "patient.admitted": 80,
+        "patient.discharged": 85,
+        "patient.transferred": 2,
+        "result.available": 896
       },
       "hl7_messages": {
-        "ADT^A01": 90,
-        "ADT^A03": 80,
-        "ADT^A08": 182,
-        "ADT^A20": 21,
-        "ORM^O01": 412,
-        "ORU^R01": 801,
-        "SIU^S14": 30,
+        "ADT^A01": 80,
+        "ADT^A02": 2,
+        "ADT^A03": 85,
+        "ADT^A08": 189,
+        "ADT^A20": 27,
+        "ORM^O01": 447,
+        "ORU^R01": 896,
+        "SIU^S12": 2,
+        "SIU^S14": 20,
         "SIU^S15": 1
       },
-      "event_types": 8,
-      "delivered_to_subscriber": 1617,
+      "event_types": 10,
+      "delivered_to_subscriber": 1749,
       "deferred_for_want_of_a_bed": 0,
-      "ward_vital_sign_panels": 412,
-      "resources_written": 1967,
+      "ward_vital_sign_panels": 457,
+      "resources_written": 2105,
       "resources_invalid": [],
       "order_problems": [],
       "consistency_problems": []
     },
     {
       "scenario": "icu_surge",
-      "start": "2026-10-08T07:00:00",
-      "end": "2026-10-09T08:00:00",
-      "seconds": 13.3,
+      "start": "2026-10-09T07:00:00",
+      "end": "2026-10-10T08:00:00",
+      "seconds": 17.7,
       "plan_events_applied": {
-        "admit": 35,
-        "bed_clean": 21,
-        "day_surgery_arrival": 3,
-        "day_surgery_leave": 3,
-        "discharge": 21,
-        "ed_arrival": 72,
-        "ed_decision": 71,
-        "ed_depart": 39,
-        "ed_seen": 72,
-        "ed_triage": 72,
-        "order": 517,
-        "result": 490,
+        "admit": 19,
+        "bed_clean": 27,
+        "discharge": 25,
+        "ed_arrival": 65,
+        "ed_decision": 67,
+        "ed_depart": 42,
+        "ed_seen": 66,
+        "ed_triage": 65,
+        "order": 461,
+        "result": 451,
+        "surgery_booked": 2,
         "surgery_cancel": 1,
-        "surgery_end": 13,
-        "surgery_start": 17
+        "surgery_end": 10,
+        "surgery_start": 10,
+        "transfer": 2
       },
       "domain_events": {
         "appointment.cancelled": 1,
-        "appointment.updated": 30,
-        "bed.status_changed": 21,
-        "encounter.updated": 215,
-        "order.placed": 517,
-        "patient.admitted": 110,
-        "patient.discharged": 90,
-        "result.available": 932
+        "appointment.scheduled": 2,
+        "appointment.updated": 20,
+        "bed.status_changed": 27,
+        "encounter.updated": 198,
+        "order.placed": 461,
+        "patient.admitted": 84,
+        "patient.discharged": 86,
+        "patient.transferred": 2,
+        "result.available": 909
       },
       "hl7_messages": {
-        "ADT^A01": 110,
-        "ADT^A03": 90,
-        "ADT^A08": 215,
-        "ADT^A20": 21,
-        "ORM^O01": 517,
-        "ORU^R01": 932,
-        "SIU^S14": 30,
+        "ADT^A01": 84,
+        "ADT^A02": 2,
+        "ADT^A03": 86,
+        "ADT^A08": 198,
+        "ADT^A20": 27,
+        "ORM^O01": 461,
+        "ORU^R01": 909,
+        "SIU^S12": 2,
+        "SIU^S14": 20,
         "SIU^S15": 1
       },
-      "event_types": 8,
-      "delivered_to_subscriber": 1916,
-      "deferred_for_want_of_a_bed": 52,
-      "ward_vital_sign_panels": 442,
-      "resources_written": 2330,
+      "event_types": 10,
+      "delivered_to_subscriber": 1790,
+      "deferred_for_want_of_a_bed": 116,
+      "ward_vital_sign_panels": 458,
+      "resources_written": 2155,
       "resources_invalid": [],
       "order_problems": [],
       "consistency_problems": [],
       "injected": {
-        "correlation_id": "4e81558602c649aa86c8d50d4dee01eb",
+        "correlation_id": "289c704b7b194e5a800350d3a1654385",
         "patients": [
           {
             "visit": "ed-x0001",
             "stay": "stay-x0001",
-            "arrival": "2026-10-08 07:01:39",
+            "arrival": "2026-10-09 07:01:39",
             "ctas": 2
           },
           {
             "visit": "ed-x0002",
             "stay": "stay-x0002",
-            "arrival": "2026-10-08 07:04:24",
+            "arrival": "2026-10-09 07:04:24",
             "ctas": 1
           },
           {
             "visit": "ed-x0003",
             "stay": "stay-x0003",
-            "arrival": "2026-10-08 07:07:43",
+            "arrival": "2026-10-09 07:07:43",
             "ctas": 2
-          },
-          {
-            "visit": "ed-x0004",
-            "stay": "stay-x0004",
-            "arrival": "2026-10-08 07:10:09",
-            "ctas": 2
-          },
-          {
-            "visit": "ed-x0005",
-            "stay": "stay-x0005",
-            "arrival": "2026-10-08 07:13:03",
-            "ctas": 1
-          },
-          {
-            "visit": "ed-x0006",
-            "stay": "stay-x0006",
-            "arrival": "2026-10-08 07:16:18",
-            "ctas": 2
-          },
-          {
-            "visit": "ed-x0007",
-            "stay": "stay-x0007",
-            "arrival": "2026-10-08 07:19:06",
-            "ctas": 2
-          },
-          {
-            "visit": "ed-x0008",
-            "stay": "stay-x0008",
-            "arrival": "2026-10-08 07:22:21",
-            "ctas": 1
-          },
-          {
-            "visit": "ed-x0009",
-            "stay": "stay-x0009",
-            "arrival": "2026-10-08 07:25:08",
-            "ctas": 2
-          },
-          {
-            "visit": "ed-x0010",
-            "stay": "stay-x0010",
-            "arrival": "2026-10-08 07:28:28",
-            "ctas": 2
-          },
-          {
-            "visit": "ed-x0011",
-            "stay": "stay-x0011",
-            "arrival": "2026-10-08 07:31:47",
-            "ctas": 1
           }
         ],
-        "icu_free_beds_now": 10
+        "icu_free_beds_now": 1
       },
-      "events_with_scenario_correlation_id": 270
+      "events_with_scenario_correlation_id": 52
     }
   ]
 }

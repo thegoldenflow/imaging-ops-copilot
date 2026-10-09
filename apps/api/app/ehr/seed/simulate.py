@@ -303,7 +303,9 @@ def simulate(rng_for, patients: list[PatientInfo], doctors: dict[str, list[str]]
         segments: list[tuple[str, datetime, datetime]] = []
         clean = timedelta(minutes=vrng.randint(*CLEANING))
         if icu:
-            transfer = at + timedelta(days=max(1.5, los_days * vrng.uniform(0.45, 0.65)))
+            # An ALC stay's ICU part comes from its acute stay, so the step-down happens before the ALC designation
+            acute_days = expected if alc_from else los_days
+            transfer = at + timedelta(days=max(1.5, acute_days * vrng.uniform(0.45, 0.65)))
             icu_bed = beds.find(["ICU"], at, transfer + clean)
             if icu_bed:
                 beds.book(icu_bed, at, transfer + clean)
