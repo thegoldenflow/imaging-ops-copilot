@@ -2,8 +2,11 @@
 
 from datetime import date
 
+import pytest
+
 from pydantic import BaseModel
 
+from app.agents import registry
 from app.core.models import Patient
 from app.core.store import Store, get_store
 from app.llm.deid import Pseudonymizer
@@ -63,6 +66,13 @@ class Echo(BaseModel):
 
 
 PROMPT = Prompt(name="t", version="t@1", system="s", template="{q}")
+
+
+@pytest.fixture(autouse=True)
+def _registered_test_agent():
+    """The LLM gateway refuses tasks without an agent-registry entry (6.4); "t" is this file's test agent."""
+    with registry.temporary("t", {"kind": "embedded_agent"}):
+        yield
 
 
 class ScriptedProvider:

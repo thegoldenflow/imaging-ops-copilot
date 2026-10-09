@@ -38,12 +38,15 @@ _CHAIN_LOCK = 0x10C_A0D1  # pg_advisory_xact_lock key serializing appends
 
 # Spec 6.3 event types; `login` is kept as its own type (sign-ins were audited before 6.3).
 EVENT_TYPES = ("read", "write", "ai_call", "sign", "break_glass", "export", "consent_change", "simulator_event",
-               "login")
+               "login", "tool_call", "approve")  # tool_call, approve: the agent runtime (6.4)
 # Fields added in WP4: left out of the digest when null (see the module docstring).
 OPTIONAL_FIELDS = ("event_type", "patient_mrn_hash", "encounter_id", "module", "prompt_version")
 _TYPE_OF_ACTION = {"read": "read", "knowledge_query": "read", "export": "export", "disclose": "export",
                    "sign": "sign", "login": "login", "ai_call": "ai_call", "break_glass": "break_glass",
-                   "consent_change": "consent_change", "simulator_event": "simulator_event"}
+                   "consent_change": "consent_change", "simulator_event": "simulator_event",
+                   "tool_call": "tool_call", "privileged_call": "tool_call"}
+# `approve` events are written with an explicit event_type by the agent runtime's approvals
+# (app/agents/approvals.py); other modules' "approve" actions (e.g. a protocol) stay writes.
 
 
 def event_type_for(action: str) -> str:
@@ -139,11 +142,12 @@ class AuditLog:
 
     def query(self, *, user_id: str | None = None, event_type: str | None = None, module: str | None = None,
               outcome: str | None = None, patient_mrn_hash: str | None = None, resource_type: str | None = None,
-              since: datetime | None = None, until: datetime | None = None, limit: int | None = None,
+              resource_id: str | None = None, action: str | None = None, since: datetime | None = None, until: datetime | None = None, limit: int | None = None,
               newest_first: bool = False) -> list[AuditEvent]:
         """Events matching every given filter (the admin audit search, the break-glass review)."""
         filters = {"user_id": user_id, "event_type": event_type, "module": module, "outcome": outcome,
-                   "patient_mrn_hash": patient_mrn_hash, "resource_type": resource_type}
+                   "patient_mrn_hash": patient_mrn_hash, "resource_type": resource_type, "resource_id": resource_id,
+                   "action": action}
         filters = {k: v for k, v in filters.items() if v is not None}
         if self._store.detached:
             out = [e for e in self._pending if all(getattr(e, k) == v for k, v in filters.items())

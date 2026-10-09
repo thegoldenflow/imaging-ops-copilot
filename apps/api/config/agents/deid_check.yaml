@@ -1,0 +1,25 @@
+# Agent registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# kind: runtime_agent (hosted by the agent runtime) | embedded_agent (AI step inside its module) |
+# module (no model; registered for its EHR writes). Model ids come from the environment (model_policy.tier).
+agent_id: deid_check
+version: 1.0.0
+kind: embedded_agent
+owner: Hospital platform team
+purpose: 'Second pass of the free-text de-identification: find identifiers the rule layer missed (6.3).'
+risk_tier: ops
+allowed_tools: []
+data_scope:
+  resources: []
+  scope: none
+model_policy:
+  tier: fast
+  max_tokens: 8000
+  temperature_max: null
+prompt_version: deid_check@1
+required_signoff_role: []
+consent_required: []
+eval_status:
+  status: passed
+  run_id: evals/deid/report.json@2026-10-08T20:24:59
+  note: Pipeline gate recall >= 0.98, precision >= 0.90 met (0.993 / 0.999); synthetic notes, mock second pass.
+deployment_status: demo

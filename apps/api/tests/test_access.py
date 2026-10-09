@@ -10,7 +10,7 @@ a medication reconciliation for another.
 
 import pytest
 
-from app.core import registry
+from app.agents import registry
 from app.core.models import Role
 from app.ehr.codes import MRN_SYSTEM, PRACTITIONER_ROLE, TASK_CODE, concept
 from app.ehr.gateway import Actor, BreakGlassRequired, FhirAccessDenied, FhirConflict, FhirGateway, LocalBackend
@@ -337,7 +337,8 @@ def test_imaging_roles_have_no_hospital_access(fresh_state):
 
 
 def test_registry_entries_are_valid():
-    entries = registry.modules()
+    """The 6.3 entries, now in the agent registry (6.4): EHR writers with a tier, signers and consents."""
+    entries = {name: spec for name, spec in registry.agents().items() if spec.writes()}
     assert {"control_tower", "discharge_summary", "medication_reconciliation", "followup_calls"} <= set(entries)
     for name, entry in entries.items():
         assert entry.tier in ("ops", "documentation", "clinical_ds"), name
@@ -352,12 +353,12 @@ def test_writes_of_unregistered_modules_are_refused(fresh_state):
     store = fresh_state
     enc, pid = _inpatient(store, "MEDA")
     nurse = gw(store, Role.NURSE, "shadow_module")
-    with pytest.raises(FhirAccessDenied, match="no entry in the safety-tier registry"):
+    with pytest.raises(FhirAccessDenied, match="no entry in the agent registry"):
         nurse.create(_flag(pid))
     event = _last(store)
     assert (event.outcome, event.module, event.resource_type) == ("denied", "shadow_module", "Flag")
-    with registry.temporary("shadow_module", {"tier": "ops", "required_signoff_role": ["nurse"],
-                                              "writes_allowed": {"Flag": ["*"]}}):
+    with registry.temporary("shadow_module", {"required_signoff_role": ["nurse"],
+                                              "allowed_tools": ["createFlag", "updateFlag"]}):
         gw(store, Role.NURSE, "shadow_module").create(_flag(pid))  # registered: allowed
     with pytest.raises(FhirAccessDenied, match="may not write Communication"):
         gw(store, Role.NURSE, "patient_instructions").create(
@@ -370,8 +371,8 @@ def test_writes_of_unregistered_modules_are_refused(fresh_state):
 def test_documents_of_an_unregistered_module_cannot_be_signed(fresh_state):
     store = fresh_state
     enc, pid = _inpatient(store, "MEDA")
-    with registry.temporary("pilot_notes", {"tier": "documentation", "required_signoff_role": ["physician"],
-                                            "writes_allowed": {"DocumentReference": ["preliminary", "final"]}}):
+    with registry.temporary("pilot_notes", {"risk_tier": "documentation", "required_signoff_role": ["physician"],
+                                            "allowed_tools": ["draftDocument", "signDocumentFinal"]}):
         doc = gw(store, Role.PHYSICIAN, "pilot_notes").create(_draft(pid, enc))
     with pytest.raises(FhirAccessDenied, match="no entry"):
         gw(store, Role.PHYSICIAN, "signing").sign_document(doc.id)

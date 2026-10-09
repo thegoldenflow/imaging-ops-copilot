@@ -22,7 +22,7 @@ function TranslationRow({ tkey, lang, label, t, canApprove }: { tkey: string; la
         <span className="flex items-center gap-2 text-sm font-medium">
           {label}
           {t && <Badge tone={t.status === "approved" ? "green" : "amber"}>{t.status === "approved" ? `approved · ${t.approved_by}` : "draft — cannot be sent"}</Badge>}
-          {t?.source === "ai" && t.status !== "approved" && <AiBadge label="AI draft" />}
+          {t?.source === "ai" && t.status !== "approved" && <AiBadge label="AI draft" agent="prep_translation" />}
         </span>
         {canApprove && !editing && (
           <span className="flex gap-1">

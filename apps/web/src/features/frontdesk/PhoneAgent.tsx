@@ -109,7 +109,7 @@ export function PhoneAgent() {
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
       <Card
-        title={<span className="flex items-center gap-2">AI phone receptionist {mode && mode !== "scripted" ? <AiBadge /> : mode && <Badge>Scripted fallback</Badge>}</span>}
+        title={<span className="flex items-center gap-2">AI phone receptionist {mode && mode !== "scripted" ? <AiBadge agent="voice_agent" /> : mode && <Badge>Scripted fallback</Badge>}</span>}
         actions={
           <>
             <Button size="sm" variant="ghost" onClick={() => setSpeak(!speak)} aria-label={speak ? "Mute agent voice" : "Unmute agent voice"}>
@@ -181,7 +181,7 @@ export function PhoneAgent() {
             </div>
             <div><dt className="text-xs text-slate-500">Outcome</dt><dd><Badge tone={session.outcome === "transferred" ? "amber" : session.outcome === "resolved" ? "green" : "slate"}>{session.outcome}</Badge></dd></div>
             {session.summary && (
-              <div><dt className="flex items-center gap-1.5 text-xs text-slate-500">Summary <AiBadge /></dt><dd className="mt-1 text-slate-700">{session.summary}</dd></div>
+              <div><dt className="flex items-center gap-1.5 text-xs text-slate-500">Summary <AiBadge agent="call_summary" /></dt><dd className="mt-1 text-slate-700">{session.summary}</dd></div>
             )}
           </dl>
         )}

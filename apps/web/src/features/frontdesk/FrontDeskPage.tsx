@@ -131,7 +131,7 @@ function CallLog() {
               <span className="text-xs text-slate-500">{dateTime(c.started_at)} · {c.transcript.filter((t) => t.role === "caller").length} caller turns</span>
               <Badge tone={c.outcome === "transferred" ? "amber" : c.outcome === "resolved" ? "green" : "slate"}>{c.outcome}</Badge>
             </div>
-            {c.summary && <p className="mt-1 flex items-start gap-2 text-slate-600"><AiBadge label="Summary" />{c.summary}</p>}
+            {c.summary && <p className="mt-1 flex items-start gap-2 text-slate-600"><AiBadge label="Summary" agent="call_summary" />{c.summary}</p>}
           </li>
         ))}
       </ul>

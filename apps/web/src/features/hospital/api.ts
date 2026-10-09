@@ -107,3 +107,23 @@ export const MIN_REASON = 10;
 
 /** The reason as the server counts it: runs of whitespace collapse to one space. */
 export const reasonLength = (text: string) => text.split(/\s+/).filter(Boolean).join(" ").length;
+
+/** What the patient message triage agent (spec 6.4, the runtime's reference agent) returns. */
+export interface TriageResult {
+  run_id: string;
+  status: "triaged" | "not_processed";
+  reason: string | null;
+  summary: string | null;
+  category: "clinical" | "scheduling" | "administrative" | "other" | null;
+  urgency: "routine" | "soon" | "urgent" | null;
+  red_flags: string[];
+  reply_draft: string | null;
+  confidence: number | null;
+  ai_status: string | null;
+  evaluated: boolean;
+  communication_id: string | null;
+  task_id: string | null;
+  review_task_id: string | null;
+  tool_requests: { tool_id: string; status: string; reason: string | null; detail: string | null }[];
+  manual?: boolean;
+}

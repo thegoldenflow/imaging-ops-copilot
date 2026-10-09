@@ -52,7 +52,7 @@ export function MriSafetyPage() {
               )}
               {s.free_text && <p className="rounded-lg bg-slate-50 p-2 text-slate-700">Patient wrote: “{s.free_text}”</p>}
               {s.devices.map((d, i) => (
-                <p key={i} className="text-xs"><AiBadge label="AI read" /> “{d.patient_words}” → <b>{d.device_name}</b> ({d.list_match ?? "not on list"}) · {d.mr_status}</p>
+                <p key={i} className="text-xs"><AiBadge label="AI read" agent="mri_implant_extract" /> “{d.patient_words}” → <b>{d.device_name}</b> ({d.list_match ?? "not on list"}) · {d.mr_status}</p>
               ))}
               {s.reviewed_by && <p className="text-xs text-slate-600">{s.review_decision === "cleared" ? "Cleared" : "Not cleared"} by {s.reviewed_by} · “{s.review_note}”</p>}
               {canReview && (s.status === "flagged" || s.status === "no_flags") && <Review s={s} />}

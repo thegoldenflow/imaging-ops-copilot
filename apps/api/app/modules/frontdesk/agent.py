@@ -2,10 +2,13 @@
 
 LlmAgent runs a tool-use loop through the LLM gateway (with
 de-identification) on Claude or Gemini; either provider takes and returns
-Anthropic-style messages and content blocks. ScriptedAgent is a deterministic
-fallback used when no API key is configured or the API is unavailable, so the
-phone flow always works.
-Both call the same server-side tools.
+Anthropic-style messages and content blocks. It is the registered agent
+`voice_agent` (config/agents): each caller turn is an agent run, and every tool
+the model asks for goes through the Tool Gateway (allow-list, caller role,
+idempotency of reschedule and cancel, audit, trace; spec 6.4). ScriptedAgent is a
+deterministic fallback used when no API key is configured or the API is
+unavailable, so the phone flow always works; it is plain code, not an agent, and
+calls the same server-side tools directly.
 """
 
 import json
@@ -13,6 +16,8 @@ import re
 import time
 from datetime import datetime
 
+from app.agents.registry import AgentNotDeployable
+from app.agents.runtime import runtime
 from app.core.store import Store
 from app.llm.deid import Pseudonymizer
 from app.llm.gateway import get_gateway
@@ -20,6 +25,7 @@ from app.llm.prompts import VOICE_AGENT
 from app.llm.providers import ProviderRefusal, ProviderUnavailable
 from app.modules.frontdesk.tools import (
     TOOL_DEFINITIONS,
+    TOOL_IDS,
     CallSession,
     Turn,
     find_named_patients,
@@ -178,21 +184,24 @@ class LlmAgent:
         history = self._history.setdefault(session.id, [])
         redacted = pseudo.redact(text)
         history.append({"role": "user", "content": redacted})
-        for _ in range(self.MAX_STEPS):
-            result = gateway.tool_turn(task="voice_agent", prompt=VOICE_AGENT, messages=history,
-                                       tools=TOOL_DEFINITIONS, redacted_text=redacted)
-            history.append({"role": "assistant", "content": result.content})
-            tool_uses = [b for b in result.content if b.type == "tool_use"]
-            if result.stop_reason != "tool_use" or not tool_uses:
-                return pseudo.restore(" ".join(b.text for b in result.content if b.type == "text").strip())
-            results = []
-            for block in tool_uses:
-                output = run_tool(store, session, block.name, pseudo.restore(dict(block.input)))
-                session.transcript.append(Turn(role="tool", text=f"{block.name} -> {json.dumps(output)[:300]}"))
-                results.append({"type": "tool_result", "tool_use_id": block.id,
-                                "content": pseudo.redact(json.dumps(output, default=str))})
-            history.append({"role": "user", "content": results})
-        return "Let me transfer you to a team member who can help."
+        with runtime.start("voice_agent", context_id=f"CallSession/{session.id}",
+                           attachments={"store": store, "session": session}) as run:
+            for _ in range(self.MAX_STEPS):
+                result = gateway.tool_turn(task="voice_agent", prompt=VOICE_AGENT, messages=history,
+                                           tools=TOOL_DEFINITIONS, redacted_text=redacted)
+                history.append({"role": "assistant", "content": result.content})
+                tool_uses = [b for b in result.content if b.type == "tool_use"]
+                if result.stop_reason != "tool_use" or not tool_uses:
+                    return pseudo.restore(" ".join(b.text for b in result.content if b.type == "text").strip())
+                results = []
+                for block in tool_uses:
+                    done = run.tool(TOOL_IDS.get(block.name, block.name), pseudo.restore(dict(block.input)))
+                    output = done.for_model()
+                    session.transcript.append(Turn(role="tool", text=f"{block.name} -> {json.dumps(output)[:300]}"))
+                    results.append({"type": "tool_result", "tool_use_id": block.id,
+                                    "content": pseudo.redact(json.dumps(output, default=str))})
+                history.append({"role": "user", "content": results})
+            return "Let me transfer you to a team member who can help."
 
 
 _scripted = ScriptedAgent()
@@ -209,7 +218,7 @@ def agent_reply(store: Store, session: CallSession, text: str) -> tuple[str, str
     if mode != "scripted":
         try:
             reply = _llm.respond(store, session, text)
-        except (ProviderUnavailable, ProviderRefusal):
+        except (ProviderUnavailable, ProviderRefusal, AgentNotDeployable):  # not deployable: prod mode, not evaluated
             mode = "scripted"
             reply = _scripted.respond(store, session, text)
     else:

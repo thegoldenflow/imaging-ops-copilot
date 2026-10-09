@@ -1,8 +1,9 @@
 // Small shared design system: buttons, cards, badges and page states.
 
 import clsx from "clsx";
-import { AlertTriangle, Inbox, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, FlaskConical, Inbox, Loader2, Sparkles } from "lucide-react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useAgent } from "../lib/agents";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "ai";
 
@@ -76,13 +77,33 @@ export function Badge({ tone = "slate", children, className }: { tone?: keyof ty
   );
 }
 
-/** Marks content produced by AI. Every AI output in the UI carries this. */
-export function AiBadge({ label = "AI-generated" }: { label?: string }) {
+/** Marks content produced by AI. Every AI output in the UI carries this. With `agent` (its registry id) the
+ * badge also says when that agent has not passed its evaluation (spec 6.4: shown in demo mode). */
+export function AiBadge({ label = "AI-generated", agent }: { label?: string; agent?: string }) {
   return (
-    <Badge tone="ai">
-      <Sparkles className="size-3" />
-      {label}
-    </Badge>
+    <>
+      <Badge tone="ai">
+        <Sparkles className="size-3" />
+        {label}
+      </Badge>
+      {agent && <NotEvaluated agent={agent} />}
+    </>
+  );
+}
+
+function NotEvaluated({ agent }: { agent: string }) {
+  const spec = useAgent(agent);
+  if (!spec?.not_evaluated_flag) return null;
+  return (
+    <span
+      title={`${spec.agent_id} ${spec.version} has not passed its evaluation (${spec.eval_status.status}); it runs in demo mode only`}
+      data-testid={`not-evaluated-${agent}`}
+    >
+      <Badge tone="amber">
+        <FlaskConical className="size-3" />
+        Not evaluated
+      </Badge>
+    </span>
   );
 }
 

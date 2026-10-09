@@ -42,7 +42,7 @@ function SummaryCard({ onFact }: { onFact: (tile: string) => void }) {
   return (
     <Card className="mb-4" title={<span className="flex items-center gap-2"><Sparkles className="size-4 text-ai-600" /> Weekly summary</span>}
       actions={<>
-        {s && <AiBadge label={s.status === "approved" ? "AI-drafted, approved" : "AI draft"} />}
+        {s && <AiBadge label={s.status === "approved" ? "AI-drafted, approved" : "AI draft"} agent="referral_weekly_summary" />}
         <Button size="sm" variant="ai" loading={generate.isPending} onClick={() => generate.mutate()} data-testid="generate-summary">{s ? "Redraft" : "Draft this week's summary"}</Button>
       </>}>
       {q.isLoading && <Loading />}

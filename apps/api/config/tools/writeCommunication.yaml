@@ -1,0 +1,76 @@
+# Tool registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# side_effect_level read / recommend / action / privileged; schemas are JSON Schema (the subset in
+# app/agents/jsonschema.py); fhir_writes is what the tool may write (agents' write rights derive from it).
+tool_id: writeCommunication
+description: Record a communication with the patient (a call, message or letter) on an encounter; it sends nothing.
+side_effect_level: action
+handler: app.agents.handlers:write_communication
+domain: fhir
+fhir_writes:
+  Communication:
+  - '*'
+input_schema:
+  type: object
+  properties:
+    encounter_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    direction:
+      type: string
+      enum:
+      - inbound
+      - outbound
+    medium:
+      type: string
+      enum:
+      - phone
+      - sms
+      - portal
+      - letter
+      - in-person
+    text:
+      type: string
+      minLength: 1
+      maxLength: 8000
+    status:
+      type: string
+      enum:
+      - completed
+      - preparation
+      - in-progress
+      - not-done
+  required:
+  - encounter_id
+  - direction
+  - medium
+  - text
+  - status
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    communication_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    status:
+      type: string
+  required:
+  - communication_id
+  - status
+  additionalProperties: false
+permission_policy:
+  roles:
+  - physician
+  - nurse
+  - clerk
+  - system
+  target:
+    encounter: encounter_id
+idempotency:
+  required: true
+  window_hours: 24
+timeout_ms: 5000
+retry:
+  max_attempts: 2
+  backoff_ms: 50
+audit_level: detailed

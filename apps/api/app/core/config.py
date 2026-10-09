@@ -57,6 +57,9 @@ class Settings:
     fhir_auth_mode: str
     fhir_client_id: str | None
     fhir_token_url: str | None
+    # "demo" or "prod" (spec 6.4): in prod an agent runs only when its eval_status is passed and its
+    # deployment_status prod_ready; in demo an agent that has not passed runs with a "not evaluated" flag.
+    app_mode: str
 
 
 def load_settings() -> Settings:
@@ -74,6 +77,9 @@ def load_settings() -> Settings:
     fhir_auth_mode = os.getenv("FHIR_AUTH_MODE", "none").strip().lower()
     if fhir_auth_mode not in ("none", "smart_backend"):
         raise ValueError(f"FHIR_AUTH_MODE must be none or smart_backend, not {fhir_auth_mode!r}")
+    app_mode = os.getenv("APP_MODE", "demo").strip().lower()
+    if app_mode not in ("demo", "prod"):
+        raise ValueError(f"APP_MODE must be demo or prod, not {app_mode!r}")
     return Settings(
         anthropic_api_key=key,
         google_agent_platform_api_key=os.getenv("GOOGLE_AGENT_PLATFORM_API_KEY") or None,
@@ -96,6 +102,7 @@ def load_settings() -> Settings:
         fhir_auth_mode=fhir_auth_mode,
         fhir_client_id=os.getenv("FHIR_CLIENT_ID") or None,
         fhir_token_url=os.getenv("FHIR_TOKEN_URL") or None,
+        app_mode=app_mode,
     )
 
 

@@ -19,8 +19,10 @@ COPY apps/api/pyproject.toml apps/api/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY apps/api/app ./app
-# Safety-tier registry and other configuration the gateway reads (6.3, 6.4).
+# Agent and tool registries and other configuration the gateways read (6.4), and the
+# versioned prompt files of the runtime agents.
 COPY apps/api/config ./config
+COPY apps/api/prompts ./prompts
 # Read-only data the app loads at startup: the knowledge graph (with the bilingual
 # terminology next to it) and the eval datasets/results shown on the AI evaluations page.
 COPY apps/kg-qa/data/knowledge_graph /srv/kg-data/knowledge_graph

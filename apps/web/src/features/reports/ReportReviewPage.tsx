@@ -31,7 +31,7 @@ function SectionEditor({ report, section, canEdit }: { report: Report; section: 
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-slate-900">{section.label}</h3>
-          {section.status === "pending" && section.ai_text && <AiBadge label="AI draft" />}
+          {section.status === "pending" && section.ai_text && <AiBadge label="AI draft" agent="cxr_draft" />}
           {section.status !== "pending" && <Badge tone={SECTION_TONE[section.status]}>{section.status}</Badge>}
         </div>
         {canEdit && !editing && (
@@ -115,7 +115,7 @@ export function ReportReviewPage() {
             <p className="text-xs text-slate-500"><span className="font-medium">Image quality (AI):</span> {r.image_quality.adequate ? "Adequate" : "Limited"} — {r.image_quality.notes}</p>
           )}
           {r.uncertainties.length > 0 && (
-            <Card title={<span className="flex items-center gap-2">Uncertainties <AiBadge /></span>}>
+            <Card title={<span className="flex items-center gap-2">Uncertainties <AiBadge agent="cxr_draft" /></span>}>
               <ul className="list-disc space-y-1 pl-4 text-sm text-slate-700">{r.uncertainties.map((u) => <li key={u}>{u}</li>)}</ul>
             </Card>
           )}
@@ -147,7 +147,7 @@ export function ReportReviewPage() {
                       <Badge tone={f.confirmed ? "red" : "slate"}>{f.confirmed ? "Confirmed" : "Not confirmed"}</Badge>
                     )}
                     <div>
-                      <p className="font-medium text-slate-900">{f.finding} <AiBadge label="AI flagged" /></p>
+                      <p className="font-medium text-slate-900">{f.finding} <AiBadge label="AI flagged" agent="cxr_draft" /></p>
                       <p className="text-xs text-slate-500">{f.reason}</p>
                       {r.status === "draft" && confirmed.includes(i) && (
                         <select value={levels[i] ?? "urgent"} onChange={(e) => setLevels({ ...levels, [i]: e.target.value })}

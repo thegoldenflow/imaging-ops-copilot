@@ -1,8 +1,8 @@
-"""FhirGateway (spec 6.2, 6.3): the only way modules read or write the hospital EHR.
+"""FhirGateway (spec 6.2, 6.3, 6.4): the only way modules read or write the hospital EHR.
 
 Modules never use the FHIR store or HTTP directly (tests/test_fhir_gateway.py
-greps for it). A gateway is opened for one actor (a signed-in user, later an
-agent or a system job) and one purpose module:
+greps for it). A gateway is opened for one actor (a signed-in user, an agent
+acting for one, or a system job) and one purpose module:
 
     fhir = FhirGateway(Actor.of(user, request), module="control_tower")
     board = fhir.get_bed_board("MEDA")
@@ -15,18 +15,20 @@ views (the operations manager sees a patient as MRN only). System actors are
 trusted and only audited.
 
 Writes follow the allow-list of the AI layer, which sits beside the EHR and only
-writes work items and drafts, then the safety-tier registry
-(config/modules.registry.json: the module needs an entry whose writes_allowed
-covers the resource and status), then the role's write rights and patient scope:
+writes work items and drafts, then the agent registry (config/agents, 6.4: the
+module needs an entry whose tools' fhir_writes cover the resource and status),
+then the role's write rights and patient scope:
 
     Task                 create and update, any status
     DocumentReference    create as docStatus=preliminary; change only while preliminary
                          (final only through the signing service, sign_document / app/ehr/signing.py)
     Communication, Flag  create and update
-    Appointment          create as status=proposed; change only while proposed
-                         (booking needs a clerk's confirmation, WP4b)
+    Appointment          create as status=proposed; change only while proposed;
+                         booked only through book_appointment, by a clerk (the
+                         privileged tool bookAppointment, after a recorded approval)
     Consent              record_consent (consent management, app/ehr/consent.py)
     Encounter.location   append a bed move, bed managers only (append_encounter_location)
+    Provenance           record_provenance, the agent runtime only (6.4)
 
 Anything else is refused with FhirAccessDenied and an audit record. Every call
 is audited (6.3 fields): actor and role, action and event type, resource type and
@@ -46,7 +48,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.core import registry
+from app.agents import registry
 from app.core.audit import mrn_hash
 from app.core.models import Role, StaffUser
 from app.core.store import Store, get_store
@@ -303,7 +305,9 @@ class FhirGateway:
         if self.is_in_scope(patient_id):
             self._scope[patient_id] = None
             return
-        grant = breakglass.active_grant(get_store(), self.actor.id, patient_id) if self.policy.break_glass else None
+        # a break-glass grant is the person's own emergency access; an agent acting for them does not inherit it
+        grant = breakglass.active_grant(get_store(), self.actor.id, patient_id) \
+            if self.policy.break_glass and self.actor.kind == "user" else None
         if grant is not None:
             self._scope[patient_id] = grant.id
             return
@@ -476,6 +480,10 @@ class FhirGateway:
     def get_documents(self, encounter_id: str) -> list[DocumentReference]:
         return [DocumentReference.model_validate(r) for r in self._encounter_items("DocumentReference", encounter_id)]
 
+    def get_encounter_resources(self, resource_type: str, encounter_id: str) -> list[FhirModel]:
+        """Any readable resource type recorded on the encounter (conditions, procedures, flags, ...), oldest first."""
+        return [validate(r) for r in self._encounter_items(resource_type, encounter_id)]
+
     def get_consents(self, patient_id: str) -> list[dict]:
         """The patient's Consent resources (plain dicts; app/ehr/consent.py reads them)."""
         self._require_type("read", "Consent", patient_id)
@@ -496,7 +504,7 @@ class FhirGateway:
         if rtype == "DocumentReference" and resource.get("docStatus") != "preliminary":
             return "documents are created as docStatus=preliminary; final needs the signing service"
         if rtype == "Appointment" and resource.get("status") != "proposed":
-            return "appointments are created as status=proposed; booking needs a clerk's confirmation"
+            return "appointments are created as status=proposed; booking goes through book_appointment"
         return None
 
     @staticmethod
@@ -521,9 +529,9 @@ class FhirGateway:
                         module: str | None = None, patient: str | None = None, encounter: str | None = None):
         """The module's registry entry, refusing the write when there is none or it does not cover it."""
         module = module or self.module
-        entry = registry.entry(module)
+        entry = registry.agent(module)
         if entry is None:
-            self._deny(action, resource_type, resource_id, f"module {module} has no entry in the safety-tier registry",
+            self._deny(action, resource_type, resource_id, f"module {module} has no entry in the agent registry",
                        patient=patient, encounter=encounter)
         if not entry.allows(resource_type, status):
             self._deny(action, resource_type, resource_id,
@@ -622,6 +630,42 @@ class FhirGateway:
         self._audit("update", "Encounter", encounter_id, detail=f"moved to {bed_id}",
                     patient=access.patient_of(stored), encounter=encounter_id)
         return Encounter.model_validate(stored)
+
+    def book_appointment(self, appointment_id: str) -> FhirModel:
+        """Proposed -> booked. A clerk's act (the registration desk), or the privileged tool bookAppointment
+        running on the approving clerk's authority (6.4); the module's tools must allow booked appointments."""
+        current = self.backend.read("Appointment", appointment_id)
+        if current is None:
+            raise LookupError(f"Appointment/{appointment_id} not found")
+        patient = access.patient_of(current)
+        self._registry_entry("update", "Appointment", appointment_id, "booked", patient=patient)
+        if self.policy is not None and (self.role not in access.BOOKERS or self.actor.kind != "user"):
+            self._deny("update", "Appointment", appointment_id, "only a clerk books appointments", patient=patient)
+        self._require_patient("update", "Appointment", appointment_id, patient)
+        if current.get("status") != "proposed":
+            raise FhirConflict(f"Appointment/{appointment_id} is {current.get('status')}, not proposed")
+        booked = {**current, "status": "booked"}
+        validate(booked)
+        stored = self.backend.update(booked)
+        self._audit("update", "Appointment", appointment_id, detail="booked", patient=patient,
+                    encounter=access.encounter_of(stored))
+        return validate(stored)
+
+    def record_provenance(self, resource: dict, *, replace: bool = False) -> FhirModel:
+        """Write the Provenance of an AI output (6.4): the agent runtime only, as a system actor."""
+        if resource.get("resourceType") != "Provenance":
+            raise ValueError("record_provenance takes a Provenance")
+        self._registry_entry("create", "Provenance", resource.get("id"), None)
+        if self.actor.kind != "system":
+            self._deny("create", "Provenance", resource.get("id"), "only the agent runtime records provenance")
+        validate(resource)
+        exists = bool(resource.get("id")) and self.backend.read("Provenance", resource["id"]) is not None
+        if exists and not replace:
+            raise FhirConflict(f"Provenance/{resource['id']} already exists")
+        stored = self.backend.update(resource) if exists else self.backend.create(resource)
+        self._audit("update" if exists else "create", "Provenance", stored["id"],
+                    detail=f"target {((stored.get('target') or [{}])[0]).get('reference')}")
+        return validate(stored)
 
     # ----- signing and consent (6.3) -----
 

@@ -17,7 +17,14 @@ needs a break-glass grant (app/ehr/breakglass.py).
 
 Imaging-centre roles (front desk, technologist, radiologist, medical director,
 referrer) have no access to the hospital EHR. System actors (the HL7 adapter,
-scripts) are trusted and only audited; agents get their own policies in WP4b.
+scripts) are trusted and only audited.
+
+Agents (6.4): an agent acting for a signed-in user (kind "agent") gets that
+user's policy here, and the Tool Gateway narrows it further to the agent's
+`data_scope`; an agent running on its own (role "agent:<agent_id>", e.g. a
+background workflow step) gets a policy built from its registry entry: the
+resource types of its data scope, hospital-wide (the Tool Gateway binds it to the
+run's encounter), writing only what its tools write, and never signing.
 """
 
 from __future__ import annotations
@@ -82,12 +89,27 @@ POLICIES: dict[str, RolePolicy] = {
 }
 NO_ACCESS = RolePolicy("none", frozenset(), frozenset())
 CONSENT_RECORDERS = frozenset({"clerk", "nurse", "physician"})
+BOOKERS = frozenset({"clerk"})  # appointments become booked only by a clerk (registration desk)
+AGENT_ROLE = "agent:"  # role of an agent running without a user: "agent:<agent_id>"
+
+
+def agent_policy(agent_id: str) -> RolePolicy:
+    """The policy of an agent running on its own, from its registry entry (none: no access)."""
+    from app.agents import registry
+
+    spec = registry.agent(agent_id)
+    if spec is None or spec.data_scope.scope == "none":
+        return NO_ACCESS
+    write = frozenset(t for t in spec.writes() if t != "Provenance")
+    return RolePolicy("hospital", frozenset(spec.data_scope.resources) | DIRECTORY, write)
 
 
 def policy_for(role: str, kind: str = "user") -> RolePolicy | None:
     """The role's policy; None for trusted system actors (no role restrictions, still audited)."""
     if kind == "system":
         return None
+    if kind == "agent" and str(role).startswith(AGENT_ROLE):
+        return agent_policy(str(role)[len(AGENT_ROLE):])
     return POLICIES.get(str(role), NO_ACCESS)
 
 
@@ -153,7 +175,7 @@ def write_refusal(policy: RolePolicy | None, role: str, resource: dict, signoff_
         if ROLE_CODE[role] not in performer_codes(resource):
             kind = "registration" if role == "clerk" else "action"
             return f"the {role} role writes only {kind} tasks (performerType {ROLE_CODE[role]})"
-    if rtype == "DocumentReference" and role not in signoff_roles:
+    if rtype == "DocumentReference" and role not in signoff_roles and not role.startswith(AGENT_ROLE):
         return f"documents of this module are signed by {', '.join(signoff_roles) or 'nobody'}, not the {role} role"
     return None
 

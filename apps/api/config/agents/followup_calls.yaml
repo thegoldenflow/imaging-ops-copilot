@@ -1,0 +1,35 @@
+# Agent registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# kind: runtime_agent (hosted by the agent runtime) | embedded_agent (AI step inside its module) |
+# module (no model; registered for its EHR writes). Model ids come from the environment (model_policy.tier).
+agent_id: followup_calls
+version: 0.1.0
+kind: runtime_agent
+owner: Patient services team
+purpose: Post-discharge follow-up calls; red flags escalate to a nurse (7.4).
+risk_tier: ops
+allowed_tools:
+- getEncounterContext
+- getDocuments
+- writeCommunication
+- createTask
+- updateTask
+data_scope:
+  resources:
+  - Patient
+  - Encounter
+  - DocumentReference
+  - Flag
+  scope: encounter
+model_policy:
+  tier: voice
+  max_tokens: 2000
+  temperature_max: null
+prompt_version: null
+required_signoff_role:
+- nurse
+consent_required:
+- followup_call
+eval_status:
+  status: pending
+deployment_status: dev
+entrypoint: null

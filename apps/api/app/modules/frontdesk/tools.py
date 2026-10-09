@@ -232,6 +232,27 @@ TOOL_DEFINITIONS = [
 ]
 
 
+# The tools in the tool registry (config/tools/<tool_id>.yaml, domain imaging_frontdesk): tool id -> name here.
+REGISTERED = {"verifyCallerIdentity": "verify_identity", "lookupAppointments": "lookup_appointment",
+              "findOpenSlots": "find_open_slots", "rescheduleAppointment": "reschedule",
+              "cancelAppointment": "cancel", "getPrepInstructions": "get_prep_instructions",
+              "getSiteInfo": "get_site_info", "transferToHuman": "transfer_to_human"}
+TOOL_IDS = {name: tool_id for tool_id, name in REGISTERED.items()}
+
+
+def registered_tool(ctx, **args) -> dict:
+    """Handler of the phone tools behind the Tool Gateway (6.4). The call session comes with the run;
+    a tool's own refusal (caller not verified, slot taken) goes back to the model as an error."""
+    from app.agents.gateway import ToolPreconditionFailed
+    from app.core.store import get_store
+
+    session = ctx.attachments["session"]
+    output = run_tool(ctx.attachments.get("store") or get_store(), session, REGISTERED[ctx.tool.tool_id], args)
+    if "error" in output:
+        raise ToolPreconditionFailed(output["error"])
+    return output
+
+
 def run_tool(store: Store, session: CallSession, name: str, args: dict) -> dict:
     fn = TOOLS.get(name)
     if fn is None:

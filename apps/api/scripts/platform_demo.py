@@ -1,4 +1,4 @@
-"""WP4 demo (spec 6.3): roles and unit scope, break-glass, consent, signing, the registry,
+"""WP4 demo (spec 6.3): roles and unit scope, break-glass, consent, signing, the registry (agent registry since WP4b),
 free-text de-identification and the extended audit log, in a terminal.
 
     cd apps/api && uv run python scripts/platform_demo.py [--commit]
@@ -139,7 +139,7 @@ def main() -> None:
             except FhirAccessDenied as e:
                 print(f"  {role:<11} signs {doc:<19} -> refused: {e}")
 
-        heading("Safety-tier registry: a module without an entry cannot write")
+        heading("Agent registry (6.4, formerly the 6.3 safety-tier registry): a module without an entry cannot write")
         try:
             gw(Role.NURSE, "shadow_module").create({"resourceType": "Flag", "status": "active",
                                                     "code": {"text": "Fall risk"},

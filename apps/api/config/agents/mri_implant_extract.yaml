@@ -1,0 +1,27 @@
+# Agent registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# kind: runtime_agent (hosted by the agent runtime) | embedded_agent (AI step inside its module) |
+# module (no model; registered for its EHR writes). Model ids come from the environment (model_policy.tier).
+agent_id: mri_implant_extract
+version: 1.0.0
+kind: embedded_agent
+owner: Imaging AI team
+purpose: Read implant mentions from MRI screening answers in four languages (System 8).
+risk_tier: clinical_ds
+allowed_tools: []
+data_scope:
+  resources: []
+  scope: none
+model_policy:
+  tier: fast
+  max_tokens: 8000
+  temperature_max: null
+prompt_version: mri_implant_extract@1
+required_signoff_role:
+- technologist
+- radiologist
+consent_required: []
+eval_status:
+  status: pending
+  run_id: evals/results/implants.json@2026-10-06T22:35:05
+  note: Mock baseline only (rule-based stand-in for the model); no release threshold set yet (6.6).
+deployment_status: demo

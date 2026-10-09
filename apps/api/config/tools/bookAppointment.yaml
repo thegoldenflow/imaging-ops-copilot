@@ -1,0 +1,58 @@
+# Tool registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# side_effect_level read / recommend / action / privileged; schemas are JSON Schema (the subset in
+# app/agents/jsonschema.py); fhir_writes is what the tool may write (agents' write rights derive from it).
+tool_id: bookAppointment
+description: Book a proposed appointment after a clerk approved it; tells the event bus (appointment.scheduled).
+side_effect_level: privileged
+handler: app.agents.handlers:book_appointment
+domain: fhir
+fhir_writes:
+  Appointment:
+  - booked
+input_schema:
+  type: object
+  properties:
+    appointment_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    approval_task_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+  required:
+  - appointment_id
+  - approval_task_id
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    appointment_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    status:
+      type: string
+    event_id:
+      type:
+      - string
+      - 'null'
+  required:
+  - appointment_id
+  - status
+  additionalProperties: false
+permission_policy:
+  roles:
+  - physician
+  - nurse
+  - clerk
+  - system
+  approver_roles:
+  - clerk
+  target:
+    appointment: appointment_id
+idempotency:
+  required: true
+  window_hours: 24
+timeout_ms: 5000
+retry:
+  max_attempts: 1
+  backoff_ms: 0
+audit_level: double

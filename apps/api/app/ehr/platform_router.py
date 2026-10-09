@@ -16,7 +16,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app.core import registry
+from app.agents import registry
 from app.core.auth import client_ip, current_user, require_roles
 from app.core.models import Role, StaffUser
 from app.core.store import get_store
@@ -60,7 +60,7 @@ def _name(patient, use: str | None) -> str | None:
 def _document_view(doc, role: str) -> dict:
     data = doc.to_fhir()
     module = source_module(data)
-    entry = registry.entry(module) if module else None
+    entry = registry.agent(module) if module else None
     signed = signatures(data)
     required = list(entry.required_signoff_role) if entry else []
     missing = [r for r in required if r not in {s["role"] for s in signed}] if entry and entry.cosign else (
@@ -252,5 +252,10 @@ def sign_document(document_id: str, request: Request,
 
 @router.get("/hospital/registry")
 def module_registry(user: StaffUser = Depends(current_user)):
-    return {"version": registry.registry().version,
-            "modules": {name: entry.model_dump() for name, entry in sorted(registry.modules().items())}}
+    """The registry entries that write to the EHR, in the 6.3 shape (the full registry is GET /api/agents)."""
+    return {"modules": {name: {"tier": spec.risk_tier, "purpose": spec.purpose, "kind": spec.kind,
+                               "required_signoff_role": spec.required_signoff_role, "cosign": spec.cosign,
+                               "consent_required": spec.consent_required,
+                               "writes_allowed": {t: sorted(s) for t, s in sorted(spec.writes().items())},
+                               "allowed_tools": spec.allowed_tools}
+                        for name, spec in sorted(registry.agents().items()) if spec.writes()}}

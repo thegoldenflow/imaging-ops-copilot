@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.agents.router import router as agents_router
 from app.core.config import settings
 from app.core.context import RequestContextMiddleware
 from app.core.db.migrate import init_db
@@ -158,6 +159,7 @@ app.include_router(inspection_router)
 app.include_router(clinical_kg_router)
 app.include_router(hospital_router)
 app.include_router(platform_router)
+app.include_router(agents_router)
 
 
 @app.exception_handler(FhirAccessDenied)

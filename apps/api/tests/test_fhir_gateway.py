@@ -16,7 +16,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from app.core import registry
+from app.agents import registry
 from app.ehr import gateway as gw
 from app.ehr.clock import hospital_now
 from app.ehr.codes import MRN_SYSTEM
@@ -31,9 +31,8 @@ API = Path(__file__).resolve().parents[1]
 OPS = Actor("U-OPS1", "Olivia Ops", "operations_manager")
 RAD = Actor("U-RAD1", "Rad One", "radiologist")
 SYSTEM = Actor("system:wp2-test", "WP2 test", "system", "system")
-TEST_MODULE = {"tier": "ops", "required_signoff_role": [],
-               "writes_allowed": {t: ["*"] for t in ("Task", "DocumentReference", "Communication", "Flag",
-                                                     "Appointment")} | {"Encounter.location": ["append"]}}
+TEST_MODULE = {"allowed_tools": ["createTask", "updateTask", "draftDocument", "writeCommunication", "createFlag",
+                                 "updateFlag", "proposeAppointment", "appendEncounterLocation"]}
 
 
 @pytest.fixture(autouse=True)

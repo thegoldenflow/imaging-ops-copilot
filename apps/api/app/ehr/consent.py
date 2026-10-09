@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
-from app.core.registry import CONSENT_CATEGORIES
+from app.agents.registry import CONSENT_CATEGORIES
 from app.core.store import get_store
 from app.ehr.clock import hospital_now
 from app.ehr.codes import PRACTITIONER_ROLE, TASK_CODE, concept

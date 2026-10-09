@@ -122,6 +122,11 @@ MODULE_ENTITIES = {
         EntitySpec("break_glass_grants", "app.ehr.breakglass:BreakGlassGrant", encrypted=("mrn", "reason", "review_note"),
                    indexes=(("user_id",), ("review_status",))),
         EntitySpec("deid_misses", "app.llm.freetext_deid:DeidMiss", kind="list", encrypted=("text", "context")),
+        # Agent runtime (6.4): one trace per run (references and hashes only) and the Tool Gateway's
+        # idempotency records (the first result of an action, replayed for 24 hours; encrypted)
+        EntitySpec("agent_traces", "app.agents.trace:AgentTrace", indexes=(("agent_id",), ("started_at",))),
+        EntitySpec("tool_idempotency", "app.agents.trace:IdempotencyRecord", encrypted=("result",),
+                   indexes=(("expires_at",),)),
     ]
 }
 

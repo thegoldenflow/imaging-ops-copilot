@@ -1,0 +1,25 @@
+# Agent registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# kind: runtime_agent (hosted by the agent runtime) | embedded_agent (AI step inside its module) |
+# module (no model; registered for its EHR writes). Model ids come from the environment (model_policy.tier).
+agent_id: call_summary
+version: 1.0.0
+kind: embedded_agent
+owner: Imaging AI team
+purpose: Summarise a front-desk phone call for the call log (System 4).
+risk_tier: ops
+allowed_tools: []
+data_scope:
+  resources: []
+  scope: none
+model_policy:
+  tier: fast
+  max_tokens: 8000
+  temperature_max: null
+prompt_version: call_summary@1
+required_signoff_role: []
+consent_required: []
+eval_status:
+  status: pending
+  run_id: null
+  note: No eval set yet.
+deployment_status: demo

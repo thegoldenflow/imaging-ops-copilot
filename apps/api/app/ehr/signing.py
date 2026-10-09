@@ -3,8 +3,9 @@
 A draft is created as `docStatus=preliminary` by the module that wrote it (its
 `source-module` extension). Signing it:
 
-1. needs a registry entry for that module whose `writes_allowed` lets its
-   documents become final, and a person (system actors cannot sign);
+1. needs an agent-registry entry for that module (config/agents, 6.4) whose
+   tools let its documents become final (signDocumentFinal), and a person
+   (system actors and agents cannot sign);
 2. the signer's role must be one of the module's `required_signoff_role` and the
    patient must be in the signer's scope (their units, or a break-glass grant);
 3. adds a signature (extension `signature`: role, signer, time). With `cosign`
@@ -12,7 +13,9 @@ A draft is created as `docStatus=preliminary` by the module that wrote it (its
    preliminary until every listed role has signed; otherwise one signature
    finalises it. The final document gets `authenticator` (the last signer's
    Practitioner) and `docStatus=final`;
-4. writes a `sign` audit event (refusals are `sign` events with outcome denied).
+4. writes a `sign` audit event (refusals are `sign` events with outcome denied);
+5. for a draft an agent wrote (extension ai-run), adds the signer to the run's
+   Provenance and records the signature as the trace's human action (6.4).
 """
 
 from __future__ import annotations
@@ -72,15 +75,15 @@ def sign(fhir: FhirGateway, document_id: str, *, at: datetime | None = None) -> 
 
         raise FhirAccessDenied(why)
 
-    from app.core import registry
+    from app.agents import registry
 
-    entry = registry.entry(module) if module else None
+    entry = registry.agent(module) if module else None
     if entry is None:
-        deny(f"the document's module ({module or 'unknown'}) has no entry in the safety-tier registry")
+        deny(f"the document's module ({module or 'unknown'}) has no entry in the agent registry")
     if not entry.allows("DocumentReference", "final"):
         deny(f"documents of module {module} cannot become final")
-    if fhir.policy is None:
-        deny("only a person can sign; system actors cannot")
+    if fhir.policy is None or fhir.actor.kind != "user":
+        deny("only a person can sign; system actors and agents cannot")
     role = fhir.role
     if not fhir.policy.signs or role not in entry.required_signoff_role:
         deny(f"documents of module {module} are signed by {', '.join(entry.required_signoff_role) or 'nobody'}, "
@@ -109,4 +112,7 @@ def sign(fhir: FhirGateway, document_id: str, *, at: datetime | None = None) -> 
                                          f"waiting for {', '.join(missing)}"
     fhir._audit("sign", "DocumentReference", document_id, detail=detail, patient=patient, encounter=encounter,
                 event_type="sign", module=module)
+    from app.agents.runtime import record_signature
+
+    record_signature(doc, signer, role, fhir.actor.id)  # an AI draft: the signer joins its Provenance and trace
     return SignResult(document_id, doc["docStatus"], signed, missing)

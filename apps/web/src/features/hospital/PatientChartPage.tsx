@@ -6,6 +6,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, Loading, PageHeader } from
 import { ApiError, api, post } from "../../lib/api";
 import { dateTime, time } from "../../lib/format";
 import { BreakGlassDialog } from "./BreakGlass";
+import { PatientMessageCard } from "./PatientMessage";
 import {
   CONSENT_FALLBACK,
   CONSENT_LABEL,
@@ -123,6 +124,7 @@ function ChartView({ chart, onChange }: { chart: Chart; onChange: () => void }) 
           )}
         </Card>
       )}
+      {chart.encounter && (chart.role === "nurse" || chart.role === "physician") && <PatientMessageCard encounterId={chart.encounter.id} />}
     </>
   );
 }

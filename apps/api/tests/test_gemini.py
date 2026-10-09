@@ -9,6 +9,7 @@ from google.genai import errors as genai_errors
 from google.genai import types
 from pydantic import BaseModel
 
+from app.agents import registry
 from app.core import config
 from app.core.store import get_store
 from app.llm import gateway as gateway_module
@@ -27,6 +28,13 @@ from app.modules.frontdesk import agent as frontdesk_agent
 from app.modules.frontdesk.tools import TOOL_DEFINITIONS
 
 PROMPT = Prompt(name="t", version="t-v1", system="sys", template="Q: {q}")
+
+
+@pytest.fixture(autouse=True)
+def _registered_test_agent():
+    """The LLM gateway refuses tasks without an agent-registry entry (6.4); "t" is this file's test agent."""
+    with registry.temporary("t", {"kind": "embedded_agent"}):
+        yield
 
 
 class Answer(BaseModel):

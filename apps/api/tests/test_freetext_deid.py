@@ -6,6 +6,7 @@ from datetime import date
 
 from sqlalchemy import text
 
+from app.agents import registry
 from app.llm.deid_eval import PRECISION_MIN, RECALL_MIN, evaluate, load_cases
 from app.llm.fhir_deid import FhirDeidentifier
 from app.llm.freetext_deid import FreeTextDeidentifier, PhiFindings, deidentify
@@ -106,7 +107,8 @@ def test_the_model_only_sees_redacted_text(fresh_state):
         seen.append(text)
         return {"findings": []}
 
-    deidentify(NOTE, _deid(), task="deid_spy")
+    with registry.temporary("deid_spy", {"kind": "embedded_agent"}):
+        deidentify(NOTE, _deid(), task="deid_spy")
     assert seen and "Tremblay" not in seen[0] and "王芳" not in seen[0] and "[PERSON_1]" in seen[0]
     assert PhiFindings.model_validate({"findings": []}).findings == []
 
@@ -136,8 +138,10 @@ def test_gateway_takes_fhir_redacted_input_without_retokenising_dates(fresh_stat
     import json
 
     prompt = Prompt("hook_test", "hook_test@1", "Summarise.", "{resources}")
-    outcome = get_gateway().structured(task="hook_test", prompt=prompt, variables={"resources": json.dumps(redacted)},
-                                       schema_cls=Out, pseudonymizer=fhir_deid.pseudo)
+    with registry.temporary("hook_test", {"kind": "embedded_agent"}):
+        outcome = get_gateway().structured(task="hook_test", prompt=prompt,
+                                           variables={"resources": json.dumps(redacted)}, schema_cls=Out,
+                                           pseudonymizer=fhir_deid.pseudo)
     assert "2026-10-07T08:00:00-04:00" in seen[0] and "[DATE_" not in seen[0]  # clinical times stay
     assert "Tremblay" not in seen[0] and "40012345" not in seen[0]
     assert outcome.data["summary"] == "Margaret Tremblay walked on 2026-10-07"

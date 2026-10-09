@@ -1,0 +1,34 @@
+# Agent registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# kind: runtime_agent (hosted by the agent runtime) | embedded_agent (AI step inside its module) |
+# module (no model; registered for its EHR writes). Model ids come from the environment (model_policy.tier).
+agent_id: voice_agent
+version: 1.0.0
+kind: embedded_agent
+owner: Imaging AI team
+purpose: 'Phone receptionist: verify the caller, look up, reschedule or cancel appointments, give preparation and
+  site information, hand over to staff (System 4).'
+risk_tier: ops
+allowed_tools:
+- verifyCallerIdentity
+- lookupAppointments
+- findOpenSlots
+- getPrepInstructions
+- getSiteInfo
+- rescheduleAppointment
+- cancelAppointment
+- transferToHuman
+data_scope:
+  resources: []
+  scope: none
+model_policy:
+  tier: voice
+  max_tokens: 1024
+  temperature_max: null
+prompt_version: voice_agent@1
+required_signoff_role: []
+consent_required: []
+eval_status:
+  status: pending
+  run_id: null
+  note: Scripted-call tests only; no model eval set.
+deployment_status: demo
