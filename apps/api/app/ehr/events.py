@@ -73,6 +73,7 @@ EVENT_TYPES: dict[str, str] = {
     "appointment.updated": "SIU^S14: an operating-room case started or finished",
     "appointment.cancelled": "SIU^S15: an operating-room case was cancelled",
     "consent.revoked": "platform: a patient withdrew a consent (no HL7 message)",
+    "consent.granted": "platform: a patient gave a consent that was missing or withdrawn (no HL7 message)",
 }
 
 MAX_ATTEMPTS = 3

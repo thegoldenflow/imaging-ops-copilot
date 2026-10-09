@@ -32,6 +32,9 @@ import { RequisitionDetailPage } from "./features/requisitions/RequisitionDetail
 import { RequisitionsPage } from "./features/requisitions/RequisitionsPage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { FrontDeskPage } from "./features/frontdesk/FrontDeskPage";
+import { BreakGlassReviewPage } from "./features/hospital/BreakGlassReviewPage";
+import { PatientChartPage } from "./features/hospital/PatientChartPage";
+import { PatientsPage } from "./features/hospital/PatientsPage";
 import { HomePage } from "./features/home/HomePage";
 import { PreRegPage } from "./features/patient/PreRegPage";
 import { ReferrerPage } from "./features/referrer/ReferrerPage";
@@ -103,6 +106,9 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/evals" element={<Guard path="/evals"><EvalsPage /></Guard>} />
               <Route path="/ai-usage" element={<Guard path="/ai-usage"><AiUsagePage /></Guard>} />
               <Route path="/audit" element={<Guard path="/audit"><AuditPage /></Guard>} />
+              <Route path="/break-glass-review" element={<Guard path="/break-glass-review"><BreakGlassReviewPage /></Guard>} />
+              <Route path="/hospital/patients" element={<Guard path="/hospital/patients"><PatientsPage /></Guard>} />
+              <Route path="/hospital/patients/:mrn" element={<Guard path="/hospital/patients"><PatientChartPage /></Guard>} />
               <Route path="*" element={<EmptyState title="Page not found" />} />
             </Route>
           </Routes>

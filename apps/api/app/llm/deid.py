@@ -55,19 +55,29 @@ class Pseudonymizer:
         self._forward.setdefault(value.strip().lower(), token)
         self._reverse.setdefault(token, value.strip())
 
+    def alias(self, token: str, value: str) -> None:
+        """Another token text that restores to a value (a date token that carries its relative day)."""
+        self._reverse.setdefault(token, value.strip())
+
     def add_known(self, value: str | None, kind: str) -> None:
         """An identifier to replace wherever it appears in free text."""
         if value and value.strip() and value.strip() not in self._known:
             self._known[value.strip()] = kind
             self._longest_first = None
 
-    def redact(self, text: str) -> str:
+    def redact_known(self, text: str) -> str:
+        """Only the identifiers learned so far (no patterns): safe to repeat on text that is
+        already de-identified, e.g. FHIR resources or notes passed through the free-text layer."""
         # Longest first, so "Fang Wang" is replaced before a shorter known value inside it.
         if self._longest_first is None:
             self._longest_first = sorted(self._known, key=len, reverse=True)
         for value in self._longest_first:
             if value.lower() in text.lower():
                 text = re.sub(re.escape(value), self._token(self._known[value], value), text, flags=re.IGNORECASE)
+        return text
+
+    def redact(self, text: str) -> str:
+        text = self.redact_known(text)
         text = EMAIL_RE.sub(lambda m: self._token("EMAIL", m.group()), text)
         text = HEALTH_CARD_RE.sub(lambda m: self._token("HEALTH_CARD", m.group()), text)
         text = ISO_DATE_RE.sub(lambda m: self._token("DATE", m.group()), text)

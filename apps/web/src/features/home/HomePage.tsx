@@ -150,6 +150,36 @@ const BUSINESS: Step[] = [
   },
 ];
 
+// Hospital platform (spec 6.3): roles, unit scope, break-glass, consent and signing. The hospital
+// staff are generated (app/ehr/seed/platform.py); their user ids follow the practitioner ids.
+const HOSPITAL: Step[] = [
+  {
+    title: "A Medicine A physician sees only their unit's patients",
+    detail: "Open the census and a patient's chart: encounter, consent, medication orders, observations and documents. Sign the discharge summary draft: only a physician can, and only through the signing service.",
+    role: "physician", userId: "U-DOC-09", to: "/hospital/patients", system: "Access · signing",
+  },
+  {
+    title: "Break-glass for an ICU patient",
+    detail: "Type the MRN of an ICU patient (the operations manager's ICU census lists them). The record is closed; open it with a reason of at least 10 characters. A red banner stays for 4 hours.",
+    role: "physician", userId: "U-DOC-09", to: "/hospital/patients", system: "Break-glass",
+  },
+  {
+    title: "The pharmacist co-signs the medication reconciliation",
+    detail: "Pharmacists see medication-related records hospital-wide, no clinical notes. The med rec draft needs the pharmacist and a physician; one signature leaves it a draft.",
+    role: "pharmacist", userId: "U-PHAR-01", to: "/hospital/patients", system: "Co-signature",
+  },
+  {
+    title: "Registration records a consent change",
+    detail: "The clerk sees demographics and visits without clinical content. Record a withdrawal of SMS consent: it is audited and published as consent.revoked on the event bus.",
+    role: "clerk", userId: "U-CLER-01", to: "/hospital/patients", system: "Consent",
+  },
+  {
+    title: "The administrator reviews the emergency access",
+    detail: "The break-glass queue shows who opened which patient, why and what they read. Mark it justified or not; the decision goes to the hash-chained audit log, filterable by event type and patient.",
+    role: "admin", userId: "U-ADMIN", to: "/break-glass-review", system: "Audit",
+  },
+];
+
 function StoryCard({ title, steps, onGo, userId }: { title: string; steps: Step[]; onGo: (s: Step) => void; userId: string }) {
   return (
     <Card title={title} className="mb-4">
@@ -180,6 +210,8 @@ export function HomePage() {
   const navigate = useNavigate();
   if (!user) return null;
 
+  const hospitalFirst = ["physician", "nurse", "pharmacist", "clerk"].includes(user.role);
+
   const go = async (step: Step) => {
     if (user.id !== step.userId) await login(step.userId);
     navigate(step.to);
@@ -191,10 +223,12 @@ export function HomePage() {
         title={`Welcome, ${user.name.split(" ").slice(-2).join(" ")}`}
         subtitle="Follow the demo storyline below, or use the menu to explore your role's tools."
       />
+      {hospitalFirst && <StoryCard title="Storyline 5 · hospital platform: roles, break-glass, consent, signing" steps={HOSPITAL} onGo={go} userId={user.id} />}
       <StoryCard title="Storyline 1 · one patient through scheduling, reporting and the front desk" steps={STORY} onGo={go} userId={user.id} />
       <StoryCard title="Storyline 2 · the requisition intake pipeline" steps={PIPELINE} onGo={go} userId={user.id} />
       <StoryCard title="Storyline 3 · radiology operations" steps={OPERATIONS} onGo={go} userId={user.id} />
       <StoryCard title="Storyline 4 · business and compliance" steps={BUSINESS} onGo={go} userId={user.id} />
+      {!hospitalFirst && <StoryCard title="Storyline 5 · hospital platform: roles, break-glass, consent, signing" steps={HOSPITAL} onGo={go} userId={user.id} />}
       <p className="flex items-center gap-1.5 text-xs text-slate-500">
         <CheckCircle2 className="size-3.5" /> Use “Reset demo” in the header to start over.
       </p>

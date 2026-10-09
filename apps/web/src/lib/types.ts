@@ -7,7 +7,12 @@ export type Role =
   | "operations_manager"
   | "medical_director"
   | "admin"
-  | "referrer";
+  | "referrer"
+  // Hospital platform (spec 6.3); the spec's ops_manager is operations_manager.
+  | "physician"
+  | "nurse"
+  | "pharmacist"
+  | "clerk";
 
 export const ROLE_LABEL: Record<Role, string> = {
   front_desk: "Front desk",
@@ -17,7 +22,14 @@ export const ROLE_LABEL: Record<Role, string> = {
   medical_director: "Medical director",
   admin: "Administrator",
   referrer: "Referring physician",
+  physician: "Physician",
+  nurse: "Nurse",
+  pharmacist: "Pharmacist",
+  clerk: "Registration clerk",
 };
+
+/** Hospital roles that work with patient records (6.3); admin sees only the audit side. */
+export const HOSPITAL_CLINICAL: Role[] = ["physician", "nurse", "pharmacist", "clerk", "operations_manager"];
 
 export interface StaffUser {
   id: string;
@@ -25,6 +37,8 @@ export interface StaffUser {
   role: Role;
   site_ids: string[];
   referrer_id: string | null;
+  unit_ids?: string[];
+  practitioner_id?: string | null;
 }
 
 export interface Site {

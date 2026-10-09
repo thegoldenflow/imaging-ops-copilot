@@ -1,6 +1,10 @@
 """WP2: FhirGateway (spec 6.2): typed reads, the write allow-list with audited refusals,
 bed moves, the HAPI backend (fake server and, when one runs, the real HAPI), and the
-grep rules that keep FHIR access inside the gateway."""
+grep rules that keep FHIR access inside the gateway.
+
+These tests are about the gateway's mechanics, so they act as a trusted system actor
+under a test module registered for every allowed write; the role and registry rules
+added in WP4 (6.3) are tested in tests/test_access.py."""
 
 import base64
 import dataclasses
@@ -12,6 +16,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from app.core import registry
 from app.ehr import gateway as gw
 from app.ehr.clock import hospital_now
 from app.ehr.codes import MRN_SYSTEM
@@ -25,9 +30,19 @@ from app.fhir.types.patient import Patient
 API = Path(__file__).resolve().parents[1]
 OPS = Actor("U-OPS1", "Olivia Ops", "operations_manager")
 RAD = Actor("U-RAD1", "Rad One", "radiologist")
+SYSTEM = Actor("system:wp2-test", "WP2 test", "system", "system")
+TEST_MODULE = {"tier": "ops", "required_signoff_role": [],
+               "writes_allowed": {t: ["*"] for t in ("Task", "DocumentReference", "Communication", "Flag",
+                                                     "Appointment")} | {"Encounter.location": ["append"]}}
 
 
-def _gateway(store, actor=OPS, module="wp2_test"):
+@pytest.fixture(autouse=True)
+def _registered_test_module():
+    with registry.temporary("wp2_test", TEST_MODULE):
+        yield
+
+
+def _gateway(store, actor=SYSTEM, module="wp2_test"):
     return FhirGateway(actor, module, LocalBackend(store))
 
 
@@ -81,7 +96,8 @@ def test_reads_are_typed_and_audited(fresh_state):
 
     events = store.audit.events()[before:]
     assert len(events) == 10  # one per call (the internal MRN lookups are not separate events)
-    assert {e.reason for e in events} == {"wp2_test"} and {e.user_id for e in events} == {"U-OPS1"}
+    assert {e.module for e in events} == {"wp2_test"} and {e.user_id for e in events} == {"system:wp2-test"}
+    assert {e.event_type for e in events} == {"read"} and events[0].patient_mrn_hash  # 6.3 audit fields
     assert [e.resource_type for e in events[:3]] == ["Patient", "Encounter", "Encounter"]
     assert events[0].resource_id == patient["id"] and events[4].resource_id == enc["id"]
 
@@ -180,7 +196,7 @@ def test_refused_creates_are_audited(fresh_state, label, build):
         _gateway(fresh_state).create(resource)
     event = _audit_tail(fresh_state, 1)[0]
     assert (event.action, event.resource_type, event.outcome) == ("create", resource["resourceType"], "denied")
-    assert event.reason.startswith("wp2_test: ") and event.user_id == "U-OPS1"
+    assert event.module == "wp2_test" and event.reason and event.user_id == "system:wp2-test"
     assert fresh_state.fhir.count(resource["resourceType"]) == before  # nothing written
 
 
@@ -219,7 +235,7 @@ def test_bed_manager_moves_a_patient(fresh_state):
     old_bed = gw._current_location(enc)["location"]["reference"].split("/")[1]
     unit = old_bed.split("-")[0]
     new_bed = _free_bed(store, unit).id
-    moved = _gateway(store).append_encounter_location(enc["id"], new_bed)
+    moved = _gateway(store, actor=OPS).append_encounter_location(enc["id"], new_bed)
     history = moved.location
     assert history[-1].location.reference == f"Location/{new_bed}" and history[-1].status == "active"
     assert history[-2].location.reference == f"Location/{old_bed}" and history[-2].status == "completed"
@@ -289,7 +305,7 @@ def test_hapi_backend_pages_and_keeps_local_search_semantics():
     assert first["encounter"] == "e1" and first["code"] == "718-7" and first["_count"] == "200"
     assert calls[0].headers["Cache-Control"] == "no-cache"  # never a server-cached search result
     assert len(calls) == 2 and calls[1].url.params.get("page") == "2"  # followed the next link
-    fhir = FhirGateway(OPS, "wp2_test", backend)
+    fhir = FhirGateway(SYSTEM, "wp2_test", backend)
     assert fhir.backend.name == "hapi"
 
 
@@ -427,7 +443,7 @@ def test_both_backends_answer_the_same(fresh_state):
         for r in resources:
             fresh_state.fhir.create(r)
             client.create(r)
-        local, hapi = _gateway(fresh_state), FhirGateway(OPS, "wp2_test", HapiBackend(client))
+        local, hapi = _gateway(fresh_state), FhirGateway(SYSTEM, "wp2_test", HapiBackend(client))
         for fhir in (local, hapi):  # a write through each backend
             created_docs.append(fhir.create(_doc(resources[0]["id"], enc)).id)
         a, b = _summary(local, mrn, enc), _summary(hapi, mrn, enc)

@@ -6,15 +6,19 @@ import gc
 import logging
 from datetime import datetime
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.core.context import RequestContextMiddleware
 from app.core.db.migrate import init_db
 from app.core.store import unit_of_work
 from app.core.unit_of_work import UnitOfWorkMiddleware
 from app.ehr import simulator
 from app.ehr.events import bus
+from app.ehr.gateway import BreakGlassRequired, FhirAccessDenied, FhirConflict
+from app.ehr.platform_router import router as platform_router
 from app.ehr.router import router as hospital_router
 from app.integrations.mocks import dispatch_due
 from app.modules.admin import service as admin
@@ -122,6 +126,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Imaging Ops Copilot API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(UnitOfWorkMiddleware)  # one transaction per request
+app.add_middleware(RequestContextMiddleware)  # who is acting, for the ai_call audit event
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -152,3 +157,19 @@ app.include_router(phipa_router)
 app.include_router(inspection_router)
 app.include_router(clinical_kg_router)
 app.include_router(hospital_router)
+app.include_router(platform_router)
+
+
+@app.exception_handler(FhirAccessDenied)
+async def _fhir_denied(request: Request, exc: FhirAccessDenied):
+    """Refused by the FhirGateway (already audited). A patient outside the user's units says so, so the
+    web app can offer break-glass."""
+    body = {"detail": str(exc), "code": "forbidden"}
+    if isinstance(exc, BreakGlassRequired):
+        body["code"] = "break_glass_required"
+    return JSONResponse(status_code=403, content=body)
+
+
+@app.exception_handler(FhirConflict)
+async def _fhir_conflict(request: Request, exc: FhirConflict):
+    return JSONResponse(status_code=409, content={"detail": str(exc)})

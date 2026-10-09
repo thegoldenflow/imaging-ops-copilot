@@ -137,7 +137,7 @@ def test_a_taken_bed_sends_the_admission_elsewhere(fresh_state):
     mover = next(e for e in fresh_state.fhir.search("Encounter", cls="IMP", status="in-progress")
                  if e["id"] != stay["id"])
     ops = next(u for u in fresh_state.staff.values() if u.role == "operations_manager")
-    FhirGateway(Actor.of(ops), module="test").append_encounter_location(mover["id"], planned_bed)
+    FhirGateway(Actor.of(ops), module="control_tower").append_encounter_location(mover["id"], planned_bed)
 
     result = simulator.advance(fresh_state, parse(admit["at"]) + timedelta(minutes=1))
     enc = fresh_state.fhir.read("Encounter", stay["id"])

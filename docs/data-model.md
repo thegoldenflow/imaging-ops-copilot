@@ -24,7 +24,7 @@ Storage: the default backend keeps each resource as encrypted JSON in PostgreSQL
 | Procedure | Surgery and procedures | code (SNOMED CT), performedPeriod, performer (surgeon), location (OR), extensions `asa-class`, `surgical-urgency` | generator | 7.1, 7.3 |
 | Condition | Diagnoses and problem list | code (SNOMED CT), clinicalStatus, category (problem-list-item / encounter-diagnosis) | generator | 7.2, 7.3 |
 | CarePlan | Discharge and follow-up plans | activity[], period, category | 7.3 | 7.3, 7.4 |
-| DocumentReference | Discharge summary, patient instructions, handoff, medication reconciliation | type, docStatus (preliminary / final), author, authenticator, content | 7.2, 7.3 | 7.2, 7.3 |
+| DocumentReference | Discharge summary, patient instructions, handoff, medication reconciliation | type, docStatus (preliminary / final), author, authenticator, content, extensions `source-module`, `signature` | 7.2, 7.3; three demo drafts for the signing service (WP4) | 7.2, 7.3 |
 | Task | Work items awaiting signature, review or action | code, status, priority, owner, performerType (role), focus, for, encounter, restriction.period.end (due) | platform, generator (pre-op checklist) | all |
 | Flag | Safety flags (ALC, fall risk, isolation, NEWS2) | code, status, period, subject, encounter | generator, 7.1, 8.1 | 7.1 |
 | Communication | Follow-up calls, reminders, escalations | payload, status, sent, recipient, sender, about | 7.4 | 7.4 |
@@ -75,7 +75,7 @@ The hospital day starts at 07:00 on the seed date (nearest weekday at a weekend)
 | ORM^O01 | `order.placed` | lab, imaging and consult orders | order (ServiceRequest); `category` |
 | ORU^R01 | `result.available` | lab and imaging results, consult done, ward vital signs every 6 h | order, results (Observation / DiagnosticReport); `category` |
 | SIU^S12 / S14 / S15 | `appointment.scheduled` / `updated` / `cancelled` | OR case booked, started or finished, cancelled | appointment, location (OR); `status` |
-| (none) | `consent.revoked` | scripted scenario (WP4 consent management later) | patient, consent; `category` |
+| (none) | `consent.revoked` / `consent.granted` | consent management (WP4, `app/ehr/consent.py`) and the scripted consent scenario | patient, consent; `category`, `previous` |
 
 Every event has `event_id` (stable per source message, so a resent HL7 message is the same event), `correlation_id`, `actor` (`system:demo-ehr`, or `user:<id>` when a person triggered it, e.g. a scripted scenario) and `occurred_at` (hospital time). Events carry references and codes only: no names, no MRN, no clinical text.
 
@@ -88,8 +88,9 @@ The plan is the intent and the FHIR store is the truth: a planned bed that is ta
 `app/ehr/gateway.py`. Modules never use the FHIR store or HTTP directly; two grep tests in `tests/test_fhir_gateway.py` enforce it. A gateway is opened for an actor (`Actor.of(user, request)`, later agents and system jobs) and a purpose module.
 
 - Typed reads (`app/fhir/types` models): `get_patient(mrn)`, `search_encounters(mrn=, patient_id=, cls=, status=, unit=, active_at=, since=, until=)` (newest first), `get_active_encounter(mrn)`, `get_bed_board(unit)` (beds with status, occupant encounter and since when, plus encounters waiting at the unit without a bed), `get_orders(encounter)` (ServiceRequest), `get_medications(encounter)` (MedicationRequest), `get_home_meds(mrn)` (active MedicationStatement), `get_observations(encounter, codes, since)` (a code also matches a vital-panel component), `get_documents(encounter)`, `read(type, id)`.
-- Write allow-list: Task (create, update, any status); DocumentReference (create as `docStatus=preliminary`, change only while preliminary; final goes through the signing service, WP4); Communication and Flag (create, update); Appointment (create as `status=proposed`, change only while proposed; booking needs a clerk, WP4b); `append_encounter_location(encounter, bed)` for bed managers (`operations_manager`): closes the current location entry, appends the bed, and, as the EHR's transfer does, marks the new bed occupied and the old one for housekeeping. Everything else, including any delete, raises `FhirAccessDenied` and leaves a `denied` audit record.
-- Audit: one record per call (actor, action, resource type, resource id or the scope: patient, encounter or unit) with the purpose module in `reason` until WP4 adds a module column.
+- Write allow-list: Task (create, update, any status); DocumentReference (create as `docStatus=preliminary`, change only while preliminary; final only through the signing service, `sign_document`); Consent (`record_consent`, consent management only); Communication and Flag (create, update); Appointment (create as `status=proposed`, change only while proposed; booking needs a clerk, WP4b); `append_encounter_location(encounter, bed)` for bed managers (`operations_manager`): closes the current location entry, appends the bed, and, as the EHR's transfer does, marks the new bed occupied and the old one for housekeeping. Everything else, including any delete, raises `FhirAccessDenied` and leaves a `denied` audit record.
+- Audit: one record per call (actor and role, action and event type, resource type, resource id or the scope: patient, encounter or unit, the patient's MRN hash, the encounter, and the purpose module in `module`; see "Audit log" below).
+- Access (WP4): see "Access, break-glass, consent and signing" below.
 - Backends (`FHIR_BACKEND`): `local` (this PostgreSQL store, in the request's unit of work) and `hapi` (`app/ehr/hapi.py`, `FHIR_BASE_URL`, `FHIR_AUTH_MODE=none`; `smart_backend` is defined, not implemented). The HAPI backend narrows the server query only with parameters that map exactly or to a superset, then matches every result on the same index columns as the local store, so both return the same resources (checked against a running HAPI in `test_both_backends_answer_the_same`).
 - The day simulator (WP3) and the generator play the EHR itself and write the store directly; the allow-list is for the AI layer.
 
@@ -107,7 +108,40 @@ The plan is the intent and the FHIR store is the truth: a planned bed that is ta
 | Free text: note, conclusion, presentedForm, document content, descriptions, comments, payloads, valueString, reaction descriptions, care plan activities | every learned identifier, then the regex layer (emails, 10-digit numbers, ISO and long dates, phone numbers); text attachments decoded and re-encoded, binary attachments dropped |
 | Narrative (`text`) | dropped |
 
-Codes, ids, references and clinical times stay. The free-text layer for partial names, mixed date formats and organisations, and the second model pass, are WP4 (6.3).
+Codes, ids, references and clinical times stay. Free text outside resources (notes, handoffs, transcripts) goes through `app/llm/freetext_deid.py` (WP4, below). The LLM gateway takes input de-identified either way with `structured(..., pseudonymizer=)`: it then repeats only the replacement of known identifiers (no date patterns, so a resource's clinical times stay) and re-identifies the output with the same map.
+
+## Access, break-glass, consent and signing (WP4, spec 6.3)
+
+Roles (`app/core/models.py` `Role`): `physician`, `nurse`, `pharmacist`, `clerk` join the imaging roles; the spec's `ops_manager` is `operations_manager`. Hospital staff are StaffUsers built from the generated Practitioner / PractitionerRole (`app/ehr/seed/platform.py`): `practitioner_id`, `unit_ids` (PractitionerRole.location), user id `U-<practitioner suffix>` (`prac-doc-09` -> `U-DOC-09`). Demo logins: `U-DOC-09` and `U-NURS-05` (Medicine A), `U-PHAR-01`, `U-CLER-01`; the imaging centre's `U-OPS` and `U-ADMIN` are the operations manager and admin.
+
+`app/ehr/access.py` (enforced in FhirGateway; the hospital API goes through it):
+
+| Role | Resource types | Patient scope | Views | Writes |
+| --- | --- | --- | --- | --- |
+| physician | all | own units (or attending), encounters active or finished in the last 72 h; others need break-glass | full | Task; DocumentReference of modules it signs for; signs per the registry |
+| nurse | all | same | full | Task, Flag, Communication; DocumentReference of modules it signs for |
+| pharmacist | directory, Patient, Encounter, MedicationRequest / Statement, AllergyIntolerance, Observation (laboratory only), DocumentReference (medrec, discharge med list) | hospital | full | DocumentReference of modules it signs for |
+| clerk | directory, Patient, Encounter, Appointment, Schedule, Slot, Consent, Task (performer clerk) | hospital | Encounter without reasonCode / diagnosis | Appointment (proposed), Task (performer clerk), Consent |
+| operations_manager | directory, Patient, Encounter, Appointment, Schedule, Slot, ServiceRequest (bed and surgery requests), Task (performer ops), Flag | hospital | Patient = MRN only; Encounter, Appointment, ServiceRequest without clinical elements | Task (performer ops), Encounter.location |
+| admin | directory | none | - | none |
+
+"Directory" = Location, Organization, Practitioner, PractitionerRole. Imaging roles have no hospital access; system actors (`Actor.system`) are trusted and audited. A patient outside a unit-scoped user's scope raises `BreakGlassRequired` (HTTP 403 with `code: break_glass_required`).
+
+Break-glass (`app/ehr/breakglass.py`, table `break_glass_grants`; reason, MRN and review note encrypted): reason of at least 10 characters, one grant per user and patient for 4 hours (wall clock), a `break_glass` audit event, review due within 24 hours, the review (justified / not_justified with a note) as a second `break_glass` event. Reads under a grant carry `break-glass BG-...` in their audit reason.
+
+Consent (`app/ehr/consent.py`): per category `permit` / `deny` / `missing` (the latest active Consent). Degradations: no `followup_call` -> no call, nurse Task `followup-manual`; no `ai_processing` -> template only; no `sms` -> Communication `not-done` plus a clerk Task `contact-patient`. `change_consent` writes through `FhirGateway.record_consent` (module `consent_management`) and publishes `consent.revoked` / `consent.granted`.
+
+Signing (`app/ehr/signing.py`): a DocumentReference carries the extension `source-module` (set by the gateway on create); signing it needs that module's registry entry, a signer role in its `required_signoff_role` (every listed role with `cosign`), the patient in the signer's scope, and a person (not a system actor). Each signature is an extension `signature` (role, signer, time); the last one sets `docStatus=final` and `authenticator`. Demo drafts: `doc-demo-discharge` and `doc-demo-handoff` (one Medicine A inpatient), `doc-demo-medrec` (another).
+
+Safety-tier registry: `apps/api/config/modules.registry.json` (`app/core/registry.py`): per module `tier`, `required_signoff_role`, `cosign`, `writes_allowed` (resource type -> statuses; `Encounter.location` -> `append`), `consent_required`. FhirGateway refuses writes of modules without an entry or outside `writes_allowed`; reads only need a purpose module. WP4b moves these fields into the agent registry.
+
+## Free-text de-identification (WP4)
+
+`app/llm/freetext_deid.py`: `FreeTextDeidentifier.learn_fhir(resources)` (or `add_person` / `add_known`) collects the record's identifiers; `detect(text)` finds the spans (dictionary and patterns), `apply` replaces them with typed tokens of the shared `Pseudonymizer`: `[PERSON_n]`, `[STAFF_n]`, `[DATE_n:D-2]` (days from the reference date), `[ADDRESS_n]`, `[PHONE_n]`, `[EMAIL_n]`, `[HEALTH_CARD_n]`, `[MRN_<keyed hash>]` for a known MRN (else `[MRN_n]`), `[ORG_n]`, `[ID_n]`; one token per person whatever the spelling; `restore()` re-identifies. `deidentify(text, deid)` adds the second pass (`deid_check@1` through the LLM gateway, structured findings; hits replaced and stored encrypted in `deid_misses`). Eval: `evals/deid/` (200 notes from `scripts/gen_deid_eval.py`, scored by `scripts/deid_eval.py`).
+
+## Audit log (WP4)
+
+`audit_events` (append-only, hash chain) gained `event_type` (`read`, `write`, `ai_call`, `sign`, `break_glass`, `export`, `consent_change`, `simulator_event`, plus `login`), `patient_mrn_hash` (keyed blind index of the MRN), `encounter_id`, `module`, `prompt_version` (ai_call). The spec's `timestamp`, `actor_id`, `actor_role` are the existing `ts`, `user_id`, `role`. Null new fields are left out of the digest, so events written before them verify unchanged. The LLM gateway writes an `ai_call` event per call (actor from the request, else `system`; module = the task). Admin: `GET /api/admin/audit` (filters outcome, event_type, module, mrn, user_id) and `GET /api/admin/audit/export` (CSV, itself an `export` event).
 
 ## Imaging exams (mapping, WP2)
 

@@ -118,6 +118,10 @@ MODULE_ENTITIES = {
         # Messages to external systems that could not be delivered (app/integrations/contract.py)
         EntitySpec("dead_letters", "app.integrations.contract:DeadLetter", encrypted=("payload",),
                    indexes=(("adapter", "status"),)),
+        # Hospital platform (6.3): break-glass grants and the free-text de-identification misses
+        EntitySpec("break_glass_grants", "app.ehr.breakglass:BreakGlassGrant", encrypted=("mrn", "reason", "review_note"),
+                   indexes=(("user_id",), ("review_status",))),
+        EntitySpec("deid_misses", "app.llm.freetext_deid:DeidMiss", kind="list", encrypted=("text", "context")),
     ]
 }
 
@@ -185,7 +189,16 @@ audit_events = Table(
     Column("reason", Text, nullable=False),
     Column("prev_hash", Text, nullable=False),
     Column("hash", Text, nullable=False),
+    # Hospital platform (6.3, migration 0005); null on events written before.
+    Column("event_type", Text),
+    Column("patient_mrn_hash", Text),
+    Column("encounter_id", Text),
+    Column("module", Text),
+    Column("prompt_version", Text),
 )
+Index("ix_audit_events_event_type", audit_events.c.event_type)
+Index("ix_audit_events_patient_mrn_hash", audit_events.c.patient_mrn_hash)
+Index("ix_audit_events_user_id", audit_events.c.user_id)
 
 auth_sessions = Table(
     "auth_sessions", metadata,

@@ -3,7 +3,8 @@
 Responsibilities: de-identify input, enforce a Pydantic output schema (one
 retry, then "needs human review"), degrade on timeouts and API failures, and
 log each call (task, model, prompt version, tokens, latency, cost, outcome)
-without storing PHI.
+without storing PHI. Each call is also an `ai_call` audit event (spec 6.3) with
+the task as module and the prompt version.
 """
 
 import hashlib
@@ -14,6 +15,7 @@ from typing import Literal
 from pydantic import BaseModel, ValidationError
 
 from app.core.config import settings
+from app.core.context import request_context
 from app.core.models import LlmCall, Patient
 from app.core.store import get_store
 from app.llm.deid import Pseudonymizer
@@ -94,7 +96,20 @@ class LlmGateway:
             input_hash=hashlib.sha256(text.encode()).hexdigest()[:16], error=(error or None) and error[:300],
         )
         store.llm_calls.append(call)
+        self._audit(store, call)
         return call
+
+    @staticmethod
+    def _audit(store, call: LlmCall) -> None:
+        """An `ai_call` audit event (6.3) for the person whose request made the call, or the system."""
+        ctx = request_context()
+        user = ctx.user if ctx else None
+        store.audit.record(
+            user_id=user.id if user else "system", user_name=user.name if user else "system",
+            role=str(user.role) if user else "system", action="ai_call", event_type="ai_call",
+            resource_type="LlmCall", resource_id=call.id, outcome=call.outcome,
+            source_ip=ctx.source_ip if ctx else None, reason=f"{call.mode}:{call.model}", module=call.task,
+            prompt_version=call.prompt_version)
 
     def structured(
         self,
@@ -106,10 +121,19 @@ class LlmGateway:
         tier: Tier = "reasoning",
         images: list[tuple[str, str]] | None = None,  # (base64, media type)
         patients: list[Patient] | None = None,
+        pseudonymizer: Pseudonymizer | None = None,
     ) -> LlmOutcome:
+        """`pseudonymizer`: the variables were de-identified by the caller with it (FHIR resources through
+        app/llm/fhir_deid.py, notes through app/llm/freetext_deid.py). The gateway then repeats only the
+        replacement of the identifiers it knows, not its own patterns (which would also tokenise the clinical
+        dates of a resource), and re-identifies the output with the same map."""
         model = self.model_for(tier)
-        pseudo = Pseudonymizer(patients)
-        text = pseudo.redact(prompt.render(**variables))
+        if pseudonymizer is not None:
+            pseudo = pseudonymizer
+            text = pseudo.redact_known(prompt.render(**variables))
+        else:
+            pseudo = Pseudonymizer(patients)
+            text = pseudo.redact(prompt.render(**variables))
         schema = strict_schema(schema_cls)
         started = time.monotonic()
         tokens_in = tokens_out = 0

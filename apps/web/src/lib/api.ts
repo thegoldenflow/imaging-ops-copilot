@@ -6,6 +6,8 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** Machine-readable reason, e.g. "break_glass_required" for a patient outside the user's units. */
+    public code?: string,
   ) {
     super(message);
   }
@@ -40,14 +42,16 @@ export async function api<T = unknown>(path: string, init: RequestInit & { json?
   const res = await fetch(path, { ...init, headers, body });
   if (!res.ok) {
     let detail = res.statusText;
+    let code: string | undefined;
     try {
       const data = await res.json();
       detail = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+      code = typeof data.code === "string" ? data.code : undefined;
     } catch {
       /* not JSON */
     }
     if (res.status === 401 && token) setToken(null);
-    throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, detail, code);
   }
   const type = res.headers.get("content-type") ?? "";
   return (type.includes("application/json") ? res.json() : res.blob()) as Promise<T>;

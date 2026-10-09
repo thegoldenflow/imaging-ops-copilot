@@ -150,7 +150,7 @@ def test_requisition_question_is_audited_and_redacted(client, login):
     r = client.post("/api/clinical-kg/ask", headers=login("U-RAD"), json={"question": question, "requisition_id": req.id})
     assert r.status_code == 200 and r.json()["requisition_id"] == req.id
     assert all(patient.family_name not in t for texts in provider.seen.values() for t in texts)
-    event = store.audit.events()[-1]
+    event = [e for e in store.audit.events() if e.event_type != "ai_call"][-1]  # the LLM calls are ai_call events
     assert (event.action, event.resource_id) == ("knowledge_query", req.id)
     assert client.get("/api/clinical-kg/history", headers=login("U-RAD")).json()["entries"][0]["question"] == question
 

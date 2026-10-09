@@ -1,6 +1,8 @@
 import clsx from "clsx";
 import {
   Activity,
+  BedDouble,
+  KeyRound,
   CalendarClock,
   ClipboardCheck,
   ClipboardList,
@@ -36,7 +38,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { isLiveLlm, llmVendor } from "../lib/llm";
-import { ROLE_LABEL, type Meta, type Role } from "../lib/types";
+import { BreakGlassBanner } from "../features/hospital/BreakGlass";
+import { HOSPITAL_CLINICAL, ROLE_LABEL, type Meta, type Role } from "../lib/types";
 import { Badge, Button } from "./ui";
 
 interface NavItem {
@@ -44,13 +47,14 @@ interface NavItem {
   label: string;
   icon: typeof Home;
   roles: Role[] | "all";
-  section: "" | "Operations" | "Intake pipeline" | "Radiology ops" | "Business & compliance" | "Oversight";
+  section: "" | "Hospital" | "Operations" | "Intake pipeline" | "Radiology ops" | "Business & compliance" | "Oversight";
 }
 
 const STAFF: Role[] = ["front_desk", "technologist", "radiologist", "operations_manager", "medical_director", "admin"];
 
 export const NAV: NavItem[] = [
   { to: "/", label: "Home", icon: Home, roles: "all", section: "" },
+  { to: "/hospital/patients", label: "Patients", icon: BedDouble, roles: HOSPITAL_CLINICAL, section: "Hospital" },
   { to: "/scheduling", label: "Scheduling", icon: CalendarClock, roles: ["front_desk", "technologist", "operations_manager", "medical_director", "admin"], section: "Operations" },
   { to: "/front-desk", label: "Front desk", icon: PhoneCall, roles: ["front_desk", "operations_manager", "admin"], section: "Operations" },
   { to: "/reading", label: "Reading room", icon: ScanLine, roles: ["radiologist", "medical_director", "admin"], section: "Operations" },
@@ -76,6 +80,7 @@ export const NAV: NavItem[] = [
   { to: "/ai-usage", label: "AI usage", icon: Activity, roles: ["operations_manager", "medical_director", "admin"], section: "Oversight" },
   { to: "/evals", label: "AI evaluations", icon: FlaskConical, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Oversight" },
   { to: "/audit", label: "Audit log", icon: ShieldCheck, roles: ["medical_director", "admin"], section: "Oversight" },
+  { to: "/break-glass-review", label: "Break-glass review", icon: KeyRound, roles: ["admin"], section: "Oversight" },
 ];
 
 export function canSee(item: NavItem, role: Role) {
@@ -162,7 +167,11 @@ export function Layout() {
           <div className="flex items-center gap-2">
             <div className="text-right leading-tight">
               <p className="text-sm font-medium text-slate-900" data-testid="current-user">{user.name}</p>
-              <p className="text-xs text-slate-500">{ROLE_LABEL[user.role]}{user.site_ids.length ? ` · ${user.site_ids.join(", ")}` : ""}</p>
+              <p className="text-xs text-slate-500">
+                {ROLE_LABEL[user.role]}
+                {user.site_ids.length ? ` · ${user.site_ids.join(", ")}` : ""}
+                {user.unit_ids?.length ? ` · ${user.unit_ids.join(", ")}` : ""}
+              </p>
             </div>
             <Button size="sm" variant="ghost" onClick={reset} loading={resetting} title="Reset demo data">
               <RotateCcw className="size-4" />
@@ -174,6 +183,7 @@ export function Layout() {
             </Button>
           </div>
         </header>
+        <BreakGlassBanner />
         <main className="flex-1 px-4 py-5 md:px-6">
           <Outlet />
         </main>

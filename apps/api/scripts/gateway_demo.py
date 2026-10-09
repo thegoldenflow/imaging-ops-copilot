@@ -46,14 +46,18 @@ def main() -> int:
         bed = next(b for b in board.beds if b.encounter_id)
         print(f"bed {bed.id}: encounter {bed.encounter_id}, patient {bed.patient_id}, since {bed.since:%a %H:%M}")
 
-        heading("The patient's stay through typed reads")
-        patient = fhir.read("Patient", bed.patient_id)
+        # Clinical content is not the bed manager's (6.3, WP4): the stay is read as a physician of the unit.
+        doctor = next((u for u in store.staff.values() if u.role == "physician" and args.unit in u.unit_ids), None)
+        clinical = FhirGateway(Actor.of(doctor) if doctor else Actor.system("gateway-demo"),
+                               module="discharge_summary", backend=backend)
+        heading(f"The patient's stay through typed reads, as {doctor.name if doctor else 'a system job'}")
+        patient = clinical.read("Patient", bed.patient_id)
         mrn = next(i.value for i in patient.identifier if i.system.endswith(":mrn"))
-        stay = fhir.get_active_encounter(mrn)
-        orders, meds = fhir.get_orders(stay.id), fhir.get_medications(stay.id)
-        vitals = fhir.get_observations(stay.id, codes=["8867-4"])
+        stay = clinical.get_active_encounter(mrn)
+        orders, meds = clinical.get_orders(stay.id), clinical.get_medications(stay.id)
+        vitals = clinical.get_observations(stay.id, codes=["8867-4"])
         print(f"active encounter {stay.id} ({stay.class_.code}, since {stay.period.start[:16]})")
-        print(f"{len(orders)} orders, {len(meds)} medication orders, {len(fhir.get_home_meds(mrn))} home medications")
+        print(f"{len(orders)} orders, {len(meds)} medication orders, {len(clinical.get_home_meds(mrn))} home medications")
         if vitals:
             hr = next(c.valueQuantity.value for c in vitals[-1].component if c.code.coding[0].code == "8867-4")
             print(f"latest heart rate {hr}/min at {vitals[-1].effectiveDateTime[:16]}")
@@ -65,18 +69,18 @@ def main() -> int:
         print("encounter subject stays a reference:", e["subject"])
 
         heading("Writes: the allow-list")
-        task = fhir.create({"resourceType": "Task", "status": "requested", "intent": "proposal", "priority": "routine",
+        task = clinical.create({"resourceType": "Task", "status": "requested", "intent": "proposal", "priority": "routine",
                             "description": "Demo: review discharge readiness", "for": stay.subject.to_fhir(),
                             "encounter": {"reference": f"Encounter/{stay.id}"}})
         print(f"created Task/{task.id} (allowed: the AI layer writes work items)")
         try:
-            fhir.create({"resourceType": "Observation", "status": "final", "code": {"text": "Potassium"},
+            clinical.create({"resourceType": "Observation", "status": "final", "code": {"text": "Potassium"},
                          "subject": stay.subject.to_fhir()})
         except FhirAccessDenied as refusal:
             print(f"refused Observation: {refusal}")
         for event in store.audit.events()[-3:]:
             print(f"audit #{event.seq}: {event.user_name} {event.action} {event.resource_type}/{event.resource_id} "
-                  f"{event.outcome} ({event.reason})")
+                  f"{event.outcome} (module {event.module}{'; ' + event.reason if event.reason else ''})")
 
         heading("An imaging exam as FHIR, and back")
         appt = next(a for a in store.appointments.values() if a.status == "completed")

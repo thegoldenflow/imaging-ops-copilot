@@ -1,12 +1,16 @@
 """Auth, demo controls, audit log viewer, AI usage dashboard and mock settings."""
 
+import csv
+import io
 from collections import defaultdict
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from app.core.auth import CLINICAL_STAFF, current_user, issue_token, require_roles
+from app.core.audit import EVENT_TYPES as AUDIT_EVENT_TYPES
+from app.core.audit import mrn_hash
+from app.core.auth import CLINICAL_STAFF, client_ip, current_user, issue_token, require_roles
 from app.core.config import settings
 from app.core.models import Role, StaffUser
 from app.core.store import get_store, reset_store
@@ -82,13 +86,47 @@ def reset_demo(user: StaffUser = Depends(current_user)):
     return {"ok": True, "version": store.version}
 
 
+def _audit_filters(outcome: str | None, event_type: str | None, module: str | None, mrn: str | None,
+                   user_id: str | None) -> dict:
+    return {"outcome": outcome or None, "event_type": event_type or None, "module": module or None,
+            "patient_mrn_hash": mrn_hash(mrn.strip()) if mrn and mrn.strip() else None, "user_id": user_id or None}
+
+
 @router.get("/admin/audit")
-def audit_log(limit: int = 200, outcome: str | None = None,
+def audit_log(limit: int = 200, outcome: str | None = None, event_type: str | None = None, module: str | None = None,
+              mrn: str | None = None, user_id: str | None = None,
               user: StaffUser = Depends(require_roles(Role.ADMIN, Role.MEDICAL_DIRECTOR))):
-    events = get_store().audit.events()
-    if outcome:
-        events = [e for e in events if e.outcome == outcome]
-    return {"events": [e.model_dump() for e in reversed(events[-limit:])], "total": len(events)}
+    """The audit log, newest first; filters by outcome, 6.3 event type, module, patient (MRN, matched
+    through its keyed hash) and user."""
+    audit = get_store().audit
+    filters = _audit_filters(outcome, event_type, module, mrn, user_id)
+    events = audit.query(**filters, limit=limit, newest_first=True)
+    total = len(audit.query(**filters)) if any(filters.values()) else len(audit.events())
+    return {"events": [e.model_dump() for e in events], "total": total, "event_types": list(AUDIT_EVENT_TYPES)}
+
+
+@router.get("/admin/audit/export")
+def audit_export(request: Request, outcome: str | None = None, event_type: str | None = None,
+                 module: str | None = None, mrn: str | None = None, user_id: str | None = None,
+                 user: StaffUser = Depends(require_roles(Role.ADMIN, Role.MEDICAL_DIRECTOR))):
+    """The matching events as CSV (append-only log: export, never edit). The export itself is an `export` event."""
+    store = get_store()
+    filters = _audit_filters(outcome, event_type, module, mrn, user_id)
+    events = store.audit.query(**filters)
+    buffer = io.StringIO()
+    fields = ["seq", "ts", "event_type", "action", "user_id", "user_name", "role", "resource_type", "resource_id",
+              "patient_mrn_hash", "encounter_id", "module", "prompt_version", "outcome", "reason", "hash"]
+    writer = csv.DictWriter(buffer, fieldnames=fields, extrasaction="ignore")
+    writer.writeheader()
+    for e in events:
+        writer.writerow(e.model_dump())
+    store.audit.record(user_id=user.id, user_name=user.name, role=user.role, action="export", event_type="export",
+                       resource_type="AuditEvent", resource_id=None, source_ip=client_ip(request), module="audit",
+                       reason=f"{len(events)} events; filters: " + ", ".join(f"{k}={v}" for k, v in filters.items()
+                                                                            if v and k != "patient_mrn_hash")
+                       + (" + patient" if filters["patient_mrn_hash"] else ""))
+    return Response(buffer.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="audit-log.csv"'})
 
 
 @router.get("/admin/audit/verify")

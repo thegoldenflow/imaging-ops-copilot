@@ -265,8 +265,10 @@ def _add_hospital(s: Store, seed: int, now: datetime) -> None:
     """Phases 6-8: the synthetic hospital EHR (FHIR resources and the day simulator's plan).
     It uses its own random streams, so the imaging data above does not change."""
     from app.ehr.seed import generate
+    from app.ehr.seed.platform import seed_platform
 
     generate(s, seed, now)
+    seed_platform(s)  # hospital staff logins (6.3 roles) and draft documents for the signing service
 
 
 def _add_staff(s: Store) -> None:

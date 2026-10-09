@@ -8,7 +8,7 @@ Setup: `docker compose up -d postgres` and the API's demo data (start the API on
 
 1. `cd apps/api && uv run python scripts/gateway_demo.py`
    - Bed board for Medicine A: "One call gives the ops manager the unit: 32 beds, how many are occupied, who is in each bed since when. It comes from FHIR Location and Encounter resources, not a private table."
-   - Typed reads for one patient: active stay, orders, medications, home medications, the latest heart rate from the vital-sign panel. "Modules ask the gateway, never the database or the FHIR server. A grep test fails the build if any module code talks to FHIR directly."
+   - Typed reads for one patient, as a physician of the unit (since WP4 the bed manager sees patients as MRN and bed only): active stay, orders, medications, home medications, the latest heart rate from the vital-sign panel. "Modules ask the gateway, never the database or the FHIR server. A grep test fails the build if any module code talks to FHIR directly."
 
 2. De-identified view.
    - "Before anything goes to a model, names become [PERSON_1], the health card [HEALTH_CARD_1], the birth date an age, and the MRN a keyed hash. Codes, references and clinical times stay, so the model can still reason over the stay. The token map never leaves the server, so the answer can be re-identified."
