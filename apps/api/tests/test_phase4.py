@@ -284,6 +284,27 @@ def test_cancelled_exam_billed_is_flagged_live(client, login):
     assert any(r["id"] == f"not_performed.{appt.id}" for r in rows)
 
 
+def test_planted_discrepancies_stay_in_the_window_whatever_the_time_of_seeding():
+    # The seed plants discrepancies among the exams of the 30 days before the seeding hour, while the reconciliation
+    # counts its 30 days back from the moment it runs: seed the claims as of every 3 hours over 3 days and reconcile
+    # at seeding time and a day later.
+    import random
+
+    from app.core.store import Store
+
+    db = get_store()
+    appointments = dict(db.appointments.items())
+    base = db.modules["seed_time"]
+    for hours in range(0, 72, 3):
+        s, now = Store(), base - timedelta(hours=hours)
+        s.appointments.update(appointments)
+        billing.seed(s, random.Random(42), now)
+        planted = set(s.modules["billing_planted"])
+        for later in (timedelta(0), billing.PLANTED_MARGIN):
+            found = {(f["kind"], f["appointment_id"]) for f in billing.reconcile(s, now + later)}
+            assert planted <= found, (now, later, planted - found)
+
+
 # ---------- System 19 · Patient feedback ----------
 
 def test_completion_sends_survey_in_patient_language_and_low_rating_alerts(client, login):
