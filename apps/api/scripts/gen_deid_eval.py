@@ -3,7 +3,9 @@
 200 synthetic clinical notes (progress notes, nursing notes, discharge notes,
 handoffs, call logs; English with Chinese passages) with planted PHI and its
 gold spans: the patient's names in several spellings (English, pinyin, Chinese
-characters, title + surname, given name alone), relatives and outside clinicians
+characters, title + surname, given name alone, a two-letter surname such as Hu or
+He alone: before a possessive, as "HU, Wei", or with no cue when it is no word,
+from a random stream of its own), relatives and outside clinicians
 the record does not know, staff from the roster, dates in mixed formats (ISO,
 slashes both ways, dots, month names, Chinese), phone numbers with extensions,
 health card numbers with version codes, MRNs, street addresses and postal codes,
@@ -441,6 +443,27 @@ def h_full_name_no_cue(c: Case, n: Note) -> None:
 HARD_SENTENCES = [h_relative_after_name, h_nickname, h_cueless_visitors, h_lowercase_doctor, h_word_date,
                   h_short_year, h_odd_phone, h_full_name_no_cue]
 
+# Two-letter surnames that are also words or symbols ("He said", "Ma'am", "Li 0.6"): a reader takes them for the
+# name only in a name context, so the notes write them alone only in one.
+WORDLIKE_SURNAMES = {"He", "Ma", "Li"}
+
+
+def s_short_surname(c: Case, n: Note, rng: random.Random) -> None:
+    """A two-letter surname (Li, Wu, Xu, Ma, Hu, He) written alone: before a possessive, as "SURNAME, Given",
+    or, when it is no word, with no cue at all. A male patient's note adds a sentence starting with "He"."""
+    forms = ["possessive", "surname first"] + ([] if c.family in WORDLIKE_SURNAMES else ["no cue"])
+    form = rng.choice(forms)
+    if form == "possessive":
+        n.phi(c.family, "PERSON", known=True).t(f"'s {rng.choice(['son', 'daughter'])} called to ask about "
+                                                 "discharge. ")
+    elif form == "surname first":
+        n.t("ID band checked: ").phi(rng.choice([c.family, c.family.upper()]), "PERSON", known=True).t(", ")
+        n.phi(c.given, "PERSON", known=True).t(". ")
+    else:
+        n.phi(c.family, "PERSON", known=True).t(" walked to the nursing station with a walker. ")
+    if c.sex == "male":
+        n.t("He asked about going home. ")
+
 
 EN_SENTENCES = [s_seen, s_relative_phone, s_patient_phone, s_address, s_postal, s_discharge_org, s_outside_followup,
                 s_pharmacy, s_email, s_nurse, s_given_name, s_family_name, s_short_date, s_month_year, s_spoke_with,
@@ -449,7 +472,7 @@ ZH_SENTENCES = [s_zh_intro, s_zh_family, s_zh_honorific, s_zh_address, s_zh_org,
 KINDS = ["Progress note", "Nursing note", "Discharge note", "Handoff", "Call log", "Consult note"]
 
 
-def build(rng: random.Random, i: int) -> dict:
+def build(rng: random.Random, i: int, short: random.Random) -> dict:
     c = Case(rng, i)
     n = Note()
     n.t(f"{rng.choice(KINDS)}. ")
@@ -468,6 +491,8 @@ def build(rng: random.Random, i: int) -> dict:
             n.t(item + " ")
         else:
             item(c, n)
+    if len(c.family) == 2:  # from a random stream of its own, so adding it left the notes before it unchanged
+        s_short_surname(c, n, short)
     text = n.text.rstrip()
     spans = [s for s in n.spans if s["end"] <= len(text)]
     for s in spans:
@@ -480,8 +505,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=6300)
     parser.add_argument("--n", type=int, default=200)
     args = parser.parse_args()
-    rng = random.Random(args.seed)
-    cases = [build(rng, i + 1) for i in range(args.n)]
+    rng, short = random.Random(args.seed), random.Random(args.seed + 1)
+    cases = [build(rng, i + 1, short) for i in range(args.n)]
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with OUT.open("w", encoding="utf-8", newline="\n") as f:
         for case in cases:

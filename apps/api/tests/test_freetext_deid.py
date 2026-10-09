@@ -55,6 +55,59 @@ def test_tokens_already_in_the_text_are_left_alone():
     assert deid.redact(once) == once
 
 
+def test_two_letter_surnames_are_redacted_where_they_read_as_names():
+    """Li, Wu, Xu, Ma, Hu and He (six of the generator's mainland Chinese surnames) are too short for the
+    dictionary: written alone they are redacted before a possessive, after a title and next to the person's
+    given name, under the person's token."""
+    for family, given in (("Li", "Min"), ("Wu", "Lei"), ("Xu", "Jing"), ("Ma", "Fang"), ("Hu", "Wei"), ("He", "Jun")):
+        deid = FreeTextDeidentifier(reference=REF)
+        deid.add_person([f"{given} {family}", f"{family} {given}"])
+        out = deid.redact(f"I am {family}'s son. Mrs. {family} slept well. ID band checked: {family.upper()}, "
+                          f"{given}. Wristband reads {given} {family.upper()}. {family}, {given} to bed 4.")
+        assert out == ("I am [PERSON_1]'s son. Mrs. [PERSON_1] slept well. ID band checked: [PERSON_1], [PERSON_1]. "
+                       "Wristband reads [PERSON_1]. [PERSON_1], [PERSON_1] to bed 4."), family
+    # A surname that is no word counts wherever it is written capitalised, like a longer one.
+    deid = FreeTextDeidentifier(reference=REF)
+    deid.add_person(["Wei Hu", "Hu Wei"])
+    assert deid.redact("Hu walked to the nursing station. Spoke with Hu.") == \
+        "[PERSON_1] walked to the nursing station. Spoke with [PERSON_1]."
+
+
+def test_two_letter_surnames_that_are_words_stay_words():
+    """"He said", "Ma'am", "Li 0.6" (lithium), "Le Fort", "45 HU" (Hounsfield units) and "Human" are not the
+    patient."""
+    for names, words, name in (
+            (["Jun He", "He Jun"], "He said the pain is better. He's going home tomorrow. Helium dilution done.",
+             "He's son called back."),
+            (["Fang Ma", "Ma Fang"], "Ma'am, your ride is here. Seen by the MA. Ma, I'll call you later.",
+             "Ma's daughter called."),
+            (["Min Li", "Li Min"], "Li 0.6 mmol/L, lithium held. Li-ion pump battery charged.", "Li's son visited."),
+            (["Minh Le", "Le Minh"], "Le Fort II fracture of the maxilla.", "Le's daughter called."),
+            (["Wei Hu", "Hu Wei"], "Liver lesion 45 HU. Human albumin given.", "Hu called back.")):
+        deid = FreeTextDeidentifier(reference=REF)
+        deid.add_person(names)
+        assert deid.redact(words) == words
+        assert deid.redact(name).startswith("[PERSON_1]"), name
+    # Next to someone else's name, a word-like surname stays a word.
+    deid = FreeTextDeidentifier(reference=REF)
+    deid.add_person(["Jun He", "He Jun"])
+    deid.add_person(["Margaret Tremblay"])
+    assert deid.redact("He, Margaret and Tom visited.") == "He, [PERSON_2] and Tom visited."
+
+
+def test_two_letter_surname_learned_from_fhir(fresh_state):
+    """The agent runtime's path: the surname of the patient and of a contact who shares it."""
+    patient = {"resourceType": "Patient", "id": "p1",
+               "name": [{"family": "Hu", "given": ["Wei"], "text": "Wei Hu"},
+                        {"family": "胡", "given": ["伟"], "text": "胡伟"}],
+               "contact": [{"relationship": [{"text": "daughter"}], "name": {"text": "Fang Hu"}}]}
+    deid = FreeTextDeidentifier(reference=REF)
+    deid.learn_fhir([patient])
+    out = deidentify("I am Hu's son. HU Fang will pick him up; 胡伟 slept well.", deid).text
+    assert "Hu" not in out and "HU" not in out and "胡伟" not in out
+    assert out.startswith("I am [PERSON_1]'s son.") and "[PERSON_2] will pick him up" in out
+
+
 def test_second_pass_catches_what_the_rules_miss_and_records_it(fresh_state):
     deid = _deid()
     note = "Hannah Novak will drive the patient home. Seen by Dr. Alicia Moreau."

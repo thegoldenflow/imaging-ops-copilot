@@ -4,7 +4,8 @@ Two layers, then the model sees the text:
 
 1. Rule layer (`FreeTextDeidentifier.detect`): finds PHI spans with a dictionary of
    the identifiers the record already holds (patient and contact names in every
-   spelling, Chinese names included; staff names; MRN, health card, phone numbers,
+   spelling, Chinese names included, two-letter surnames such as Hu or He where they
+   read as names; staff names; MRN, health card, phone numbers,
    street addresses; organisations) and with patterns for what the record does not
    hold: names after titles, credentials or family relations (English and Chinese),
    dates in mixed formats (ISO, slashes, dots, month names, Chinese), phone numbers
@@ -75,6 +76,16 @@ NOT_NAMES = frozenset({
     "Requested", "Plan", "Assessment", "Impression", "Signed", "Dictated", "Verified", "Co-signed", "Cosigned",
     "Practitioner", "Care", "Manager", "Coordinator", "Navigator", "Educator", "Specialist", "Therapist",
 })
+# Two-letter words, clinical symbols and eponym particles a two-letter name (Li, He, Ma, Le) can also be ("He said",
+# "Ma'am", "Li 0.6", "Le Fort"): written alone, such a name counts only where it reads as one (`_short_names`).
+SHORT_WORDS = frozenset("""Ad Ah Am An As At Aw Ax Be By Do Eh Ex Go Ha He Hi Hm Id If In Is It Lo Ma Me Mo My No Of
+Oh Ok On Or Ow Ox Pa Re So To Uh Um Up Us We Ye Yo Dr Mr Ms Mx Jr Sr St Pt Rx Dx Hx Tx Sx Fx Bx Cx Px Ix Wt Ht Hb
+Hg Na Ca Mg Fe Zn Cu Cl Li Co Cr Ag Au Pb Al Ba Tc Ga Gd Xe Kr Tl Se Si Ni Mn Ne Ar Ho Rb Ir Bi Sn Le De La""".split())
+# Short words whose "'s" mostly makes another word ("He's" is "he is", "do's and don'ts"): as a name they take a
+# possessive only before a family relation ("He's son").
+S_WORDS = frozenset({"He", "It", "Do"})
+FAMILY = (r"son|daughter|wife|husband|spouse|partner|mother|father|mom|dad|brother|sister|niece|nephew|grandson|"
+          r"granddaughter|son-in-law|daughter-in-law|children|grandchildren")
 MONTHS = {m: i + 1 for i, names in enumerate([
     ("january", "jan"), ("february", "feb"), ("march", "mar"), ("april", "apr"), ("may",), ("june", "jun"),
     ("july", "jul"), ("august", "aug"), ("september", "sep", "sept"), ("october", "oct"), ("november", "nov"),
@@ -237,6 +248,8 @@ class FreeTextDeidentifier:
         self.reference = reference or date.today()
         self._known: dict[str, str] = {}  # spelling -> kind
         self._known_re: re.Pattern | None = None
+        self._short: dict[str, str] = {}  # two-letter name part ("Hu") -> kind
+        self._owners: dict[str, set[str]] = {}  # name or name part (lower case) -> the people it names
 
     # ----- the dictionary -----
 
@@ -251,17 +264,27 @@ class FreeTextDeidentifier:
 
     def add_person(self, spellings: Iterable[str], kind: str = "PERSON") -> None:
         """One person under one token, whichever spelling; family and given names alone count too
-        when they are written capitalised (a known patient called by their surname)."""
+        when they are written capitalised (a known patient called by their surname). Two-letter
+        parts (Li, Hu, He) are not in the dictionary: `_short_names` finds them where they read as names."""
         spellings = [s.strip() for s in spellings if s and s.strip()]
         if not spellings:
             return
         first = spellings[0]
         for s in spellings:
             self.add_known(s, kind, same_as=first)
+            self._owners.setdefault(s.lower(), set()).add(first)
         for s in spellings:
             for part in re.split(r"\s+", s.replace("Dr.", "").strip()):
-                if len(part) >= 3 and part[0].isupper() and part not in NOT_NAMES:
+                if part in NOT_NAMES:
+                    continue
+                if len(part) >= 3 and part[0].isupper():
                     self.add_known(part, kind, same_as=first)
+                elif re.fullmatch(r"[A-Z][a-z]", part):
+                    self._short[part] = kind
+                    self.pseudo.token(kind, part, same_as=first)
+                else:
+                    continue
+                self._owners.setdefault(part.lower(), set()).add(first)
 
     def learn_fhir(self, resources: Iterable[dict]) -> None:
         """The identifiers a set of FHIR resources holds (patients, contacts, staff, organisations)."""
@@ -344,12 +367,43 @@ class FreeTextDeidentifier:
                     if re.search(f"[{HAN}]", value) and kind == "PERSON" and text[end:end + 2] in _CN_STAFF_HONORIFICS:
                         kind = "STAFF"
                 found.append(Span(start, end, kind))
+        found += self._short_names(text, [s for s in found if s.source == "known" and s.kind in ("PERSON", "STAFF")])
         spans = _resolve(found, protected)
         for s in spans:
             if s.kind == "DATE":
                 when = _parse_date(text[s.start:s.end], self.reference)
                 s.date_offset = (when - self.reference).days if when else None
         return spans
+
+    def _short_names(self, text: str, names: list[Span]) -> list[Span]:
+        """Two-letter parts of known names (Li, Wu, Xu, Ma, Hu, He). One that is no word ("Hu", "Xu") counts
+        wherever it is written capitalised, like a longer part; one that is also a word ("He said", "Ma'am",
+        "Li 0.6") only where it reads as a name: before a possessive ("Ma's son"; "He's" only before a family
+        relation), or next to another part of the same person's name, written capitalised or upper case
+        ("Hu, Wei", "HE Jun", "Wei HU"; not "He, Margaret and Tom"). After a title or a relation ("Mr. He",
+        "son Li") the patterns find it. Each hit takes the person's token."""
+        if not self._short:
+            return []
+        found: list[Span] = []
+
+        def add(start: int, end: int) -> None:
+            found.append(Span(start, end, self._short[text[start:end].capitalize()], "known"))
+
+        parts = "|".join(self._short)
+        if words := [p for p in self._short if p not in SHORT_WORDS]:
+            for m in re.finditer(rf"(?<!\w)(?:{'|'.join(words)})(?!\w)", text):
+                add(m.start(), m.end())
+        for m in re.finditer(rf"(?<!\w)({parts})(?=['’]s\b(\s+(?i:{FAMILY})\b)?)", text):
+            if m[1] not in S_WORDS or m[2]:
+                add(m.start(), m.end())
+        either = "|".join(f"{p}|{p.upper()}" for p in self._short)
+        after, before = re.compile(rf"[ \t]+({either})(?!\w)"), re.compile(rf"(?<!\w)({either})(?:,[ \t]*|[ \t]+)\Z")
+        for s in names:
+            owners = self._owners.get(text[s.start:s.end].lower(), set())
+            for m in (after.match(text, s.end), before.search(text, 0, s.start)):
+                if m and owners & self._owners[m[1].lower()]:
+                    add(m.start(1), m.end(1))
+        return found
 
     # ----- replacement -----
 

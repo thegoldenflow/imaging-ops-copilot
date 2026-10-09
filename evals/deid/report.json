@@ -1,9 +1,9 @@
 {
   "eval": "deid_freetext",
   "spec": "6.3",
-  "run_at": "2026-10-08T20:24:59",
+  "run_at": "2026-10-09T16:51:00",
   "cases": 200,
-  "gold_spans": 2482,
+  "gold_spans": 2513,
   "thresholds": {
     "recall": 0.98,
     "precision": 0.9
@@ -17,12 +17,12 @@
     }
   },
   "rule_layer": {
-    "recall": 0.9887,
+    "recall": 0.9889,
     "precision": 0.9992,
-    "gold_spans": 2482,
-    "caught": 2454,
-    "redacted_spans": 2456,
-    "correct_redactions": 2454,
+    "gold_spans": 2513,
+    "caught": 2485,
+    "redacted_spans": 2487,
+    "correct_redactions": 2485,
     "recall_known_identifiers": 1.0,
     "recall_pattern_only": 0.9816,
     "date_offset_accuracy": 0.9332,
@@ -58,9 +58,9 @@
         "recall": 1.0
       },
       "PERSON": {
-        "gold": 546,
-        "caught": 523,
-        "recall": 0.9579
+        "gold": 577,
+        "caught": 554,
+        "recall": 0.9601
       },
       "PHONE": {
         "gold": 202,
@@ -77,10 +77,10 @@
   "pipeline": {
     "recall": 0.9932,
     "precision": 0.9992,
-    "gold_spans": 2482,
-    "caught": 2465,
-    "redacted_spans": 2467,
-    "correct_redactions": 2465,
+    "gold_spans": 2513,
+    "caught": 2496,
+    "redacted_spans": 2498,
+    "correct_redactions": 2496,
     "recall_known_identifiers": 1.0,
     "recall_pattern_only": 0.9889,
     "date_offset_accuracy": 0.9332,
@@ -116,9 +116,9 @@
         "recall": 1.0
       },
       "PERSON": {
-        "gold": 546,
-        "caught": 534,
-        "recall": 0.978
+        "gold": 577,
+        "caught": 565,
+        "recall": 0.9792
       },
       "PHONE": {
         "gold": 202,
@@ -375,6 +375,6 @@
       "text": "Alana Walsh"
     }
   ],
-  "seconds": 2.2,
+  "seconds": 3.3,
   "note": "Synthetic notes generated alongside the rules (scripts/gen_deid_eval.py); the metrics show the pipeline works, not performance on real clinical text. With the mock provider the second pass is a heuristic stand-in, not a model."
 }

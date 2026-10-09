@@ -1,13 +1,13 @@
 # Free-text de-identification eval (spec 6.3)
 
-Run 2026-10-08T20:24:59 on 200 synthetic notes with 2482 planted PHI spans (`evals/deid/cases.jsonl`). Second pass: mock provider (ok 200).
+Run 2026-10-09T16:51:00 on 200 synthetic notes with 2513 planted PHI spans (`evals/deid/cases.jsonl`). Second pass: mock provider (ok 200).
 
 **PASSED**: thresholds recall >= 0.98, precision >= 0.9 (rule layer + second pass).
 
 | | Recall | Precision | Caught / gold | Correct / redacted | Known identifiers | Pattern only | Date offsets |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Rule layer | 0.9887 | 0.9992 | 2454 / 2482 | 2454 / 2456 | 1.0 | 0.9816 | 0.9332 |
-| Rule layer + second pass | 0.9932 | 0.9992 | 2465 / 2482 | 2465 / 2467 | 1.0 | 0.9889 | 0.9332 |
+| Rule layer | 0.9889 | 0.9992 | 2485 / 2513 | 2485 / 2487 | 1.0 | 0.9816 | 0.9332 |
+| Rule layer + second pass | 0.9932 | 0.9992 | 2496 / 2513 | 2496 / 2498 | 1.0 | 0.9889 | 0.9332 |
 
 Recall by kind (pipeline):
 
@@ -19,7 +19,7 @@ Recall by kind (pipeline):
 | HEALTH_CARD | 150 | 150 | 1.0 |
 | MRN | 218 | 218 | 1.0 |
 | ORG | 258 | 258 | 1.0 |
-| PERSON | 546 | 534 | 0.978 |
+| PERSON | 577 | 565 | 0.9792 |
 | PHONE | 202 | 202 | 1.0 |
 | STAFF | 162 | 159 | 0.9815 |
 
