@@ -13,6 +13,7 @@ from app.core.audit import mrn_hash
 from app.core.models import Role
 from app.ehr import breakglass
 from app.ehr.codes import MRN_SYSTEM
+from app.ehr.fhirstore import unit_of
 from app.ehr.gateway import Actor, BreakGlassRequired, FhirGateway, LocalBackend
 from app.fhir.dt import ref_id
 
@@ -22,14 +23,26 @@ def _physician(store):
 
 
 def _icu_patient(store) -> tuple[str, str]:
-    """(patient id, MRN) of an ICU inpatient: outside the demo physician's unit (Medicine A)."""
+    """(patient id, MRN) of an ICU inpatient outside the demo physician's scope: no encounter on their unit (Medicine
+    A) or attended by them. An ED admission can start in the ICU under a Medicine A attending, so on some seeded
+    days (a Friday) the first ICU inpatient is the demo physician's own patient."""
+    doctor = _physician(store)
     for enc in store.fhir.search("Encounter", cls="IMP", status="in-progress", unit="ICU"):
         pid = ref_id(enc["subject"])
-        if not any(e["status"] in ("arrived", "triaged", "in-progress") and e["id"] != enc["id"]
-                   for e in store.fhir.search("Encounter", patient=pid)):
+        encounters = store.fhir.search("Encounter", patient=pid)
+        if any(e["status"] in ("arrived", "triaged", "in-progress") and e["id"] != enc["id"] for e in encounters):
+            continue
+        if not any(_theirs(e, doctor) for e in encounters):
             patient = store.fhir.read("Patient", pid)
             return pid, next(i["value"] for i in patient["identifier"] if i["system"] == MRN_SYSTEM)
-    raise AssertionError("no ICU inpatient")
+    raise AssertionError("no ICU inpatient outside the demo physician's scope")
+
+
+def _theirs(encounter: dict, user) -> bool:
+    """Whether the encounter was ever on one of the user's units or is attended by them."""
+    units = {unit_of(ref_id(loc["location"])) for loc in encounter.get("location") or []}
+    attending = {ref_id(p.get("individual")) for p in encounter.get("participant") or []} - {None}
+    return bool(units & set(user.unit_ids)) or user.practitioner_id in attending
 
 
 def test_break_glass_flow_through_the_api(fresh_state, client, login):
@@ -103,6 +116,29 @@ def test_the_grant_is_per_user_and_patient_and_ends_after_four_hours(fresh_state
     assert not item["active"] and not item["overdue"]
     late = datetime.now() + timedelta(hours=25)
     assert next(g for g in breakglass.queue(store, now=late) if g["id"] == grant.id)["overdue"]
+
+
+def test_an_icu_patient_needs_break_glass_whatever_the_time_of_seeding():
+    # The hospital is generated as of 07:00 on the day of seeding (Saturday seeds Friday, Sunday seeds Monday), and
+    # who lies in the ICU, under which attending, depends on that day: on a Friday the first ICU inpatient is the demo
+    # physician's own Medicine A patient. Seed as of every 6 hours over 3 days from a Friday; the generator reads only
+    # the hospital day, so one seeding per day stands for the others.
+    from app.core.config import settings
+    from app.core.store import Store, use_store
+    from app.ehr.seed import generate, hospital_day_start
+    from app.ehr.seed.platform import seed_platform
+
+    times = [datetime(2026, 10, 9) + timedelta(hours=h) for h in range(0, 72, 6)]
+    seedings = {hospital_day_start(t): t for t in times}
+    assert [d.strftime("%a") for d in sorted(seedings)] == ["Fri", "Mon"]
+    for wall in seedings.values():
+        s = Store()
+        with use_store(s):
+            generate(s, settings.seed, wall)
+            seed_platform(s)
+            _, mrn = _icu_patient(s)
+            with pytest.raises(BreakGlassRequired):
+                FhirGateway(Actor.of(_physician(s)), "patient_chart", LocalBackend(s)).get_patient(mrn)
 
 
 def test_who_may_break_the_glass(fresh_state, client, login):

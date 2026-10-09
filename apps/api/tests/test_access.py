@@ -13,6 +13,7 @@ import pytest
 from app.agents import registry
 from app.core.models import Role
 from app.ehr.codes import MRN_SYSTEM, PRACTITIONER_ROLE, TASK_CODE, concept
+from app.ehr.fhirstore import unit_of
 from app.ehr.gateway import Actor, BreakGlassRequired, FhirAccessDenied, FhirConflict, FhirGateway, LocalBackend
 from app.fhir.dt import ref, ref_id
 
@@ -34,14 +35,26 @@ def _mrn(store, patient_id: str) -> str:
     return next(i["value"] for i in patient["identifier"] if i["system"] == MRN_SYSTEM)
 
 
-def _inpatient(store, unit: str, but: set[str] = frozenset()) -> tuple[str, str]:
-    """(encounter id, patient id) of a current inpatient on the unit."""
+def _inpatient(store, unit: str, but: set[str] = frozenset(), outside=None) -> tuple[str, str]:
+    """(encounter id, patient id) of a current inpatient on the unit; with `outside` (a unit-scoped user), one who
+    is not theirs: no encounter on their units or attended by them. An ED admission can start in the ICU under a
+    Medicine A attending, so on some seeded days (a Friday) the first ICU inpatient is the demo physician's own."""
     for enc in store.fhir.search("Encounter", cls="IMP", status="in-progress", unit=unit):
         pid = ref_id(enc["subject"])
-        if pid not in but and not any(e["id"] != enc["id"] and e["status"] in ("arrived", "triaged", "in-progress")
-                                      for e in store.fhir.search("Encounter", patient=pid)):
+        encounters = store.fhir.search("Encounter", patient=pid)
+        if pid in but or any(e["id"] != enc["id"] and e["status"] in ("arrived", "triaged", "in-progress")
+                             for e in encounters):
+            continue
+        if outside is None or not any(_theirs(e, outside) for e in encounters):
             return enc["id"], pid
     raise AssertionError(f"no inpatient on {unit}")
+
+
+def _theirs(encounter: dict, user) -> bool:
+    """Whether the encounter was ever on one of the user's units or is attended by them."""
+    units = {unit_of(ref_id(loc["location"])) for loc in encounter.get("location") or []}
+    attending = {ref_id(p.get("individual")) for p in encounter.get("participant") or []} - {None}
+    return bool(units & set(user.unit_ids)) or user.practitioner_id in attending
 
 
 def _doc_patient(store, doc_id: str) -> tuple[str, str]:
@@ -95,7 +108,7 @@ def test_hospital_staff_come_from_the_generated_practitioners(fresh_state):
 def test_visibility_physician(fresh_state):
     store = fresh_state
     enc, pid = _inpatient(store, "MEDA")
-    other_enc, other = _inpatient(store, "ICU")
+    other_enc, other = _inpatient(store, "ICU", outside=_user(store, Role.PHYSICIAN))
     fhir = gw(store, Role.PHYSICIAN)
     patient = fhir.get_patient(_mrn(store, pid))
     assert patient.name and patient.birthDate  # the whole record of the unit's patients
@@ -251,7 +264,7 @@ def test_write_physician(fresh_state):
     for module, resource in (("bedside_nursing", _flag(pid)), ("nursing_handoff", _draft(pid, enc))):
         with pytest.raises(FhirAccessDenied):
             gw(store, Role.PHYSICIAN, module).create(resource)
-    _, other = _inpatient(store, "ICU")
+    _, other = _inpatient(store, "ICU", outside=_user(store, Role.PHYSICIAN))
     with pytest.raises(BreakGlassRequired):
         gw(store, Role.PHYSICIAN, "discharge_summary").create(_task(other, enc))
 

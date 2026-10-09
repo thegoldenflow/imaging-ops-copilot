@@ -58,9 +58,13 @@ def mrn_of(store, pid: str) -> str:
     return next(i["value"] for i in store.fhir.read("Patient", pid)["identifier"] if i["system"] == MRN_SYSTEM)
 
 
-def inpatient(store, unit: str) -> tuple[str, str]:
-    enc = store.fhir.search("Encounter", cls="IMP", status="in-progress", unit=unit, limit=1)[0]
-    return enc["id"], ref_id(enc["subject"])
+def inpatient(store, unit: str, outside: FhirGateway | None = None) -> tuple[str, str]:
+    """The unit's first current inpatient; with `outside`, the first one outside that gateway user's scope (an ICU
+    stay can be a Medicine A patient under the demo physician)."""
+    for enc in store.fhir.search("Encounter", cls="IMP", status="in-progress", unit=unit):
+        if outside is None or not outside.is_in_scope(ref_id(enc["subject"])):
+            return enc["id"], ref_id(enc["subject"])
+    raise LookupError(f"no inpatient on {unit}")
 
 
 def attempt(fn) -> str:
@@ -93,7 +97,7 @@ def main() -> None:
             print(f"  {role:<19} {u.id:<10} {u.name:<24} units: {', '.join(u.unit_ids) or '(hospital-wide or none)'}")
 
         own_enc, own = inpatient(store, "MEDA")
-        icu_enc, icu = inpatient(store, "ICU")
+        icu_enc, icu = inpatient(store, "ICU", outside=gw(Role.PHYSICIAN))
         heading(f"Who sees what (FhirGateway decides, not the UI): MEDA patient {own}, ICU patient {icu}")
         checks = {
             "MEDA patient": lambda f: f.get_patient(mrn_of(store, own)),

@@ -101,6 +101,9 @@ def generate(store: Store, seed: int, wall_now: datetime) -> dict:
         elif s.admit <= tl.horizon:
             future_orders = M.stay_orders(b, s, p)
         else:
+            if ed is not None and now < ed.decision <= tl.horizon:
+                # decided within the plan, but no bed until after it: the decision's bed request needs the stay
+                plan_stays[s.id] = M.plan_dict(s)
             continue
         if s.discharge > now:
             plan_stays[s.id] = M.plan_dict(s)

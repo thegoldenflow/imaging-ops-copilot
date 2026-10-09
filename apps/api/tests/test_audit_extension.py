@@ -11,6 +11,7 @@ import pytest
 from app.core.audit import GENESIS_HASH, _event, event_type_for, mrn_hash, verify_chain
 from app.core.models import Role
 from app.ehr.codes import MRN_SYSTEM
+from app.ehr.gateway import Actor, FhirGateway, LocalBackend
 from app.fhir.dt import ref_id
 
 LEGACY = {"user_id": "U-ADMIN", "user_name": "Casey Brooks", "role": "admin", "action": "read",
@@ -82,10 +83,13 @@ def test_simulator_control_actions_are_simulator_events(fresh_state, client, log
 
 def test_admin_search_and_export(fresh_state, client, login):
     store = fresh_state
-    enc = next(e for e in store.fhir.search("Encounter", cls="IMP", status="in-progress", unit="ICU"))
+    doctor = next(u for u in store.staff.values() if u.role == Role.PHYSICIAN and u.demo_login)
+    # An ICU patient outside the physician's scope: some ICU stays are Medicine A patients under the demo physician
+    scope = FhirGateway(Actor.of(doctor), "patient_chart", LocalBackend(store))
+    enc = next(e for e in store.fhir.search("Encounter", cls="IMP", status="in-progress", unit="ICU")
+               if not scope.is_in_scope(ref_id(e["subject"])))
     mrn = next(i["value"] for i in store.fhir.read("Patient", ref_id(enc["subject"]))["identifier"]
                if i["system"] == MRN_SYSTEM)
-    doctor = next(u for u in store.staff.values() if u.role == Role.PHYSICIAN and u.demo_login)
     assert client.get(f"/api/hospital/patients/{mrn}", headers=login(doctor.id)).status_code == 403
     admin = login("U-ADMIN")
     found = client.get("/api/admin/audit", headers=admin, params={"mrn": mrn}).json()

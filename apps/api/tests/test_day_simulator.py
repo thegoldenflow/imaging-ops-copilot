@@ -60,7 +60,10 @@ def test_a_day_in_order_with_six_event_types_and_valid_resources(fresh_state, re
     # Every weekday plan has these; transfers (ICU step-down) and OR bookings depend on the day
     assert {"patient.admitted", "patient.discharged", "encounter.updated", "order.placed", "result.available",
             "bed.status_changed", "appointment.updated"} <= kinds
-    assert result.applied["discharge"] > 10 and result.applied["admit"] > 10 and result.vitals_panels > 100
+    assert result.applied["discharge"] > 10 and result.vitals_panels > 100
+    # Elective patients come in at 06:00 on the day of their surgery: a Friday's day runs to Saturday 08:00, with no
+    # OR list, so it admits from the ED only (7 on the seeded Friday)
+    assert result.applied["admit"] > (10 if (start + timedelta(days=1)).weekday() < 5 else 5)
 
     bus.drain()
     assert len(recorder) == sum(result.events.values())
@@ -80,6 +83,28 @@ def test_a_day_in_order_with_six_event_types_and_valid_resources(fresh_state, re
     assert simulator.consistency_problems(fresh_state) == []
     for rtype, rid in sorted(result.written):
         validate(fresh_state.fhir.read(rtype, rid))
+
+
+def test_every_admission_decided_in_the_plan_has_its_stay_whatever_the_time_of_seeding():
+    # The plan covers 36 hours from 07:00 on the day of seeding. On a Tuesday the wards are full: ED patients decided
+    # for admission that evening wait for a bed until after the plan ends, and the decision's bed request needs the
+    # stay. Seed as of every 6 hours over 3 days from a Tuesday; the generator reads only the hospital day, so one
+    # seeding per day stands for the others.
+    from app.core.config import settings
+    from app.core.store import Store, use_store
+    from app.ehr.seed import generate, hospital_day_start
+
+    times = [datetime(2026, 10, 13) + timedelta(hours=h) for h in range(0, 72, 6)]
+    seedings = {hospital_day_start(t): t for t in times}
+    assert [d.strftime("%a") for d in sorted(seedings)] == ["Tue", "Wed", "Thu"]
+    for wall in seedings.values():
+        s = Store()
+        with use_store(s):
+            generate(s, settings.seed, wall)
+        plan = s.modules["hospital_plan"]
+        decided = [plan["visits"][e["visit"]] for e in plan["events"] if e["kind"] == "ed_decision"]
+        missing = [v["id"] for v in decided if v["admit"] and v["stay"] not in plan["stays"]]
+        assert missing == [], wall
 
 
 def test_discharge_frees_the_bed_through_housekeeping(fresh_state):
