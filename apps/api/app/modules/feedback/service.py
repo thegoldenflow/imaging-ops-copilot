@@ -8,6 +8,7 @@ manager right away. Ratings and themes are shown by site and week."""
 
 import random
 import secrets
+import statistics
 from datetime import datetime, timedelta
 from typing import Literal
 
@@ -22,6 +23,7 @@ from app.modules.feedback.lexicon import SEED_COMMENTS, SENTIMENTS, THEMES, base
 from app.modules.scheduling import service as scheduling
 
 LOW_RATING = 2
+BAD_MONTH_MARGIN = 0.25  # the seed keeps Westbrook's 30-day average at least this far below every other site's
 SURVEY_TEXT = {
     "en": "Thank you for visiting {site}. How was your {exam}? Tell us in 1 minute: {link}",
     "fr": "Merci de votre visite à {site}. Comment s'est passé votre examen ({exam}) ? Répondez en 1 minute : {link}",
@@ -208,12 +210,68 @@ def confirm(resp: FeedbackResponse, sentiment: str, themes: list[str], by: str, 
 
 # ---------- Seed ----------
 
+def _seed_alert(s: Store, resp: FeedbackResponse, now: datetime) -> None:
+    if resp.rating <= LOW_RATING or resp.sentiment == "negative":
+        alert = _alert(s, resp, f"{resp.rating}-star rating" if resp.rating <= LOW_RATING else "negative comment (AI)",
+                       resp.submitted_at, notify=False)
+        if alert and resp.submitted_at < now - timedelta(days=3):
+            alert.status, alert.follow_up = "followed_up", "Called the patient and apologised; issue passed to the site lead."
+            alert.followed_up_by, alert.followed_up_at = SITE_MANAGERS[resp.site_id], resp.submitted_at + timedelta(days=1)
+
+
+def _reword(s: Store, resp: FeedbackResponse, comment: tuple, now: datetime) -> None:
+    """Give a seeded answer another (language, rating, comment) from the bank, with its labels and alert."""
+    _, resp.rating, resp.comment = comment
+    label = baseline(resp.rating, resp.comment)
+    resp.ai_sentiment, resp.ai_themes, resp.ai_summary = label["sentiment"], label["themes"], label["summary_en"]
+    resp.sentiment, resp.themes = label["sentiment"], list(label["themes"])
+    for alert in [a for a in alerts(s).values() if a.response_id == resp.id]:
+        del alerts(s)[alert.id]
+    _seed_alert(s, resp, now)
+
+
+def _keep_bad_month(s: Store, by_lang: dict[str, list[tuple]], now: datetime) -> None:
+    """Westbrook's 30-day average must stay below every other site's by BAD_MONTH_MARGIN, at seeding time and for
+    a day after, whatever the time of seeding. The draw usually gets there, but the small sites have only a handful
+    of answers in 30 days. When it does not, Westbrook's best answer of the last 29 days becomes a wait-time
+    complaint, one at a time; once Westbrook has none above LOW_RATING left, the closest site's worst answer becomes
+    a happy one instead. No rng draws, so the rest of the seeded data is unchanged."""
+    rows = list(responses(s).values())
+    first, last = now - timedelta(days=30), now - timedelta(days=29)  # where the window starts, now and in a day
+    starts = [first, last] + [r.submitted_at for r in rows if first < r.submitted_at < last]
+
+    def closest() -> tuple[float, str]:  # the smallest lead of another site over Westbrook, and that site
+        leads = []
+        for start in starts:
+            ratings: dict[str, list[int]] = {}
+            for r in rows:
+                if r.submitted_at >= start:
+                    ratings.setdefault(r.site_id, []).append(r.rating)
+            wbk = statistics.mean(ratings.pop("WBK", [5]))
+            leads += [(statistics.mean(v) - wbk, sid) for sid, v in ratings.items()]
+        return min(leads)
+
+    def spare(site: str) -> list[FeedbackResponse]:  # seeded answers in the window all day, best first
+        return sorted((r for r in rows if r.site_id == site and r.ai_status == "seeded" and r.submitted_at >= last),
+                      key=lambda r: (r.rating, r.submitted_at), reverse=True)
+
+    while (lead := closest())[0] < BAD_MONTH_MARGIN:
+        if worse := [r for r in spare("WBK") if r.rating > LOW_RATING]:
+            _reword(s, worse[0], next(c for c in by_lang[worse[0].language]
+                                      if c[1] <= LOW_RATING and "wait_time" in baseline(c[1], c[2])["themes"]), now)
+        elif better := [r for r in spare(lead[1]) if r.rating < 5]:
+            _reword(s, better[-1], max(by_lang[better[-1].language], key=lambda c: c[1]), now)
+        else:
+            break
+
+
 def seed(s: Store, rng: random.Random, now: datetime) -> None:
     """About 300 answered surveys over 90 days, pre-labelled with the baseline;
-    Westbrook's waits get worse over the last month. Two responses arrive
-    unclassified (the worker labels them through the gateway at startup) and
-    three surveys are still waiting for an answer, always one of them in
-    Chinese (the end-to-end test opens it from the 15 newest)."""
+    Westbrook's waits get worse over the last month (always the lowest 30-day
+    average, see _keep_bad_month). Two responses arrive unclassified (the worker
+    labels them through the gateway at startup) and three surveys are still
+    waiting for an answer, always one of them in Chinese (the end-to-end test
+    opens it from the 15 newest)."""
     done = sorted((a for a in s.appointments.values() if a.status == AppointmentStatus.COMPLETED and a.end < now),
                   key=lambda a: a.id)
     by_lang: dict[str, list[tuple]] = {}
@@ -245,12 +303,7 @@ def seed(s: Store, rng: random.Random, now: datetime) -> None:
         if rng.random() < 0.7 and when < now - timedelta(days=2):
             resp.confirmed_by, resp.confirmed_at = "Jordan Lee", when + timedelta(days=1)
         responses(s)[resp.id] = resp
-        if rating <= LOW_RATING or label["sentiment"] == "negative":
-            alert = _alert(s, resp, f"{rating}-star rating" if rating <= LOW_RATING else "negative comment (AI)", when,
-                           notify=False)
-            if alert and when < now - timedelta(days=3):
-                alert.status, alert.follow_up = "followed_up", "Called the patient and apologised; issue passed to the site lead."
-                alert.followed_up_by, alert.followed_up_at = SITE_MANAGERS[appt.site_id], when + timedelta(days=1)
+        _seed_alert(s, resp, now)
     # Two fresh responses for the worker to classify, and three unanswered surveys (one in Chinese).
     for appt, (rating, comment) in zip(rng.sample(fresh, 2), [
         (2, "We waited almost two hours and the waiting room was cold. Nobody explained the delay."),
@@ -266,6 +319,7 @@ def seed(s: Store, rng: random.Random, now: datetime) -> None:
         responses(s)[resp.id] = resp
         if rating <= LOW_RATING:
             _alert(s, resp, f"{rating}-star rating", resp.submitted_at)
+    _keep_bad_month(s, by_lang, now)
     zh = [a for a in fresh if s.patients[a.patient_id].preferred_language == "zh"][:1]
     late = not zh
     if late:

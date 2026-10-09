@@ -390,6 +390,33 @@ def test_seed_plants_an_open_chinese_survey_even_without_a_recent_chinese_patien
     assert sum(v.status == "sent" for v in feedback.surveys(s).values()) == 3
 
 
+def test_seed_keeps_westbrooks_bad_month_whatever_the_time_of_seeding():
+    # Which exams fall in the last 30 days depends on the time of seeding, and the small sites have only a handful
+    # of answers there: seed the feedback as of every 3 hours over 3 days and look at the dashboard's 30-day window,
+    # at seeding time and a day later.
+    import random
+    import statistics
+
+    from app.core.store import Store
+    from app.modules.feedback import service as feedback
+
+    db = get_store()
+    tables = {t: dict(getattr(db, t).items()) for t in ("sites", "exams", "patients", "appointments")}
+    base = datetime.now().replace(minute=0, second=0, microsecond=0)
+    for hours in range(0, 72, 3):
+        s, now = Store(), base - timedelta(hours=hours)
+        for table, rows in tables.items():
+            getattr(s, table).update(rows)
+        feedback.seed(s, random.Random(42), now)
+        for later in (timedelta(0), timedelta(days=1)):
+            ratings: dict[str, list[int]] = {}
+            for r in feedback.responses(s).values():
+                if r.submitted_at >= now + later - timedelta(days=30):
+                    ratings.setdefault(r.site_id, []).append(r.rating)
+            wbk = statistics.mean(ratings.pop("WBK"))
+            assert min(statistics.mean(v) for v in ratings.values()) - wbk >= feedback.BAD_MONTH_MARGIN, (now, later)
+
+
 # ---------- System 20 · PHIPA access monitoring ----------
 
 def test_every_planted_anomaly_is_caught_with_evidence(client, login):
