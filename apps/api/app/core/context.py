@@ -13,6 +13,8 @@ object does.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -34,6 +36,17 @@ _context: ContextVar[RequestContext | None] = ContextVar("request_context", defa
 
 def request_context() -> RequestContext | None:
     return _context.get()
+
+
+@contextmanager
+def acting_as_system() -> Iterator[None]:
+    """Inside a request, act as the system: for work that belongs to no user even when a request happens to
+    start it (e.g. the Control Tower's agent writing a narrative on its own authority)."""
+    token = _context.set(None)
+    try:
+        yield
+    finally:
+        _context.reset(token)
 
 
 class RequestContextMiddleware:

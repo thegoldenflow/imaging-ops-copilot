@@ -23,6 +23,7 @@ import { PortalPage } from "./features/portal/PortalPage";
 import { PortalPatientPage } from "./features/portal/PortalPatientPage";
 import { PeerReviewPage } from "./features/peer-review/PeerReviewPage";
 import { ContrastPage } from "./features/contrast/ContrastPage";
+import { ControlTowerPage } from "./features/control-tower/ControlTowerPage";
 import { EvalsPage } from "./features/evals/EvalsPage";
 import { ClinicalKnowledgePage } from "./features/clinical-kg/ClinicalKnowledge";
 import { MriSafetyPage } from "./features/mri-safety/MriSafetyPage";
@@ -109,6 +110,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/ai-usage" element={<Guard path="/ai-usage"><AiUsagePage /></Guard>} />
               <Route path="/audit" element={<Guard path="/audit"><AuditPage /></Guard>} />
               <Route path="/break-glass-review" element={<Guard path="/break-glass-review"><BreakGlassReviewPage /></Guard>} />
+              <Route path="/control-tower" element={<Guard path="/control-tower"><ControlTowerPage /></Guard>} />
               <Route path="/hospital/patients" element={<Guard path="/hospital/patients"><PatientsPage /></Guard>} />
               <Route path="/hospital/patients/:mrn" element={<Guard path="/hospital/patients"><PatientChartPage /></Guard>} />
               <Route path="*" element={<EmptyState title="Page not found" />} />

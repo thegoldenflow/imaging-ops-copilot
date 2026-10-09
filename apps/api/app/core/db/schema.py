@@ -127,6 +127,9 @@ MODULE_ENTITIES = {
         EntitySpec("agent_traces", "app.agents.trace:AgentTrace", indexes=(("agent_id",), ("started_at",))),
         EntitySpec("tool_idempotency", "app.agents.trace:IdempotencyRecord", encrypted=("result",),
                    indexes=(("expires_at",),)),
+        # Control Tower (7.1): the exception stream (the narrative may quote beds and MRN tokens: encrypted)
+        EntitySpec("flow_exceptions", "app.modules.control_tower.exceptions:FlowException", encrypted=("narration",),
+                   indexes=(("status",), ("key",))),
     ]
 }
 

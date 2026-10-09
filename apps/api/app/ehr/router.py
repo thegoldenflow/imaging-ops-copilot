@@ -19,7 +19,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.auth import client_ip, require_roles
 from app.core.models import Role, StaffUser
 from app.core.store import get_store
-from app.ehr import scenarios, simulator
+from app.ehr import scenarios, simjobs, simulator
 from app.ehr.events import EVENT_TYPES, bus
 from app.ehr.hl7 import Hl7EventAdapter
 
@@ -39,7 +39,7 @@ def _busy(e: simulator.SimulatorBusy):
 
 @router.get("/simulator")
 def get_simulator(user: StaffUser = Depends(require_roles(*CONTROL))):
-    return {**simulator.status(get_store()), "scenarios": scenarios.SCENARIOS}
+    return {**simulator.status(get_store()), "scenarios": scenarios.SCENARIOS, "job": simjobs.current()}
 
 
 class AdvanceRequest(BaseModel):
@@ -72,6 +72,19 @@ def fast_forward(request: Request, hour: int = Body(8, embed=True, ge=0, le=23),
         _busy(e)
     _audit(request, user, "fast-forward", f"to {result.end:%Y-%m-%d %H:%M}, {sum(result.events.values())} events")
     return result.summary()
+
+
+@router.post("/simulator/fast-forward/start")
+def fast_forward_start(request: Request, hour: int = Body(8, embed=True, ge=0, le=23),
+                       user: StaffUser = Depends(require_roles(*CONTROL))):
+    """The same fast-forward as a background job in steps of 30 hospital minutes (WP5: the control bar shows its
+    progress and the boards move while it runs). GET /simulator reports the job."""
+    try:
+        job = simjobs.start(get_store(), hour, operator=user.id)
+    except simulator.SimulatorBusy as e:
+        _busy(e)
+    _audit(request, user, "fast-forward", f"background job {job['id']} to {job['target']}")
+    return job
 
 
 @router.post("/simulator/run")

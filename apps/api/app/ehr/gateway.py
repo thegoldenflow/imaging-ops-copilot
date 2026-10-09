@@ -42,6 +42,7 @@ Resources passed on to a model go through app/llm/fhir_deid.py first.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -230,6 +231,7 @@ class FhirGateway:
         self._patients: dict[str, dict | None] = {}  # patient id -> Patient resource (MRN for the audit hash)
         self._scope: dict[str, str | None] = {}  # patient id -> None (in scope) or the break-glass grant id
         self._enc_patient: dict[str, str | None] = {}  # encounter id -> patient id
+        self._batch: dict | None = None  # collecting the reads of a composite read (batch)
 
     @property
     def role(self) -> str:
@@ -245,9 +247,29 @@ class FhirGateway:
                    None)
         return mrn_hash(mrn)
 
+    @contextmanager
+    def batch(self, label: str):
+        """A composite read (e.g. the Control Tower's boards: ten hospital-wide searches) audited as one record:
+        allowed reads that name no patient are collected and written together when the block ends; anything
+        about a patient, every refusal and every write is still audited at once."""
+        self._batch = {"label": label, "reads": []}
+        try:
+            yield self
+        finally:
+            batch, self._batch = self._batch, None
+            if batch["reads"]:
+                types = sorted({t for t, _ in batch["reads"]})
+                parts = "; ".join(detail for _, detail in batch["reads"])
+                self._audit("read", "Bundle", label, detail=f"{len(batch['reads'])} reads of {', '.join(types)}: "
+                                                             f"{parts}"[:1000])
+
     def _audit(self, action: str, resource_type: str, resource_id: str | None, *, outcome: str = "allowed",
                detail: str | None = None, patient: str | None = None, encounter: str | None = None,
                event_type: str | None = None, module: str | None = None) -> None:
+        batch = self._batch
+        if batch is not None and action == "read" and outcome == "allowed" and patient is None and encounter is None:
+            batch["reads"].append((resource_type, f"{resource_type} {detail or resource_id or ''}".strip()))
+            return
         grant = self._scope.get(patient) if patient and outcome == "allowed" else None
         reason = "; ".join(x for x in (f"break-glass {grant}" if grant else None, detail) if x)
         get_store().audit.record(
@@ -491,6 +513,37 @@ class FhirGateway:
         found = self.backend.search("Consent", patient=patient_id)
         self._audit("read", "Consent", patient_id, patient=patient_id)
         return self._visible(found)
+
+    def search(self, resource_type: str, *, order: str | None = None, limit: int | None = None,
+               **params: Any) -> list[dict]:
+        """A hospital-wide search (the Control Tower's boards, the flow models' training data): resources of
+        one type across patients, as plain dicts. Only for actors whose scope is the whole hospital (system
+        jobs, agents running on their own, hospital-wide roles); unit-scoped roles read per patient or unit.
+        Parameters are the store's search parameters (patient, encounter, status, code, category, cls,
+        location, unit, owner, focus, ids, date_from, date_to, active_at). One audit record per call."""
+        self._require_type("read", resource_type)
+        if self.policy is not None and self.policy.scope != "hospital":
+            self._deny("read", resource_type, None, f"the {self.role} role may not search the whole hospital")
+        found = self.backend.search(resource_type, order=order, limit=limit, **params)
+        shown = ", ".join(f"{k}={v if not isinstance(v, (list, tuple, set)) else f'[{len(v)}]'}"
+                          for k, v in sorted(params.items()) if v is not None)
+        self._audit("read", resource_type, None, detail=f"search {shown}".strip() + f"; {len(found)} found")
+        return self._visible(found)
+
+    def resolve_refs(self, refs: list[str]) -> set[str]:
+        """Which of these `Type/id` references name an existing resource the actor may read (a model's
+        evidence references are checked against the EHR before anything shows them). One audit record."""
+        out: set[str] = set()
+        for value in dict.fromkeys(refs):
+            rtype, _, rid = value.partition("/")
+            if not rid or rtype not in access.ALL_TYPES:
+                continue
+            if self.policy is not None and (rtype not in self.policy.read or self.policy.scope != "hospital"):
+                continue
+            if self.backend.read(rtype, rid) is not None:
+                out.add(value)
+        self._audit("read", "Reference", None, detail=f"resolve {len(out)} of {len(set(refs))} references")
+        return out
 
     # ----- writes -----
 

@@ -298,10 +298,11 @@ def write_surgery(b: Builder, sg: Surgery, p: PatientInfo, as_of: datetime, hori
         arrival = sg.booked_start - timedelta(hours=1, minutes=30)
         encounter = f"amb-{sg.id}" if sg.day_surgery and arrival <= as_of else booking_encounter
     status = "cancelled" if cancelled else ("fulfilled" if done else ("arrived" if started else "booked"))
-    b.appointment(p.id, sg.booked_start, sg.booked_start + timedelta(minutes=sg.booked_minutes), status=status,
-                  service=C.snomed(sg.code), location=sg.room, practitioner=sg.surgeon, based_on=f"orreq-{sg.id}",
-                  encounter=encounter, minutes=sg.booked_minutes, description=name,
-                  extensions=[ext("asa-class", valueInteger=sg.asa), ext("surgical-urgency", valueCode=sg.urgency)])
+    appointment = b.appointment(p.id, sg.booked_start, sg.booked_start + timedelta(minutes=sg.booked_minutes),
+                                status=status, service=C.snomed(sg.code), location=sg.room, practitioner=sg.surgeon,
+                                based_on=f"orreq-{sg.id}", encounter=encounter, minutes=sg.booked_minutes,
+                                description=name, extensions=[ext("asa-class", valueInteger=sg.asa),
+                                                              ext("surgical-urgency", valueCode=sg.urgency)])
     if sg.day_surgery and not cancelled:
         arrival = sg.booked_start - timedelta(hours=1, minutes=30)
         if arrival <= as_of:
@@ -322,8 +323,9 @@ def write_surgery(b: Builder, sg: Surgery, p: PatientInfo, as_of: datetime, hori
             if code == "preop-npo":
                 done_check = hours_to_go < 10
             b.task(p.id, (code, label), min(as_of, sg.booked_at + timedelta(days=1)),
-                   status="completed" if done_check else "requested", enc=encounter, focus=f"Appointment/{sg.id}",
-                   owner_role="nurse", description=f"{label} before {name}", due=sg.booked_start - timedelta(hours=1),
+                   status="completed" if done_check else "requested", enc=encounter,
+                   focus=f"Appointment/{appointment['id']}", owner_role="nurse",
+                   description=f"{label} before {name}", due=sg.booked_start - timedelta(hours=1),
                    priority="urgent" if sg.urgency == "emergent" else "routine")
 
 

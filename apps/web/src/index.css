@@ -26,3 +26,87 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Control Tower (WP5): its own dark / light theme, scoped to the page (`.ct[data-theme]`); the tokens follow the
+   warehouse control tower's (bg, surface, accent, critical, warning, ok). */
+@theme inline {
+  --color-ct-bg: var(--ct-bg);
+  --color-ct-surface: var(--ct-surface);
+  --color-ct-raised: var(--ct-raised);
+  --color-ct-border: var(--ct-border);
+  --color-ct-text: var(--ct-text);
+  --color-ct-muted: var(--ct-muted);
+  --color-ct-accent: var(--ct-accent);
+  --color-ct-critical: var(--ct-critical);
+  --color-ct-warning: var(--ct-warning);
+  --color-ct-ok: var(--ct-ok);
+  --color-ct-info: var(--ct-info);
+  --color-ct-ai: var(--ct-ai);
+  --color-ct-critical-soft: var(--ct-critical-soft);
+  --color-ct-warning-soft: var(--ct-warning-soft);
+  --color-ct-ok-soft: var(--ct-ok-soft);
+  --color-ct-info-soft: var(--ct-info-soft);
+  --color-ct-ai-soft: var(--ct-ai-soft);
+}
+
+.ct[data-theme="dark"] {
+  --ct-bg: #0b1220;
+  --ct-surface: #111a2e;
+  --ct-raised: #17223b;
+  --ct-border: #24324f;
+  --ct-text: #e6edf7;
+  --ct-muted: #8fa3bf;
+  --ct-accent: #3b82f6;
+  --ct-critical: #f87171;
+  --ct-warning: #fbbf24;
+  --ct-ok: #34d399;
+  --ct-info: #60a5fa;
+  --ct-ai: #a78bfa;
+  --ct-critical-soft: rgb(248 113 113 / 0.14);
+  --ct-warning-soft: rgb(251 191 36 / 0.14);
+  --ct-ok-soft: rgb(52 211 153 / 0.14);
+  --ct-info-soft: rgb(96 165 250 / 0.14);
+  --ct-ai-soft: rgb(167 139 250 / 0.16);
+  color-scheme: dark;
+}
+
+.ct[data-theme="light"] {
+  --ct-bg: #f3f6fb;
+  --ct-surface: #ffffff;
+  --ct-raised: #f1f4f9;
+  --ct-border: #dbe2ee;
+  --ct-text: #0f172a;
+  --ct-muted: #5b6b82;
+  --ct-accent: #2563eb;
+  --ct-critical: #dc2626;
+  --ct-warning: #b45309;
+  --ct-ok: #047857;
+  --ct-info: #1d4ed8;
+  --ct-ai: #6d28d9;
+  --ct-critical-soft: rgb(220 38 38 / 0.09);
+  --ct-warning-soft: rgb(217 119 6 / 0.12);
+  --ct-ok-soft: rgb(4 120 87 / 0.1);
+  --ct-info-soft: rgb(29 78 216 / 0.08);
+  --ct-ai-soft: rgb(109 40 217 / 0.09);
+  color-scheme: light;
+}
+
+@keyframes ct-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.ct-live {
+  animation: ct-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ct-shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
+}
+
+.ct-skeleton {
+  background: linear-gradient(90deg, var(--ct-raised) 0px, var(--ct-border) 80px, var(--ct-raised) 160px);
+  background-size: 400px 100%;
+  animation: ct-shimmer 1.4s linear infinite;
+}

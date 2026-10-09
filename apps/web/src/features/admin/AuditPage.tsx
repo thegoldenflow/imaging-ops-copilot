@@ -24,13 +24,15 @@ interface AuditEvent {
   prompt_version: string | null;
 }
 
-type Filter = "all" | "denied" | "break_glass" | "sign" | "consent_change" | "ai_call";
+type Filter = "all" | "denied" | "break_glass" | "sign" | "approve" | "tool_call" | "consent_change" | "ai_call";
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All events" },
   { id: "denied", label: "Denied (403)" },
   { id: "break_glass", label: "Break-glass" },
   { id: "sign", label: "Signatures" },
+  { id: "approve", label: "Approvals" },
+  { id: "tool_call", label: "Tool calls" },
   { id: "consent_change", label: "Consent" },
   { id: "ai_call", label: "AI calls" },
 ];

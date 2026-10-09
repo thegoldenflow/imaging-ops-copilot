@@ -362,9 +362,16 @@ def build_store(seed: int | None = None) -> Store:
     return store
 
 
+# Held (exclusively) while the demo data is rewritten; background steps take it shared and skip while a reset runs,
+# so the TRUNCATE of every table never deadlocks with a step writing into them.
+REWRITE_LOCK = 0x5EED_DA7A
+
+
 def reset_store(seed: int | None = None) -> Store:
     """Regenerate the demo data and write it over the current database contents."""
     store = get_store()
+    if not store.detached:
+        store.conn().execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": REWRITE_LOCK})
     persist(build_store(seed), store)
     clear_process_cache()
     return store

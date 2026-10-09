@@ -180,6 +180,35 @@ const HOSPITAL: Step[] = [
   },
 ];
 
+// Hospital flow Control Tower (spec 7.1): the bed manager's one screen for the ED, the beds and the OR.
+const FLOW: Step[] = [
+  {
+    title: "Read the hospital at 07:00",
+    detail: "Three boards from FHIR: the ED with admission probabilities, the beds with expected discharges and the net gap, the OR lists with predicted durations and pre-op readiness. Full wards and long OR cases are already exceptions.",
+    role: "operations_manager", userId: "U-OPS", to: "/control-tower", system: "Control Tower",
+  },
+  {
+    title: "Approve what the AI recommends",
+    detail: "Open an exception: the narrative and the actions come from the rule engine's facts and action menu, the evidence is checked in the EHR. Approve: a Task goes to each action's owner role and the approval is audited. Or reject with a reason, or defer.",
+    role: "operations_manager", userId: "U-OPS", to: "/control-tower", system: "Action drawer",
+  },
+  {
+    title: "Inject an ICU surge and let the day run",
+    detail: "From the control bar: an ICU surge of 8 patients, then run the clock. ICU fills, patients board in the ED and new exceptions appear within seconds. Fast-forward to 08:00 tomorrow runs in the background.",
+    role: "operations_manager", userId: "U-OPS", to: "/control-tower", system: "Day simulator",
+  },
+  {
+    title: "Drill down: unit, bed grid, patient card",
+    detail: "Click a unit for its bed grid and a bed for the patient card. The bed manager sees MRN, admission and expected discharge only; everything else is hidden for the role.",
+    role: "operations_manager", userId: "U-OPS", to: "/control-tower", system: "RBAC",
+  },
+  {
+    title: "The charge nurse sees the clinical card",
+    detail: "As the Medicine A nurse the same bed shows name, reason for admission, vital signs and the discharge prediction with its three main factors. Patients of other units keep their MRN hidden.",
+    role: "nurse", userId: "U-NURS-05", to: "/control-tower", system: "RBAC",
+  },
+];
+
 function StoryCard({ title, steps, onGo, userId }: { title: string; steps: Step[]; onGo: (s: Step) => void; userId: string }) {
   return (
     <Card title={title} className="mb-4">
@@ -211,11 +240,13 @@ export function HomePage() {
   if (!user) return null;
 
   const hospitalFirst = ["physician", "nurse", "pharmacist", "clerk"].includes(user.role);
+  const flowFirst = user.role === "operations_manager";
 
   const go = async (step: Step) => {
     if (user.id !== step.userId) await login(step.userId);
     navigate(step.to);
   };
+  const flow = <StoryCard title="Storyline 6 · hospital flow Control Tower: ED, beds and OR" steps={FLOW} onGo={go} userId={user.id} />;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -223,12 +254,15 @@ export function HomePage() {
         title={`Welcome, ${user.name.split(" ").slice(-2).join(" ")}`}
         subtitle="Follow the demo storyline below, or use the menu to explore your role's tools."
       />
+      {flowFirst && flow}
       {hospitalFirst && <StoryCard title="Storyline 5 · hospital platform: roles, break-glass, consent, signing" steps={HOSPITAL} onGo={go} userId={user.id} />}
+      {hospitalFirst && flow}
       <StoryCard title="Storyline 1 · one patient through scheduling, reporting and the front desk" steps={STORY} onGo={go} userId={user.id} />
       <StoryCard title="Storyline 2 · the requisition intake pipeline" steps={PIPELINE} onGo={go} userId={user.id} />
       <StoryCard title="Storyline 3 · radiology operations" steps={OPERATIONS} onGo={go} userId={user.id} />
       <StoryCard title="Storyline 4 · business and compliance" steps={BUSINESS} onGo={go} userId={user.id} />
       {!hospitalFirst && <StoryCard title="Storyline 5 · hospital platform: roles, break-glass, consent, signing" steps={HOSPITAL} onGo={go} userId={user.id} />}
+      {!hospitalFirst && !flowFirst && flow}
       <p className="flex items-center gap-1.5 text-xs text-slate-500">
         <CheckCircle2 className="size-3.5" /> Use “Reset demo” in the header to start over.
       </p>

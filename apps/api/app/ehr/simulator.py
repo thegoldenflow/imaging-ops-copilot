@@ -42,7 +42,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import DBAPIError
 
 from app.core.store import Store
 from app.ehr import codes as C
@@ -61,6 +62,7 @@ from app.fhir.dt import fhir_datetime, parse, ref, ref_id
 log = logging.getLogger("app.simulator")
 
 SIM_LOCK = 0x51_D4_7A  # pg advisory lock: one simulator step at a time
+LOCK_WAIT = "5s"  # how long a person's action waits for a background tick in progress
 DEFAULT_RATE = 60.0  # hospital seconds per wall second: one hospital hour per demo minute
 MAX_TICK = timedelta(minutes=30)  # a background tick never jumps further than this
 RETRY = timedelta(minutes=30)  # a patient without a free bed tries again after this
@@ -121,8 +123,19 @@ def next_morning(now: datetime, hour: int = 8) -> datetime:
 
 
 def _locked(store: Store) -> None:
-    if not store.try_lock(SIM_LOCK):
-        raise SimulatorBusy("The simulator is busy; try again in a moment")
+    """One simulator step at a time. A person's action (advance, fast-forward, run, pause, inject) waits up to
+    LOCK_WAIT for a background tick in progress; the tick itself never waits (it tries and skips)."""
+    if store.detached:
+        return
+    conn = store.conn()
+    try:
+        with conn.begin_nested():  # a timed-out wait must not abort the request's transaction
+            conn.execute(text(f"SET LOCAL lock_timeout = '{LOCK_WAIT}'"))
+            conn.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": SIM_LOCK})
+    except DBAPIError as e:
+        raise SimulatorBusy("The simulator is busy; try again in a moment") from e
+    finally:
+        conn.execute(text("SET LOCAL lock_timeout = 0"))
 
 
 def advance(store: Store, until: datetime, *, last_wall: datetime | None = None) -> AdvanceResult:

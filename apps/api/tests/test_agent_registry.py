@@ -22,7 +22,9 @@ EXISTING_TASKS = {"requisition_extract", "requisition_triage", "protocol_suggest
                   "referral_weekly_summary", "clinical_kg_parse", "clinical_kg_answer", "deid_check"}
 # WP4's modules.registry.json (6.3), as it was: tier, sign-off roles, cosign, consents, writes_allowed.
 WP4_ENTRIES = {
-    "control_tower": ("ops", ["operations_manager"], False, [], {"Task": {"*"}, "Encounter.location": {"append"}}),
+    # WP5: the charge nurse approves Control Tower actions too (7.1)
+    "control_tower": ("ops", ["operations_manager", "nurse"], False, [],
+                      {"Task": {"*"}, "Encounter.location": {"append"}}),
     "registration": ("ops", ["clerk"], False, [], {"Appointment": {"proposed"}, "Task": {"*"}}),
     "consent_management": ("ops", [], False, [], {"Consent": {"active"}}),
     "bedside_nursing": ("ops", ["nurse"], False, [], {"Task": {"*"}, "Flag": {"*"}, "Communication": {"*"}}),
@@ -71,12 +73,15 @@ def test_every_existing_agent_is_registered_with_its_prompt_version():
                    TRIAGE_PROMPT):
         spec = agents[prompt.name]
         assert spec.kind == "embedded_agent" and spec.prompt_version == prompt.version, prompt.name
-    # the 7.1-7.4 agents are registered with their WP4 rights; their code comes in WP5-WP8
-    for name in ("control_tower", "discharge_summary", "patient_instructions", "nursing_handoff",
-                 "medication_reconciliation", "order_review", "followup_calls"):
+    # the 7.2-7.4 agents are registered with their WP4 rights; their code comes in WP6-WP8
+    for name in ("discharge_summary", "patient_instructions", "nursing_handoff", "medication_reconciliation",
+                 "order_review", "followup_calls"):
         assert agents[name].kind == "runtime_agent" and agents[name].deployment_status == "dev", name
-    # the one runtime agent with code
+    # the runtime agents with code: the reference agent and the Control Tower's narrator (WP5)
     assert agents["patient_message_triage"].entrypoint == "app.agents.library.patient_message_triage"
+    tower = agents["control_tower"]
+    assert tower.entrypoint == "app.modules.control_tower.agent" and tower.prompt_version == "control_tower@1"
+    assert tower.deployment_status == "demo"
 
 
 def test_wp4_registry_entries_moved_over_unchanged():

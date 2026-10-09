@@ -9,12 +9,13 @@ from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.agents.router import router as agents_router
 from app.core.config import settings
 from app.core.context import RequestContextMiddleware
 from app.core.db.migrate import init_db
-from app.core.store import unit_of_work
+from app.core.store import REWRITE_LOCK, unit_of_work
 from app.core.unit_of_work import UnitOfWorkMiddleware
 from app.ehr import simulator
 from app.ehr.events import bus
@@ -37,6 +38,8 @@ from app.modules.frontdesk.router import router as frontdesk_router
 from app.modules.inspection import service as inspection
 from app.modules.inspection.router import router as inspection_router
 from app.modules.clinical_kg.router import router as clinical_kg_router
+from app.modules.control_tower import service as control_tower
+from app.modules.control_tower.router import router as control_tower_router
 from app.modules.inventory.router import router as inventory_router
 from app.modules.mri_safety.router import router as mri_router
 from app.modules.peer_review import service as peer_review
@@ -59,9 +62,13 @@ logging.getLogger("httpx2").setLevel(logging.WARNING)
 
 
 def _step(name: str, fn, *args) -> None:
-    """One background step in its own transaction, so a failure rolls back only that step."""
+    """One background step in its own transaction, so a failure rolls back only that step. Skipped while the
+    demo data is being rewritten (a reset holds REWRITE_LOCK)."""
     try:
         with unit_of_work() as store:
+            if not store.conn().execute(text("SELECT pg_try_advisory_xact_lock_shared(:key)"),
+                                        {"key": REWRITE_LOCK}).scalar():
+                return
             fn(store, *args)
     except Exception:  # keep the loop alive; log without payloads (may contain PHI)
         log.exception("%s failed", name)
@@ -104,12 +111,24 @@ def _drain_events() -> None:
 
 
 async def _hospital_loop() -> None:
-    """Moves the hospital clock while the day simulator runs, then delivers the domain events it
-    published to the subscribers. Every second, so a running simulation reaches the screens quickly."""
+    """Moves the hospital clock while the day simulator runs, delivers the domain events it published to the
+    subscribers, then refreshes the Control Tower (boards and exception stream; a no-op when nothing changed).
+    Every second (the time the steps took counts towards it), so a running simulation reaches the screens quickly."""
+    loop = asyncio.get_running_loop()
     while True:
-        await asyncio.sleep(1)
+        started = loop.time()
         await asyncio.to_thread(_step, "day simulator", simulator.tick)
         await asyncio.to_thread(_drain_events)
+        await asyncio.to_thread(_step, "control tower", control_tower.refresh_step)
+        await asyncio.sleep(max(0.1, 1 - (loop.time() - started)))
+
+
+async def _narrator_loop() -> None:
+    """Writes the narrative and recommended actions of new Control Tower exceptions (a model call each), apart
+    from the hospital loop so a slow model never delays the boards."""
+    while True:
+        await asyncio.sleep(2)
+        await asyncio.to_thread(_step, "control tower narration", control_tower.narrate_step)
 
 
 @contextlib.asynccontextmanager
@@ -118,7 +137,7 @@ async def lifespan(_: FastAPI):
     # rescanning the large, long-lived row cache (app/core/db/repo.py). Measured ~30% faster.
     gc.set_threshold(50_000, 50, 100)
     await asyncio.to_thread(init_db)  # migrate; generate the demo data on first start
-    loops = (_dispatch_loop, _intake_loop, _hospital_loop)
+    loops = (_dispatch_loop, _intake_loop, _hospital_loop, _narrator_loop)
     tasks = [asyncio.create_task(loop()) for loop in loops] if settings.background_workers else []
     yield
     for task in tasks:
@@ -160,6 +179,7 @@ app.include_router(clinical_kg_router)
 app.include_router(hospital_router)
 app.include_router(platform_router)
 app.include_router(agents_router)
+app.include_router(control_tower_router)
 
 
 @app.exception_handler(FhirAccessDenied)

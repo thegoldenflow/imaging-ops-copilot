@@ -41,7 +41,7 @@ Branch: `feat/hospital-platform`, cut from `feat/postgres` (phase 0 completion: 
 | Extension module | Reuses | Path and interface |
 | --- | --- | --- |
 | 6.1 Exam ↔ FHIR | Imaging appointment + study + report | `Appointment`, `ImagingStudy` (`app/core/models.py`), `Report` (`app/modules/reports/service.py`: `report_for_study(store, study_id)`). In this code base `Exam` is the exam catalog entry (code, name, modality, minutes); the "exam" the spec maps is the booked exam: `Appointment` (+ its `ImagingStudy` and `Report` once performed and read). |
-| 7.1 Control Tower | Scheduling command center | `app/modules/scheduling/service.py`: `utilization`, `heatmap`, `rank_waitlist`; polling every 3 s in `features/scheduling` |
+| 7.1 Control Tower | Scheduling command center | `app/modules/scheduling/service.py`: `utilization`, `heatmap`, `rank_waitlist`; polling every 3 s in `features/scheduling`. Done in WP5: `app/modules/control_tower` (boards, flow models, rules, exceptions, narrator agent), `features/control-tower` (polls every second while the simulator runs) |
 | 7.2 Order review | Contrast & renal checker, triage | `app/modules/contrast/service.py`: `ContrastConfig`, `evaluate(store, patient_id, requisition_id) -> ContrastCheck` (rules first, AI only for history); `app/modules/triage/service.py` |
 | 7.3 Documentation | Report draft and sign-off | `app/modules/reports/service.py`: `generate_draft`, `edit_ratio`, `sign(store, report, signer_name, confirmed_urgent, ...)`; bilingual terminology in `app/modules/clinical_kg` (glossary, `terms`) |
 | 7.4 Voice services | Front-desk phone agent | `app/modules/frontdesk/tools.py` (`verify_identity`, `transfer_to_human`, `run_tool`, `CallSession`), `agent.py` (`ScriptedAgent`, `LlmAgent`, `agent_reply`), browser Web Speech in `features/frontdesk` |
@@ -49,7 +49,7 @@ Branch: `feat/hospital-platform`, cut from `feat/postgres` (phase 0 completion: 
 
 ## 4. Frontend (apps/web)
 
-- React 18, TypeScript, Vite 5, Tailwind v4 (`@theme` brand and `ai` colours in `src/index.css`), TanStack Query, react-router 6, lucide icons. No chart library (`src/components/charts.tsx` is hand-written SVG). Light theme only.
+- React 18, TypeScript, Vite 5, Tailwind v4 (`@theme` brand and `ai` colours in `src/index.css`), TanStack Query, react-router 6, lucide icons. No chart library (`src/components/charts.tsx` is hand-written SVG). Light theme only, except the Control Tower (WP5): `.ct[data-theme=dark|light]` tokens in `src/index.css` (`bg-ct-*`, `text-ct-*`), after the warehouse tokens; its kit (`features/control-tower/kit.tsx`: SeverityPill, StatusPill, KpiTile, HeadlineBar, Drawer, skeleton / empty / error panels).
 - Shell: `src/components/Layout.tsx` (`NAV` items with roles and sections, `canSee`, header with role and AI-mode badge, reset button), routes and `Guard` in `src/main.tsx`.
 - Kit: `src/components/ui.tsx` — `Button`, `Card`, `Badge`, `AiBadge`, `Loading`, `EmptyState`, `ErrorState`, `PageHeader`, `Stat`, `Tabs`.
 - API: `src/lib/api.ts` (`api`, `post`, `patch`, `put`, `download`, `ApiError`), `src/lib/auth.tsx` (`useAuth`), types in `src/lib/types.ts`.
@@ -118,3 +118,12 @@ Java 21, Spring Boot, Temporal Java SDK 1.35, MySQL. Nothing is copyable into Py
 | Placeholder tokens `[NAME_1]`, `[DATE_3]` | `[PERSON_n]` / `[STAFF_n]` (the token kinds WP2 already used), `[DATE_n:D-2]` (with days from the reference date); MRN `[MRN_<keyed hash>]` when known |
 | Audit fields timestamp, actor_id, actor_role | existing `ts`, `user_id`, `role`; new `event_type`, `patient_mrn_hash`, `encounter_id`, `module`, `prompt_version` |
 | Release gate "CI runs the module eval" (de-identification) | `tests/test_freetext_deid.py::test_eval_meets_the_thresholds` in the backend suite and `scripts/deid_eval.py --check` (the repository has no CI pipeline yet) |
+| 7.1 Control Tower, its three boards, exception stream, action drawer | `apps/api/app/modules/control_tower/` (`snapshot.py`, `rules.py`, `exceptions.py`, `agent.py`, `service.py`, `router.py`, `/api/control-tower/...`), `apps/web/src/features/control-tower/` (route `/control-tower`) |
+| "charge nurse", "OR coordinator" | a `nurse` of the unit (decides that unit's exceptions); the OR coordinator is the `operations_manager` (no separate role) |
+| `getBedBoard(unitId)` for the whole hospital | `FhirGateway.search(type, **params)` + `batch(label)` (one audit record for the board's ten searches), `resolve_refs(refs)` for the narrator's evidence |
+| LightGBM (7.1 models) | scikit-learn `HistGradientBoostingClassifier` / `Regressor` (already a dependency; LightGBM is a stack change awaiting the owner); "LightGBM feature contributions" = path attributions on the trees (`flowmodels.Explainer`) |
+| `scripts/build_flow_dataset.py`, `models/flow/` | `apps/api/scripts/build_flow_dataset.py`, `apps/api/scripts/train_flow_models.py`; `apps/api/models/flow/` (`<model>.joblib`, `report.json`, `report.md`, README; training CSVs in `data/`, not in git) |
+| narrator output `{exception_id, severity, narrative, recommended_actions[{action, rationale, owner_role, expected_effect}], evidence_refs[]}` | the same plus `action_id` per action (the engine's menu entry; its wording and owner role are the engine's) |
+| `explainException` (the recommend example of 6.4) | tool `explainException` (an `ai-review` Task for the bed manager and charge nurses); the approved action = tool `createFlowTask` (Task code `flow-action`) |
+| 7.1 evals | `evals/control_tower/` (`rules/cases.jsonl` 20 scenarios, `narrator/cases.jsonl` 30 exceptions, `report.json` / `report.md`, rating sheet), runner `apps/api/scripts/control_tower_eval.py` |
+| "fast-forward to 08:00 tomorrow" from the control bar | `POST /api/hospital/simulator/fast-forward/start` (background job, `app/ehr/simjobs.py`); the synchronous `/simulator/fast-forward` stays for scripts |

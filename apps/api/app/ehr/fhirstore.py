@@ -266,10 +266,14 @@ class FhirStore:
         return cipher().encrypt(json.dumps(resource, separators=(",", ":"), ensure_ascii=False), _CONTEXT)
 
     @staticmethod
-    def _decrypt(token: str) -> dict:
+    def _decrypt_text(token: str) -> str:
         from app.core.db.crypto import cipher
 
-        return json.loads(cipher().decrypt(token, _CONTEXT))
+        return cipher().decrypt(token, _CONTEXT)
+
+    @classmethod
+    def _decrypt(cls, token: str) -> dict:
+        return json.loads(cls._decrypt_text(token))
 
     def _row(self, resource: dict, cols: dict | None = None) -> dict:
         meta = resource.get("meta") or {}
@@ -380,9 +384,12 @@ class FhirStore:
         for token, rid in self._store.conn().execute(stmt):
             key = (resource_type, rid)
             resource = self._cache.get(key)
-            if resource is None:
-                resource = self._cache[key] = self._decrypt(token)
-            out.append(copy.deepcopy(resource))
+            if resource is None:  # parsing the JSON twice is several times cheaper than a deep copy
+                text = self._decrypt_text(token)
+                self._cache[key] = json.loads(text)
+                out.append(json.loads(text))
+            else:
+                out.append(copy.deepcopy(resource))
         return out
 
     def count(self, resource_type: str, **params: Any) -> int:
