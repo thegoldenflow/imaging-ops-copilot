@@ -82,7 +82,7 @@ const PIPELINE: Step[] = [
 const OPERATIONS: Step[] = [
   {
     title: "An exam finishes and lands in the reading backlog",
-    detail: "Mark one of today's or tomorrow's exams done. A study is created and assigned to a credentialed radiologist; CT exams also get a dose record from the scanner.",
+    detail: "Mark an upcoming exam done (the list opens on the site's next open day). A study is created and assigned to a credentialed radiologist; CT exams also get a dose record from the scanner.",
     role: "technologist", userId: "U-TECH", to: "/scheduling?tab=appointments", system: "Backlog · CT dose",
   },
   {

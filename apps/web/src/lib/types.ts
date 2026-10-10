@@ -46,6 +46,7 @@ export interface Site {
   name: string;
   address: string;
   modalities: string[];
+  open_days: number[]; // 0 = Monday
 }
 
 export type LlmMode = "mock" | "anthropic" | "gemini";

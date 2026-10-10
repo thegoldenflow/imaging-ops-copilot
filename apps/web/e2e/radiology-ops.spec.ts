@@ -101,6 +101,25 @@ test("radiology operations end to end", async ({ page }) => {
   await shot(page, "p3-07-dose-trends");
 });
 
+test("appointments open on the site's next open day, also at a weekend", async ({ page }) => {
+  // Every site is closed on Sundays, so on a Saturday "tomorrow" had nothing to mark done. Whatever today is,
+  // the browser goes to the coming Saturday and Sunday: Lakeshore's list opens on the Monday after.
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const at = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + 6 - d.getDay() + days);
+    d.setHours(10, 0, 0, 0);
+    return d;
+  };
+  await signInAs(page, "technologist");
+  for (const weekend of [at(0), at(1)]) {
+    await page.clock.setFixedTime(weekend);
+    await page.goto("/scheduling?tab=appointments");
+    await expect(page.getByLabel("Day")).toHaveValue(iso(at(2)));
+    await expect(page.locator('[data-testid^="complete-"]').first()).toBeVisible({ timeout: 20_000 });
+  }
+});
+
 test("QA report is for the QA lead only", async ({ page }) => {
   await signInAs(page, "admin");
   const res = await page.request.get("/api/peer-review/qa", {
