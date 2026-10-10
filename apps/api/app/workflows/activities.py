@@ -358,6 +358,20 @@ def draft_patient_instructions(args: dict) -> dict:
                                 documentation.doc_ref("patient_instructions", args["encounter_id"]))
 
 
+@step_activity("journey.scheduleFollowupCall", "scheduleFollowupCall")
+def schedule_followup_call(args: dict) -> dict:
+    """WP8 (7.4): the follow-up call scheduled when its four conditions hold, else the workflow's manual follow-up
+    Task for a nurse (app/modules/voice_services/journey.py)."""
+    from app.modules.voice_services import journey as voice
+
+    return voice.schedule_step(get_store(), args, manual_task=lambda reason: _engine_task(
+        args, "scheduleFollowupCall", "manual", f"Follow up with the patient by phone yourself: {reason}.", "nurse"))
+
+
+# Journeys started before WP8 (versions 1 and 2) replay their placeholder: the call proposed as an appointment and
+# booked after a clerk's approval. The two activities stay registered for such a journey still waiting there.
+
+
 @step_activity("journey.requestFollowupCall", "scheduleFollowupCall")
 def request_followup_call(args: dict) -> dict:
     """The follow-up agent's consent check, then the call proposed for 48 h after discharge (hospital time) and its
@@ -571,7 +585,8 @@ def review_regression(args: dict) -> dict:
 
 ACTIVITIES = [record_progress, open_task, close_tasks, journey_context, triage_assist, order_review,
               med_rec_admission, bed_assignment, predict_duration, propose_schedule, news2_alert,
-              draft_discharge_summary, draft_patient_instructions, request_followup_call, book_followup_call,
+              draft_discharge_summary, draft_patient_instructions, schedule_followup_call, request_followup_call,
+              book_followup_call,
               coding_stub, capacity_detect, capacity_explain, capacity_execute, capacity_verify,
               capacity_record_outcome, review_create_task, review_write_corrected, review_append_case,
               review_regression]

@@ -39,13 +39,13 @@ CRITERIA = [
     ("low_confidence", "The low-confidence loop: after the human correction the eval set has one more case and the "
                        "regression eval runs",
      ["test_low_confidence_output_is_corrected_added_as_an_eval_case_and_the_regression_runs"]),
-    ("replay", "One Temporal replay test per workflow (plus the version-1 journey through patched())",
+    ("replay", "One Temporal replay test per workflow (plus the version-1 and version-2 journeys through patched())",
      ["test_captured_history_replays_against_the_current_code", "test_every_workflow_has_a_replay_test",
       "test_the_version_1_journey_has_no_patch_marker_and_the_current_one_has"]),
-    ("journey_end_to_end", "The whole journey from admission to the booked follow-up call",
-     ["test_journey_runs_from_admission_to_the_booked_follow_up_call"]),
+    ("journey_end_to_end", "The whole journey from admission to the scheduled follow-up call (WP8)",
+     ["test_journey_runs_from_admission_to_the_scheduled_follow_up_call"]),
     ("privileged", "An activity calling a privileged tool is not retried; its failure becomes a Task; retry and "
-                   "skip by the operations manager are audited",
+                   "skip by the operations manager are audited (a probe workflow since WP8)",
      ["test_a_failed_privileged_call_is_not_retried_and_waits_for_a_retry_or_skip"]),
     ("capacity", "Capacity exceptions: approved actions executed with idempotency keys, verified after 1 h; "
                  "rejected and cleared ones record an outcome",

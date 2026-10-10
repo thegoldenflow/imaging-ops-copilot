@@ -1,6 +1,6 @@
 # Durable workflows: acceptance report (WP4c, spec 6.5)
 
-Run 2026-10-09T20:40:41 · temporalio 1.33.0 · Temporal's time-skipping test server and the replay of captured histories · 33 of 33 tests passed in 110.1 s.
+Run 2026-10-10T06:05:16 · temporalio 1.33.0 · Temporal's time-skipping test server and the replay of captured histories · 35 of 35 tests passed in 170.8 s.
 
 **passed**
 
@@ -10,14 +10,16 @@ Run 2026-10-09T20:40:41 · temporalio 1.33.0 · Temporal's time-skipping test se
 | Killing and restarting the worker resumes the journey without re-running completed steps | passed | `test_a_restarted_worker_resumes_the_journey_without_running_completed_steps_again` passed |
 | A sign-off timeout (24 h; 24 s in the test) produces the escalation Task, then the operations manager is told | passed | `test_a_signoff_not_given_in_24_seconds_escalates_then_tells_the_operations_manager` passed |
 | The low-confidence loop: after the human correction the eval set has one more case and the regression eval runs | passed | `test_low_confidence_output_is_corrected_added_as_an_eval_case_and_the_regression_runs` passed |
-| One Temporal replay test per workflow (plus the version-1 journey through patched()) | passed | `test_captured_history_replays_against_the_current_code` passed, passed, passed, passed, passed, passed<br>`test_every_workflow_has_a_replay_test` passed<br>`test_the_version_1_journey_has_no_patch_marker_and_the_current_one_has` passed |
-| The whole journey from admission to the booked follow-up call | passed | `test_journey_runs_from_admission_to_the_booked_follow_up_call` passed |
-| An activity calling a privileged tool is not retried; its failure becomes a Task; retry and skip by the operations manager are audited | passed | `test_a_failed_privileged_call_is_not_retried_and_waits_for_a_retry_or_skip` passed |
+| One Temporal replay test per workflow (plus the version-1 and version-2 journeys through patched()) | passed | `test_captured_history_replays_against_the_current_code` passed, passed, passed, passed, passed, passed, passed<br>`test_every_workflow_has_a_replay_test` passed<br>`test_the_version_1_journey_has_no_patch_marker_and_the_current_one_has` passed |
+| The whole journey from admission to the scheduled follow-up call (WP8) | passed | `test_journey_runs_from_admission_to_the_scheduled_follow_up_call` passed |
+| An activity calling a privileged tool is not retried; its failure becomes a Task; retry and skip by the operations manager are audited (a probe workflow since WP8) | passed | `test_a_failed_privileged_call_is_not_retried_and_waits_for_a_retry_or_skip` passed |
 | Capacity exceptions: approved actions executed with idempotency keys, verified after 1 h; rejected and cleared ones record an outcome | passed | `test_capacity_workflow_executes_the_approval_and_checks_the_occupancy_an_hour_later` passed<br>`test_rejected_and_cleared_exceptions_record_their_outcome_too` passed |
 | EventBus <-> Temporal bridge (insert-first outbox, order, outage), offline mode, roles and audit of retry and skip | passed | `test_without_temporal_the_bridge_is_off_and_the_view_says_offline` passed<br>`test_domain_events_map_to_workflow_starts_and_signals` passed<br>`test_the_outbox_takes_each_event_once_and_sends_in_order` passed<br>`test_commands_wait_while_temporal_is_unreachable_and_go_out_when_it_is_back` passed<br>`test_retry_and_skip_are_for_the_operations_manager_and_admin_and_audited` passed |
 | Demo script demo/workflows.md (3 minutes, a deliberate failure and the recovery) | passed | `demo/workflows.md` present |
 
 ## Real server (docker dev server, a real worker process killed and restarted)
+
+Carried over from the WP4c run of 2026-10-09 (not re-run in WP8, which changed no worker or MedRec code).
 
 Exit code 0; MedRec documents after the injected failures: 1; resumed 16.5 s after the restart; completed steps run again: none.
 

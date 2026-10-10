@@ -73,6 +73,11 @@ class Settings:
     workflow_escalation_timeout_s: int
     workflow_followup_delay_s: int
     workflow_verify_after_s: int
+    # Post-discharge follow-up calls (7.4) without a journey workflow: due this many hospital hours after the
+    # discharge, still placed until `window` hours after it; the nurse calls back within `callback` minutes.
+    followup_call_delay_h: int = 48
+    followup_call_window_h: int = 72
+    followup_callback_minutes: int = 30
 
 
 def load_settings() -> Settings:
@@ -124,6 +129,9 @@ def load_settings() -> Settings:
         workflow_escalation_timeout_s=int(os.getenv("WORKFLOW_ESCALATION_TIMEOUT_S", str(24 * 3600))),
         workflow_followup_delay_s=int(os.getenv("WORKFLOW_FOLLOWUP_DELAY_S", str(48 * 3600))),
         workflow_verify_after_s=int(os.getenv("WORKFLOW_VERIFY_AFTER_S", str(3600))),
+        followup_call_delay_h=int(os.getenv("FOLLOWUP_CALL_DELAY_H", "48")),
+        followup_call_window_h=int(os.getenv("FOLLOWUP_CALL_WINDOW_H", "72")),
+        followup_callback_minutes=int(os.getenv("FOLLOWUP_CALLBACK_MINUTES", "30")),
     )
 
 

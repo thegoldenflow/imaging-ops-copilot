@@ -10,9 +10,10 @@ Steps, each an activity (app/workflows/activities.py) whose side effects go thro
 A sign-off step waits for a signal (the document signed final, the Task decided) racing the escalation deadlines
 (FlowBase._await_signoff). The order review and the admission medication reconciliation are WP6's
 (app/modules/med_safety/journey.py), the discharge summary and the patient instructions WP7's
-(app/modules/documentation/journey.py). The steps whose modules come later (the follow-up call: WP8, NEWS2: WP9's
-8.1 stub, coding: the 8.1 roadmap card) are interfaces with placeholder implementations
-(app/agents/library/journey_stubs.py), clearly marked as such.
+(app/modules/documentation/journey.py), the follow-up call WP8's (app/modules/voice_services/journey.py: the four
+conditions of 7.4, then the call scheduled or a nurse's manual Task; version 3, behind `patched`). The steps whose
+modules come later (NEWS2: WP9's 8.1 stub, coding: the 8.1 roadmap card) are interfaces with placeholder
+implementations, clearly marked as such.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ with workflow.unsafe.imports_passed_through():
     from app.workflows.base import FlowBase, _iso
 
 CODING_PATCH = "journey-coding-step"  # version 2 (see the end of run)
+FOLLOWUP_PATCH = "journey-followup-call"  # version 3: WP8 schedules the follow-up call itself (no clerk booking)
 
 
 @workflow.defn(name=M.JOURNEY)
@@ -92,7 +94,14 @@ class InpatientJourneyWorkflow(FlowBase):
         await workflow.sleep(delay)
         await self._finish("followupDelay")
 
-        await self._followup(args)
+        # Version 3 (WP8, 7.4): the follow-up service schedules the call itself once the four conditions hold, or
+        # gives a nurse the manual follow-up. A journey started on version 1 or 2 replays its placeholder branch
+        # (the call proposed as an appointment and booked after a clerk's approval) without the marker.
+        if workflow.patched(FOLLOWUP_PATCH):
+            await self._auto("scheduleFollowupCall", "journey.scheduleFollowupCall",
+                             {**args, "discharged_at": self.meta.get("discharged_at")})
+        else:
+            await self._followup(args)
         # Version 2 added the coding step (8.1). `patched` marks new executions; a journey started on version 1
         # replays its history without the marker and finishes as it began (tests/fixtures/workflows/journey_v1.json).
         if workflow.patched(CODING_PATCH):
@@ -167,8 +176,9 @@ class InpatientJourneyWorkflow(FlowBase):
                 return
 
     async def _followup(self, args: dict) -> None:
-        """WP8 replaces the call itself. Here: consent check, then the follow-up call booked after a clerk's
-        approval (bookAppointment is privileged: no automatic retry; a failure becomes a Task)."""
+        """Versions 1 and 2 (before WP8; kept so their histories replay): a consent check, then the follow-up call
+        booked after a clerk's approval (bookAppointment is privileged: no automatic retry; a failure becomes a
+        Task)."""
         key = "scheduleFollowupCall"
         await self._begin(key)
         req = await self._activity(key, "journey.requestFollowupCall",

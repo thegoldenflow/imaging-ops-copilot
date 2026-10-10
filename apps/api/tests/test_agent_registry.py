@@ -43,6 +43,11 @@ WP4_ENTRIES = {
 }
 # Added in WP4b on purpose: booking (privileged, WP2 deferred it here) and the runtime's own entry.
 WP4B_ADDITIONS = {"registration": {"Appointment": {"booked"}}}
+# Changed in WP8 on purpose (7.4): the follow-up record is documentation (signed off by the nurse who handles an
+# escalation); the agent writes its call record, the nurse Task (requested only: it never closes one) and the
+# patient-reported Observations.
+WP8_CHANGES = {"followup_calls": ("documentation", ["nurse"], False, ["followup_call"],
+                                  {"Communication": {"*"}, "Task": {"requested"}, "Observation": {"preliminary"}})}
 
 
 class Out(BaseModel):
@@ -73,8 +78,11 @@ def test_every_existing_agent_is_registered_with_its_prompt_version():
                    TRIAGE_PROMPT):
         spec = agents[prompt.name]
         assert spec.kind == "embedded_agent" and spec.prompt_version == prompt.version, prompt.name
-    # the 7.4 agent is registered with its WP4 rights; its code comes in WP8
-    assert agents["followup_calls"].kind == "runtime_agent" and agents["followup_calls"].deployment_status == "dev"
+    # WP8 (7.4): the follow-up calls (registered in WP4) and the call centre, with their code and prompts
+    for name in ("followup_calls", "call_center"):
+        spec = agents[name]
+        assert spec.kind == "runtime_agent" and spec.prompt_version == f"{name}@1", name
+        assert spec.entrypoint and spec.deployment_status == "demo" and spec.eval_status.status == "pending", name
     # WP7 (7.3): the three documentation agents
     for name, module in (("discharge_summary", "summary_agent"), ("patient_instructions", "instructions_agent"),
                          ("nursing_handoff", "handoff_agent")):
@@ -95,7 +103,7 @@ def test_every_existing_agent_is_registered_with_its_prompt_version():
 
 def test_wp4_registry_entries_moved_over_unchanged():
     agents = registry.agents()
-    for name, (tier, signers, cosign, consents, writes) in WP4_ENTRIES.items():
+    for name, (tier, signers, cosign, consents, writes) in {**WP4_ENTRIES, **WP8_CHANGES}.items():
         spec = agents[name]
         assert (spec.risk_tier, spec.required_signoff_role, spec.cosign, spec.consent_required) == (
             tier, signers, cosign, consents), name

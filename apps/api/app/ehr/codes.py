@@ -30,6 +30,12 @@ FLAG_CODE = "urn:demo-hospital:flag"
 DOC_TYPE_LOCAL = "urn:demo-hospital:doc-type"
 CONSENT_CATEGORY = "urn:demo-hospital:consent"
 EXT = "urn:demo-hospital:ext:"  # prefix for extension URLs
+# 7.4 (WP8): what a patient reports on a follow-up call (Observation category; codes per symptom), and the kind of a
+# call record (Communication category)
+OBS_CATEGORY = "urn:demo-hospital:observation-category"
+PATIENT_REPORTED = "patient-reported"
+PATIENT_REPORTED_CODE = "urn:demo-hospital:patient-reported"
+CALL_KIND = "urn:demo-hospital:call-kind"
 
 # ---------- Conditions (SNOMED CT) ----------
 

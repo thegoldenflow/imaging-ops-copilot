@@ -1,0 +1,50 @@
+{"id": "fu-01", "patient": "en", "red_flag": true, "codes": ["fever"], "answers": {"open": "My temperature was 38.9 last night."}, "note": "fever reading", "source": "authored"}
+{"id": "fu-02", "patient": "en", "red_flag": true, "codes": ["chest_pain"], "answers": {"open": "I've had some chest pain since yesterday."}, "note": "emergency", "source": "authored"}
+{"id": "fu-03", "patient": "en", "red_flag": true, "codes": ["short_breath"], "answers": {"open": "I get short of breath just walking to the bathroom."}, "note": "emergency", "source": "authored"}
+{"id": "fu-04", "patient": "en", "red_flag": true, "codes": ["wound_drainage"], "answers": {"open": "I'm okay.", "other": "Also my wound keeps oozing a lot, the dressing is soaked."}, "note": "heavy drainage, told at the end", "source": "authored"}
+{"id": "fu-05", "patient": "en", "red_flag": true, "codes": ["fall"], "answers": {"other": "I fell in the bathroom on Tuesday."}, "note": "a fall", "source": "authored"}
+{"id": "fu-06", "patient": "en", "red_flag": true, "codes": ["cannot_eat_drink"], "answers": {"open": "I can't keep anything down, I throw up everything."}, "note": "cannot eat or drink", "source": "authored"}
+{"id": "fu-07", "patient": "en", "red_flag": true, "codes": ["altered_consciousness"], "answers": {"open": "My daughter says I've been confused since this morning."}, "note": "altered consciousness", "source": "authored"}
+{"id": "fu-08", "patient": "en", "red_flag": true, "codes": ["wants_person"], "answers": {"other": "Yes, I want to talk to a nurse please."}, "note": "asks for a person", "source": "authored"}
+{"id": "fu-09", "patient": "en", "red_flag": true, "codes": ["heavy_bleeding"], "answers": {"open": "There's bleeding from my nose that won't stop."}, "note": "heavy bleeding", "source": "authored"}
+{"id": "fu-10", "patient": "zh", "red_flag": true, "codes": ["wound_drainage"], "answers": {"open": "伤口一直在渗液，纱布都湿透了"}, "note": "the demo case", "source": "authored"}
+{"id": "fu-11", "patient": "zh", "red_flag": true, "codes": ["fever"], "answers": {"open": "我昨天发烧到三十八度八"}, "note": "fever in Chinese numerals", "source": "authored"}
+{"id": "fu-12", "patient": "zh", "red_flag": true, "codes": ["chest_pain"], "answers": {"open": "我胸口有点闷，有时候疼"}, "note": "chest tightness", "source": "authored"}
+{"id": "fu-13", "patient": "zh", "red_flag": true, "codes": ["fall"], "answers": {"open": "还好", "other": "我前天在家里摔倒了"}, "note": "a fall, told at the end", "source": "authored"}
+{"id": "fu-14", "patient": "zh", "red_flag": true, "codes": ["cannot_eat_drink"], "answers": {"open": "这两天吃不下东西，喝水也吐"}, "note": "cannot eat or drink", "source": "authored"}
+{"id": "fu-15", "patient": "zh", "red_flag": true, "codes": ["@first_flag"], "answers": {"first_flag": "有，有一点"}, "note": "yes to their own first warning sign", "source": "authored"}
+{"id": "fu-16", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "I'm doing well, thank you."}, "note": "all clear", "source": "authored"}
+{"id": "fu-17", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "Getting better every day."}, "note": "all clear", "source": "authored"}
+{"id": "fu-18", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "Pretty good, just a bit tired."}, "note": "all clear, tired", "source": "authored"}
+{"id": "fu-19", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "Fine.", "other": "No, that's all, thanks."}, "note": "all clear", "source": "authored"}
+{"id": "fu-20", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "Much better than in hospital."}, "note": "all clear", "source": "authored"}
+{"id": "fu-21", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "I feel good.", "followup": "Yes, my son will drive me."}, "note": "all clear", "source": "authored"}
+{"id": "fu-22", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "All good here."}, "note": "all clear", "source": "authored"}
+{"id": "fu-23", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "Not bad at all."}, "note": "all clear", "source": "authored"}
+{"id": "fu-24", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "I'm recovering well."}, "note": "all clear", "source": "authored"}
+{"id": "fu-25", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "挺好的，谢谢"}, "note": "all clear", "source": "authored"}
+{"id": "fu-26", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "还不错，一天比一天好"}, "note": "all clear", "source": "authored"}
+{"id": "fu-27", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "都挺好的"}, "note": "all clear", "source": "authored"}
+{"id": "fu-28", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "还可以，就是有点累"}, "note": "all clear, tired", "source": "authored"}
+{"id": "fu-29", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "没什么问题"}, "note": "all clear", "source": "authored"}
+{"id": "fu-30", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "好多了", "other": "没有了，谢谢"}, "note": "all clear", "source": "authored"}
+{"id": "fu-31", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "挺好", "followup": "知道，我女儿会陪我去"}, "note": "all clear", "source": "authored"}
+{"id": "fu-32", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "身体还行"}, "note": "all clear", "source": "authored"}
+{"id": "fu-33", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "My temperature was 37.6, I feel fine."}, "note": "low reading", "source": "authored"}
+{"id": "fu-34", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "No chest pain, no breathing problems, all fine."}, "note": "negations", "source": "authored"}
+{"id": "fu-35", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "I'm okay.", "other": "There is a little clear fluid on the dressing, less than before."}, "note": "light drainage", "source": "authored"}
+{"id": "fu-36", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "Good.", "other": "No, I haven't fallen, I use the walker."}, "note": "negated fall", "source": "authored"}
+{"id": "fu-37", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "体温37度2，没什么不舒服"}, "note": "low reading", "source": "authored"}
+{"id": "fu-38", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "伤口有一点点渗液，比前两天少了"}, "note": "light drainage", "source": "authored"}
+{"id": "fu-39", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "没有胸痛，也没有喘不过气"}, "note": "negations", "source": "authored"}
+{"id": "fu-40", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "挺好，没摔倒"}, "note": "negated fall", "source": "authored"}
+{"id": "fu-41", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "A bit dizzy when I stand up, otherwise okay."}, "note": "dizziness", "source": "authored"}
+{"id": "fu-42", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "Fine.", "med": "No, I forgot it yesterday."}, "note": "a missed medicine", "source": "authored"}
+{"id": "fu-43", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "Okay.", "med_problems": "Yes, I ran out of one of them."}, "note": "ran out", "source": "authored"}
+{"id": "fu-44", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "Good.", "other": "Should I keep taking the antibiotic after the box is finished?"}, "note": "a question for the nurse", "source": "authored"}
+{"id": "fu-45", "patient": "en", "red_flag": false, "codes": [], "answers": {"open": "Good.", "followup": "No, I didn't know about it."}, "note": "did not know the follow-up", "source": "authored"}
+{"id": "fu-46", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "有点头晕，别的还好"}, "note": "dizziness", "source": "authored"}
+{"id": "fu-47", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "还行", "med": "没有，昨天忘了吃"}, "note": "a missed medicine", "source": "authored"}
+{"id": "fu-48", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "还好", "other": "药吃完了还要不要继续吃？"}, "note": "a question for the nurse", "source": "authored"}
+{"id": "fu-49", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "腿有点肿"}, "note": "swelling", "source": "authored"}
+{"id": "fu-50", "patient": "zh", "red_flag": false, "codes": [], "answers": {"open": "挺好", "followup": "不知道"}, "note": "did not know the follow-up", "source": "authored"}

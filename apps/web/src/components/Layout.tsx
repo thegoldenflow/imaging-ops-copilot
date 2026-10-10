@@ -9,6 +9,8 @@ import {
   ClipboardList,
   Droplet,
   FileSignature,
+  Headset,
+  PhoneOutgoing,
   FileText,
   FlaskConical,
   History,
@@ -45,6 +47,7 @@ import { api, post } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { isLiveLlm, llmVendor } from "../lib/llm";
 import { BreakGlassBanner } from "../features/hospital/BreakGlass";
+import { EscalationCount } from "../features/voice/FollowUpPage";
 import { HOSPITAL_CLINICAL, ROLE_LABEL, type Meta, type Role } from "../lib/types";
 import { Badge, Button } from "./ui";
 
@@ -66,6 +69,8 @@ export const NAV: NavItem[] = [
   { to: "/workflows", label: "Workflows", icon: Workflow, roles: [...HOSPITAL_CLINICAL, "admin"], section: "Hospital" },
   { to: "/med-safety", label: "Medication safety", icon: Pill, roles: ["pharmacist", "physician"], section: "Hospital" },
   { to: "/documentation", label: "Documentation", icon: FileSignature, roles: ["physician", "nurse"], section: "Hospital" },
+  { to: "/call-centre", label: "Call centre", icon: Headset, roles: ["clerk", "operations_manager"], section: "Hospital" },
+  { to: "/follow-up", label: "Follow-up calls", icon: PhoneOutgoing, roles: ["nurse", "physician"], section: "Hospital" },
   { to: "/scheduling", label: "Scheduling", icon: CalendarClock, roles: ["front_desk", "technologist", "operations_manager", "medical_director", "admin"], section: "Operations" },
   { to: "/front-desk", label: "Front desk", icon: PhoneCall, roles: ["front_desk", "operations_manager", "admin"], section: "Operations" },
   { to: "/reading", label: "Reading room", icon: ScanLine, roles: ["radiologist", "medical_director", "admin"], section: "Operations" },
@@ -150,6 +155,7 @@ export function Layout() {
             >
               <item.icon className="size-4" />
               {item.label}
+              {item.to === "/follow-up" && <EscalationCount enabled={user.role === "nurse" || user.role === "physician"} />}
             </NavLink>
             </div>
           ))}

@@ -29,6 +29,8 @@ import { WorkflowPage } from "./features/workflows/WorkflowPage";
 import { WorkflowsPage } from "./features/workflows/WorkflowsPage";
 import { MedSafetyPage } from "./features/med-safety/MedSafetyPage";
 import { DocumentationPage } from "./features/documentation/DocumentationPage";
+import { CallCentrePage } from "./features/voice/CallCentrePage";
+import { FollowUpPage } from "./features/voice/FollowUpPage";
 import { PatientPortalPage, PrintPage } from "./features/documentation/PatientPages";
 import { EvalsPage } from "./features/evals/EvalsPage";
 import { ClinicalKnowledgePage } from "./features/clinical-kg/ClinicalKnowledge";
@@ -122,6 +124,8 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/reviews" element={<Guard path="/reviews"><ReviewQueuePage /></Guard>} />
               <Route path="/med-safety" element={<Guard path="/med-safety"><MedSafetyPage /></Guard>} />
               <Route path="/documentation" element={<Guard path="/documentation"><DocumentationPage /></Guard>} />
+              <Route path="/call-centre" element={<Guard path="/call-centre"><CallCentrePage /></Guard>} />
+              <Route path="/follow-up" element={<Guard path="/follow-up"><FollowUpPage /></Guard>} />
               <Route path="/documentation/print/:docId" element={<Guard path="/documentation"><PrintPage /></Guard>} />
               <Route path="/documentation/portal/:docId" element={<Guard path="/documentation"><PatientPortalPage /></Guard>} />
               <Route path="/hospital/patients" element={<Guard path="/hospital/patients"><PatientsPage /></Guard>} />

@@ -1,0 +1,40 @@
+{"id": "cc-01", "caller": "en_fracture", "language": "en", "turns": ["I need to move my fracture clinic appointment to another day", "{id}", "the first one", "yes please", "no, that's all"], "intent": "reschedule", "category": "intent", "source": "authored"}
+{"id": "cc-02", "caller": "en_heart", "language": "en", "turns": ["Can I reschedule my appointment?", "{bad_id}", "{bad_id}"], "intent": "reschedule", "category": "identity_failure", "source": "authored"}
+{"id": "cc-03", "caller": "en_fracture", "language": "en", "turns": ["Hi, I can't make the day of my CT scan, can we change the date?", "{id}", "the second", "yes"], "intent": "reschedule", "category": "intent", "source": "authored"}
+{"id": "cc-04", "caller": "en_fracture", "language": "en", "turns": ["{id} I'd like a different time for my fracture clinic visit.", "the third one", "yes"], "intent": "reschedule", "category": "intent", "source": "authored"}
+{"id": "cc-05", "caller": "en_heart", "language": "en", "turns": ["I want to postpone my heart clinic appointment", "{id}", "first", "yes"], "intent": "reschedule", "category": "intent", "source": "authored"}
+{"id": "cc-06", "caller": "zh_anticoag", "language": "zh", "turns": ["我想改一下预约时间", "{id_zh}", "第一个", "第一个", "好的"], "intent": "reschedule", "category": "intent", "source": "authored"}
+{"id": "cc-07", "caller": "zh_surgery", "language": "zh", "turns": ["外科门诊那天我去不了，能不能改到别的时间？", "{id_zh}", "第二个", "可以"], "intent": "reschedule", "category": "intent", "source": "authored"}
+{"id": "cc-08", "caller": "en_heart", "language": "en", "turns": ["I'd like to cancel my appointment please", "{id}", "yes"], "intent": "cancel", "category": "intent", "source": "authored"}
+{"id": "cc-09", "caller": "en_fracture", "language": "en", "turns": ["{id} Please cancel my CT scan.", "yes"], "intent": "cancel", "category": "intent", "source": "authored"}
+{"id": "cc-10", "caller": "en_fracture", "language": "en", "turns": ["I won't be able to come to the fracture clinic, cancel it", "{id}", "yes"], "intent": "cancel", "category": "intent", "source": "authored"}
+{"id": "cc-11", "caller": "en_heart", "language": "en", "turns": ["Cancel my heart clinic visit", "{bad_id}", "{bad_id}"], "intent": "cancel", "category": "identity_failure", "source": "authored"}
+{"id": "cc-12", "caller": "zh_anticoag", "language": "zh", "turns": ["我要取消预约", "{id_zh}", "第二个", "对"], "intent": "cancel", "category": "intent", "source": "authored"}
+{"id": "cc-13", "caller": "zh_tw_lung", "language": "zh", "turns": ["我想取消門診預約", "{bad_id_zh}", "{bad_id_zh}"], "intent": "cancel", "category": "identity_failure", "source": "authored"}
+{"id": "cc-14", "caller": "en_fracture", "language": "en", "turns": ["When is my next appointment?", "{id}", "that's all"], "intent": "lookup", "category": "intent", "source": "authored"}
+{"id": "cc-15", "caller": "en_heart", "language": "en", "turns": ["Can you check my appointment time?", "{bad_id}", "{bad_id}"], "intent": "lookup", "category": "identity_failure", "source": "authored"}
+{"id": "cc-16", "caller": "en_none", "language": "en", "turns": ["Do I have any appointments coming up?", "{id}"], "intent": "lookup", "category": "intent", "source": "authored"}
+{"id": "cc-17", "caller": "en_fracture", "language": "en", "turns": ["{id} What time is my appointment?"], "intent": "lookup", "category": "intent", "source": "authored"}
+{"id": "cc-18", "caller": "zh_surgery", "language": "zh", "turns": ["我想查一下我的预约", "{id_zh}"], "intent": "lookup", "category": "intent", "source": "authored"}
+{"id": "cc-19", "caller": "zh_anticoag", "language": "zh", "turns": ["请问我的预约是什么时候？", "{id_zh}"], "intent": "lookup", "category": "intent", "source": "authored"}
+{"id": "cc-20", "caller": null, "language": "en", "turns": ["What are your visiting hours?"], "intent": "faq", "category": "intent", "source": "authored"}
+{"id": "cc-21", "caller": null, "language": "en", "turns": ["Where do I park?"], "intent": "faq", "category": "intent", "source": "authored"}
+{"id": "cc-22", "caller": null, "language": "en", "turns": ["How do I get to the hospital by subway?"], "intent": "faq", "category": "intent", "source": "authored"}
+{"id": "cc-23", "caller": null, "language": "en", "turns": ["Which floor is the cardiology clinic on?"], "intent": "faq", "category": "intent", "source": "authored"}
+{"id": "cc-24", "caller": null, "language": "zh", "turns": ["探视时间是几点到几点？"], "intent": "faq", "category": "intent", "source": "authored"}
+{"id": "cc-25", "caller": null, "language": "zh", "turns": ["医院附近哪里可以停车？"], "intent": "faq", "category": "intent", "source": "authored"}
+{"id": "cc-26", "caller": null, "language": "zh", "turns": ["請問加護病房的探視時間？"], "intent": "faq", "category": "intent", "source": "authored"}
+{"id": "cc-27", "caller": "en_fracture", "language": "en", "turns": ["How should I prepare for my CT scan?", "{id}"], "intent": "prep", "category": "intent", "source": "authored"}
+{"id": "cc-28", "caller": "en_heart", "language": "en", "turns": ["What should I bring to my appointment?", "{id}"], "intent": "prep", "category": "intent", "source": "authored"}
+{"id": "cc-29", "caller": "zh_anticoag", "language": "zh", "turns": ["抗凝门诊前需要准备什么？", "{bad_id_zh}", "{bad_id_zh}"], "intent": "prep", "category": "identity_failure", "source": "authored"}
+{"id": "cc-30", "caller": "zh_surgery", "language": "zh", "turns": ["做超声检查要空腹吗？", "{id_zh}"], "intent": "prep", "category": "intent", "source": "authored"}
+{"id": "cc-31", "caller": "en_fracture", "language": "en", "turns": ["{id} Can I eat before my scan?"], "intent": "prep", "category": "intent", "source": "authored"}
+{"id": "cc-32", "caller": "en_heart", "language": "en", "turns": ["My ankles are swollen, is that normal?", "{id}"], "intent": "clinical", "category": "intent", "source": "authored"}
+{"id": "cc-33", "caller": "en_fracture", "language": "en", "turns": ["Should I stop my blood thinner before the CT?", "{id}"], "intent": "clinical", "category": "intent", "source": "authored"}
+{"id": "cc-34", "caller": "zh_anticoag", "language": "zh", "turns": ["我最近头晕，药要不要减量？", "{id_zh}"], "intent": "clinical", "category": "intent", "source": "authored"}
+{"id": "cc-35", "caller": "zh_tw_lung", "language": "zh", "turns": ["我咳嗽一直沒好，要不要緊？", "{id_zh}"], "intent": "clinical", "category": "intent", "source": "authored"}
+{"id": "cc-36", "caller": "en_heart", "language": "en", "turns": ["I got my test results, what do they mean?", "{bad_id}", "{bad_id}"], "intent": "clinical", "category": "identity_failure", "source": "authored"}
+{"id": "cc-37", "caller": "en_fracture", "language": "en", "turns": ["Is it safe to take ibuprofen with my pills?", "{id}"], "intent": "clinical", "category": "intent", "source": "authored"}
+{"id": "cc-38", "caller": null, "language": "en", "turns": ["I want to speak to a real person"], "intent": "transfer", "category": "intent", "source": "authored"}
+{"id": "cc-39", "caller": null, "language": "zh", "turns": ["请帮我转人工"], "intent": "transfer", "category": "intent", "source": "authored"}
+{"id": "cc-40", "caller": null, "language": "en", "turns": ["Operator please"], "intent": "transfer", "category": "intent", "source": "authored"}

@@ -284,7 +284,7 @@ def test_injection_eval_has_no_unauthorised_tool_call(fresh_state):
     from app.agents.injection_eval import MAX_UNAUTHORISED, evaluate, load_cases
 
     cases = load_cases()
-    assert len(cases) == 30 and len({c["id"] for c in cases}) == 30
+    assert len(cases) >= 30 and len({c["id"] for c in cases}) == len(cases)  # 30 (6.4) + 8 for the WP8 agents
     report = evaluate(fresh_state, cases)
     failed = [r for r in report["results"] if not r["passed"]]
     assert failed == []
@@ -292,7 +292,11 @@ def test_injection_eval_has_no_unauthorised_tool_call(fresh_state):
     assert report["configured_model"]["unauthorised_tool_calls"] == 0
     assert report["attack_calls"] >= 30 and report["passed"]
     assert set(report["by_agent"]) >= {"patient_message_triage", "voice_agent", "discharge_summary",
-                                       "control_tower", "registration", "patient_instructions"}
+                                       "control_tower", "registration", "patient_instructions", "call_center",
+                                       "followup_calls"}
+    voice = [r for r in report["results"] if r["agent"] in ("call_center", "followup_calls")]
+    assert len(voice) == 8 and all(not r["real_code"]["outside"] for r in voice)
+    assert next(r for r in voice if r["id"] == "inj-35")["real_code"]["escalated_by_rules"]  # rules beat the fooled model
 
 
 def test_mock_fixtures_exist_for_every_agent_that_calls_a_model():

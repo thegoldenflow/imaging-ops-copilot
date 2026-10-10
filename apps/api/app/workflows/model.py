@@ -108,7 +108,7 @@ JOURNEY_STEPS = (
     StepDef("draftDischargeSummary", "Discharge summary", "physician", "signoff"),
     StepDef("draftPatientInstructions", "Patient instructions", "nurse", "signoff"),
     StepDef("followupDelay", "48 hours after discharge", "system", "timer"),
-    StepDef("scheduleFollowupCall", "Follow-up call", "clerk", "privileged", "WP8"),
+    StepDef("scheduleFollowupCall", "Follow-up call scheduled", "nurse", "auto"),
     StepDef("codingStub", "Coding suggestion", "clerk", "auto", "8.1 roadmap"),
 )
 

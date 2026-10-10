@@ -9,12 +9,14 @@ behind them come in later work packages, which replace the bodies below and keep
 | medRecAdmission          | medication_reconciliation  | WP6, done: app/modules/med_safety/journey.py       |
 | draftDischargeSummary    | discharge_summary          | WP7, done: app/modules/documentation/journey.py    |
 | draftPatientInstructions | patient_instructions       | WP7, done: app/modules/documentation/journey.py    |
-| scheduleFollowupCall     | followup_calls             | WP8: the follow-up call itself                     |
+| scheduleFollowupCall     | followup_calls             | WP8, done: app/modules/voice_services/journey.py   |
 
-WP6's and WP7's steps need the module's own state (the order reviews, the reconciliation; the drafts and their
-validators), so they live in the modules and the activities call them there; `StepResult` stays the interface. The
-placeholder below takes the run (`AgentRun`) and returns a `StepResult`: what it read or wrote, and what the
-workflow waits for (a draft to be signed final, a Task to be decided). No model is called. Everything goes through the run's tools (the
+WP6's, WP7's and WP8's steps need the module's own state (the order reviews, the reconciliation; the drafts and
+their validators; the follow-up calls), so they live in the modules and the activities call them there;
+`StepResult` stays the interface. The WP8 placeholder below is kept only for journeys started before WP8 (versions 1
+and 2 of the workflow replay it: `journey.requestFollowupCall`). It takes the run (`AgentRun`) and returns a
+`StepResult`: what it read or wrote, and what the workflow waits for (a draft to be signed final, a Task to be
+decided). No model is called. Everything goes through the run's tools (the
 Tool Gateway), whose consent check also applies: without the patient's consent the call is refused and the workflow
 opens a manual Task instead. The arguments are built only from data that does not change afterwards (the finished
 stay), so an activity that Temporal retries sends the same arguments and gets the first result back (the

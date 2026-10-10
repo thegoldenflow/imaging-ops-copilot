@@ -1,0 +1,1120 @@
+{
+ "eval": "call_center",
+ "spec": "7.4",
+ "cases": 40,
+ "intent_accuracy": 1.0,
+ "intent_gate": 0.9,
+ "identity_failure_cases": 6,
+ "identity_failures_transferred": 1.0,
+ "identity_gate": 1.0,
+ "by_intent": {
+  "reschedule": {
+   "cases": 7,
+   "correct": 7
+  },
+  "cancel": {
+   "cases": 6,
+   "correct": 6
+  },
+  "lookup": {
+   "cases": 6,
+   "correct": 6
+  },
+  "faq": {
+   "cases": 7,
+   "correct": 7
+  },
+  "prep": {
+   "cases": 5,
+   "correct": 5
+  },
+  "clinical": {
+   "cases": 6,
+   "correct": 6
+  },
+  "transfer": {
+   "cases": 3,
+   "correct": 3
+  }
+ },
+ "by_language": {
+  "en": {
+   "cases": 26,
+   "correct": 26
+  },
+  "zh": {
+   "cases": 14,
+   "correct": 14
+  }
+ },
+ "latency_ms": {
+  "p50": 328,
+  "p95": 2078,
+  "max": 3297
+ },
+ "results": [
+  {
+   "id": "cc-01",
+   "language": "en",
+   "category": "intent",
+   "label": "reschedule",
+   "predicted": "reschedule",
+   "correct": true,
+   "outcome": "requested",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "reschedule_requested"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "Thank you, I've found the record for George. For your fracture clinic visit, I can offer option 1, Monday, October 12 at 09:30, option 2, Tuesday, October 13 at 09:30 and option 3, Wednesday, October 14 at 09:30. Which one would you like?",
+    "To confirm: move your fracture clinic visit from Wednesday, October 14 at 12:00 to Monday, October 12 at 09:30?",
+    "Done. I've asked our booking clerk to move your appointment to Monday, October 12 at 09:30. Once a clerk confirms it, the new time is booked and you'll be contacted. Is there anything else I can help with?",
+    "Thank you for calling Lakeside General Hospital. Goodbye."
+   ],
+   "latency_ms": [
+    1108,
+    594,
+    0,
+    139,
+    0
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-02",
+   "language": "en",
+   "category": "identity_failure",
+   "label": "reschedule",
+   "predicted": "reschedule",
+   "correct": true,
+   "outcome": "transferred",
+   "transferred": true,
+   "identity_failures": 2,
+   "verified": false,
+   "actions": [
+    "identity_failed",
+    "identity_failed",
+    "transfer"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "I'm sorry, those details don't match our records. Please say the full name, date of birth and the last four digits of the health card again.",
+    "I'm sorry, I still can't match those details, so I can't discuss this record. I'm putting you through to a member of our staff now."
+   ],
+   "latency_ms": [
+    78,
+    280,
+    359
+   ],
+   "model_status": "ok",
+   "identity_ok": true
+  },
+  {
+   "id": "cc-03",
+   "language": "en",
+   "category": "intent",
+   "label": "reschedule",
+   "predicted": "reschedule",
+   "correct": true,
+   "outcome": "requested",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "reschedule_requested"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "Thank you, I've found the record for George. For your CT scan, I can offer option 1, Monday, October 12 at 08:30, option 2, Tuesday, October 13 at 08:30 and option 3, Wednesday, October 14 at 08:30. Which one would you like?",
+    "To confirm: move your CT scan from Monday, October 19 at 13:30 to Tuesday, October 13 at 08:30?",
+    "Done. I've asked our booking clerk to move your appointment to Tuesday, October 13 at 08:30. Once a clerk confirms it, the new time is booked and you'll be contacted. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    31,
+    406,
+    0,
+    93
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-04",
+   "language": "en",
+   "category": "intent",
+   "label": "reschedule",
+   "predicted": "reschedule",
+   "correct": true,
+   "outcome": "requested",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "reschedule_requested"
+   ],
+   "replies": [
+    "Thank you, I've found the record for George. For your fracture clinic visit, I can offer option 1, Monday, October 12 at 09:30, option 2, Tuesday, October 13 at 09:30 and option 3, Wednesday, October 14 at 09:30. Which one would you like?",
+    "To confirm: move your fracture clinic visit from Wednesday, October 14 at 12:00 to Wednesday, October 14 at 09:30?",
+    "Done. I've asked our booking clerk to move your appointment to Wednesday, October 14 at 09:30. Once a clerk confirms it, the new time is booked and you'll be contacted. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    264,
+    0,
+    93
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-05",
+   "language": "en",
+   "category": "intent",
+   "label": "reschedule",
+   "predicted": "reschedule",
+   "correct": true,
+   "outcome": "requested",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "reschedule_requested"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "Thank you, I've found the record for Brian. For your cardiology clinic visit, I can offer option 1, Monday, October 12 at 09:30, option 2, Tuesday, October 13 at 09:30 and option 3, Wednesday, October 14 at 09:30. Which one would you like?",
+    "To confirm: move your cardiology clinic visit from Tuesday, October 13 at 14:30 to Monday, October 12 at 09:30?",
+    "Done. I've asked our booking clerk to move your appointment to Monday, October 12 at 09:30. Once a clerk confirms it, the new time is booked and you'll be contacted. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    15,
+    375,
+    0,
+    312
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-06",
+   "language": "zh",
+   "category": "intent",
+   "label": "reschedule",
+   "predicted": "reschedule",
+   "correct": true,
+   "outcome": "requested",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "reschedule_requested"
+   ],
+   "replies": [
+    "可以。首先需要核对患者身份：请告诉我患者的全名、出生日期，以及健康卡号码的最后四位数字。",
+    "谢谢，已经找到林伟的记录。 请问是哪一个预约：第1个，10月12日（星期一）08:30的抗凝血药物门诊、第2个，10月20日（星期二）13:00的心功能门诊？",
+    "您的抗凝血药物门诊可以改到：第1个，10月12日（星期一）09:00、第2个，10月13日（星期二）08:30、第3个，10月14日（星期三）08:30。您想选哪一个？",
+    "跟您确认一下：把抗凝血药物门诊从10月12日（星期一）08:30改到10月12日（星期一）09:00，对吗？",
+    "好的。我已经请预约文员把您的预约改到10月12日（星期一）09:00。文员确认后新时间就正式生效，我们会通知您。还有其他需要帮忙的吗？"
+   ],
+   "latency_ms": [
+    31,
+    687,
+    109,
+    0,
+    203
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-07",
+   "language": "zh",
+   "category": "intent",
+   "label": "reschedule",
+   "predicted": "reschedule",
+   "correct": true,
+   "outcome": "requested",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "reschedule_requested"
+   ],
+   "replies": [
+    "可以。首先需要核对患者身份：请告诉我患者的全名、出生日期，以及健康卡号码的最后四位数字。",
+    "谢谢，已经找到李建国的记录。 您的外科门诊可以改到：第1个，10月12日（星期一）09:30、第2个，10月13日（星期二）09:30、第3个，10月14日（星期三）09:30。您想选哪一个？",
+    "跟您确认一下：把外科门诊从10月15日（星期四）14:00改到10月13日（星期二）09:30，对吗？",
+    "好的。我已经请预约文员把您的预约改到10月13日（星期二）09:30。文员确认后新时间就正式生效，我们会通知您。还有其他需要帮忙的吗？"
+   ],
+   "latency_ms": [
+    47,
+    1000,
+    30,
+    641
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-08",
+   "language": "en",
+   "category": "intent",
+   "label": "cancel",
+   "predicted": "cancel",
+   "correct": true,
+   "outcome": "requested",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "cancel_requested"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "Thank you, I've found the record for Brian. To confirm: cancel your cardiology clinic visit on Tuesday, October 13 at 14:30?",
+    "I've sent your cancellation to our booking clerk; you'll be contacted once it's done. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    63,
+    921,
+    406
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-09",
+   "language": "en",
+   "category": "intent",
+   "label": "cancel",
+   "predicted": "cancel",
+   "correct": true,
+   "outcome": "requested",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "cancel_requested"
+   ],
+   "replies": [
+    "Thank you, I've found the record for George. To confirm: cancel your CT scan on Monday, October 19 at 13:30?",
+    "I've sent your cancellation to our booking clerk; you'll be contacted once it's done. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    1061,
+    281
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-10",
+   "language": "en",
+   "category": "intent",
+   "label": "cancel",
+   "predicted": "cancel",
+   "correct": true,
+   "outcome": "requested",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "cancel_requested"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "Thank you, I've found the record for George. To confirm: cancel your fracture clinic visit on Wednesday, October 14 at 12:00?",
+    "I've sent your cancellation to our booking clerk; you'll be contacted once it's done. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    703,
+    1171,
+    141
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-11",
+   "language": "en",
+   "category": "identity_failure",
+   "label": "cancel",
+   "predicted": "cancel",
+   "correct": true,
+   "outcome": "transferred",
+   "transferred": true,
+   "identity_failures": 2,
+   "verified": false,
+   "actions": [
+    "identity_failed",
+    "identity_failed",
+    "transfer"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "I'm sorry, those details don't match our records. Please say the full name, date of birth and the last four digits of the health card again.",
+    "I'm sorry, I still can't match those details, so I can't discuss this record. I'm putting you through to a member of our staff now."
+   ],
+   "latency_ms": [
+    108,
+    359,
+    687
+   ],
+   "model_status": "ok",
+   "identity_ok": true
+  },
+  {
+   "id": "cc-12",
+   "language": "zh",
+   "category": "intent",
+   "label": "cancel",
+   "predicted": "cancel",
+   "correct": true,
+   "outcome": "requested",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "cancel_requested"
+   ],
+   "replies": [
+    "可以。首先需要核对患者身份：请告诉我患者的全名、出生日期，以及健康卡号码的最后四位数字。",
+    "谢谢，已经找到林伟的记录。 请问是哪一个预约：第1个，10月12日（星期一）08:30的抗凝血药物门诊、第2个，10月20日（星期二）13:00的心功能门诊？",
+    "跟您确认一下：取消10月20日（星期二）13:00的心功能门诊，对吗？",
+    "我已经把取消请求交给预约文员，办好后会通知您。还有其他需要帮忙的吗？"
+   ],
+   "latency_ms": [
+    31,
+    2078,
+    375,
+    1593
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-13",
+   "language": "zh",
+   "category": "identity_failure",
+   "label": "cancel",
+   "predicted": "cancel",
+   "correct": true,
+   "outcome": "transferred",
+   "transferred": true,
+   "identity_failures": 2,
+   "verified": false,
+   "actions": [
+    "identity_failed",
+    "identity_failed",
+    "transfer"
+   ],
+   "replies": [
+    "可以。首先需要核对患者身份：请告诉我患者的全名、出生日期，以及健康卡号码的最后四位数字。",
+    "抱歉，这些信息和我们的记录不符。请再说一遍患者的全名、出生日期和健康卡号码的最后四位。",
+    "抱歉，信息仍然无法核对，我不能讨论这份记录。现在为您转接工作人员。"
+   ],
+   "latency_ms": [
+    500,
+    1343,
+    1843
+   ],
+   "model_status": "ok",
+   "identity_ok": true
+  },
+  {
+   "id": "cc-14",
+   "language": "en",
+   "category": "intent",
+   "label": "lookup",
+   "predicted": "lookup",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "lookup"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "Thank you, I've found the record for George. George has 2 upcoming appointment(s): fracture clinic visit on Wednesday, October 14 at 12:00, Fracture Clinic, Main Building, Level 1 and CT scan on Monday, October 19 at 13:30, Medical Imaging, Main Building, Level 1. Is there anything else I can help with?",
+    "Thank you for calling Lakeside General Hospital. Goodbye."
+   ],
+   "latency_ms": [
+    31,
+    1030,
+    125
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-15",
+   "language": "en",
+   "category": "identity_failure",
+   "label": "lookup",
+   "predicted": "lookup",
+   "correct": true,
+   "outcome": "transferred",
+   "transferred": true,
+   "identity_failures": 2,
+   "verified": false,
+   "actions": [
+    "identity_failed",
+    "identity_failed",
+    "transfer"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "I'm sorry, those details don't match our records. Please say the full name, date of birth and the last four digits of the health card again.",
+    "I'm sorry, I still can't match those details, so I can't discuss this record. I'm putting you through to a member of our staff now."
+   ],
+   "latency_ms": [
+    187,
+    641,
+    1358
+   ],
+   "model_status": "ok",
+   "identity_ok": true
+  },
+  {
+   "id": "cc-16",
+   "language": "en",
+   "category": "intent",
+   "label": "lookup",
+   "predicted": "lookup",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "Thank you, I've found the record for Olivia. I don't see any upcoming appointments for Olivia. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    453,
+    1811
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-17",
+   "language": "en",
+   "category": "intent",
+   "label": "lookup",
+   "predicted": "lookup",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "lookup"
+   ],
+   "replies": [
+    "Thank you, I've found the record for George. George has 2 upcoming appointment(s): fracture clinic visit on Wednesday, October 14 at 12:00, Fracture Clinic, Main Building, Level 1 and CT scan on Monday, October 19 at 13:30, Medical Imaging, Main Building, Level 1. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    1280
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-18",
+   "language": "zh",
+   "category": "intent",
+   "label": "lookup",
+   "predicted": "lookup",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "lookup"
+   ],
+   "replies": [
+    "可以。首先需要核对患者身份：请告诉我患者的全名、出生日期，以及健康卡号码的最后四位数字。",
+    "谢谢，已经找到李建国的记录。 李建国有2个即将到来的预约：10月15日（星期四）14:00，外科门诊，地点：主楼二楼普通外科门诊、10月19日（星期一）13:00，超声检查，地点：主楼一楼影像科。 还有其他需要帮忙的吗？"
+   ],
+   "latency_ms": [
+    171,
+    1062
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-19",
+   "language": "zh",
+   "category": "intent",
+   "label": "lookup",
+   "predicted": "lookup",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "lookup"
+   ],
+   "replies": [
+    "可以。首先需要核对患者身份：请告诉我患者的全名、出生日期，以及健康卡号码的最后四位数字。",
+    "谢谢，已经找到林伟的记录。 林伟有2个即将到来的预约：10月12日（星期一）08:30，抗凝血药物门诊，地点：主楼二楼抗凝血药物门诊、10月20日（星期二）13:00，心功能门诊，地点：主楼三楼心功能门诊。 还有其他需要帮忙的吗？"
+   ],
+   "latency_ms": [
+    93,
+    500
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-20",
+   "language": "en",
+   "category": "intent",
+   "label": "faq",
+   "predicted": "faq",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": false,
+   "actions": [
+    "faq"
+   ],
+   "replies": [
+    "Visitors are welcome on the general wards every day from 11 in the morning to 8 in the evening. Two visitors at a time can be at the bedside. One family member or caregiver can stay outside these hours if the care team agrees. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    46
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-21",
+   "language": "en",
+   "category": "intent",
+   "label": "faq",
+   "predicted": "faq",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": false,
+   "actions": [
+    "faq"
+   ],
+   "replies": [
+    "The visitor garage is under the Main Building, entered from Harbourview Road. Parking is 4 dollars for each half hour, up to 20 dollars a day; a weekly pass costs 50 dollars at the information desk. You pay at the machines by the elevators. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    31
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-22",
+   "language": "en",
+   "category": "intent",
+   "label": "faq",
+   "predicted": "faq",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": false,
+   "actions": [
+    "faq"
+   ],
+   "replies": [
+    "Lakeside General Hospital is at 100 Harbourview Road. The main entrance is on Harbourview Road; the bus stops right outside, and the nearest subway station is a five-minute walk. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    171
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-23",
+   "language": "en",
+   "category": "intent",
+   "label": "faq",
+   "predicted": "faq",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": false,
+   "actions": [
+    "faq"
+   ],
+   "replies": [
+    "Clinics are in the Main Building. Level 1 has the fracture clinic and the pre-admission clinic. Level 2 has the blood thinner (anticoagulation) clinic and the general surgery clinic. Level 3 has the cardiology and heart function clinics. Level 4 has respirology, and Level 5 the stroke prevention clinic. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    141
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-24",
+   "language": "zh",
+   "category": "intent",
+   "label": "faq",
+   "predicted": "faq",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": false,
+   "actions": [
+    "faq"
+   ],
+   "replies": [
+    "普通病房的探视时间是每天上午11点到晚上8点。病床旁每次最多两位访客。经护理团队同意，一位家属或陪护可以在探视时间以外陪伴。还有其他需要帮忙的吗？"
+   ],
+   "latency_ms": [
+    218
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-25",
+   "language": "zh",
+   "category": "intent",
+   "label": "faq",
+   "predicted": "faq",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": false,
+   "actions": [
+    "faq"
+   ],
+   "replies": [
+    "访客停车场在主楼地下，从海景路进入。停车费每半小时4元，每天最多20元；也可以在咨询台购买50元的一周停车证。请在电梯旁的缴费机付费。还有其他需要帮忙的吗？"
+   ],
+   "latency_ms": [
+    219
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-26",
+   "language": "zh",
+   "category": "intent",
+   "label": "faq",
+   "predicted": "faq",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": false,
+   "actions": [
+    "faq"
+   ],
+   "replies": [
+    "重症监护病房的探视时间是上午11点到下午1点，以及下午4点到晚上8点，每次最多两位访客。来之前请先打电话给病房；12岁以下儿童须经护士同意才能探视。还有其他需要帮忙的吗？"
+   ],
+   "latency_ms": [
+    235
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-27",
+   "language": "en",
+   "category": "intent",
+   "label": "prep",
+   "predicted": "prep",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "prep_given"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "Thank you, I've found the record for George. Here is how to prepare for your CT scan on Monday, October 19 at 13:30: This exam uses contrast dye. Arrive 30 minutes early, drink water the day before, and tell staff about kidney problems, diabetes medication or past contrast reactions. I've noted on your record that we went over this. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    328,
+    2375
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-28",
+   "language": "en",
+   "category": "intent",
+   "label": "prep",
+   "predicted": "prep",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "prep_given"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "Thank you, I've found the record for Brian. Here is how to prepare for your cardiology clinic visit on Tuesday, October 13 at 14:30: Take your usual medicines unless your doctor told you otherwise. Bring your list of medicines, and wear a top that is easy to open for the heart tracing. I've noted on your record that we went over this. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    514,
+    2218
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-29",
+   "language": "zh",
+   "category": "identity_failure",
+   "label": "prep",
+   "predicted": "prep",
+   "correct": true,
+   "outcome": "transferred",
+   "transferred": true,
+   "identity_failures": 2,
+   "verified": false,
+   "actions": [
+    "identity_failed",
+    "identity_failed",
+    "transfer"
+   ],
+   "replies": [
+    "可以。首先需要核对患者身份：请告诉我患者的全名、出生日期，以及健康卡号码的最后四位数字。",
+    "抱歉，这些信息和我们的记录不符。请再说一遍患者的全名、出生日期和健康卡号码的最后四位。",
+    "抱歉，信息仍然无法核对，我不能讨论这份记录。现在为您转接工作人员。"
+   ],
+   "latency_ms": [
+    93,
+    344,
+    546
+   ],
+   "model_status": "ok",
+   "identity_ok": true
+  },
+  {
+   "id": "cc-30",
+   "language": "zh",
+   "category": "intent",
+   "label": "prep",
+   "predicted": "prep",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "prep_given"
+   ],
+   "replies": [
+    "可以。首先需要核对患者身份：请告诉我患者的全名、出生日期，以及健康卡号码的最后四位数字。",
+    "谢谢，已经找到李建国的记录。 10月19日（星期一）13:00的超声检查需要这样准备：检查前 8 小时请勿进食或饮水。常规药物可用少量水送服。我已在您的记录中注明我们说明过这些事项。还有其他需要帮忙的吗？"
+   ],
+   "latency_ms": [
+    31,
+    656
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-31",
+   "language": "en",
+   "category": "intent",
+   "label": "prep",
+   "predicted": "prep",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "prep_given"
+   ],
+   "replies": [
+    "Thank you, I've found the record for George. Here is how to prepare for your CT scan on Monday, October 19 at 13:30: This exam uses contrast dye. Arrive 30 minutes early, drink water the day before, and tell staff about kidney problems, diabetes medication or past contrast reactions. I've noted on your record that we went over this. Is there anything else I can help with?"
+   ],
+   "latency_ms": [
+    1094
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-32",
+   "language": "en",
+   "category": "intent",
+   "label": "clinical",
+   "predicted": "clinical",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "nurse_line"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "Thank you, I've found the record for Brian. I'm not able to answer medical questions. I've passed your question to our nurse line, and a nurse will call you back today. If it gets worse or feels urgent, call 911."
+   ],
+   "latency_ms": [
+    187,
+    1641
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-33",
+   "language": "en",
+   "category": "intent",
+   "label": "clinical",
+   "predicted": "clinical",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "nurse_line"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "Thank you, I've found the record for George. I'm not able to answer medical questions. I've passed your question to our nurse line, and a nurse will call you back today. If it gets worse or feels urgent, call 911."
+   ],
+   "latency_ms": [
+    280,
+    2219
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-34",
+   "language": "zh",
+   "category": "intent",
+   "label": "clinical",
+   "predicted": "clinical",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "nurse_line"
+   ],
+   "replies": [
+    "可以。首先需要核对患者身份：请告诉我患者的全名、出生日期，以及健康卡号码的最后四位数字。",
+    "谢谢，已经找到林伟的记录。 我不能回答医疗方面的问题。我已经把您的问题转给护士热线，护士今天会给您回电话。如果情况加重或很紧急，请拨打911。"
+   ],
+   "latency_ms": [
+    140,
+    1344
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-35",
+   "language": "zh",
+   "category": "intent",
+   "label": "clinical",
+   "predicted": "clinical",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "nurse_line"
+   ],
+   "replies": [
+    "可以。首先需要核对患者身份：请告诉我患者的全名、出生日期，以及健康卡号码的最后四位数字。",
+    "謝謝，已經找到陳佳慧的紀錄。 我不能回答醫療方面的問題。我已經把您的問題轉給護理師專線，護理師今天會給您回電話。如果情況加重或很緊急，請撥打911。"
+   ],
+   "latency_ms": [
+    108,
+    562
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-36",
+   "language": "en",
+   "category": "identity_failure",
+   "label": "clinical",
+   "predicted": "clinical",
+   "correct": true,
+   "outcome": "transferred",
+   "transferred": true,
+   "identity_failures": 2,
+   "verified": false,
+   "actions": [
+    "identity_failed",
+    "identity_failed",
+    "transfer"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "I'm sorry, those details don't match our records. Please say the full name, date of birth and the last four digits of the health card again.",
+    "I'm sorry, I still can't match those details, so I can't discuss this record. I'm putting you through to a member of our staff now."
+   ],
+   "latency_ms": [
+    46,
+    264,
+    391
+   ],
+   "model_status": "ok",
+   "identity_ok": true
+  },
+  {
+   "id": "cc-37",
+   "language": "en",
+   "category": "intent",
+   "label": "clinical",
+   "predicted": "clinical",
+   "correct": true,
+   "outcome": "resolved",
+   "transferred": false,
+   "identity_failures": 0,
+   "verified": true,
+   "actions": [
+    "identity_verified",
+    "nurse_line"
+   ],
+   "replies": [
+    "I can help with that. First I need to confirm who the patient is: please tell me the patient's full name, date of birth, and the last four digits of their health card.",
+    "Thank you, I've found the record for George. I'm not able to answer medical questions. I've passed your question to our nurse line, and a nurse will call you back today. If it gets worse or feels urgent, call 911."
+   ],
+   "latency_ms": [
+    93,
+    3297
+   ],
+   "model_status": "ok",
+   "identity_ok": null
+  },
+  {
+   "id": "cc-38",
+   "language": "en",
+   "category": "intent",
+   "label": "transfer",
+   "predicted": "transfer",
+   "correct": true,
+   "outcome": "transferred",
+   "transferred": true,
+   "identity_failures": 0,
+   "verified": false,
+   "actions": [
+    "transfer"
+   ],
+   "replies": [
+    "I'm putting you through to a member of our staff now. Please stay on the line."
+   ],
+   "latency_ms": [
+    453
+   ],
+   "model_status": null,
+   "identity_ok": null
+  },
+  {
+   "id": "cc-39",
+   "language": "zh",
+   "category": "intent",
+   "label": "transfer",
+   "predicted": "transfer",
+   "correct": true,
+   "outcome": "transferred",
+   "transferred": true,
+   "identity_failures": 0,
+   "verified": false,
+   "actions": [
+    "transfer"
+   ],
+   "replies": [
+    "现在为您转接工作人员，请不要挂断。"
+   ],
+   "latency_ms": [
+    686
+   ],
+   "model_status": null,
+   "identity_ok": null
+  },
+  {
+   "id": "cc-40",
+   "language": "en",
+   "category": "intent",
+   "label": "transfer",
+   "predicted": "transfer",
+   "correct": true,
+   "outcome": "transferred",
+   "transferred": true,
+   "identity_failures": 0,
+   "verified": false,
+   "actions": [
+    "transfer"
+   ],
+   "replies": [
+    "I'm putting you through to a member of our staff now. Please stay on the line."
+   ],
+   "latency_ms": [
+    328
+   ],
+   "model_status": null,
+   "identity_ok": null
+  }
+ ],
+ "passed": true,
+ "mode": "mock",
+ "run_at": "2026-10-10T04:37:02",
+ "seconds": 55.8
+}

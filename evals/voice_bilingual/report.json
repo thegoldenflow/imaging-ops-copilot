@@ -1,0 +1,425 @@
+{
+ "eval": "voice_bilingual",
+ "spec": "7.4",
+ "cases": 20,
+ "by_language": {
+  "en": 10,
+  "zh": 10
+ },
+ "outcome_ok": 20,
+ "language_ok": 20,
+ "write_back_ok": 20,
+ "pairs_consistent": "10 of 10",
+ "results": [
+  {
+   "id": "bi-faq-en",
+   "scenario": "faq",
+   "language": "en",
+   "expected": {
+    "intent": "faq",
+    "outcome": "resolved"
+   },
+   "got": {
+    "intent": "faq",
+    "outcome": "resolved",
+    "action": null
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 2
+  },
+  {
+   "id": "bi-faq-zh",
+   "scenario": "faq",
+   "language": "zh",
+   "expected": {
+    "intent": "faq",
+    "outcome": "resolved"
+   },
+   "got": {
+    "intent": "faq",
+    "outcome": "resolved",
+    "action": null
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 2
+  },
+  {
+   "id": "bi-lookup-en",
+   "scenario": "lookup",
+   "language": "en",
+   "expected": {
+    "intent": "lookup"
+   },
+   "got": {
+    "intent": "lookup",
+    "outcome": "resolved",
+    "action": null
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 3
+  },
+  {
+   "id": "bi-lookup-zh",
+   "scenario": "lookup",
+   "language": "zh",
+   "expected": {
+    "intent": "lookup"
+   },
+   "got": {
+    "intent": "lookup",
+    "outcome": "resolved",
+    "action": null
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 3
+  },
+  {
+   "id": "bi-prep-en",
+   "scenario": "prep",
+   "language": "en",
+   "expected": {
+    "intent": "prep",
+    "action": "prep_given"
+   },
+   "got": {
+    "intent": "prep",
+    "outcome": "resolved",
+    "action": "prep_given"
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 3
+  },
+  {
+   "id": "bi-prep-zh",
+   "scenario": "prep",
+   "language": "zh",
+   "expected": {
+    "intent": "prep",
+    "action": "prep_given"
+   },
+   "got": {
+    "intent": "prep",
+    "outcome": "resolved",
+    "action": "prep_given"
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 3
+  },
+  {
+   "id": "bi-clinical-en",
+   "scenario": "clinical",
+   "language": "en",
+   "expected": {
+    "intent": "clinical",
+    "action": "nurse_line"
+   },
+   "got": {
+    "intent": "clinical",
+    "outcome": "resolved",
+    "action": "nurse_line"
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 3
+  },
+  {
+   "id": "bi-clinical-zh",
+   "scenario": "clinical",
+   "language": "zh",
+   "expected": {
+    "intent": "clinical",
+    "action": "nurse_line"
+   },
+   "got": {
+    "intent": "clinical",
+    "outcome": "resolved",
+    "action": "nurse_line"
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 3
+  },
+  {
+   "id": "bi-transfer-en",
+   "scenario": "transfer",
+   "language": "en",
+   "expected": {
+    "intent": "transfer",
+    "outcome": "transferred"
+   },
+   "got": {
+    "intent": "transfer",
+    "outcome": "transferred",
+    "action": null
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 1
+  },
+  {
+   "id": "bi-transfer-zh",
+   "scenario": "transfer",
+   "language": "zh",
+   "expected": {
+    "intent": "transfer",
+    "outcome": "transferred"
+   },
+   "got": {
+    "intent": "transfer",
+    "outcome": "transferred",
+    "action": null
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 1
+  },
+  {
+   "id": "bi-clear-en",
+   "scenario": "clear",
+   "language": "en",
+   "expected": {
+    "escalated": false
+   },
+   "got": {
+    "escalated": false,
+    "by": null,
+    "codes": []
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 17
+  },
+  {
+   "id": "bi-clear-zh",
+   "scenario": "clear",
+   "language": "zh",
+   "expected": {
+    "escalated": false
+   },
+   "got": {
+    "escalated": false,
+    "by": null,
+    "codes": []
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 17
+  },
+  {
+   "id": "bi-fever-en",
+   "scenario": "fever",
+   "language": "en",
+   "expected": {
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "fever"
+    ]
+   },
+   "got": {
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "fever"
+    ]
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 4
+  },
+  {
+   "id": "bi-fever-zh",
+   "scenario": "fever",
+   "language": "zh",
+   "expected": {
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "fever"
+    ]
+   },
+   "got": {
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "fever"
+    ]
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 4
+  },
+  {
+   "id": "bi-wound-en",
+   "scenario": "wound",
+   "language": "en",
+   "expected": {
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wound_drainage"
+    ]
+   },
+   "got": {
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wound_drainage"
+    ]
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 4
+  },
+  {
+   "id": "bi-wound-zh",
+   "scenario": "wound",
+   "language": "zh",
+   "expected": {
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wound_drainage"
+    ]
+   },
+   "got": {
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wound_drainage"
+    ]
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 4
+  },
+  {
+   "id": "bi-missed_medicine-en",
+   "scenario": "missed_medicine",
+   "language": "en",
+   "expected": {
+    "escalated": true,
+    "by": "model"
+   },
+   "got": {
+    "escalated": true,
+    "by": "model",
+    "codes": []
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 17
+  },
+  {
+   "id": "bi-missed_medicine-zh",
+   "scenario": "missed_medicine",
+   "language": "zh",
+   "expected": {
+    "escalated": true,
+    "by": "model"
+   },
+   "got": {
+    "escalated": true,
+    "by": "model",
+    "codes": []
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 17
+  },
+  {
+   "id": "bi-person-en",
+   "scenario": "person",
+   "language": "en",
+   "expected": {
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wants_person"
+    ]
+   },
+   "got": {
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wants_person"
+    ]
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 17
+  },
+  {
+   "id": "bi-person-zh",
+   "scenario": "person",
+   "language": "zh",
+   "expected": {
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wants_person"
+    ]
+   },
+   "got": {
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wants_person"
+    ]
+   },
+   "outcome_ok": true,
+   "language_ok": true,
+   "wrong_language": [],
+   "write_back": true,
+   "turns": 17
+  }
+ ],
+ "passed": true,
+ "mode": "mock",
+ "run_at": "2026-10-10T04:40:08",
+ "seconds": 29.0
+}

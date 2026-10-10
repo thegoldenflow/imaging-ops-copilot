@@ -1,0 +1,70 @@
+# Tool registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# side_effect_level read / recommend / action / privileged; schemas are JSON Schema (the subset in
+# app/agents/jsonschema.py); fhir_writes is what the tool may write (agents' write rights derive from it).
+tool_id: getPatientAppointments
+description: A patient's upcoming appointments (booked or proposed), soonest first, with the service and the place.
+side_effect_level: read
+handler: app.modules.voice_services.tools:get_patient_appointments
+domain: fhir
+reads:
+- Appointment
+input_schema:
+  type: object
+  properties:
+    patient_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+  required:
+  - patient_id
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    appointments:
+      type: array
+      maxItems: 20
+      items:
+        type: object
+        properties:
+          appointment_id:
+            type: string
+          service:
+            type: string
+          service_display:
+            type: string
+          start:
+            type: string
+          minutes:
+            type: integer
+          location:
+            type: string
+          status:
+            type: string
+          encounter_id:
+            type:
+            - string
+            - 'null'
+        required:
+        - appointment_id
+        - service
+        - start
+        - status
+        additionalProperties: false
+  required:
+  - appointments
+  additionalProperties: false
+permission_policy:
+  roles:
+  - physician
+  - nurse
+  - clerk
+  - system
+  target:
+    patient: patient_id
+idempotency:
+  required: false
+timeout_ms: 5000
+retry:
+  max_attempts: 2
+  backoff_ms: 50
+audit_level: standard

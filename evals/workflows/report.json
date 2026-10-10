@@ -1,14 +1,14 @@
 {
   "package": "WP4c durable workflows (spec 6.5)",
-  "run_at": "2026-10-09T20:40:41",
+  "run_at": "2026-10-10T06:05:16",
   "temporalio": "1.33.0",
   "status": "passed",
   "tests": {
-    "total": 33,
-    "passed": 33,
+    "total": 35,
+    "passed": 35,
     "failed": 0,
     "skipped": 0,
-    "seconds": 110.1
+    "seconds": 170.8
   },
   "criteria": [
     {
@@ -53,10 +53,11 @@
     },
     {
       "key": "replay",
-      "criterion": "One Temporal replay test per workflow (plus the version-1 journey through patched())",
+      "criterion": "One Temporal replay test per workflow (plus the version-1 and version-2 journeys through patched())",
       "status": "passed",
       "tests": {
         "test_captured_history_replays_against_the_current_code": [
+          "passed",
           "passed",
           "passed",
           "passed",
@@ -74,17 +75,17 @@
     },
     {
       "key": "journey_end_to_end",
-      "criterion": "The whole journey from admission to the booked follow-up call",
+      "criterion": "The whole journey from admission to the scheduled follow-up call (WP8)",
       "status": "passed",
       "tests": {
-        "test_journey_runs_from_admission_to_the_booked_follow_up_call": [
+        "test_journey_runs_from_admission_to_the_scheduled_follow_up_call": [
           "passed"
         ]
       }
     },
     {
       "key": "privileged",
-      "criterion": "An activity calling a privileged tool is not retried; its failure becomes a Task; retry and skip by the operations manager are audited",
+      "criterion": "An activity calling a privileged tool is not retried; its failure becomes a Task; retry and skip by the operations manager are audited (a probe workflow since WP8)",
       "status": "passed",
       "tests": {
         "test_a_failed_privileged_call_is_not_retried_and_waits_for_a_retry_or_skip": [
@@ -157,67 +158,73 @@
     "stderr": [],
     "medrec_documents": 1,
     "rerun_steps": "none",
-    "resume_seconds": 16.5
+    "resume_seconds": 16.5,
+    "note": "carried over from the WP4c run (2026-10-09); WP8 changed no worker or MedRec code and did not re-run it against the docker dev server"
   },
   "results": {
-    "test_journey_runs_from_admission_to_the_booked_follow_up_call": {
+    "test_journey_runs_from_admission_to_the_scheduled_follow_up_call": {
       "file": "tests.test_workflows",
-      "seconds": 45.3,
+      "seconds": 81.3,
       "status": "passed"
     },
     "test_a_failed_medrec_activity_is_retried_and_leaves_exactly_one_medrec_document": {
       "file": "tests.test_workflows",
-      "seconds": 8.5,
+      "seconds": 10.9,
       "status": "passed"
     },
     "test_a_restarted_worker_resumes_the_journey_without_running_completed_steps_again": {
       "file": "tests.test_workflows",
-      "seconds": 4.3,
+      "seconds": 8.3,
       "status": "passed"
     },
     "test_a_signoff_not_given_in_24_seconds_escalates_then_tells_the_operations_manager": {
       "file": "tests.test_workflows",
-      "seconds": 4.1,
+      "seconds": 7.1,
       "status": "passed"
     },
-    "test_a_failed_privileged_call_is_not_retried_and_waits_for_a_retry_or_skip": {
-      "file": "tests.test_workflows",
-      "seconds": 13.0,
-      "status": "passed"
-    },
-    "test_capacity_workflow_executes_the_approval_and_checks_the_occupancy_an_hour_later": {
-      "file": "tests.test_workflows",
-      "seconds": 12.1,
-      "status": "passed"
-    },
-    "test_rejected_and_cleared_exceptions_record_their_outcome_too": {
-      "file": "tests.test_workflows",
-      "seconds": 10.4,
-      "status": "passed"
-    },
-    "test_low_confidence_output_is_corrected_added_as_an_eval_case_and_the_regression_runs": {
+    "test_the_pharmacists_last_order_decision_in_the_workbench_signs_off_the_order_review": {
       "file": "tests.test_workflows",
       "seconds": 3.5,
       "status": "passed"
     },
+    "test_a_failed_privileged_call_is_not_retried_and_waits_for_a_retry_or_skip": {
+      "file": "tests.test_workflows",
+      "seconds": 4.7,
+      "status": "passed"
+    },
+    "test_capacity_workflow_executes_the_approval_and_checks_the_occupancy_an_hour_later": {
+      "file": "tests.test_workflows",
+      "seconds": 17.3,
+      "status": "passed"
+    },
+    "test_rejected_and_cleared_exceptions_record_their_outcome_too": {
+      "file": "tests.test_workflows",
+      "seconds": 17.4,
+      "status": "passed"
+    },
+    "test_low_confidence_output_is_corrected_added_as_an_eval_case_and_the_regression_runs": {
+      "file": "tests.test_workflows",
+      "seconds": 5.9,
+      "status": "passed"
+    },
     "test_a_journey_whose_encounter_is_gone_ends_without_asking_anyone": {
       "file": "tests.test_workflows",
-      "seconds": 3.1,
+      "seconds": 4.1,
       "status": "passed"
     },
     "test_captured_history_replays_against_the_current_code[capacity]": {
       "file": "tests.test_workflow_replay",
-      "seconds": 0.3,
+      "seconds": 0.5,
       "status": "passed"
     },
     "test_captured_history_replays_against_the_current_code[capacity_rejected]": {
       "file": "tests.test_workflow_replay",
-      "seconds": 0.1,
+      "seconds": 0.3,
       "status": "passed"
     },
     "test_captured_history_replays_against_the_current_code[journey]": {
       "file": "tests.test_workflow_replay",
-      "seconds": 0.3,
+      "seconds": 0.7,
       "status": "passed"
     },
     "test_captured_history_replays_against_the_current_code[journey_medrec_retry]": {
@@ -227,12 +234,17 @@
     },
     "test_captured_history_replays_against_the_current_code[journey_v1]": {
       "file": "tests.test_workflow_replay",
-      "seconds": 0.3,
+      "seconds": 0.4,
+      "status": "passed"
+    },
+    "test_captured_history_replays_against_the_current_code[journey_v2]": {
+      "file": "tests.test_workflow_replay",
+      "seconds": 0.5,
       "status": "passed"
     },
     "test_captured_history_replays_against_the_current_code[review]": {
       "file": "tests.test_workflow_replay",
-      "seconds": 0.1,
+      "seconds": 0.2,
       "status": "passed"
     },
     "test_every_workflow_has_a_replay_test": {
@@ -247,7 +259,7 @@
     },
     "test_without_temporal_the_bridge_is_off_and_the_view_says_offline": {
       "file": "tests.test_workflow_bridge",
-      "seconds": 0.2,
+      "seconds": 0.3,
       "status": "passed"
     },
     "test_domain_events_map_to_workflow_starts_and_signals": {
@@ -267,57 +279,57 @@
     },
     "test_a_signal_for_a_workflow_that_does_not_run_is_dropped": {
       "file": "tests.test_workflow_bridge",
-      "seconds": 0.0,
+      "seconds": 0.1,
       "status": "passed"
     },
     "test_people_and_modules_publish_what_workflows_wait_for": {
       "file": "tests.test_workflow_bridge",
-      "seconds": 0.2,
+      "seconds": 0.3,
       "status": "passed"
     },
     "test_the_exception_stream_publishes_opened_decided_and_cleared": {
       "file": "tests.test_workflow_bridge",
-      "seconds": 0.5,
+      "seconds": 0.8,
       "status": "passed"
     },
     "test_a_run_below_its_confidence_threshold_keeps_a_de_identified_case_for_review": {
       "file": "tests.test_workflow_bridge",
-      "seconds": 0.5,
+      "seconds": 1.0,
       "status": "passed"
     },
     "test_the_timeline_keeps_the_newest_version_and_shows_retries": {
       "file": "tests.test_workflow_bridge",
-      "seconds": 0.0,
+      "seconds": 0.3,
       "status": "passed"
     },
     "test_retry_and_skip_are_for_the_operations_manager_and_admin_and_audited": {
       "file": "tests.test_workflow_bridge",
-      "seconds": 0.3,
+      "seconds": 0.7,
       "status": "passed"
     },
     "test_the_view_shows_nurses_only_their_units": {
       "file": "tests.test_workflow_bridge",
-      "seconds": 0.3,
+      "seconds": 0.4,
       "status": "passed"
     },
     "test_a_journey_starts_from_the_view_only_for_an_inpatient_stay": {
       "file": "tests.test_workflow_bridge",
-      "seconds": 0.2,
+      "seconds": 0.6,
       "status": "passed"
     },
     "test_deliberate_failures_are_a_demo_feature_and_audited": {
       "file": "tests.test_workflow_bridge",
-      "seconds": 0.3,
+      "seconds": 0.4,
       "status": "passed"
     },
     "test_a_running_capacity_workflow_executes_the_approval_instead_of_the_request": {
       "file": "tests.test_workflow_bridge",
-      "seconds": 1.0,
+      "seconds": 1.5,
       "status": "passed"
     },
     "test_a_low_confidence_review_is_corrected_by_the_agents_signer": {
       "file": "tests.test_workflow_bridge",
-      "seconds": 0.4,
+      "seconds": 0.5,
       "status": "passed"
     },
     "test_an_exception_is_read_fresh_after_its_lock_so_it_is_narrated_once": {

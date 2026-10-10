@@ -174,6 +174,16 @@ const HOSPITAL: Step[] = [
     role: "physician", userId: "U-DOC-09", to: "/documentation", system: "Documentation",
   },
   {
+    title: "The call centre answers in the caller's language",
+    detail: "Play a caller: visiting hours and parking come from the FAQ without an identity check; for an appointment the AI first checks the name, birth date and the last four card digits. A reschedule or cancellation is only proposed: confirm it in one click. A medical question is never answered: it goes to the nurse line. Speak Chinese and it answers in Chinese.",
+    role: "clerk", userId: "U-CLER-01", to: "/call-centre", system: "Call centre",
+  },
+  {
+    title: "A Chinese follow-up call escalates a red flag",
+    detail: "48 hours after discharge the AI calls with questions from the signed instructions, in the patient's language. Place the call for the Chinese-speaking patient and answer that the wound keeps leaking: the rules escalate at once (no AI needed), the nurse queue puts it on top with the patient's words. Write the call-back note and close or refer it.",
+    role: "nurse", userId: "U-NURS-05", to: "/follow-up", system: "Follow-up calls",
+  },
+  {
     title: "Registration records a consent change",
     detail: "The clerk sees demographics and visits without clinical content. Record a withdrawal of SMS consent: it is audited and published as consent.revoked on the event bus.",
     role: "clerk", userId: "U-CLER-01", to: "/hospital/patients", system: "Consent",

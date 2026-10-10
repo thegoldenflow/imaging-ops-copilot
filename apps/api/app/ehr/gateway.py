@@ -23,9 +23,15 @@ then the role's write rights and patient scope:
     DocumentReference    create as docStatus=preliminary; change only while preliminary
                          (final only through the signing service, sign_document / app/ehr/signing.py)
     Communication, Flag  create and update
+    Observation          patient-reported findings only (category patient-reported,
+                         status preliminary: what a patient said on a follow-up call,
+                         7.4); create, and change only while preliminary
     Appointment          create as status=proposed; change only while proposed;
                          booked only through book_appointment, by a clerk (the
-                         privileged tool bookAppointment, after a recorded approval)
+                         privileged tool bookAppointment, after a recorded approval;
+                         with `replaces`, the appointment it replaces is cancelled in
+                         the same step); a booked one is cancelled only through
+                         cancel_appointment, by a clerk (cancelBookedAppointment)
     Consent              record_consent (consent management, app/ehr/consent.py)
     Encounter.location   append a bed move, bed managers only (append_encounter_location)
     Provenance           record_provenance, the agent runtime only (6.4)
@@ -56,7 +62,7 @@ from app.core.store import Store, get_store
 from app.ehr import access, breakglass
 from app.ehr.access import ACTIVE_ENCOUNTER
 from app.ehr.clock import hospital_now
-from app.ehr.codes import BED_STATUS, EXT, MRN_SYSTEM, coding
+from app.ehr.codes import BED_STATUS, EXT, MRN_SYSTEM, OBS_CATEGORY, PATIENT_REPORTED, coding
 from app.fhir.dt import fhir_datetime, parse, ref, ref_id
 from app.fhir.types import validate
 from app.fhir.types.datatypes import FhirModel
@@ -69,8 +75,15 @@ from app.fhir.types.patient import Patient
 from app.fhir.types.service_request import ServiceRequest
 
 BED_MANAGER_ROLES = {Role.OPERATIONS_MANAGER}
-WRITABLE = ("Task", "DocumentReference", "Communication", "Flag", "Appointment")
+CANCELLABLE = ("proposed", "pending", "booked")  # appointments a clerk may still cancel (not arrived or done)
+WRITABLE = ("Task", "DocumentReference", "Communication", "Flag", "Appointment", "Observation")
 SOURCE_MODULE = EXT + "source-module"  # the module that created a document (its registry entry governs signing)
+
+
+def patient_reported(observation: dict) -> bool:
+    """A finding the patient reported (7.4): the only Observation the AI layer writes, always as preliminary."""
+    return any(c.get("system") == OBS_CATEGORY and c.get("code") == PATIENT_REPORTED
+               for cat in observation.get("category") or [] for c in cat.get("coding") or [])
 
 
 class FhirAccessDenied(PermissionError):
@@ -574,6 +587,8 @@ class FhirGateway:
             return "documents are created as docStatus=preliminary; final needs the signing service"
         if rtype == "Appointment" and resource.get("status") != "proposed":
             return "appointments are created as status=proposed; booking goes through book_appointment"
+        if rtype == "Observation" and not (patient_reported(resource) and resource.get("status") == "preliminary"):
+            return "the only observations written here are patient-reported findings, as preliminary"
         return None
 
     @staticmethod
@@ -592,6 +607,9 @@ class FhirGateway:
                 return "a document keeps the module that created it"
         if rtype == "Appointment" and (current.get("status") != "proposed" or new.get("status") != "proposed"):
             return "only a proposed appointment can be changed, and it stays proposed"
+        if rtype == "Observation" and not all(patient_reported(r) and r.get("status") == "preliminary"
+                                              for r in (current, new)):
+            return "only a preliminary patient-reported observation can be changed, and it stays so"
         return None
 
     def _registry_entry(self, action: str, resource_type: str, resource_id: str | None, status: str | None, *,
@@ -700,25 +718,66 @@ class FhirGateway:
                     patient=access.patient_of(stored), encounter=encounter_id)
         return Encounter.model_validate(stored)
 
-    def book_appointment(self, appointment_id: str) -> FhirModel:
+    def book_appointment(self, appointment_id: str, *, replaces: str | None = None) -> FhirModel:
         """Proposed -> booked. A clerk's act (the registration desk), or the privileged tool bookAppointment
-        running on the approving clerk's authority (6.4); the module's tools must allow booked appointments."""
+        running on the approving clerk's authority (6.4); the module's tools must allow booked appointments.
+        `replaces`: a reschedule (7.4): the patient's appointment this one replaces is cancelled in the same step,
+        so the one approval covers both."""
         current = self.backend.read("Appointment", appointment_id)
         if current is None:
             raise LookupError(f"Appointment/{appointment_id} not found")
         patient = access.patient_of(current)
         self._registry_entry("update", "Appointment", appointment_id, "booked", patient=patient)
-        if self.policy is not None and (self.role not in access.BOOKERS or self.actor.kind != "user"):
-            self._deny("update", "Appointment", appointment_id, "only a clerk books appointments", patient=patient)
+        self._require_booker("update", appointment_id, patient, "books")
         self._require_patient("update", "Appointment", appointment_id, patient)
         if current.get("status") != "proposed":
             raise FhirConflict(f"Appointment/{appointment_id} is {current.get('status')}, not proposed")
+        old = None
+        if replaces:
+            old = self.backend.read("Appointment", replaces)
+            if old is None:
+                raise LookupError(f"Appointment/{replaces} not found")
+            if access.patient_of(old) != patient:
+                self._deny("update", "Appointment", replaces, "a reschedule replaces an appointment of the same "
+                                                              "patient", patient=patient)
+            if old.get("status") not in CANCELLABLE:
+                raise FhirConflict(f"Appointment/{replaces} is {old.get('status')}; it cannot be replaced")
+            self._registry_entry("update", "Appointment", replaces, "cancelled", patient=patient)
         booked = {**current, "status": "booked"}
         validate(booked)
         stored = self.backend.update(booked)
-        self._audit("update", "Appointment", appointment_id, detail="booked", patient=patient,
-                    encounter=access.encounter_of(stored))
+        self._audit("update", "Appointment", appointment_id, detail="booked" + (f", replaces {replaces}" if replaces
+                                                                                else ""),
+                    patient=patient, encounter=access.encounter_of(stored))
+        if old is not None:
+            self._cancel(old, f"Rescheduled to Appointment/{appointment_id}", patient)
         return validate(stored)
+
+    def cancel_appointment(self, appointment_id: str, reason: str) -> FhirModel:
+        """Booked (or proposed) -> cancelled: a clerk's act, or the privileged tool cancelBookedAppointment on the
+        approving clerk's authority (7.4: the call centre records the request, a clerk confirms it)."""
+        current = self.backend.read("Appointment", appointment_id)
+        if current is None:
+            raise LookupError(f"Appointment/{appointment_id} not found")
+        patient = access.patient_of(current)
+        self._registry_entry("update", "Appointment", appointment_id, "cancelled", patient=patient)
+        self._require_booker("update", appointment_id, patient, "cancels")
+        self._require_patient("update", "Appointment", appointment_id, patient)
+        if current.get("status") not in CANCELLABLE:
+            raise FhirConflict(f"Appointment/{appointment_id} is {current.get('status')}; it cannot be cancelled")
+        return validate(self._cancel(current, reason, patient))
+
+    def _require_booker(self, action: str, appointment_id: str, patient: str | None, verb: str) -> None:
+        if self.policy is not None and (self.role not in access.BOOKERS or self.actor.kind != "user"):
+            self._deny(action, "Appointment", appointment_id, f"only a clerk {verb} appointments", patient=patient)
+
+    def _cancel(self, current: dict, reason: str, patient: str | None) -> dict:
+        cancelled = {**current, "status": "cancelled", "cancelationReason": {"text": reason[:200]}}
+        validate(cancelled)
+        stored = self.backend.update(cancelled)
+        self._audit("update", "Appointment", current["id"], detail=f"cancelled: {reason[:120]}", patient=patient,
+                    encounter=access.encounter_of(stored))
+        return stored
 
     def record_provenance(self, resource: dict, *, replace: bool = False) -> FhirModel:
         """Write the Provenance of an AI output (6.4): the agent runtime only, as a system actor."""

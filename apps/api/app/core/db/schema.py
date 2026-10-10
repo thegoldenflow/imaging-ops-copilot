@@ -144,6 +144,16 @@ MODULE_ENTITIES = {
         EntitySpec("medrec_sessions", "app.modules.med_safety.models:MedRecSession",
                    encrypted=("items", "ai_detail", "discharge_table"), indexes=(("id",), ("status",),
                                                                              ("encounter_id",))),
+        # Patient voice services (7.4): call-centre calls and follow-up calls. Transcripts, dialog state, answers,
+        # the patient's words and the summaries are free text about the patient: encrypted. No audio is stored.
+        EntitySpec("voice_calls", "app.modules.voice_services.models:HospitalCall",
+                   encrypted=("transcript", "state", "intents", "actions", "summary", "caller_relation",
+                              "transfer_reason"),
+                   indexes=(("patient_id",), ("started_at",))),
+        EntitySpec("followup_calls", "app.modules.voice_services.models:FollowupCall",
+                   encrypted=("script", "transcript", "answers", "rule_hits", "classifier", "summary", "reason",
+                              "nurse_actions"),
+                   indexes=(("encounter_id",), ("status",), ("unit_id",))),
     ]
 }
 
@@ -175,6 +185,7 @@ BLOBS = {
     "hospital_plan",  # the day simulator's upcoming events (app/ehr)
     "hospital_clock",  # the hospital's simulated clock (app/ehr)
     "workflow_faults",  # failures injected into workflow steps for the demo (app/workflows/faults.py)
+    "voice_demo",  # the planted voice-services demo cases (app/ehr/seed/voice.py: ids only)
 }
 
 # Derived per process from stored data; never written to the database.

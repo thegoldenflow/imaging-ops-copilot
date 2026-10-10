@@ -19,6 +19,8 @@ from app.ehr.events import DomainEvent, bus
 from app.ehr.gateway import Actor, FhirGateway
 from app.workflows import bridge, faults, progress
 from app.workflows import model as M
+from app.workflows.activities import StepError, step_activity
+from tests import workflow_probe
 from tests.temporal_harness import DB, harness
 
 PHARMACIST, PHYSICIAN, NURSE, CLERK, OPS = "U-PHAR-01", "U-DOC-09", "U-NURS-05", "U-CLER-01", "U-OPS"
@@ -135,11 +137,22 @@ def _documents(store, encounter_id: str, code: str) -> list[dict]:
             if any(c.get("code") == code for c in (d.get("type") or {}).get("coding") or [])]
 
 
-def test_journey_runs_from_admission_to_the_booked_follow_up_call(fresh_state, monkeypatch):
+def _ensure_phone(store, patient_id: str) -> None:
+    """7.4 calls only a patient with a phone number on file."""
+    patient = store.fhir.read("Patient", patient_id)
+    if not any(t.get("system") == "phone" for t in patient.get("telecom") or []):
+        patient["telecom"] = [{"system": "phone", "value": "416-555-0199", "use": "home"}]
+        store.fhir.update(patient)
+
+
+def test_journey_runs_from_admission_to_the_scheduled_follow_up_call(fresh_state, monkeypatch):
+    from app.modules.voice_services import followup
+
     store = fresh_state
     with harness(monkeypatch) as h:
         with DB:
             enc, pid = _inpatient(store, leaving=True)
+            _ensure_phone(store, pid)
         wf = _admit(h, enc)
 
         s = h.wait_step(wf, "orderReview", ("waiting",))
@@ -171,10 +184,8 @@ def test_journey_runs_from_admission_to_the_booked_follow_up_call(fresh_state, m
 
         h.wait_step(wf, "followupDelay", ("waiting",))
         h.skip(48 * 3600 + 60)
-        s = h.wait_step(wf, "scheduleFollowupCall", ("waiting",))
-        approval = s["waiting_for"]["refs"][0]
-        _decide(approval, CLERK)
-
+        # WP8 (7.4): the four conditions hold (discharged, consent, phone, signed instructions): the call is scheduled
+        # by the follow-up service itself, no booking and no clerk
         h.wait(lambda: progress.get(wf).status == "completed", what="the journey to complete")
         h.capture(wf, "journey")
         with DB:
@@ -182,8 +193,13 @@ def test_journey_runs_from_admission_to_the_booked_follow_up_call(fresh_state, m
             statuses = {s["key"]: s["status"] for s in run.steps}
             assert statuses["scheduleFollowupCall"] == "done" and statuses["codingStub"] == "done"
             assert all(v in ("done", "skipped") for v in statuses.values()), statuses
-            appointment = next(r for r in h.step(wf, "scheduleFollowupCall")["refs"] if r.startswith("Appointment/"))
-            assert store.fhir.read("Appointment", appointment.split("/")[1])["status"] == "booked"
+            comm = next(r for r in h.step(wf, "scheduleFollowupCall")["refs"] if r.startswith("Communication/"))
+            call = followup.get(followup.call_id_for(enc["id"]))
+            assert call.status == "scheduled" and call.source == "journey" and call.workflow_id == wf
+            assert f"Communication/{call.communication_id}" == comm and call.script[0]["key"] == "identity"
+            assert store.fhir.read("Communication", call.communication_id)["status"] == "preparation"
+            assert not any(a.get("status") == "proposed" for a in store.fhir.search("Appointment", patient=pid)
+                           if (a.get("serviceType") or [{}])[0].get("coding", [{}])[0].get("code") == "followup-call")
             assert [d["id"] for d in _documents(store, enc["id"], "medrec")
                     if d["id"].endswith("-admission")] == [f"medrec-{enc['id']}-admission"]  # (and the discharge one)
             completed = [e for e in bus.events(store, types=["workflow.step_completed"], limit=200)
@@ -364,62 +380,64 @@ def test_the_pharmacists_last_order_decision_in_the_workbench_signs_off_the_orde
             assert doc["docStatus"] == "preliminary" and len(_documents(store, enc["id"], "medrec")) == 1
 
 
-def test_a_failed_privileged_call_is_not_retried_and_waits_for_a_retry_or_skip(fresh_state, monkeypatch, client, login):
-    """bookAppointment is privileged: its activity runs once; the failure becomes a Task for the clerk and the step
-    waits for the operations manager (retry, then skip; both audited)."""
-    store = fresh_state
-    _timers(monkeypatch, followup_delay_s=60)
-    with harness(monkeypatch) as h:
-        enc, wf, s = _to_medrec(h, store)
-        _sign_medrec(s["waiting_for"]["refs"][0], PHARMACIST)
-        _sign_medrec(s["waiting_for"]["refs"][0], PHYSICIAN)
-        h.wait_step(wf, "wardMonitoring", ("waiting",))
-        with DB:
-            bus.publish(_event("patient.discharged", enc))
-        # WP7 without a signed discharge medication table: nothing drafted, a Task says what is missing
-        s = h.wait_step(wf, "draftDischargeSummary", ("waiting",))
-        assert s["waiting_for"]["refs"][0].startswith("Task/") and \
-            s["waiting_for"]["refs"][1] == f"DocumentReference/dsum-{enc['id']}"
-        _document_step(s["waiting_for"]["refs"][0], PHYSICIAN)
-        s = h.wait_step(wf, "draftPatientInstructions", ("waiting",))
-        _document_step(s["waiting_for"]["refs"][0], NURSE)
-        h.wait_step(wf, "followupDelay", ("waiting",))
-        h.skip(61)
-        s = h.wait_step(wf, "scheduleFollowupCall", ("waiting",))
-        appointment = next(r for r in s["refs"] if r.startswith("Appointment/")).split("/")[1]
-        with DB:  # the slot is gone before the clerk approves: the booking will fail
-            appt = store.fhir.read("Appointment", appointment)
-            appt["status"] = "cancelled"
-            store.fhir.update(appt)
-        _decide(s["waiting_for"]["refs"][0], CLERK)
+@step_activity(workflow_probe.ACTIVITY, workflow_probe.STEP, max_attempts=M.PRIVILEGED_MAX_ATTEMPTS)
+def _probe_privileged_call(args: dict) -> dict:
+    """A real privileged call that the Tool Gateway refuses: a booking whose approval record is not one."""
+    with runtime.start("workflow_engine", user=None, encounter_id=args["encounter_id"],
+                       context_id=args["workflow_id"]) as run:
+        proposed = run.tool("proposeAppointment", {"encounter_id": args["encounter_id"], "service": "probe-booking",
+                                                   "start": "2030-01-07T09:00", "minutes": 15})
+        booked = run.tool("bookAppointment", {"appointment_id": proposed.output["appointment_id"],
+                                              "approval_task_id": "not-an-approval"})
+        run.finish(outcome=booked.status)
+    if not booked.ok:
+        raise StepError(f"bookAppointment {booked.status}: {booked.reason}")
+    return {"detail": "booked"}
 
-        s = h.wait(lambda: (x := h.step(wf, "scheduleFollowupCall")) and x["status"] == "failed"
-                   and any(t["kind"] == "failed" for t in x["tasks"]) and x, what="the failed booking's Task")
-        assert s["attempts"] == 1
+
+def test_a_failed_privileged_call_is_not_retried_and_waits_for_a_retry_or_skip(fresh_state, monkeypatch, client, login):
+    """6.5: an activity that calls a privileged tool runs once; the failure becomes an urgent Task for the step's
+    owner and the step waits for the operations manager (retry, then skip; both audited). Since WP8 no journey step
+    is privileged (7.4 places the follow-up call without a booking), so a probe workflow on the same FlowBase
+    machinery runs the step (tests/workflow_probe.py)."""
+    from app.workflows import worker
+    from tests.temporal_harness import TASK_QUEUE
+
+    store = fresh_state
+    monkeypatch.setattr(worker, "WORKFLOWS", [*worker.WORKFLOWS, workflow_probe.PrivilegedStepProbe])
+    monkeypatch.setattr(worker, "ACTIVITIES", [*worker.ACTIVITIES, _probe_privileged_call])
+    with harness(monkeypatch) as h:
+        with DB:
+            enc, pid = _inpatient(store)
+        wf = f"journey-probe-{uuid.uuid4().hex[:8]}"
+        h.loop.run(h.client.start_workflow(workflow_probe.PROBE, {"encounter_id": enc["id"], "patient_id": pid},
+                                           id=wf, task_queue=TASK_QUEUE))
+        step = workflow_probe.STEP
+        s = h.wait(lambda: (x := h.step(wf, step)) and x["status"] == "failed"
+                   and any(t["kind"] == "failed" for t in x["tasks"]) and x, what="the failed call's Task")
+        assert s["attempts"] == 1 and "approval_invalid" in s["detail"]
         with DB:
             failed = store.fhir.read("Task", next(t["task_id"] for t in s["tasks"] if t["kind"] == "failed"))
             assert failed["performerType"][0]["coding"][0]["code"] == "clerk" and failed["priority"] == "urgent"
+            assert "never retried automatically" in failed["description"]
         _, attempts = _activities(h, wf)
-        assert attempts["journey.bookFollowupCall"] == [1]
+        assert attempts[workflow_probe.ACTIVITY] == [1]
 
         with DB:
             nurse = login(NURSE)
-            assert client.post(f"/api/workflows/{wf}/steps/scheduleFollowupCall/retry", json={},
-                               headers=nurse).status_code == 403
+            assert client.post(f"/api/workflows/{wf}/steps/{step}/retry", json={}, headers=nurse).status_code == 403
             ops = login(OPS)
-            r = client.post(f"/api/workflows/{wf}/steps/scheduleFollowupCall/retry", json={"note": "slot reopened?"},
-                            headers=ops)
+            r = client.post(f"/api/workflows/{wf}/steps/{step}/retry", json={"note": "approval fixed?"}, headers=ops)
             assert r.status_code == 202, r.text
-        h.wait(lambda: _activities_count(h, wf, "journey.bookFollowupCall") == 2, what="the retried booking")
-        h.wait(lambda: (x := h.step(wf, "scheduleFollowupCall")) and x["status"] == "failed"
-               and x["detail"].startswith("Failed after"), what="the second failure")
+        h.wait(lambda: _activities_count(h, wf, workflow_probe.ACTIVITY) == 2, what="the retried call")
+        h.wait(lambda: (x := h.step(wf, step)) and x["status"] == "failed" and x["detail"].startswith("Failed after"),
+               what="the second failure")
         with DB:
-            r = client.post(f"/api/workflows/{wf}/steps/scheduleFollowupCall/skip", json={"note": "booked by phone"},
-                            headers=ops)
+            r = client.post(f"/api/workflows/{wf}/steps/{step}/skip", json={"note": "booked by phone"}, headers=ops)
             assert r.status_code == 202, r.text
-        h.wait(lambda: progress.get(wf).status == "completed", what="the journey to complete")
+        h.wait(lambda: progress.get(wf).status == "completed", what="the probe to complete")
         with DB:
-            assert h.step(wf, "scheduleFollowupCall")["status"] == "skipped"
+            assert h.step(wf, step)["status"] == "skipped"
             assert store.fhir.read("Task", failed["id"])["status"] == "completed"  # skipped: the failure Task is done
             actions = {e.action for e in store.audit.query(resource_type="Workflow", resource_id=wf)}
             assert {"workflow_retry", "workflow_skip"} <= actions

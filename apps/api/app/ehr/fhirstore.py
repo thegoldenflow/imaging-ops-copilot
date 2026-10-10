@@ -424,6 +424,10 @@ class FhirStore:
                 clauses.append(t.c.date < value)
             elif key == "active_at":
                 clauses.append(and_(t.c.date <= value, or_(t.c.date_end.is_(None), t.c.date_end > value)))
+            elif key == "ended_from":  # WP8: stays discharged in a window (the period's end)
+                clauses.append(t.c.date_end >= value)
+            elif key == "ended_to":
+                clauses.append(t.c.date_end < value)
             elif key in INDEX_COLUMNS:
                 values = _as_list(value)
                 clauses.append(t.c[key].in_(values) if len(values) > 1 else t.c[key] == values[0])
@@ -477,6 +481,10 @@ def matches(cols: dict, key: str, value: Any) -> bool:
         return cols["date"] is not None and cols["date"] < value
     if key == "active_at":
         return cols["date"] is not None and cols["date"] <= value and (cols["date_end"] is None or cols["date_end"] > value)
+    if key == "ended_from":
+        return cols["date_end"] is not None and cols["date_end"] >= value
+    if key == "ended_to":
+        return cols["date_end"] is not None and cols["date_end"] < value
     if key not in INDEX_COLUMNS:
         raise ValueError(f"Unsupported FHIR search parameter {key!r}")
     return cols[key] in _as_list(value)

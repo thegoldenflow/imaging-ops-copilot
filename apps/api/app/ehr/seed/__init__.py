@@ -16,6 +16,7 @@ from app.ehr.seed import documentation
 from app.ehr.seed import materialize as M
 from app.ehr.seed import medsafety
 from app.ehr.seed import people
+from app.ehr.seed import voice
 from app.ehr.seed.builder import Builder
 from app.ehr.seed.simulate import WINDOW_DAYS, simulate
 
@@ -160,6 +161,10 @@ def generate(store: Store, seed: int, wall_now: datetime) -> dict:
     medsafety_cases = medsafety.generate(b, tl, by_id, now)
     # Documentation (WP7): discharge plans and planted cases, last of all, with their own random streams and ids
     documentation_cases = documentation.generate(b, tl, by_id, now, medsafety_cases)
+    # Voice services (WP8): discharged patients due for a follow-up call and call-centre appointments, after WP7
+    used = {case["patient"] for cases in (medsafety_cases, documentation_cases) for case in cases.values()
+            if isinstance(case, dict) and case.get("patient")}
+    voice_cases = voice.generate(b, tl, by_id, now, used)
 
     events.sort(key=plan_order)
     store.modules["hospital_plan"] = {"generated_for": now.isoformat(), "horizon": tl.horizon.isoformat(), "seed": seed,
@@ -168,5 +173,5 @@ def generate(store: Store, seed: int, wall_now: datetime) -> dict:
     store.modules["hospital_clock"] = {"now": now.isoformat(), "rate": 0, "running": False}
     return {"now": now, "resources": b.written, "patients": len(patients), "events": len(events),
             "inpatients": len(occupied), "ed_now": sum(1 for v in tl.ed_visits if v.arrival <= now < v.end),
-            "medsafety": medsafety_cases, "documentation": documentation_cases}
+            "medsafety": medsafety_cases, "documentation": documentation_cases, "voice": voice_cases}
 

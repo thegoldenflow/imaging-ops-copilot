@@ -59,6 +59,8 @@ from app.modules.reports.router import router as reports_router
 from app.modules.requisitions import service as requisitions
 from app.modules.requisitions.router import router as requisitions_router
 from app.modules.scheduling.router import router as scheduling_router
+from app.modules.voice_services import followup as voice_followup
+from app.modules.voice_services.router import router as voice_router
 from app.workflows import bridge as workflow_bridge
 from app.workflows.router import router as workflows_router
 
@@ -128,6 +130,7 @@ async def _hospital_loop() -> None:
         await asyncio.to_thread(_drain_events)
         await asyncio.to_thread(_step, "control tower", control_tower.refresh_step)
         await asyncio.to_thread(_step, "medication safety intake", med_safety.intake_step)
+        await asyncio.to_thread(_step, "voice follow-up sweep", voice_followup.sweep_step)
         await asyncio.sleep(max(0.1, 1 - (loop.time() - started)))
 
 
@@ -223,6 +226,7 @@ app.include_router(control_tower_router)
 app.include_router(workflows_router)
 app.include_router(med_safety_router)
 app.include_router(documentation_router)
+app.include_router(voice_router)
 
 
 @app.exception_handler(FhirAccessDenied)

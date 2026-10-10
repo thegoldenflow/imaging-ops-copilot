@@ -2,34 +2,39 @@
 # kind: runtime_agent (hosted by the agent runtime) | embedded_agent (AI step inside its module) |
 # module (no model; registered for its EHR writes). Model ids come from the environment (model_policy.tier).
 agent_id: followup_calls
-version: 0.1.0
+version: 0.2.0
 kind: runtime_agent
 owner: Patient services team
-purpose: Post-discharge follow-up calls; red flags escalate to a nurse (7.4).
-risk_tier: ops
+purpose: 'Post-discharge follow-up calls (7.4): the call scheduled 48 hours after discharge, its questions built from
+  the signed patient instructions, red flags escalated to a nurse (rules first, then the model classifier), the call
+  record, the patient-reported symptoms and the nurse Task written back. It never gives medical advice.'
+risk_tier: documentation
 allowed_tools:
 - getEncounterContext
 - getDocuments
-- writeCommunication
-- createTask
-- updateTask
+- writeCallRecord
+- createCallTask
+- recordPatientReportedObservation
 data_scope:
   resources:
   - Patient
   - Encounter
   - DocumentReference
   - Flag
+  - Communication
   scope: encounter
 model_policy:
-  tier: voice
-  max_tokens: 2000
+  tier: reasoning
+  max_tokens: 1500
   temperature_max: null
-prompt_version: null
+prompt_version: followup_calls@1
 required_signoff_role:
 - nurse
 consent_required:
 - followup_call
 eval_status:
   status: pending
-deployment_status: dev
-entrypoint: null
+  run_id: null
+  note: Mock baseline only (evals/followup, evals/voice_bilingual); not run on a live model.
+deployment_status: demo
+entrypoint: app.modules.voice_services.followup_agent

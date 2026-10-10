@@ -84,6 +84,9 @@ EVENT_TYPES: dict[str, str] = {
     "exception.cleared": "platform: an exception's condition cleared",
     "agent.low_confidence": "platform: an agent run's confidence fell below the agent's registry threshold",
     "workflow.step_completed": "platform: a durable workflow completed or skipped a step",
+    # WP8 (7.4): a follow-up call escalated to a nurse (the notification), and a nurse's handling of it
+    "followup.escalated": "platform: a post-discharge follow-up call escalated to a nurse (red flag or classifier)",
+    "followup.handled": "platform: a nurse closed a follow-up escalation or referred it to a physician",
 }
 
 MAX_ATTEMPTS = 3

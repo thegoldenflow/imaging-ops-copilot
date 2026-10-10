@@ -376,7 +376,8 @@ def test_registry_entries_are_valid():
         assert entry.tier in ("ops", "documentation", "clinical_ds"), name
         if entry.tier != "ops":
             assert entry.required_signoff_role, f"{name}: documentation and clinical_ds modules need a signer"
-            assert entry.allows("DocumentReference", "preliminary"), name
+            # a draft document, or (7.4, WP8) the follow-up call's record
+            assert entry.allows("DocumentReference", "preliminary") or entry.allows("Communication", "completed"), name
     assert entries["medication_reconciliation"].cosign and entries["discharge_summary"].consent_required == [
         "ai_processing"]
 
