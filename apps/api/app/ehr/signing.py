@@ -11,8 +11,10 @@ A draft is created as `docStatus=preliminary` by the module that wrote it (its
 3. adds a signature (extension `signature`: role, signer, time). With `cosign`
    (medication reconciliation: pharmacist and physician) the draft stays
    preliminary until every listed role has signed; otherwise one signature
-   finalises it. The final document gets `authenticator` (the last signer's
-   Practitioner) and `docStatus=final`;
+   finalises it. The final document gets `docStatus=final` and `authenticator`:
+   the signer, or with `cosign` the signer of the first listed role (the
+   pharmacist of a medication reconciliation, spec 7.2), whatever the order of
+   the signatures; the co-signers stay in the signature extensions;
 4. writes a `sign` audit event (refusals are `sign` events with outcome denied);
 5. for a draft an agent wrote (extension ai-run), adds the signer to the run's
    Provenance and records the signature as the trace's human action (6.4).
@@ -106,6 +108,11 @@ def sign(fhir: FhirGateway, document_id: str, *, at: datetime | None = None) -> 
     if not missing:
         doc["docStatus"] = "final"
         doc["authenticator"] = signer
+        if entry.cosign:  # the primary signer (first listed role) authenticates; the co-signers are extensions
+            primary = next((s for s in done if s["role"] == entry.required_signoff_role[0]), None)
+            if primary is not None and primary["by"]:
+                doc["authenticator"] = {"reference": primary["by"], **({"display": primary["name"]}
+                                                                        if primary["name"] else {})}
     validate(doc)
     fhir.backend.update(doc)
     detail = "final" if not missing else f"co-signature {len(signed)} of {len(entry.required_signoff_role)}; " \

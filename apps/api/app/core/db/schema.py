@@ -136,6 +136,14 @@ MODULE_ENTITIES = {
                    indexes=(("workflow_type", "status"), ("encounter_id",), ("exception_id",))),
         EntitySpec("agent_reviews", "app.agents.reviews:AgentReview", encrypted=("input", "output", "correction"),
                    indexes=(("run_id",), ("status",))),
+        # Medication safety (7.2): the review queue. Order reviews keyed by the order reference, reconciliations by
+        # encounter and kind; the AI commentary, the reconciliation items (with the pharmacist's reasons) and the
+        # decisions are free text: encrypted
+        EntitySpec("order_reviews", "app.modules.med_safety.models:OrderReview",
+                   encrypted=("commentary", "decision"), indexes=(("id",), ("status",), ("patient_id",))),
+        EntitySpec("medrec_sessions", "app.modules.med_safety.models:MedRecSession",
+                   encrypted=("items", "ai_detail", "discharge_table"), indexes=(("id",), ("status",),
+                                                                             ("encounter_id",))),
     ]
 }
 

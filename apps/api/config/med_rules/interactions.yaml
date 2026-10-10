@@ -1,0 +1,162 @@
+# Drug interaction pairs (docs/SPEC-hospital.md 7.2, rule "interaction"): 25 pairs. A new order is checked against
+# the patient's other active orders and home medications; a pair matches in either order. Loaded by
+# app/modules/med_safety/rules.py.
+#
+# DEMO SIMPLIFICATION, NOT CLINICAL GUIDANCE. Mechanisms are one-line paraphrases written for this demo; every pair
+# names the public source it paraphrases (`source`). Production replaces this file with a commercial drug knowledge
+# base (for example FDB or Lexicomp) maintained by pharmacy (see README.md).
+#
+# A side is `rxcui` (one RxNorm ingredient or a list) or `class` (the therapeutic class in app/ehr/codes.py
+# MEDICATIONS: nsaid, ssri, opioid, fluoroquinolone, ...). severity: major or moderate.
+pairs:
+  # Anticoagulant plus NSAID: the 8.2 storyline's interaction.
+  - id: warfarin-nsaid
+    a: {rxcui: "11289", name: warfarin}
+    b: {class: nsaid, name: NSAIDs}
+    severity: major
+    mechanism: NSAIDs inhibit platelet function and injure the gastric mucosa on top of warfarin's anticoagulation, a high risk of major (especially gastrointestinal) bleeding.
+    source: FDA prescribing information, warfarin sodium (Coumadin), Drug interactions - NSAIDs and antiplatelet agents (public domain)
+  - id: warfarin-aspirin
+    a: {rxcui: "11289", name: warfarin}
+    b: {rxcui: "1191", name: aspirin}
+    severity: major
+    mechanism: Aspirin's irreversible platelet inhibition adds to warfarin's anticoagulation and raises the bleeding risk.
+    source: FDA prescribing information, warfarin sodium (Coumadin), Drug interactions - antiplatelet agents (public domain)
+  - id: warfarin-clopidogrel
+    a: {rxcui: "11289", name: warfarin}
+    b: {rxcui: "32968", name: clopidogrel}
+    severity: major
+    mechanism: Clopidogrel's P2Y12 platelet inhibition adds to warfarin's anticoagulation and raises the bleeding risk.
+    source: FDA prescribing information, clopidogrel (Plavix), Warnings - bleeding with anticoagulants (public domain)
+  - id: warfarin-amiodarone
+    a: {rxcui: "11289", name: warfarin}
+    b: {rxcui: "703", name: amiodarone}
+    severity: major
+    mechanism: Amiodarone inhibits CYP2C9 and CYP3A4, slowing warfarin clearance; the INR can rise sharply over weeks.
+    source: FDA prescribing information, amiodarone (Cordarone), Drug interactions - warfarin (public domain)
+  - id: warfarin-sulfamethoxazole
+    a: {rxcui: "11289", name: warfarin}
+    b: {rxcui: "10180", name: sulfamethoxazole}
+    severity: major
+    mechanism: Sulfamethoxazole inhibits CYP2C9 and displaces warfarin from albumin, raising the INR.
+    source: FDA prescribing information, sulfamethoxazole-trimethoprim (Bactrim), Drug interactions - warfarin (public domain)
+  - id: warfarin-fluconazole
+    a: {rxcui: "11289", name: warfarin}
+    b: {rxcui: "4450", name: fluconazole}
+    severity: major
+    mechanism: Fluconazole inhibits CYP2C9, the main route of S-warfarin clearance, raising the INR.
+    source: FDA prescribing information, fluconazole (Diflucan), Drug interactions - coumarin anticoagulants (public domain)
+  - id: warfarin-metronidazole
+    a: {rxcui: "11289", name: warfarin}
+    b: {rxcui: "6922", name: metronidazole}
+    severity: major
+    mechanism: Metronidazole inhibits warfarin metabolism (CYP2C9), prolonging the prothrombin time.
+    source: FDA prescribing information, metronidazole (Flagyl), Drug interactions - warfarin (public domain)
+  - id: warfarin-fluoroquinolone
+    a: {rxcui: "11289", name: warfarin}
+    b: {class: fluoroquinolone, name: fluoroquinolones}
+    severity: moderate
+    mechanism: Fluoroquinolones can raise the INR (reduced warfarin clearance and gut vitamin K production); check the INR during the course.
+    source: FDA prescribing information, ciprofloxacin (Cipro) and levofloxacin (Levaquin), Drug interactions - warfarin (public domain)
+  - id: warfarin-ssri
+    a: {rxcui: "11289", name: warfarin}
+    b: {class: ssri, name: SSRIs}
+    severity: moderate
+    mechanism: SSRIs deplete platelet serotonin and impair aggregation, adding to warfarin's bleeding risk.
+    source: FDA prescribing information, sertraline (Zoloft), Warnings - abnormal bleeding (public domain)
+  - id: doac-nsaid
+    a: {rxcui: ["1364430", "1114195", "1037042"], name: direct oral anticoagulants}
+    b: {class: nsaid, name: NSAIDs}
+    severity: major
+    mechanism: NSAIDs inhibit platelets and injure the gastric mucosa on top of the direct oral anticoagulant, a high risk of major bleeding.
+    source: FDA prescribing information, apixaban (Eliquis) and rivaroxaban (Xarelto), Drug interactions - NSAIDs (public domain)
+  - id: heparin-nsaid
+    a: {rxcui: ["67108", "5224"], name: heparins}
+    b: {class: nsaid, name: NSAIDs}
+    severity: major
+    mechanism: NSAIDs inhibit platelets on top of heparin anticoagulation, raising the bleeding risk (including spinal or epidural haematoma).
+    source: FDA prescribing information, enoxaparin sodium (Lovenox), Boxed warning and drug interactions (public domain)
+  - id: clopidogrel-omeprazole
+    a: {rxcui: "32968", name: clopidogrel}
+    b: {rxcui: "7646", name: omeprazole}
+    severity: moderate
+    mechanism: Omeprazole inhibits CYP2C19, which activates clopidogrel, so less antiplatelet effect; pantoprazole is preferred.
+    source: FDA prescribing information, clopidogrel (Plavix), Warnings - CYP2C19 inhibitors (public domain)
+  - id: simvastatin-clarithromycin
+    a: {rxcui: "36567", name: simvastatin}
+    b: {rxcui: "21212", name: clarithromycin}
+    severity: major
+    mechanism: Clarithromycin strongly inhibits CYP3A4, raising simvastatin levels; myopathy and rhabdomyolysis (contraindicated together).
+    source: FDA prescribing information, simvastatin (Zocor), Contraindications - strong CYP3A4 inhibitors (public domain)
+  - id: simvastatin-amiodarone
+    a: {rxcui: "36567", name: simvastatin}
+    b: {rxcui: "703", name: amiodarone}
+    severity: moderate
+    mechanism: Amiodarone raises simvastatin exposure; the myopathy risk rises above 20 mg of simvastatin a day.
+    source: FDA prescribing information, simvastatin (Zocor), Dosage limits with amiodarone (public domain)
+  - id: lisinopril-spironolactone
+    a: {rxcui: "29046", name: lisinopril}
+    b: {rxcui: "9997", name: spironolactone}
+    severity: moderate
+    mechanism: Both raise serum potassium (less aldosterone effect); hyperkalaemia, more so with renal impairment. Check potassium.
+    source: FDA prescribing information, spironolactone (Aldactone), Warnings - hyperkalaemia with ACE inhibitors (public domain)
+  - id: spironolactone-potassium
+    a: {rxcui: "9997", name: spironolactone}
+    b: {rxcui: "8591", name: potassium chloride}
+    severity: major
+    mechanism: A potassium-sparing diuretic with potassium supplements can cause severe hyperkalaemia.
+    source: FDA prescribing information, spironolactone (Aldactone), Warnings - potassium supplementation (public domain)
+  - id: lisinopril-potassium
+    a: {rxcui: "29046", name: lisinopril}
+    b: {rxcui: "8591", name: potassium chloride}
+    severity: moderate
+    mechanism: ACE inhibitors reduce potassium excretion; potassium supplements add hyperkalaemia risk. Check potassium.
+    source: FDA prescribing information, lisinopril (Zestril), Drug interactions - potassium supplements (public domain)
+  - id: lithium-nsaid
+    a: {rxcui: "6448", name: lithium}
+    b: {class: nsaid, name: NSAIDs}
+    severity: major
+    mechanism: NSAIDs reduce renal lithium clearance, raising lithium levels into the toxic range.
+    source: FDA prescribing information, lithium carbonate, Drug interactions - NSAIDs (public domain)
+  - id: lithium-lisinopril
+    a: {rxcui: "6448", name: lithium}
+    b: {rxcui: "29046", name: lisinopril}
+    severity: major
+    mechanism: ACE inhibitors reduce lithium excretion; lithium toxicity. Monitor levels or avoid.
+    source: FDA prescribing information, lithium carbonate, Drug interactions - ACE inhibitors (public domain)
+  - id: lithium-hydrochlorothiazide
+    a: {rxcui: "6448", name: lithium}
+    b: {rxcui: "5487", name: hydrochlorothiazide}
+    severity: major
+    mechanism: Thiazides increase proximal reabsorption of lithium, raising levels by about a quarter or more; lithium toxicity.
+    source: FDA prescribing information, lithium carbonate, Drug interactions - diuretics (public domain)
+  - id: methotrexate-sulfamethoxazole
+    a: {rxcui: "6851", name: methotrexate}
+    b: {rxcui: "10180", name: sulfamethoxazole}
+    severity: major
+    mechanism: Both are antifolates and sulfamethoxazole reduces methotrexate clearance; bone marrow suppression.
+    source: FDA prescribing information, methotrexate, Drug interactions - trimethoprim-sulfamethoxazole (public domain)
+  - id: digoxin-amiodarone
+    a: {rxcui: "3407", name: digoxin}
+    b: {rxcui: "703", name: amiodarone}
+    severity: major
+    mechanism: Amiodarone inhibits P-glycoprotein and roughly doubles digoxin levels; halve the digoxin dose and check levels.
+    source: FDA prescribing information, digoxin (Lanoxin), Drug interactions - amiodarone (public domain)
+  - id: tramadol-ssri
+    a: {rxcui: "10689", name: tramadol}
+    b: {class: ssri, name: SSRIs}
+    severity: major
+    mechanism: Both increase serotonergic activity; serotonin syndrome and a lower seizure threshold.
+    source: FDA prescribing information, tramadol (Ultram), Warnings - serotonin syndrome (public domain)
+  - id: opioid-benzodiazepine
+    a: {class: opioid, name: opioids}
+    b: {rxcui: "6470", name: lorazepam}
+    severity: major
+    mechanism: Additive central nervous system and respiratory depression; profound sedation, respiratory depression, death.
+    source: FDA boxed warning (2016), opioids with benzodiazepines (public domain)
+  - id: colchicine-clarithromycin
+    a: {rxcui: "2683", name: colchicine}
+    b: {rxcui: "21212", name: clarithromycin}
+    severity: major
+    mechanism: Clarithromycin inhibits CYP3A4 and P-glycoprotein, raising colchicine to toxic levels.
+    source: FDA prescribing information, colchicine (Colcrys), Drug interactions - strong CYP3A4 inhibitors (public domain)

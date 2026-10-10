@@ -1,0 +1,29 @@
+# Medication reconciliation settings (docs/SPEC-hospital.md 7.2, "MedRec") and the duplicate-test window of the order
+# review. Loaded by app/modules/med_safety/rules.py and medrec.py.
+#
+# DEMO SIMPLIFICATION, NOT CLINICAL GUIDANCE; every setting names the source it follows (`source`). Production
+# takes therapeutic duplication groups from a commercial drug knowledge base (see README.md).
+
+# Rule "duplicate test": a lab or imaging order whose code was already ordered for the patient within this window
+# and has a result.
+duplicate_test:
+  window_hours: 72
+  categories: [lab, imaging]
+  source: Choosing Wisely Canada, internal medicine and laboratory medicine lists - avoid repeat tests without a change in clinical status (public summary)
+
+# Duplicate therapy: two different ingredients of one of these therapeutic classes (app/ehr/codes.py MEDICATIONS)
+# active together.
+duplicate_therapy:
+  classes: [anticoagulant, antiplatelet, nsaid, opioid, statin, proton pump inhibitor, ssri, ace inhibitor,
+            beta blocker, benzodiazepine, antipsychotic, gabapentinoid, sulfonylurea, dpp4 inhibitor, cephalosporin,
+            penicillin, fluoroquinolone, macrolide]
+  source: ISMP Canada and Institute for Safe Medication Practices, therapeutic duplication as a reconciliation discrepancy (public summary)
+
+# Classes whose omission or duplication is a major discrepancy (harm from an unintended gap or double dose).
+high_risk_classes: [anticoagulant, antiplatelet, insulin, beta blocker, opioid, antiepileptic, thyroid hormone,
+                    corticosteroid]
+high_risk_source: Accreditation Canada Required Organizational Practice "Medication reconciliation"; ISMP high-alert medication list (public summaries)
+
+# Inpatient orders by these routes, or as needed, are usually meant for the stay only; the discharge reconciliation
+# says so when one is not on the discharge prescriptions (the pharmacist still decides).
+hospital_use_routes: [intravenous, subcutaneous]

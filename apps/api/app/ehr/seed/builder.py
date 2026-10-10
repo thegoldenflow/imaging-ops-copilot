@@ -117,9 +117,9 @@ class Builder:
 
     def condition(self, pid: str, code: str, onset: datetime | date, *, enc: str | None = None,
                   category: str = "problem-list-item", clinical: str = "active",
-                  abated: datetime | None = None) -> dict:
+                  abated: datetime | None = None, rid: str | None = None) -> dict:
         resource: dict = {
-            "resourceType": "Condition", "id": self.next_id("cond"),
+            "resourceType": "Condition", "id": rid or self.next_id("cond"),
             "clinicalStatus": C.concept(C.CONDITION_CLINICAL, clinical),
             "category": [C.concept(C.CONDITION_CATEGORY, category)],
             "code": C.snomed(code), "subject": ref("Patient", pid),
@@ -153,9 +153,9 @@ class Builder:
                            intent: str = "order", status: str = "active", requester: str | None = None,
                            dose: float | None = None, per_day: int | None = None, prn: bool = False,
                            route: str | None = None, reason: str | None = None, note: str | None = None,
-                           category: str = "inpatient") -> dict:
+                           category: str = "inpatient", rid: str | None = None) -> dict:
         resource: dict = {
-            "resourceType": "MedicationRequest", "id": self.next_id("medrx"), "status": status, "intent": intent,
+            "resourceType": "MedicationRequest", "id": rid or self.next_id("medrx"), "status": status, "intent": intent,
             "category": [C.concept("http://terminology.hl7.org/CodeSystem/medicationrequest-category", category)],
             "medicationCodeableConcept": C.rxnorm(rxcui), "subject": ref("Patient", pid),
             "authoredOn": fhir_datetime(authored),
@@ -172,9 +172,10 @@ class Builder:
         return self.add(resource)
 
     def medication_statement(self, pid: str, rxcui: str, start: date, *, status: str = "active", enc: str | None = None,
-                             dose: float | None = None, per_day: int | None = None, reason: str | None = None) -> dict:
+                             dose: float | None = None, per_day: int | None = None, reason: str | None = None,
+                             rid: str | None = None) -> dict:
         resource: dict = {
-            "resourceType": "MedicationStatement", "id": self.next_id("medst"), "status": status,
+            "resourceType": "MedicationStatement", "id": rid or self.next_id("medst"), "status": status,
             "medicationCodeableConcept": C.rxnorm(rxcui), "subject": ref("Patient", pid),
             "effectivePeriod": {"start": fhir_date(start)},
             "dateAsserted": fhir_date(start),
@@ -188,10 +189,10 @@ class Builder:
         return self.add(resource)
 
     def allergy(self, pid: str, allergen: tuple[str, str, str, str], recorded: date, *, criticality: str,
-                reaction: str, severity: str, enc: str | None = None) -> dict:
+                reaction: str, severity: str, enc: str | None = None, rid: str | None = None) -> dict:
         system, code, display, drug_class = allergen
         resource = {
-            "resourceType": "AllergyIntolerance", "id": self.next_id("alg"),
+            "resourceType": "AllergyIntolerance", "id": rid or self.next_id("alg"),
             "clinicalStatus": C.concept(C.ALLERGY_CLINICAL, "active"),
             "category": ["medication" if drug_class else ("food" if code == "91935009" else "environment")],
             "criticality": criticality, "code": C.concept(system, code, display),
@@ -256,9 +257,9 @@ class Builder:
 
     def diagnostic_report(self, pid: str, enc: str | None, code: dict, when: datetime, *, conclusion: str,
                           results: list[str] | None = None, category: str = "LAB", based_on: str | None = None,
-                          status: str = "final") -> dict:
+                          status: str = "final", rid: str | None = None) -> dict:
         resource: dict = {
-            "resourceType": "DiagnosticReport", "id": self.next_id("dr"), "status": status,
+            "resourceType": "DiagnosticReport", "id": rid or self.next_id("dr"), "status": status,
             "category": [C.concept("http://terminology.hl7.org/CodeSystem/v2-0074", category)],
             "code": code, "subject": ref("Patient", pid), "effectiveDateTime": fhir_datetime(when),
             "issued": fhir_datetime(when), "conclusion": conclusion,

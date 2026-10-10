@@ -1,0 +1,93 @@
+# Tool registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# side_effect_level read / recommend / action / privileged; schemas are JSON Schema (the subset in
+# app/agents/jsonschema.py); fhir_writes is what the tool may write (agents' write rights derive from it).
+tool_id: submitOrderReview
+description: 'Put the AI commentary on an order into the reviewer''s queue (a Task with intent proposal whose focus is
+  the order, 7.2). It never changes the order: the pharmacist or physician decides.'
+side_effect_level: recommend
+handler: app.modules.med_safety.tools:submit_order_review
+domain: fhir
+fhir_writes:
+  Task:
+  - requested
+input_schema:
+  type: object
+  properties:
+    review_id:
+      type: string
+      pattern: ^ORV-[0-9]{5,}$
+    encounter_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    order_ref:
+      type: string
+      pattern: ^(MedicationRequest|ServiceRequest)/[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    reviewer_roles:
+      type: array
+      minItems: 1
+      maxItems: 2
+      items:
+        type: string
+        enum:
+        - pharmacist
+        - physician
+    severity:
+      type: string
+      enum:
+      - none
+      - info
+      - minor
+      - moderate
+      - major
+      - blocking
+    summary:
+      type: string
+      minLength: 1
+      maxLength: 300
+    commentary:
+      type: string
+      minLength: 2
+      maxLength: 12000
+    evidence_refs:
+      type: array
+      maxItems: 60
+      items:
+        type: string
+        pattern: ^[A-Z][A-Za-z]+/[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+  required:
+  - review_id
+  - encounter_id
+  - order_ref
+  - reviewer_roles
+  - severity
+  - summary
+  - commentary
+  - evidence_refs
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    task_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    status:
+      type: string
+  required:
+  - task_id
+  - status
+  additionalProperties: false
+permission_policy:
+  roles:
+  - pharmacist
+  - physician
+  - system
+  target:
+    encounter: encounter_id
+idempotency:
+  required: true
+  window_hours: 24
+timeout_ms: 5000
+retry:
+  max_attempts: 2
+  backoff_ms: 50
+audit_level: detailed

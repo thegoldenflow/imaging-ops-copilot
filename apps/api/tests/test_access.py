@@ -144,8 +144,13 @@ def test_visibility_pharmacist(fresh_state):
     assert fhir.get_patient(_mrn(store, pid)).name
     assert fhir.get_medications(enc) is not None and fhir.get_home_meds(_mrn(store, pid)) is not None
     labs = fhir.get_observations(enc)
-    assert all(o.category[0].coding[0].code == "laboratory" for o in labs)  # lab results only, no vital signs
-    for refused in (lambda: fhir.get_orders(enc), lambda: fhir.read("Condition", "x"), lambda: fhir.get_consents(pid)):
+    assert all(o.category[0].coding[0].code == "laboratory" for o in labs)  # lab results, no vital signs
+    # WP6: what dosing and reconciliation need besides labs: body weight (not the vital-sign panels) and diagnoses
+    weights = fhir.get_patient_resources("Observation", pid, codes=["29463-7"])
+    assert weights and all(o.code.coding[0].code == "29463-7" for o in weights)
+    assert not fhir.get_patient_resources("Observation", pid, codes=["85353-1"])
+    assert fhir.get_patient_resources("Condition", pid)
+    for refused in (lambda: fhir.get_orders(enc), lambda: fhir.read("Procedure", "x"), lambda: fhir.get_consents(pid)):
         with pytest.raises(FhirAccessDenied):
             refused()
     medrec_enc, _ = _doc_patient(store, MEDREC)
@@ -237,6 +242,8 @@ def test_sign_pharmacist(fresh_state):
         gw(store, Role.PHARMACIST, "signing").sign_document(MEDREC)  # the same role twice
     second = gw(store, Role.PHYSICIAN, "signing").sign_document(MEDREC)
     assert (second.doc_status, second.signed_roles) == ("final", ["pharmacist", "physician"])
+    doc = store.fhir.read("DocumentReference", MEDREC)  # the pharmacist authenticates (7.2); the physician co-signed
+    assert doc["authenticator"]["reference"] == f"Practitioner/{_user(store, Role.PHARMACIST).practitioner_id}"
     with pytest.raises(FhirAccessDenied):
         gw(store, Role.PHARMACIST, "signing").sign_document(DISCHARGE)
 

@@ -506,6 +506,22 @@ class FhirGateway:
         """Any readable resource type recorded on the encounter (conditions, procedures, flags, ...), oldest first."""
         return [validate(r) for r in self._encounter_items(resource_type, encounter_id)]
 
+    def get_patient_resources(self, resource_type: str, patient_id: str, *, codes: list[str] | None = None,
+                              status: str | list[str] | None = None, since: datetime | None = None,
+                              order: str | None = "date") -> list[FhirModel]:
+        """A patient's resources of one type across all their encounters (allergies, the problem list, labs from
+        the last clinic visit, ...), oldest first; `codes` as in get_observations. Unit scope and break-glass apply
+        as for any patient read; one audit record."""
+        self._require_type("read", resource_type, patient_id)
+        self._require_patient("read", resource_type, patient_id, patient_id)
+        found = self.backend.search(resource_type, patient=patient_id, status=status, date_from=since, order=order)
+        if codes:
+            wanted = set(codes)
+            found = [r for r in found if _codes(r) & wanted]
+        self._audit("read", resource_type, patient_id, patient=patient_id,
+                    detail=f"codes {', '.join(codes)}" if codes else None)
+        return [validate(r) for r in self._visible(found)]
+
     def get_consents(self, patient_id: str) -> list[dict]:
         """The patient's Consent resources (plain dicts; app/ehr/consent.py reads them)."""
         self._require_type("read", "Consent", patient_id)

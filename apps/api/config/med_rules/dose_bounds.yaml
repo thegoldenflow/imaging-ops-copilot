@@ -1,0 +1,113 @@
+# Dose bounds by age and weight (docs/SPEC-hospital.md 7.2, rule "dose bounds"): an order's single dose, daily dose
+# (dose x times a day; for an as-needed order the most it allows) and weekly dose are checked against the limits for
+# the patient's age and weight. Loaded by app/modules/med_safety/rules.py.
+#
+# DEMO SIMPLIFICATION, NOT CLINICAL GUIDANCE. The limits are rounded paraphrases of the labelled adult maximums,
+# written for this demo; every entry names the public source it paraphrases (`source`). Production replaces this
+# file with a commercial drug knowledge base (for example FDB or Lexicomp) maintained by pharmacy (see README.md).
+#
+# Limits (all optional, in `unit`):
+#   adult:      min_dose, max_dose, max_daily, max_weekly
+#   older:      age_from, and tighter max_dose / max_daily from that age
+#   low_weight: below_kg, and max_dose / max_daily, or max_dose_per_kg / max_daily_per_kg, under that weight
+#   per_kg:     min_dose_per_kg / max_dose_per_kg for weight-based dosing (needs a recorded weight)
+# severity: of a dose above a limit (a dose below the minimum is moderate).
+drugs:
+  - rxcui: "161"
+    name: acetaminophen
+    unit: mg
+    adult: {max_dose: 1000, max_daily: 4000}
+    low_weight: {below_kg: 50, max_dose_per_kg: 15, max_daily_per_kg: 75}
+    severity: major
+    source: FDA prescribing information, acetaminophen injection (Ofirmev), Dosage - adults under 50 kg; FDA OTC acetaminophen labelling, 4 g daily limit (public domain)
+  - rxcui: "35827"
+    name: ketorolac
+    unit: mg
+    adult: {max_dose: 30, max_daily: 120}
+    older: {age_from: 65, max_dose: 15, max_daily: 60}
+    low_weight: {below_kg: 50, max_dose: 15, max_daily: 60}
+    severity: major
+    source: FDA prescribing information, ketorolac tromethamine, Dosage - patients 65 or older, under 50 kg (public domain)
+  - rxcui: "5640"
+    name: ibuprofen
+    unit: mg
+    adult: {max_dose: 800, max_daily: 3200}
+    severity: major
+    source: FDA prescribing information, ibuprofen (Motrin), Dosage and Administration (public domain)
+  - rxcui: "7258"
+    name: naproxen
+    unit: mg
+    adult: {max_dose: 500, max_daily: 1500}
+    severity: major
+    source: FDA prescribing information, naproxen (Naprosyn), Dosage and Administration (public domain)
+  - rxcui: "140587"
+    name: celecoxib
+    unit: mg
+    adult: {max_dose: 400, max_daily: 400}
+    severity: moderate
+    source: FDA prescribing information, celecoxib (Celebrex), Dosage and Administration (public domain)
+  - rxcui: "67108"
+    name: enoxaparin
+    unit: mg
+    adult: {min_dose: 20}
+    per_kg: {max_dose_per_kg: 1.5}
+    severity: major
+    source: FDA prescribing information, enoxaparin sodium (Lovenox), Dosage - 1 mg/kg twice daily or 1.5 mg/kg once daily (public domain)
+  - rxcui: "11124"
+    name: vancomycin
+    unit: mg
+    adult: {max_dose: 2000}
+    per_kg: {min_dose_per_kg: 10, max_dose_per_kg: 20}
+    severity: moderate
+    source: FDA prescribing information, vancomycin injection, Dosage; ASHP/IDSA 2020 vancomycin consensus guideline, 15-20 mg/kg per dose (reference)
+  - rxcui: "6851"
+    name: methotrexate
+    unit: mg
+    adult: {max_weekly: 25}
+    severity: major
+    source: FDA prescribing information, methotrexate tablets, Boxed warning - weekly dosing, fatal daily-dosing errors (public domain)
+  - rxcui: "2683"
+    name: colchicine
+    unit: mg
+    adult: {max_daily: 1.2}
+    severity: major
+    source: FDA prescribing information, colchicine (Colcrys), Gout prophylaxis dosing (public domain)
+  - rxcui: "6470"
+    name: lorazepam
+    unit: mg
+    adult: {max_daily: 10}
+    older: {age_from: 65, max_dose: 1, max_daily: 2}
+    severity: moderate
+    source: FDA prescribing information, lorazepam (Ativan), Dosage - elderly or debilitated patients (public domain)
+  - rxcui: "3407"
+    name: digoxin
+    unit: mg
+    adult: {max_daily: 0.5}
+    older: {age_from: 70, max_daily: 0.125}
+    severity: major
+    source: FDA prescribing information, digoxin (Lanoxin), Dosage; AGS Beers Criteria, digoxin above 0.125 mg a day (reference)
+  - rxcui: "10689"
+    name: tramadol
+    unit: mg
+    adult: {max_dose: 100, max_daily: 400}
+    older: {age_from: 75, max_daily: 300}
+    severity: major
+    source: FDA prescribing information, tramadol (Ultram), Dosage - patients over 75 (public domain)
+  - rxcui: "6809"
+    name: metformin
+    unit: mg
+    adult: {max_daily: 2550}
+    severity: moderate
+    source: FDA prescribing information, metformin hydrochloride (Glucophage), Dosage and Administration (public domain)
+  - rxcui: "519"
+    name: allopurinol
+    unit: mg
+    adult: {max_daily: 800}
+    severity: moderate
+    source: FDA prescribing information, allopurinol (Zyloprim), Dosage and Administration (public domain)
+  - rxcui: "25480"
+    name: gabapentin
+    unit: mg
+    adult: {max_daily: 3600}
+    severity: moderate
+    source: FDA prescribing information, gabapentin (Neurontin), Dosage and Administration (public domain)

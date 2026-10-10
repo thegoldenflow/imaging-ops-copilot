@@ -118,7 +118,10 @@ def test_discharge_frees_the_bed_through_housekeeping(fresh_state):
     assert enc["status"] == "finished" and enc["hospitalization"]["dischargeDisposition"]
     assert all(loc["status"] == "completed" for loc in enc["location"])
     assert fresh_state.fhir.read("Location", bed)["operationalStatus"]["code"] == "K"
-    assert not fresh_state.fhir.search("MedicationRequest", encounter=stay, status="active")
+    # inpatient orders end; discharge prescriptions (intent plan, WP6) go home with the patient
+    assert not fresh_state.fhir.search("MedicationRequest", encounter=stay, status="active", category="order")
+    assert all(m["intent"] == "plan" for m in fresh_state.fhir.search("MedicationRequest", encounter=stay,
+                                                                       status="active"))
     simulator.advance_by(fresh_state, 180)
     assert fresh_state.fhir.read("Location", bed)["operationalStatus"]["code"] in ("U", "O")  # cleaned (maybe reused)
 

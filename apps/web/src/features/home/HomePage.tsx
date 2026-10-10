@@ -164,9 +164,9 @@ const HOSPITAL: Step[] = [
     role: "physician", userId: "U-DOC-09", to: "/hospital/patients", system: "Break-glass",
   },
   {
-    title: "The pharmacist co-signs the medication reconciliation",
-    detail: "Pharmacists see medication-related records hospital-wide, no clinical notes. The med rec draft needs the pharmacist and a physician; one signature leaves it a draft.",
-    role: "pharmacist", userId: "U-PHAR-01", to: "/hospital/patients", system: "Co-signature",
+    title: "The pharmacist works the medication safety queue",
+    detail: "Rules flag every new order first (allergies block; interactions, renal dosing, dose bounds, repeat tests), the AI comments with its confidence and evidence. A hip-fracture patient on warfarin got naproxen: a major interaction; reconcile the admission, handle every discrepancy, sign. A physician co-signs.",
+    role: "pharmacist", userId: "U-PHAR-01", to: "/med-safety", system: "Medication safety",
   },
   {
     title: "Registration records a consent change",

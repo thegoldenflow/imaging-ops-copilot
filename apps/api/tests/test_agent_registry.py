@@ -73,10 +73,14 @@ def test_every_existing_agent_is_registered_with_its_prompt_version():
                    TRIAGE_PROMPT):
         spec = agents[prompt.name]
         assert spec.kind == "embedded_agent" and spec.prompt_version == prompt.version, prompt.name
-    # the 7.2-7.4 agents are registered with their WP4 rights; their code comes in WP6-WP8
-    for name in ("discharge_summary", "patient_instructions", "nursing_handoff", "medication_reconciliation",
-                 "order_review", "followup_calls"):
+    # the 7.3-7.4 agents are registered with their WP4 rights; their code comes in WP7-WP8
+    for name in ("discharge_summary", "patient_instructions", "nursing_handoff", "followup_calls"):
         assert agents[name].kind == "runtime_agent" and agents[name].deployment_status == "dev", name
+    # WP6 (7.2): the order review's commentary and the reconciliation's indication judgements
+    for name, module in (("order_review", "review_agent"), ("medication_reconciliation", "medrec_agent")):
+        spec = agents[name]
+        assert spec.entrypoint == f"app.modules.med_safety.{module}" and spec.prompt_version == f"{name}@1", name
+        assert spec.deployment_status == "demo" and spec.eval_status.status == "pending", name
     # the runtime agents with code: the reference agent and the Control Tower's narrator (WP5)
     assert agents["patient_message_triage"].entrypoint == "app.agents.library.patient_message_triage"
     tower = agents["control_tower"]

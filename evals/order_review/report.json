@@ -1,0 +1,1808 @@
+{
+  "metrics": {
+    "cases": 60,
+    "schema_validity": 1.0,
+    "grounding_rate": 1.0,
+    "precision": 0.9455,
+    "recall": 0.8966,
+    "tp": 52,
+    "fp": 3,
+    "fn": 6,
+    "latency_p50_ms": 452,
+    "latency_p95_ms": 1030,
+    "new_without_indication": {
+      "cases": 44,
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "flagged": 8,
+      "labelled_without_indication": 8,
+      "decided_by": {
+        "ai": 35,
+        "rule": 9
+      }
+    }
+  },
+  "per_type": {
+    "age_related": {
+      "tp": 8,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "allergy": {
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "dose": {
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "duplicate_test": {
+      "tp": 3,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.75,
+      "recall": 1.0
+    },
+    "duplicate_therapy": {
+      "tp": 4,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.8,
+      "recall": 1.0
+    },
+    "indication": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 4,
+      "precision": 1.0,
+      "recall": 0.3333
+    },
+    "interaction": {
+      "tp": 14,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "monitoring": {
+      "tp": 7,
+      "fp": 0,
+      "fn": 2,
+      "precision": 1.0,
+      "recall": 0.7778
+    },
+    "renal": {
+      "tp": 5,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.8333,
+      "recall": 1.0
+    }
+  },
+  "gates": {
+    "precision": 0.8,
+    "recall": 0.85,
+    "schema_validity": 1.0,
+    "grounding_rate": 1.0
+  },
+  "passed": true,
+  "results": [
+    {
+      "id": "or-001",
+      "title": "Warfarin at home, naproxen added after a hip fracture, INR 3.8",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "age_related",
+        "interaction",
+        "monitoring"
+      ],
+      "predicted": [
+        "age_related",
+        "interaction",
+        "monitoring"
+      ],
+      "true_positive": [
+        "age_related",
+        "interaction",
+        "monitoring"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 3280,
+      "evidence_refs": 4,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-002",
+      "title": "Warfarin and a new ibuprofen for back pain",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "interaction"
+      ],
+      "predicted": [
+        "interaction"
+      ],
+      "true_positive": [
+        "interaction"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 469,
+      "evidence_refs": 2,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-003",
+      "title": "Apixaban and intravenous ketorolac after appendicitis",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "interaction"
+      ],
+      "predicted": [
+        "interaction"
+      ],
+      "true_positive": [
+        "interaction"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 390,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-004",
+      "title": "Enoxaparin prophylaxis and celecoxib for osteoarthritis at 70",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "age_related",
+        "interaction"
+      ],
+      "predicted": [
+        "age_related",
+        "interaction"
+      ],
+      "true_positive": [
+        "age_related",
+        "interaction"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 375,
+      "evidence_refs": 2,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-005",
+      "title": "Penicillin allergy, piperacillin for sepsis",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "allergy"
+      ],
+      "expected": [
+        "allergy"
+      ],
+      "predicted": [
+        "allergy"
+      ],
+      "true_positive": [
+        "allergy"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 593,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "rule",
+        "confidence": null
+      }
+    },
+    {
+      "id": "or-006",
+      "title": "Aspirin allergy (NSAID class), ibuprofen for a fracture",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "allergy"
+      ],
+      "expected": [
+        "allergy"
+      ],
+      "predicted": [
+        "allergy"
+      ],
+      "true_positive": [
+        "allergy"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 250,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-007",
+      "title": "Ceftriaxone allergy (cephalosporin), cefazolin for cellulitis",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "allergy"
+      ],
+      "expected": [
+        "allergy"
+      ],
+      "predicted": [
+        "allergy"
+      ],
+      "true_positive": [
+        "allergy"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 405,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "rule",
+        "confidence": null
+      }
+    },
+    {
+      "id": "or-008",
+      "title": "Morphine allergy (opioid), hydromorphone after a hip fracture",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "allergy"
+      ],
+      "expected": [
+        "allergy"
+      ],
+      "predicted": [
+        "allergy"
+      ],
+      "true_positive": [
+        "allergy"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 328,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-009",
+      "title": "Metformin continued with an eGFR of 22",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "renal_dosing"
+      ],
+      "expected": [
+        "renal"
+      ],
+      "predicted": [
+        "renal"
+      ],
+      "true_positive": [
+        "renal"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 719,
+      "evidence_refs": 1
+    },
+    {
+      "id": "or-010",
+      "title": "Gabapentin started with an eGFR of 25 and no neuropathic diagnosis",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "renal_dosing"
+      ],
+      "expected": [
+        "indication",
+        "renal"
+      ],
+      "predicted": [
+        "renal"
+      ],
+      "true_positive": [
+        "renal"
+      ],
+      "false_positive": [],
+      "false_negative": [
+        "indication"
+      ],
+      "latency_ms": 360,
+      "evidence_refs": 1,
+      "indication": {
+        "label": false,
+        "predicted": false,
+        "type": "new_without_indication",
+        "decided_by": "ai",
+        "confidence": 0.8
+      }
+    },
+    {
+      "id": "or-011",
+      "title": "Nitrofurantoin for a urinary infection with an eGFR of 18",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "renal_dosing"
+      ],
+      "expected": [
+        "renal"
+      ],
+      "predicted": [
+        "renal"
+      ],
+      "true_positive": [
+        "renal"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 327,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "rule",
+        "confidence": null
+      }
+    },
+    {
+      "id": "or-012",
+      "title": "Enoxaparin 40 mg after a hip fracture with an eGFR of 28",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "renal_dosing"
+      ],
+      "expected": [
+        "renal"
+      ],
+      "predicted": [
+        "renal"
+      ],
+      "true_positive": [
+        "renal"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 265,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.78
+      }
+    },
+    {
+      "id": "or-013",
+      "title": "Metformin continued with an eGFR of 45",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [
+        "renal"
+      ],
+      "true_positive": [],
+      "false_positive": [
+        "renal"
+      ],
+      "false_negative": [],
+      "latency_ms": 265,
+      "evidence_refs": 1
+    },
+    {
+      "id": "or-014",
+      "title": "Tramadol 100 mg four times a day at 80",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "dose_bounds"
+      ],
+      "expected": [
+        "dose"
+      ],
+      "predicted": [
+        "dose"
+      ],
+      "true_positive": [
+        "dose"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 329,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-015",
+      "title": "Acetaminophen 1 g four times a day at 44 kg",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "dose_bounds"
+      ],
+      "expected": [
+        "dose"
+      ],
+      "predicted": [
+        "dose"
+      ],
+      "true_positive": [
+        "dose"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 281,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-016",
+      "title": "Ketorolac 30 mg every 6 hours at 72",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "dose_bounds"
+      ],
+      "expected": [
+        "age_related",
+        "dose"
+      ],
+      "predicted": [
+        "age_related",
+        "dose"
+      ],
+      "true_positive": [
+        "age_related",
+        "dose"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 250,
+      "evidence_refs": 2,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-017",
+      "title": "Methotrexate 15 mg ordered daily for rheumatoid arthritis",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "dose_bounds"
+      ],
+      "expected": [
+        "dose"
+      ],
+      "predicted": [
+        "dose"
+      ],
+      "true_positive": [
+        "dose"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 280,
+      "evidence_refs": 1
+    },
+    {
+      "id": "or-018",
+      "title": "Vancomycin 1 g twice a day at 110 kg",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "dose_bounds"
+      ],
+      "expected": [
+        "dose",
+        "monitoring"
+      ],
+      "predicted": [
+        "dose",
+        "monitoring"
+      ],
+      "true_positive": [
+        "dose",
+        "monitoring"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 250,
+      "evidence_refs": 2,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "rule",
+        "confidence": null
+      }
+    },
+    {
+      "id": "or-019",
+      "title": "Lorazepam started for sleep at 84",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [
+        "age_related",
+        "indication"
+      ],
+      "predicted": [
+        "age_related"
+      ],
+      "true_positive": [
+        "age_related"
+      ],
+      "false_positive": [],
+      "false_negative": [
+        "indication"
+      ],
+      "latency_ms": 265,
+      "evidence_refs": 1,
+      "indication": {
+        "label": false,
+        "predicted": false,
+        "type": "new_without_indication",
+        "decided_by": "ai",
+        "confidence": 0.8
+      }
+    },
+    {
+      "id": "or-020",
+      "title": "Quetiapine started at 88 with Alzheimer's disease",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [
+        "age_related"
+      ],
+      "predicted": [
+        "age_related"
+      ],
+      "true_positive": [
+        "age_related"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 717,
+      "evidence_refs": 1,
+      "indication": {
+        "label": false,
+        "predicted": false,
+        "type": "new_without_indication",
+        "decided_by": "ai",
+        "confidence": 0.6
+      }
+    },
+    {
+      "id": "or-021",
+      "title": "Tramadol for back pain on sertraline",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "interaction"
+      ],
+      "predicted": [
+        "interaction"
+      ],
+      "true_positive": [
+        "interaction"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 625,
+      "evidence_refs": 2,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-022",
+      "title": "Lorazepam added to morphine at 70",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "age_related",
+        "indication",
+        "interaction"
+      ],
+      "predicted": [
+        "age_related",
+        "interaction"
+      ],
+      "true_positive": [
+        "age_related",
+        "interaction"
+      ],
+      "false_positive": [],
+      "false_negative": [
+        "indication"
+      ],
+      "latency_ms": 1234,
+      "evidence_refs": 2,
+      "indication": {
+        "label": false,
+        "predicted": false,
+        "type": "new_without_indication",
+        "decided_by": "ai",
+        "confidence": 0.8
+      }
+    },
+    {
+      "id": "or-023",
+      "title": "Spironolactone added to lisinopril and potassium in heart failure, K 5.4",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "interaction",
+        "monitoring"
+      ],
+      "predicted": [
+        "interaction",
+        "monitoring"
+      ],
+      "true_positive": [
+        "interaction",
+        "monitoring"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 687,
+      "evidence_refs": 4,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-024",
+      "title": "Potassium chloride added to spironolactone, K 4.0",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "indication",
+        "interaction"
+      ],
+      "predicted": [
+        "interaction"
+      ],
+      "true_positive": [
+        "interaction"
+      ],
+      "false_positive": [],
+      "false_negative": [
+        "indication"
+      ],
+      "latency_ms": 296,
+      "evidence_refs": 1,
+      "indication": {
+        "label": false,
+        "predicted": false,
+        "type": "new_without_indication",
+        "decided_by": "ai",
+        "confidence": 0.8
+      }
+    },
+    {
+      "id": "or-025",
+      "title": "Clarithromycin for pneumonia on simvastatin",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "interaction"
+      ],
+      "predicted": [
+        "interaction"
+      ],
+      "true_positive": [
+        "interaction"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 264,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "rule",
+        "confidence": null
+      }
+    },
+    {
+      "id": "or-026",
+      "title": "Amiodarone started on digoxin",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "interaction",
+        "monitoring"
+      ],
+      "predicted": [
+        "interaction"
+      ],
+      "true_positive": [
+        "interaction"
+      ],
+      "false_positive": [],
+      "false_negative": [
+        "monitoring"
+      ],
+      "latency_ms": 264,
+      "evidence_refs": 2,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-027",
+      "title": "Ibuprofen for back pain on lithium",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "interaction"
+      ],
+      "predicted": [
+        "interaction"
+      ],
+      "true_positive": [
+        "interaction"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 328,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-028",
+      "title": "Sulfamethoxazole for a urinary infection on methotrexate",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "interaction"
+      ],
+      "predicted": [
+        "interaction"
+      ],
+      "true_positive": [
+        "interaction"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 280,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "rule",
+        "confidence": null
+      }
+    },
+    {
+      "id": "or-029",
+      "title": "Omeprazole added to clopidogrel",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "interaction"
+      ],
+      "predicted": [
+        "interaction"
+      ],
+      "true_positive": [
+        "interaction"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 250,
+      "evidence_refs": 2,
+      "indication": {
+        "label": false,
+        "predicted": false,
+        "type": "new_without_indication",
+        "decided_by": "ai",
+        "confidence": 0.8
+      }
+    },
+    {
+      "id": "or-030",
+      "title": "Pantoprazole started with nothing to protect against",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [
+        "indication"
+      ],
+      "predicted": [
+        "indication"
+      ],
+      "true_positive": [
+        "indication"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 280,
+      "evidence_refs": 1,
+      "indication": {
+        "label": false,
+        "predicted": false,
+        "type": "new_without_indication",
+        "decided_by": "ai",
+        "confidence": 0.8
+      }
+    },
+    {
+      "id": "or-031",
+      "title": "Ceftriaxone for pneumonia",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 703,
+      "evidence_refs": 0,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "rule",
+        "confidence": null
+      }
+    },
+    {
+      "id": "or-032",
+      "title": "Acetaminophen 1 g four times a day at 70 kg after a fracture",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 500,
+      "evidence_refs": 0,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-033",
+      "title": "Atorvastatin after a myocardial infarction",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 500,
+      "evidence_refs": 0,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-034",
+      "title": "Amlodipine continued for hypertension",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 594,
+      "evidence_refs": 0
+    },
+    {
+      "id": "or-035",
+      "title": "Metoprolol continued for atrial fibrillation",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 329,
+      "evidence_refs": 0
+    },
+    {
+      "id": "or-036",
+      "title": "Insulin glargine continued for diabetes",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 577,
+      "evidence_refs": 0
+    },
+    {
+      "id": "or-037",
+      "title": "Enoxaparin 40 mg after a hip fracture, normal kidneys",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 452,
+      "evidence_refs": 0,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.78
+      }
+    },
+    {
+      "id": "or-038",
+      "title": "Hydromorphone as needed after a fracture at 50",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 515,
+      "evidence_refs": 0,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-039",
+      "title": "Ondansetron as needed after an appendectomy",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 422,
+      "evidence_refs": 0,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-040",
+      "title": "Salbutamol in a COPD exacerbation",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 1030,
+      "evidence_refs": 0,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-041",
+      "title": "Simvastatin added to atorvastatin",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [
+        "duplicate_therapy"
+      ],
+      "predicted": [
+        "duplicate_therapy"
+      ],
+      "true_positive": [
+        "duplicate_therapy"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 1045,
+      "evidence_refs": 2,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-042",
+      "title": "Hydromorphone added to morphine after a fracture",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [
+        "duplicate_therapy"
+      ],
+      "predicted": [
+        "duplicate_therapy"
+      ],
+      "true_positive": [
+        "duplicate_therapy"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 546,
+      "evidence_refs": 2,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-043",
+      "title": "Pantoprazole added to omeprazole",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [
+        "duplicate_therapy",
+        "indication"
+      ],
+      "predicted": [
+        "duplicate_therapy",
+        "indication"
+      ],
+      "true_positive": [
+        "duplicate_therapy",
+        "indication"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 515,
+      "evidence_refs": 3,
+      "indication": {
+        "label": false,
+        "predicted": false,
+        "type": "new_without_indication",
+        "decided_by": "ai",
+        "confidence": 0.8
+      }
+    },
+    {
+      "id": "or-044",
+      "title": "Enoxaparin bridging on warfarin, INR 1.6",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [
+        "duplicate_therapy"
+      ],
+      "predicted": [
+        "duplicate_therapy"
+      ],
+      "true_positive": [
+        "duplicate_therapy"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 625,
+      "evidence_refs": 2,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-045",
+      "title": "Clopidogrel added to aspirin after a myocardial infarction",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [
+        "duplicate_therapy"
+      ],
+      "true_positive": [],
+      "false_positive": [
+        "duplicate_therapy"
+      ],
+      "false_negative": [],
+      "latency_ms": 485,
+      "evidence_refs": 2,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-046",
+      "title": "Warfarin continued, INR 2.4",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 280,
+      "evidence_refs": 0
+    },
+    {
+      "id": "or-047",
+      "title": "Warfarin continued with no INR on record",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [
+        "monitoring"
+      ],
+      "predicted": [
+        "monitoring"
+      ],
+      "true_positive": [
+        "monitoring"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 422,
+      "evidence_refs": 1
+    },
+    {
+      "id": "or-048",
+      "title": "Ciprofloxacin for a urinary infection on warfarin, no recent INR",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "interaction"
+      ],
+      "expected": [
+        "interaction",
+        "monitoring"
+      ],
+      "predicted": [
+        "interaction"
+      ],
+      "true_positive": [
+        "interaction"
+      ],
+      "false_positive": [],
+      "false_negative": [
+        "monitoring"
+      ],
+      "latency_ms": 296,
+      "evidence_refs": 2,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "rule",
+        "confidence": null
+      }
+    },
+    {
+      "id": "or-049",
+      "title": "Lisinopril started with potassium 5.6",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [
+        "monitoring"
+      ],
+      "predicted": [
+        "monitoring"
+      ],
+      "true_positive": [
+        "monitoring"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 421,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-050",
+      "title": "Vancomycin 1.5 g at 80 kg in sepsis",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [
+        "monitoring"
+      ],
+      "predicted": [
+        "monitoring"
+      ],
+      "true_positive": [
+        "monitoring"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 639,
+      "evidence_refs": 1,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "rule",
+        "confidence": null
+      }
+    },
+    {
+      "id": "or-051",
+      "title": "Digoxin 0.125 mg continued at 75",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [
+        "monitoring"
+      ],
+      "predicted": [
+        "monitoring"
+      ],
+      "true_positive": [
+        "monitoring"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 452,
+      "evidence_refs": 1
+    },
+    {
+      "id": "or-052",
+      "title": "Glyburide continued at 79",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [
+        "age_related"
+      ],
+      "predicted": [
+        "age_related"
+      ],
+      "true_positive": [
+        "age_related"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 890,
+      "evidence_refs": 1
+    },
+    {
+      "id": "or-053",
+      "title": "Naproxen for back pain at 40",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 734,
+      "evidence_refs": 0,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-054",
+      "title": "Ibuprofen for osteoarthritis at 82 with an eGFR of 55",
+      "kind": "medication",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [
+        "age_related",
+        "renal"
+      ],
+      "predicted": [
+        "age_related",
+        "renal"
+      ],
+      "true_positive": [
+        "age_related",
+        "renal"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 719,
+      "evidence_refs": 2,
+      "indication": {
+        "label": true,
+        "predicted": true,
+        "type": "new",
+        "decided_by": "ai",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "or-055",
+      "title": "Blood count repeated a day after the last one",
+      "kind": "service",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "duplicate_test"
+      ],
+      "expected": [
+        "duplicate_test"
+      ],
+      "predicted": [
+        "duplicate_test"
+      ],
+      "true_positive": [
+        "duplicate_test"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 875,
+      "evidence_refs": 2
+    },
+    {
+      "id": "or-056",
+      "title": "Serial troponin three hours after the first",
+      "kind": "service",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "duplicate_test"
+      ],
+      "expected": [],
+      "predicted": [
+        "duplicate_test"
+      ],
+      "true_positive": [],
+      "false_positive": [
+        "duplicate_test"
+      ],
+      "false_negative": [],
+      "latency_ms": 655,
+      "evidence_refs": 2
+    },
+    {
+      "id": "or-057",
+      "title": "Creatinine repeated after 80 hours",
+      "kind": "service",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 609,
+      "evidence_refs": 0
+    },
+    {
+      "id": "or-058",
+      "title": "Chest X-ray repeated after 30 hours",
+      "kind": "service",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "duplicate_test"
+      ],
+      "expected": [
+        "duplicate_test"
+      ],
+      "predicted": [
+        "duplicate_test"
+      ],
+      "true_positive": [
+        "duplicate_test"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 1000,
+      "evidence_refs": 2
+    },
+    {
+      "id": "or-059",
+      "title": "Potassium repeated while the first is still pending",
+      "kind": "service",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [],
+      "expected": [],
+      "predicted": [],
+      "true_positive": [],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 969,
+      "evidence_refs": 0
+    },
+    {
+      "id": "or-060",
+      "title": "Hemoglobin repeated after 50 hours in a stable patient",
+      "kind": "service",
+      "status": "done",
+      "schema_valid": true,
+      "grounded": true,
+      "bad_refs": [],
+      "rules": [
+        "duplicate_test"
+      ],
+      "expected": [
+        "duplicate_test"
+      ],
+      "predicted": [
+        "duplicate_test"
+      ],
+      "true_positive": [
+        "duplicate_test"
+      ],
+      "false_positive": [],
+      "false_negative": [],
+      "latency_ms": 389,
+      "evidence_refs": 2
+    }
+  ],
+  "seconds": 58.6,
+  "mode": "mock",
+  "run_at": "2026-10-09T19:50:53"
+}

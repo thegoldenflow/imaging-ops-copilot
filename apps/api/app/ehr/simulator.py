@@ -674,8 +674,8 @@ class _Run:
         for cond in self.fhir.search("Condition", encounter=s.id, status="active"):
             cond["clinicalStatus"] = C.concept(C.CONDITION_CLINICAL, "resolved")
             self._save(cond)
-        for med in self.fhir.search("MedicationRequest", encounter=s.id, status="active"):
-            med["status"] = "completed"
+        for med in self.fhir.search("MedicationRequest", encounter=s.id, status="active", category="order"):
+            med["status"] = "completed"  # inpatient orders end; discharge prescriptions (intent plan) go home
             self._save(med)
         for flag in self.fhir.search("Flag", encounter=s.id, status="active"):
             flag["status"] = "inactive"

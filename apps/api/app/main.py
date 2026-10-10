@@ -40,6 +40,8 @@ from app.modules.inspection.router import router as inspection_router
 from app.modules.clinical_kg.router import router as clinical_kg_router
 from app.modules.control_tower import service as control_tower
 from app.modules.control_tower.router import router as control_tower_router
+from app.modules.med_safety import service as med_safety
+from app.modules.med_safety.router import router as med_safety_router
 from app.modules.inventory.router import router as inventory_router
 from app.modules.mri_safety.router import router as mri_router
 from app.modules.peer_review import service as peer_review
@@ -114,7 +116,8 @@ def _drain_events() -> None:
 
 async def _hospital_loop() -> None:
     """Moves the hospital clock while the day simulator runs, delivers the domain events it published to the
-    subscribers, then refreshes the Control Tower (boards and exception stream; a no-op when nothing changed).
+    subscribers, then refreshes the Control Tower (boards and exception stream) and sweeps new orders and stays into
+    the medication-safety queue (each a no-op when nothing changed).
     Every second (the time the steps took counts towards it), so a running simulation reaches the screens quickly."""
     loop = asyncio.get_running_loop()
     while True:
@@ -122,6 +125,7 @@ async def _hospital_loop() -> None:
         await asyncio.to_thread(_step, "day simulator", simulator.tick)
         await asyncio.to_thread(_drain_events)
         await asyncio.to_thread(_step, "control tower", control_tower.refresh_step)
+        await asyncio.to_thread(_step, "medication safety intake", med_safety.intake_step)
         await asyncio.sleep(max(0.1, 1 - (loop.time() - started)))
 
 
@@ -149,11 +153,13 @@ async def _workflow_worker() -> None:
 
 
 async def _narrator_loop() -> None:
-    """Writes the narrative and recommended actions of new Control Tower exceptions (a model call each), apart
-    from the hospital loop so a slow model never delays the boards."""
+    """Writes the narrative and recommended actions of new Control Tower exceptions, then the AI commentary of
+    order reviews and the indication judgements of medication reconciliations (a model call each), apart from the
+    hospital loop so a slow model never delays the boards."""
     while True:
         await asyncio.sleep(2)
         await asyncio.to_thread(_step, "control tower narration", control_tower.narrate_step)
+        await asyncio.to_thread(_step, "medication safety AI", med_safety.ai_step)
 
 
 @contextlib.asynccontextmanager
@@ -211,6 +217,7 @@ app.include_router(platform_router)
 app.include_router(agents_router)
 app.include_router(control_tower_router)
 app.include_router(workflows_router)
+app.include_router(med_safety_router)
 
 
 @app.exception_handler(FhirAccessDenied)

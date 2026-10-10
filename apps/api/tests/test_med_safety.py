@@ -1,0 +1,403 @@
+"""WP6 (spec 7.2): orders and medication safety end to end on the seeded hospital.
+
+The generator plants the 8.2 case (warfarin plus a new naproxen, a home antihypertensive missed at admission), a
+blocking allergy, renal dosing, dose bounds, a duplicate test and a Medicine A admission reconciliation, and writes
+discharge prescriptions for the stays leaving within 24 hours (app/ehr/seed/medsafety.py). Covered here: the
+intake and the rules on real FHIR data, the AI commentary (schema, evidence, queue Task, consent, prod mode), the
+decisions, admission and discharge reconciliation through signing and co-signing, the discharge medication table
+interface for 7.3, the workbench API and its RBAC.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from app.agents import registry
+from app.agents import trace as traces
+from app.core.models import Role
+from app.ehr import consent, simulator
+from app.ehr.clock import hospital_now
+from app.ehr.gateway import Actor, FhirGateway, LocalBackend
+from app.fhir.dt import parse, ref_id
+from app.modules.med_safety import discharge, review_agent, service as S
+from app.modules.med_safety.models import reviews, session_key, sessions
+from app.modules.med_safety.reconcile import RecItem
+
+NAPROXEN = "MedicationRequest/medrx-ms-82-naproxen"
+PIPERACILLIN = "MedicationRequest/medrx-ms-allergy-piperacillin"
+KETOROLAC = "MedicationRequest/medrx-ms-renal-ketorolac"
+TRAMADOL = "MedicationRequest/medrx-ms-dose-tramadol"
+REPEAT_TEST = "ServiceRequest/ord-ms-duplicate"
+QUETIAPINE = "medrx-ms-medrec-quetiapine"
+
+
+@pytest.fixture(autouse=True)
+def fresh_intake():
+    """Every test starts from the rolled-back seed: forget which state the intake sweep last saw."""
+    S.reset_state()
+    yield
+    S.reset_state()
+
+
+def user(store, role: Role):
+    return next(u for u in store.staff.values() if u.role == role and u.demo_login)
+
+
+def encounter_of(store, rid: str, rtype: str = "MedicationRequest") -> str:
+    return ref_id(store.fhir.read(rtype, rid)["encounter"])
+
+
+def settled_session(store, encounter_id: str, kind: str):
+    session = S.reconcile(store, encounter_id, kind)
+    return S.settle(store, session.id)
+
+
+def handle_all(store, pharmacist, session, *, modify: str | None = None):
+    for item in [RecItem.model_validate(i) for i in session.items]:
+        if item.discrepancy and item.action is None:
+            if item.id == modify:
+                session = S.handle_item(store, pharmacist, session.id, item.id, "modify", "Resume at home dose",
+                                        change="Resume the home medication at the home dose")
+            else:
+                session = S.handle_item(store, pharmacist, session.id, item.id, "accept", "Intended by the team")
+    return session
+
+
+# ---------- demo data ----------
+
+
+def test_generator_plants_the_cases_and_discharge_prescriptions(fresh_state):
+    store = fresh_state
+    naproxen = store.fhir.read("MedicationRequest", "medrx-ms-82-naproxen")
+    stay = ref_id(naproxen["encounter"])
+    orders = {m["medicationCodeableConcept"]["coding"][0]["code"]
+              for m in store.fhir.search("MedicationRequest", encounter=stay)}
+    assert "11289" in orders  # warfarin continued
+    pid = ref_id(naproxen["subject"])
+    home = {m["medicationCodeableConcept"]["coding"][0]["code"]
+            for m in store.fhir.search("MedicationStatement", patient=pid, status="active")}
+    missed = [rx for rx in ("17767", "29046", "5487") if rx in home and rx not in orders]
+    assert "11289" in home and missed  # a home antihypertensive not ordered on admission
+    assert store.fhir.read("Observation", "obs-ms-82-inr")["valueQuantity"]["value"] == 3.8
+    for rid in ("medrx-ms-allergy-piperacillin", "medrx-ms-renal-ketorolac", "medrx-ms-dose-tramadol", QUETIAPINE):
+        assert store.fhir.read("MedicationRequest", rid)["status"] == "active"
+    assert store.fhir.read("ServiceRequest", "ord-ms-duplicate")["status"] == "active"
+    plans = store.fhir.search("MedicationRequest", category="plan")
+    assert plans and all(p["intent"] == "plan" and p["status"] == "active" and p["id"].startswith("medrx-dc-")
+                         and p["category"][0]["coding"][0]["code"] == "discharge" for p in plans)
+    stays = {ref_id(p["encounter"]) for p in plans}
+    units = {S._unit_of_encounter(store.fhir.read("Encounter", s)) for s in stays}
+    assert "MEDA" in units  # the demo physician co-signs one
+
+
+def test_discharge_keeps_the_discharge_prescriptions_active(fresh_state):
+    store = fresh_state
+    plans = store.fhir.search("MedicationRequest", category="plan")
+    stays = {ref_id(p["encounter"]) for p in plans}
+    upcoming = sorted((e for e in store.modules["hospital_plan"]["events"] if e["kind"] == "discharge"
+                       and e["stay"] in stays), key=lambda e: e["at"])
+    first = upcoming[0]
+    minutes = (parse(first["at"]) - hospital_now(store)).total_seconds() / 60 + 1
+    simulator.advance_by(store, minutes)
+    stay = first["stay"]
+    assert store.fhir.read("Encounter", stay)["status"] == "finished"
+    meds = store.fhir.search("MedicationRequest", encounter=stay)
+    assert all(m["status"] == "completed" for m in meds if m["intent"] == "order")
+    assert all(m["status"] == "active" for m in meds if m["intent"] == "plan")
+
+
+# ---------- intake and rules ----------
+
+
+def test_intake_reviews_new_orders_with_the_rules(fresh_state):
+    store = fresh_state
+    counts = S.intake(store, force=True)
+    assert counts["reviews"] > 50 and counts["admission"] > 5 and counts["discharge"] > 5
+    table = reviews(store)
+    naproxen = table.get(NAPROXEN)
+    assert naproxen.severity == "major" and not naproxen.blocking and naproxen.status == "pending"
+    assert any(f["entry"] == "interactions:warfarin-nsaid" for f in naproxen.findings)
+    allergy = table.get(PIPERACILLIN)
+    assert allergy.blocking and allergy.findings[0]["rule"] == "allergy"
+    assert table.get(KETOROLAC).findings[0]["rule"] == "renal_dosing"
+    assert any(f["rule"] == "dose_bounds" and "a day is above 300" in f["detail"] for f in table.get(TRAMADOL).findings)
+    repeat = table.get(REPEAT_TEST)
+    assert repeat.kind == "service" and repeat.reviewer_roles == ["physician"]
+    assert repeat.findings[0]["rule"] == "duplicate_test" and repeat.commentary_status == "pending"
+    # the review never changes the order
+    assert store.fhir.read("MedicationRequest", "medrx-ms-82-naproxen")["status"] == "active"
+    assert S.intake(store, force=True) == {"reviews": 0, "admission": 0, "discharge": 0}
+    assert S.intake(store) == {}  # nothing changed: the sweep is skipped
+
+
+def test_entry_points_are_idempotent(fresh_state):
+    store = fresh_state
+    first = S.review_order(store, NAPROXEN)
+    assert S.review_order(store, NAPROXEN).id == first.id
+    encounter = encounter_of(store, "medrx-ms-82-naproxen")
+    reviewed = S.review_encounter_orders(store, encounter)
+    assert first.id in {r.id for r in reviewed} and len({r.id for r in reviewed}) == len(reviewed)
+    session = S.reconcile(store, encounter, "admission")
+    assert S.reconcile(store, encounter, "admission").id == session.id
+    settled = S.settle(store, session.id)
+    assert S.settle(store, session.id).document_id == settled.document_id  # one draft record
+    docs = [d for d in store.fhir.search("DocumentReference", encounter=encounter, code="medrec")]
+    assert len(docs) == 1
+    with pytest.raises(ValueError):
+        S.review_order(store, "Observation/x")
+
+
+# ---------- the AI commentary ----------
+
+
+def test_ai_commentary_is_schema_valid_grounded_and_queued(fresh_state):
+    store = fresh_state
+    review = S.review_order(store, NAPROXEN)
+    review = S.comment(store, review.id)
+    assert review.commentary_status == "done" and not review.blocking  # the AI never blocks
+    commentary = review.commentary
+    review_agent.Commentary.model_validate({k: commentary[k] for k in ("concerns", "alternatives", "guideline_refs")})
+    assert commentary["concerns"] and commentary["unresolved_refs"] == []
+    refs = [r for c in commentary["concerns"] for r in c["evidence_refs"]]
+    assert refs and S.module_fhir().resolve_refs(refs) == set(refs)
+    assert commentary["guideline_refs"] and all(S.knowledge.resolve(g) for g in commentary["guideline_refs"])
+    assert all(0 <= c["confidence"] <= 1 for c in commentary["concerns"])
+    task = store.fhir.read("Task", review.review_task_id)
+    assert (task["intent"], task["status"], task["focus"]["reference"]) == ("proposal", "requested", NAPROXEN)
+    assert {c["coding"][0]["code"] for c in task["performerType"]} == {"pharmacist", "doctor"}
+    run = traces.run_of(task)
+    trace = traces.get(run)
+    assert trace.agent_id == "order_review" and trace.prompt_version == "order_review@1"
+    assert NAPROXEN in trace.input_refs and trace.provenance_id
+    assert store.fhir.read("Provenance", trace.provenance_id)["target"][0]["reference"] == f"Task/{task['id']}"
+
+
+def test_without_consent_or_in_prod_mode_the_rules_stand_alone(fresh_state):
+    store = fresh_state
+    S.intake(store, force=True)
+    fhir = FhirGateway(Actor.system("test"), "consent_management", LocalBackend(store))
+    flagged = [r for r in reviews(store).values() if r.kind == "medication" and r.findings]
+    without = next((r for r in flagged if consent.consent_status(fhir, r.patient_id)["ai_processing"] != "permit"), None)
+    if without is None:  # make one: the patient withdrew the AI-processing consent
+        without = flagged[0]
+        for c in store.fhir.search("Consent", patient=without.patient_id):
+            if c["category"][0]["coding"][0]["code"] == "ai_processing":
+                store.fhir.update({**c, "provision": {**c["provision"], "type": "deny"}})
+    review = S.comment(store, without.id)
+    assert review.commentary_status == "refused" and "consent" in review.commentary["reason"]
+    assert review.findings and review.status == "pending"  # the rule findings stand
+    other = next(r for r in flagged if r.id != without.id)
+    with registry.mode("prod"):
+        refused = S.comment(store, other.id)
+    assert refused.commentary_status == "refused" and refused.findings
+
+
+# ---------- decisions ----------
+
+
+def test_review_decisions_need_the_right_person_and_a_reason(fresh_state):
+    store = fresh_state
+    S.intake(store, force=True)
+    pharmacist, physician = user(store, Role.PHARMACIST), user(store, Role.PHYSICIAN)
+    allergy = reviews(store).get(PIPERACILLIN)
+    with pytest.raises(S.DecisionDenied, match="pharmacist"):
+        S.decide_review(store, physician, allergy.id, "accept_order", "Tolerated before")  # Medicine A, but blocking
+    with pytest.raises(S.DecisionProblem, match="reason"):
+        S.decide_review(store, pharmacist, allergy.id, "request_change", "no")
+    decided = S.decide_review(store, pharmacist, allergy.id, "request_change",
+                              "Anaphylaxis to penicillin: switch to a non-beta-lactam")
+    assert decided.status == "resolved" and decided.decision["change_task_id"]
+    task = store.fhir.read("Task", decided.decision["change_task_id"])
+    assert task["code"]["coding"][0]["code"] == "order-change-request"
+    assert task["performerType"][0]["coding"][0]["code"] == "doctor"
+    assert store.fhir.read("MedicationRequest", "medrx-ms-allergy-piperacillin")["status"] == "active"
+    event = [e for e in store.audit.events() if e.event_type == "approve"][-1]
+    assert event.user_id == pharmacist.id and event.module == "order_review"
+    with pytest.raises(S.DecisionProblem, match="already"):
+        S.decide_review(store, pharmacist, allergy.id, "accept_order", "Second thoughts")
+    # with AI commentary: the decision completes the ai-review Task
+    naproxen = S.comment(store, reviews(store).get(NAPROXEN).id)
+    decided = S.decide_review(store, pharmacist, naproxen.id, "request_change", "Stop naproxen; acetaminophen instead")
+    task = store.fhir.read("Task", naproxen.review_task_id)
+    assert task["status"] == "completed" and {o["valueString"] for o in task["output"]} >= {"approve", pharmacist.id}
+    assert traces.get(traces.run_of(task)).human_action["decision"] == "accept"
+    with pytest.raises(S.DecisionDenied):
+        S.decide_review(store, pharmacist, reviews(store).get(REPEAT_TEST).id, "accept_order", "Fine as ordered")
+
+
+# ---------- reconciliation ----------
+
+
+def test_admission_reconciliation_signed_and_cosigned(fresh_state):
+    store = fresh_state
+    pharmacist, physician = user(store, Role.PHARMACIST), user(store, Role.PHYSICIAN)
+    encounter = encounter_of(store, QUETIAPINE)
+    session = settled_session(store, encounter, "admission")
+    items = {i["id"]: RecItem.model_validate(i) for i in session.items}
+    assert session.ai_status == "done" and session.document_id
+    assert any(i.type == "dose_change" for i in items.values())
+    assert items["dup-statin"].type == "duplicate_therapy"
+    quetiapine = items["new-51272"]
+    assert quetiapine.type == "new_without_indication" and quetiapine.source == "ai" and quetiapine.confidence
+    with pytest.raises(S.DecisionProblem, match="Handle every discrepancy"):
+        S.sign(store, pharmacist, session.id)
+    with pytest.raises(S.DecisionDenied):
+        S.handle_item(store, physician, session.id, "dup-statin", "accept", "Intended")
+    with pytest.raises(S.DecisionProblem, match="change"):
+        S.handle_item(store, pharmacist, session.id, "dup-statin", "modify", "Two statins")
+    session = handle_all(store, pharmacist, session, modify="dup-statin")
+    assert S.unhandled(session) == []
+    with pytest.raises(S.DecisionProblem, match="after the pharmacist"):
+        S.sign(store, physician, session.id)
+    signed = S.sign(store, pharmacist, session.id)
+    doc = store.fhir.read("DocumentReference", signed.document_id)
+    assert signed.status == "pharmacist_signed" and doc["docStatus"] == "preliminary"
+    assert signed.change_tasks  # the modify item went to the prescriber
+    sign_events = [e for e in store.audit.events() if e.event_type == "sign" and e.resource_id == signed.document_id]
+    assert sign_events and sign_events[-1].user_id == pharmacist.id
+    final = S.sign(store, physician, session.id)
+    doc = store.fhir.read("DocumentReference", final.document_id)
+    assert final.status == "final" and doc["docStatus"] == "final"
+    assert doc["authenticator"]["reference"] == f"Practitioner/{pharmacist.practitioner_id}"
+    prov = store.fhir.read("Provenance", traces.provenance_id(traces.run_of(doc)))
+    verifiers = {a["who"]["reference"] for a in prov["agent"]
+                 if any(c.get("code") == "verifier" for c in (a.get("type") or {}).get("coding") or [])}
+    assert verifiers == {f"Practitioner/{pharmacist.practitioner_id}", f"Practitioner/{physician.practitioner_id}"}
+    with pytest.raises(S.DecisionProblem):
+        S.handle_item(store, pharmacist, session.id, "dup-statin", "accept", "Too late")
+
+
+def test_the_82_case_shows_the_interaction_and_the_omission(fresh_state):
+    store = fresh_state
+    pharmacist = user(store, Role.PHARMACIST)
+    encounter = encounter_of(store, "medrx-ms-82-naproxen")
+    S.review_encounter_orders(store, encounter)
+    session = settled_session(store, encounter, "admission")
+    items = [RecItem.model_validate(i) for i in session.items]
+    omissions = [i for i in items if i.type == "omission" and i.home.rxcui in ("17767", "29046", "5487")]
+    assert omissions
+    view = S.session_view(store, pharmacist, session.id)
+    flag = view["order_flags"][NAPROXEN]
+    assert flag["severity"] == "major" and any("warfarin" in t for t in flag["titles"])
+    naproxen = next(i for i in items if i.order and i.order.ref == NAPROXEN)
+    assert naproxen.type == "new" and naproxen.source == "ai"  # fracture pain: indicated
+
+
+def test_discharge_medication_table_interface(fresh_state):
+    """The interface 7.3 builds on: a typed read through FhirGateway, final only by default; and the endpoint."""
+    store = fresh_state
+    pharmacist, physician = user(store, Role.PHARMACIST), user(store, Role.PHYSICIAN)
+    plans = store.fhir.search("MedicationRequest", category="plan")
+    stays = sorted({ref_id(p["encounter"]) for p in plans})
+    stay = next(s for s in stays if S._unit_of_encounter(store.fhir.read("Encounter", s)) == "MEDA")
+    session = settled_session(store, stay, "discharge")
+    reader = FhirGateway(Actor.of(physician), "discharge_summary", LocalBackend(store))
+    assert discharge.discharge_medication_table(reader, stay) is None
+    items = [RecItem.model_validate(i) for i in session.items]
+    S.accept_hospital_use(store, pharmacist, session.id, "Hospital use only; stops at discharge")
+    home_gap = next((i.id for i in items if i.type == "omission" and i.home is not None), None)
+    session = handle_all(store, pharmacist, S._medrec_session(store, session.id), modify=home_gap)
+    S.sign(store, pharmacist, session.id)
+    pending = discharge.discharge_medication_table(reader, stay, final_only=False)
+    assert pending.status == "awaiting_cosign"
+    S.sign(store, physician, session.id)
+    table = discharge.discharge_medication_table(reader, stay)
+    assert table.status == "final" and table.encounter_id == stay and table.document.startswith("DocumentReference/")
+    assert [s.role for s in table.signatures] == ["pharmacist", "physician"]
+    lines = table.all()
+    discharge_rx = {p["medicationCodeableConcept"]["coding"][0]["code"] for p in plans
+                    if ref_id(p["encounter"]) == stay}
+    assert {m.rxcui for m in [*table.new, *table.changed]} | {m.rxcui for m in table.continued} >= discharge_rx
+    for line in lines:
+        assert line.category in ("new", "changed", "stopped", "continued") and line.source_refs
+        assert all(store.fhir.read(*r.split("/")) for r in line.source_refs)
+    if home_gap:
+        resumed = [m for m in table.continued if m.change_note]
+        assert resumed and resumed[0].rxcui == home_gap.removeprefix("om-")
+    for m in table.changed:
+        assert m.previous_text and m.dose_text and m.previous_text != m.dose_text
+
+
+def test_discharge_medications_endpoint(client, login, fresh_state):
+    store = fresh_state
+    pharmacist, physician = user(store, Role.PHARMACIST), user(store, Role.PHYSICIAN)
+    plans = store.fhir.search("MedicationRequest", category="plan")
+    stay = next(s for s in sorted({ref_id(p["encounter"]) for p in plans})
+                if S._unit_of_encounter(store.fhir.read("Encounter", s)) == "MEDA")
+    url = f"/api/med-safety/encounters/{stay}/discharge-medications"
+    assert client.get(url, headers=login(physician.id)).status_code == 404
+    session = settled_session(store, stay, "discharge")
+    session = handle_all(store, pharmacist, session)
+    S.sign(store, pharmacist, session.id)
+    assert client.get(url + "?final_only=false", headers=login(physician.id)).json()["status"] == "awaiting_cosign"
+    S.sign(store, physician, session.id)
+    body = client.get(url, headers=login(physician.id)).json()
+    assert body["schema"] == "discharge-medication-table@1" and body["status"] == "final"
+    assert set(body) >= {"new", "changed", "stopped", "continued", "document", "signatures"}
+    assert client.get(url, headers=login(pharmacist.id)).status_code == 200
+    assert client.get(url, headers=login(user(store, Role.CLERK).id)).status_code == 403
+
+
+# ---------- the workbench API ----------
+
+
+def test_workbench_queue_and_rbac(client, login, fresh_state):
+    store = fresh_state
+    pharmacist, physician = user(store, Role.PHARMACIST), user(store, Role.PHYSICIAN)
+    for other in (user(store, Role.NURSE), user(store, Role.CLERK), store.staff["U-OPS"], store.staff["U-ADMIN"]):
+        assert client.get("/api/med-safety/queue", headers=login(other.id)).status_code == 403
+    body = client.get("/api/med-safety/queue", headers=login(pharmacist.id)).json()
+    items = body["items"]
+    assert items[0]["blocking"] and items[0]["kind"] == "order_review"
+    ranks = [(not i["blocking"], -S.rules.SEVERITY_RANK[i["severity"]]) for i in items if i["status"] == "pending"]
+    assert ranks == sorted(ranks)  # blocking first, then severity
+    assert all(i["order_kind"] == "medication" for i in items if i["kind"] == "order_review")
+    assert any(i.get("order_ref") == NAPROXEN for i in items) and all(i["mrn"] for i in items)
+    mine = client.get("/api/med-safety/queue?show=all", headers=login(physician.id)).json()["items"]
+    assert mine and all(i["unit_id"] in physician.unit_ids for i in mine)
+    assert any(i.get("order_ref") == REPEAT_TEST for i in mine)
+    repeat = reviews(store).get(REPEAT_TEST)
+    assert client.get(f"/api/med-safety/reviews/{repeat.id}", headers=login(pharmacist.id)).status_code == 403
+    assert client.get(f"/api/med-safety/reviews/{repeat.id}", headers=login(physician.id)).status_code == 200
+    naproxen = reviews(store).get(NAPROXEN)  # Orthopedics: outside the Medicine A physician's units
+    response = client.get(f"/api/med-safety/reviews/{naproxen.id}", headers=login(physician.id))
+    assert response.status_code == 403 and response.json()["code"] == "break_glass_required"
+
+
+def test_workbench_flow_over_http(client, login, fresh_state):
+    store = fresh_state
+    pharmacist, physician = user(store, Role.PHARMACIST), user(store, Role.PHYSICIAN)
+    ph, md = login(pharmacist.id), login(physician.id)
+    client.get("/api/med-safety/queue", headers=ph)
+    naproxen = reviews(store).get(NAPROXEN)
+    view = client.post(f"/api/med-safety/reviews/{naproxen.id}/commentary", headers=ph).json()
+    assert view["commentary"]["concerns"] and view["can_decide"]
+    refs = [r for c in view["commentary"]["concerns"] for r in c["evidence_refs"]] + view["commentary"]["guideline_refs"]
+    shown = client.get("/api/med-safety/evidence", params=[("ref", r) for r in refs], headers=ph).json()["evidence"]
+    assert {e["kind"] for e in shown} <= {"fhir", "guideline"} and len(shown) == len(set(refs))
+    decided = client.post(f"/api/med-safety/reviews/{naproxen.id}/decision", headers=ph,
+                          json={"decision": "accept_order", "reason": "x"})
+    assert decided.status_code == 409
+    decided = client.post(f"/api/med-safety/reviews/{naproxen.id}/decision", headers=ph,
+                          json={"decision": "request_change", "reason": "Stop naproxen: warfarin and INR 3.8"})
+    assert decided.status_code == 200 and decided.json()["status"] == "resolved"
+    encounter = encounter_of(store, QUETIAPINE)
+    session = S.reconcile(store, encounter, "admission")
+    view = client.get(f"/api/med-safety/medrec/{session.id}", headers=ph).json()
+    assert view["ai_status"] == "done" and not view["can_sign"] and view["can_handle"]
+    for item in view["items"]:
+        if item["discrepancy"]:
+            response = client.post(f"/api/med-safety/medrec/{session.id}/items/{item['id']}", headers=ph,
+                                   json={"action": "accept", "reason": "Reviewed with the team"})
+            assert response.status_code == 200
+    view = client.get(f"/api/med-safety/medrec/{session.id}", headers=ph).json()
+    assert view["can_sign"] and view["unhandled"] == []
+    assert client.post(f"/api/med-safety/medrec/{session.id}/sign", headers=md).status_code == 409
+    signed = client.post(f"/api/med-safety/medrec/{session.id}/sign", headers=ph).json()
+    assert signed["status"] == "pharmacist_signed" and signed["document"]["doc_status"] == "preliminary"
+    final = client.post(f"/api/med-safety/medrec/{session.id}/sign", headers=md).json()
+    assert final["status"] == "final" and final["document"]["doc_status"] == "final"
+    assert sessions(store).get(session_key(encounter, "admission")).status == "final"
+    assert client.post(f"/api/med-safety/medrec/{session.id}/sign", headers=login(user(store, Role.NURSE).id)) \
+        .status_code == 403
+

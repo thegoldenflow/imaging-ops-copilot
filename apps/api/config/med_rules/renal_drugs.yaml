@@ -1,0 +1,100 @@
+# Renal dosing list (docs/SPEC-hospital.md 7.2, rule "renal dosing"): 15 drugs whose use or dose must change when
+# the patient's latest eGFR is below the threshold. Loaded by app/modules/med_safety/rules.py.
+#
+# DEMO SIMPLIFICATION, NOT CLINICAL GUIDANCE. The entries are short paraphrases written for this demo; every entry
+# names the public source it paraphrases (`source`). Production replaces this file with a commercial drug knowledge
+# base (for example FDB or Lexicomp) maintained by pharmacy (see README.md).
+#
+# Fields: rxcui (RxNorm ingredient, as the generator codes medications), name, severity (major: avoid or
+# contraindicated below the threshold; moderate: give an adjusted dose), suggested (the adjusted dose or action the
+# rule shows), source.
+threshold_egfr: 30
+drugs:
+  # Biguanide: lactic acidosis risk when renal clearance falls.
+  - rxcui: "6809"
+    name: metformin
+    severity: major
+    suggested: Stop metformin; it is contraindicated when eGFR is below 30 mL/min/1.73 m2. Choose another glucose-lowering agent.
+    source: FDA prescribing information, metformin hydrochloride (Glucophage), Contraindications and Dosage in renal impairment (public domain)
+  # DPP-4 inhibitor cleared by the kidney.
+  - rxcui: "593411"
+    name: sitagliptin
+    severity: moderate
+    suggested: 25 mg once daily when eGFR is below 30 mL/min/1.73 m2.
+    source: FDA prescribing information, sitagliptin (Januvia), Dosage and Administration, patients with renal impairment (public domain)
+  # Direct thrombin inhibitor, about 80% renally cleared.
+  - rxcui: "1037042"
+    name: dabigatran
+    severity: major
+    suggested: Avoid at creatinine clearance below 30 mL/min (Canadian labelling contraindicates it); choose another anticoagulant with the prescriber.
+    source: FDA prescribing information, dabigatran etexilate (Pradaxa), Dosage in renal impairment; Health Canada product monograph (public)
+  # Factor Xa inhibitor, partly renally cleared.
+  - rxcui: "1114195"
+    name: rivaroxaban
+    severity: moderate
+    suggested: Atrial fibrillation with creatinine clearance 15-50 mL/min, 15 mg once daily with the evening meal; avoid below 15.
+    source: FDA prescribing information, rivaroxaban (Xarelto), Dosage and Administration, renal impairment (public domain)
+  # Factor Xa inhibitor; dose reduction uses age, weight and creatinine together.
+  - rxcui: "1364430"
+    name: apixaban
+    severity: moderate
+    suggested: Check the dose-reduction criteria (age 80 or over, weight 60 kg or less, serum creatinine 1.5 mg/dL or more); 2.5 mg twice daily when two apply.
+    source: FDA prescribing information, apixaban (Eliquis), Dosage and Administration (public domain)
+  # Low-molecular-weight heparin, renally cleared; accumulates with anti-Xa activity.
+  - rxcui: "67108"
+    name: enoxaparin
+    severity: moderate
+    suggested: Creatinine clearance below 30 mL/min, prophylaxis 30 mg once daily; treatment 1 mg/kg once daily.
+    source: FDA prescribing information, enoxaparin sodium (Lovenox), Dosage in severe renal impairment (public domain)
+  # Gabapentinoid excreted unchanged in urine; sedation and falls when it accumulates.
+  - rxcui: "25480"
+    name: gabapentin
+    severity: moderate
+    suggested: Creatinine clearance 15-29 mL/min, 200-700 mg per day in one or two doses.
+    source: FDA prescribing information, gabapentin (Neurontin), Dosage adjustment in renal impairment (public domain)
+  # Urinary antiseptic: ineffective and more toxic when renal function is poor.
+  - rxcui: "7454"
+    name: nitrofurantoin
+    severity: major
+    suggested: Avoid when creatinine clearance is below 30 mL/min (poor urinary concentration, risk of toxicity); choose another antibiotic.
+    source: FDA prescribing information, nitrofurantoin (Macrobid), Contraindications; AGS Beers Criteria renal table (reference)
+  # NSAID: the label contraindicates it in advanced renal impairment.
+  - rxcui: "35827"
+    name: ketorolac
+    severity: major
+    suggested: Do not use in advanced renal impairment; use acetaminophen or an opioid at a renally adjusted dose.
+    source: FDA prescribing information, ketorolac tromethamine, Contraindications (public domain)
+  # NSAID: reduces renal perfusion and can cause acute kidney injury.
+  - rxcui: "5640"
+    name: ibuprofen
+    severity: major
+    suggested: Avoid NSAIDs when eGFR is below 30 mL/min/1.73 m2; use acetaminophen for pain.
+    source: FDA NSAID class labelling, Renal toxicity warning; KDIGO 2012 CKD guideline, NSAID advice (public summary)
+  - rxcui: "7258"
+    name: naproxen
+    severity: major
+    suggested: Avoid NSAIDs when eGFR is below 30 mL/min/1.73 m2; use acetaminophen for pain.
+    source: FDA prescribing information, naproxen (Naprosyn), Renal toxicity warning (public domain)
+  - rxcui: "140587"
+    name: celecoxib
+    severity: major
+    suggested: Not recommended in severe renal insufficiency; use acetaminophen for pain.
+    source: FDA prescribing information, celecoxib (Celebrex), Renal toxicity warning (public domain)
+  # Xanthine oxidase inhibitor; oxypurinol accumulates.
+  - rxcui: "519"
+    name: allopurinol
+    severity: moderate
+    suggested: Start at 100 mg daily or less and titrate to urate; review a 300 mg dose.
+    source: FDA prescribing information, allopurinol (Zyloprim), Dosage in renal impairment (public domain)
+  # Anti-gout; toxicity (neuromuscular, marrow) when clearance falls.
+  - rxcui: "2683"
+    name: colchicine
+    severity: moderate
+    suggested: Creatinine clearance below 30 mL/min, gout prophylaxis starts at 0.3 mg once daily; avoid repeat treatment courses within 14 days.
+    source: FDA prescribing information, colchicine (Colcrys), Dosage in renal impairment (public domain)
+  # Potassium-sparing diuretic: hyperkalaemia.
+  - rxcui: "9997"
+    name: spironolactone
+    severity: major
+    suggested: Avoid in heart failure when eGFR is below 30 mL/min/1.73 m2 (hyperkalaemia); check potassium.
+    source: FDA prescribing information, spironolactone (Aldactone), Warnings - hyperkalaemia; heart failure dosing (public domain)

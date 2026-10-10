@@ -23,6 +23,8 @@ COPY apps/api/app ./app
 # versioned prompt files of the runtime agents.
 COPY apps/api/config ./config
 COPY apps/api/prompts ./prompts
+# Synthetic guideline summaries the medication-safety agents retrieve from (7.2)
+COPY apps/api/knowledge ./knowledge
 # The Control Tower's trained flow models and their report (7.1; the training data stays out of the image)
 COPY apps/api/models/flow/*.joblib apps/api/models/flow/report.json ./models/flow/
 # Read-only data the app loads at startup: the knowledge graph (with the bilingual

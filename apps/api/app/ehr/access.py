@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | physician | every resource of the patients of their units (or whom they attend); others need break-glass | Task; DocumentReference drafts of modules they sign for; signs per the registry |
 | nurse | the same for their unit | Task, Flag, Communication; DocumentReference drafts of modules they sign for |
-| pharmacist | hospital-wide: patient, encounter, medications, allergies, lab results, medication documents | DocumentReference drafts of modules they sign for (medication reconciliation, order review) |
+| pharmacist | hospital-wide: patient, encounter, medications, allergies, lab results, body weight and height, diagnoses, medication documents | DocumentReference drafts of modules they sign for (medication reconciliation, order review) |
 | clerk | hospital-wide: demographics, encounters without clinical content, scheduling, consents, registration tasks | Appointment (proposed), registration Task, Consent |
 | operations_manager | hospital-wide aggregates: beds, encounters without clinical content, OR and bed requests, flags; a patient only as MRN | action Task (performer `ops`), Encounter.location (bed move) |
 | admin | no patient data: locations, organisation, staff (plus the audit log and the registry, outside the EHR) | nothing in the EHR |
@@ -50,6 +50,9 @@ DIRECTORY = frozenset({"Location", "Organization", "Practitioner", "Practitioner
 ROLE_CODE = {"physician": "doctor", "nurse": "nurse", "pharmacist": "pharmacist", "clerk": "clerk",
              "operations_manager": "ops"}
 MEDICATION_DOCS = frozenset({DOC_TYPES["medrec"][1], DOC_TYPES["discharge_med_list"][1]})
+# What a pharmacist needs beyond laboratory results to dose (WP6): body weight and height. With the diagnosis list
+# (Condition, the indications a reconciliation checks) these are the "medication-related resources" of 6.3.
+DOSING_OBSERVATIONS = frozenset({"29463-7", "8302-2"})
 # Encounter and scheduling elements that carry clinical content.
 CLINICAL_ELEMENTS = {
     "Encounter": ("reasonCode", "reasonReference", "diagnosis"),
@@ -76,7 +79,7 @@ POLICIES: dict[str, RolePolicy] = {
                         signs=True, break_glass=True),
     "pharmacist": RolePolicy("hospital", DIRECTORY | {"Patient", "Encounter", "MedicationRequest",
                                                       "MedicationStatement", "AllergyIntolerance", "Observation",
-                                                      "DocumentReference"},
+                                                      "Condition", "DocumentReference"},
                              frozenset({"DocumentReference"}), signs=True),
     "clerk": RolePolicy("hospital", DIRECTORY | {"Patient", "Encounter", "Appointment", "Schedule", "Slot",
                                                  "Consent", "Task"},
@@ -135,7 +138,7 @@ def can_see(role: str, resource: dict) -> bool:
     rtype = resource.get("resourceType")
     if role == "pharmacist":
         if rtype == "Observation":
-            return "laboratory" in _codes(resource.get("category") or [])
+            return "laboratory" in _codes(resource.get("category") or []) or                 bool(_codes(resource.get("code")) & DOSING_OBSERVATIONS)
         if rtype == "DocumentReference":
             return doc_type(resource) in MEDICATION_DOCS
     if role == "clerk" and rtype == "Task":
