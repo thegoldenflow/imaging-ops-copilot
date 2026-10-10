@@ -33,6 +33,21 @@ const SpeechRecognitionCtor = (window as unknown as { SpeechRecognition?: new ()
 
 interface TurnResponse { reply: string; mode: string; latency_ms: number; ended: boolean; session: CallSession }
 
+// The browser voice for each language of the phone line.
+const VOICES: Record<string, { tag: string; label: string }> = {
+  en: { tag: "en-CA", label: "English" },
+  fr: { tag: "fr-CA", label: "Français" },
+  zh: { tag: "zh-CN", label: "中文" },
+};
+
+// The language of a reply: the scripted fallback keeps the call's language in its state; for the model's replies,
+// Chinese characters mean Chinese.
+function replyLanguage(res: TurnResponse): string {
+  const lang = res.session.state?.lang;
+  if (res.mode === "scripted" && lang && lang in VOICES) return lang;
+  return /[一-鿿]/.test(res.reply) ? "zh" : "en";
+}
+
 export function PhoneAgent() {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<CallSession | null>(null);
@@ -41,6 +56,7 @@ export function PhoneAgent() {
   const [listening, setListening] = useState(false);
   const [lastLatency, setLastLatency] = useState<number | null>(null);
   const [mode, setMode] = useState<string | null>(null);
+  const [lang, setLang] = useState("en"); // the language of the agent's last reply: its voice and the microphone's
   const recognition = useRef<Recognition | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
@@ -50,11 +66,11 @@ export function PhoneAgent() {
   }, [session?.transcript.length]);
   useEffect(() => () => window.speechSynthesis?.cancel(), []);
 
-  const say = (line: string) => {
+  const say = (line: string, language: string) => {
     if (!speak || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(line);
-    u.lang = "en-CA";
+    u.lang = VOICES[language].tag;
     window.speechSynthesis.speak(u);
   };
 
@@ -64,16 +80,19 @@ export function PhoneAgent() {
       setSession(s);
       setLastLatency(null);
       setMode(s.agent_mode);
-      say(s.transcript[0].text);
+      setLang("en");
+      say(s.transcript[0].text, "en");
     },
   });
   const turn = useMutation({
     mutationFn: (utterance: string) => post<TurnResponse>(`/api/frontdesk/calls/${session!.id}/turn`, { text: utterance }),
     onSuccess: (res) => {
+      const language = replyLanguage(res);
       setSession(res.session);
       setLastLatency(res.latency_ms);
       setMode(res.mode);
-      say(res.reply);
+      setLang(language);
+      say(res.reply, language);
       queryClient.invalidateQueries();
     },
   });
@@ -93,7 +112,7 @@ export function PhoneAgent() {
     if (!SpeechRecognitionCtor) return;
     if (listening) { recognition.current?.stop(); return; }
     const r = new SpeechRecognitionCtor();
-    r.lang = "en-CA";
+    r.lang = VOICES[lang].tag;
     r.interimResults = false;
     r.onresult = (e) => submit(e.results[0][0].transcript);
     r.onend = () => setListening(false);
@@ -173,6 +192,7 @@ export function PhoneAgent() {
         ) : (
           <dl className="space-y-3 text-sm">
             <div><dt className="text-xs text-slate-500">Agent</dt><dd>{mode === "claude" ? "Claude (tool use)" : mode === "gemini" ? "Gemini (tool use)" : "Scripted fallback (no API key)"}</dd></div>
+            <div><dt className="text-xs text-slate-500">Language (agent voice)</dt><dd data-testid="call-language">{VOICES[lang].label}</dd></div>
             <div><dt className="text-xs text-slate-500">Identity</dt><dd>{session.verified_patient_id ? <Badge tone="green">Verified</Badge> : <Badge tone="amber">Not verified</Badge>}</dd></div>
             <div><dt className="text-xs text-slate-500">Last response time (server)</dt><dd className="tabular">{lastLatency == null ? "–" : `${lastLatency} ms`}</dd></div>
             <div>

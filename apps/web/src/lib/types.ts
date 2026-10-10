@@ -215,6 +215,7 @@ export interface CallSession {
   summary: string | null;
   latencies_ms: number[];
   patient_name?: string | null;
+  state?: { lang?: string; [k: string]: unknown }; // lang: the scripted fallback's language for the call (en, fr, zh)
 }
 
 // ---------- Phase 2: requisition pipeline ----------
