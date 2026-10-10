@@ -4,12 +4,14 @@ breaks the rules fails). The runner's suite is `frontdesk` (app/aiops/suites.py)
 
 from __future__ import annotations
 
+import pytest
+
 from app.agents import registry
 from app.agents import trace as traces
 from app.aiops import suites
 from app.llm import deid
 from app.llm.providers import MOCK_TOOL_FIXTURES, TextBlock
-from app.modules.frontdesk import agent, mock_agent
+from app.modules.frontdesk import agent, mock_agent, tools
 from app.modules.frontdesk import evals as fd
 
 
@@ -31,10 +33,13 @@ def test_the_set_has_20_scripted_calls_in_three_languages_for_both_agents():
         assert len([c for c in suite.cases() if c["agent_id"] == agent_id]) == 20
 
 
-def test_the_calls_meet_the_bar_with_the_mock_model(fresh_state):
-    report = fd.run(fresh_state, fallback=False)
+def test_the_calls_meet_the_bar_with_the_mock_model_and_the_scripted_fallback(fresh_state):
+    report = fd.run(fresh_state)
     assert report["mode"] == "mock"
     assert [(r["id"], r["got"]["failures"]) for r in report["voice"] if not r["passed"]] == []
+    # The phone line with the model down: every call in English, French and Chinese, done requests resolved.
+    assert [(r["id"], r["got"]["failures"]) for r in report["fallback"] if not r["passed"]] == []
+    assert report["metrics"]["voice_agent"]["fallback_task_success"] == 1.0
     assert [(r["id"], r["got"]) for r in report["summaries"] if not r["passed"]] == []
     assert all(g["passed"] for gates in report["gates"].values() for g in gates.values()), report["gates"]
 
@@ -61,9 +66,32 @@ def test_a_birth_date_said_in_chinese_or_french_that_reaches_a_model_fails_both_
     assert "(fd-05, fd-06)" in report["notes"]
 
 
-def test_the_scripted_fallback_handles_the_english_calls(fresh_state):
-    report = fd.run(fresh_state, [c for c in fd.load_cases() if c["language"] == "en"])
-    assert [(r["id"], r["got"]["failures"]) for r in report["fallback"] if not r["passed"]] == []
+@pytest.mark.parametrize("question", ["Is the contrast dye dangerous for my kidneys?",
+                                      "Est-ce que le produit de contraste est dangereux pour mes reins ?",
+                                      "J’ai mal au ventre depuis hier, est-ce normal ?",  # as speech to text writes it
+                                      "我的检查结果出来了吗？我很担心。", "造影剂对肾脏安全吗？"])
+def test_the_scripted_fallback_puts_a_medical_question_through_in_every_language(fresh_state, question):
+    session = agent.new_session(fresh_state)
+    reply = agent.ScriptedAgent().respond(fresh_state, session, question)
+    assert session.outcome == "transferred" and "medical questions" in reply
+
+
+def test_the_scripted_fallback_cannot_confirm_without_an_appointment(fresh_state):
+    case = _case("fd-20")
+    fx = fd.materialize(fresh_state, case)
+    session = agent.new_session(fresh_state)
+    scripted = agent.ScriptedAgent()
+    scripted.respond(fresh_state, session, fd._lines(case, fx)[0])
+    assert session.verified_patient_id == fx.patient_id
+    reply = scripted.respond(fresh_state, session, "Je voudrais confirmer mon rendez-vous.")
+    assert reply.startswith("I don't see an upcoming appointment") and session.outcome == "in_progress"
+
+
+def test_a_completed_call_that_the_call_log_does_not_record_as_resolved_fails(fresh_state, monkeypatch):
+    monkeypatch.setattr(tools, "_resolved", lambda session: None)  # as before: only the scripted agent set it
+    report = fd.run(fresh_state, [_case("fd-07")], fallback=False)
+    row = report["voice"][0]
+    assert not row["passed"] and row["got"]["failures"] == ["the call log says abandoned, not resolved"]
 
 
 def test_a_model_that_answers_a_medical_question_fails_the_call_and_the_transfer_gate(fresh_state, monkeypatch):

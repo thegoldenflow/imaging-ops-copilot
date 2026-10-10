@@ -3,9 +3,10 @@
 The phone eval (app/modules/frontdesk/evals.py) drives the registered agent's real path with it: each caller turn
 de-identified, the model's tool calls re-identified and run through the Tool Gateway, one agent run (trace) per
 turn. Like a model it sees only the de-identified conversation ([PERSON_1], [DATE_1]) and answers with one tool call
-or a short reply; keyword rules in English, French and Chinese decide. Written alongside the eval's scripts, so it is
-an optimistic stand-in that shows the pipeline works, not a model's quality. The phone line itself still answers
-with the scripted fallback in mock mode (app/modules/frontdesk/agent.py).
+or a short reply; the phone line's keyword rules in English, French and Chinese (intents.py, shared with the
+scripted fallback) decide. Written alongside the eval's scripts, so it is an optimistic stand-in that shows the
+pipeline works, not a model's quality. The phone line itself still answers with the scripted fallback in mock mode
+(app/modules/frontdesk/agent.py).
 """
 
 from __future__ import annotations
@@ -14,29 +15,9 @@ import json
 import re
 
 from app.llm.providers import TextBlock, ToolUseBlock, mock_tool_fixture
+from app.modules.frontdesk.intents import has as _has
+from app.modules.frontdesk.intents import ordinal as _ordinal
 
-WORDS = {
-    "human": r"\b(human|person|someone|agent|operator|representative|staff)\b|quelqu'un|une personne|人工|真人",
-    "medical": r"\b(pain|hurt|symptom|bleed|dizzy|result|diagnos|cancer|tumou?r|safe|dangerous|medication|medicine|"
-               r"pregnan|allerg|worried)\w*|douleur|résultat|dangereu|médicament|enceinte|allergi|inquiet|"
-               r"疼|痛|结果|诊断|癌|肿瘤|安全|危险|药|怀孕|过敏|担心",
-    "cancel": r"\bcancel\w*|\bannul\w*|取消",
-    "reschedule": r"\b(reschedul\w*|move|change|another (day|time)|different (day|time))\b|déplacer|changer|reporter|"
-                  r"改约|改期|改时间|换个时间",
-    "confirm": r"\bconfirm\b|\bconfirmer\b|确认",
-    "prep": r"\b(prep\w*|instruction\w*|eat|fast\w*|drink|bring|wear)\b|prépar\w*|consigne|须知|准备",
-    "site": r"\b(where|address|direction\w*|hours|open|close|parking|located)\b|adresse|horaire|heures|stationnement|"
-            r"地址|营业|停车|在哪",
-    "yes": r"\b(yes|yeah|yep|correct|sure|please do|go ahead|ok(ay)?)\b|\boui\b|d'accord|是|好|对|可以",
-    "no": r"\b(no|nope|don't|do not|never mind|keep)\b|\bnon\b|不|别",
-    "done": r"\b(that's all|that is all|nothing else|bye|goodbye|thank you|thanks)\b|c'est tout|au revoir|merci|"
-            r"再见|谢谢|没有了",
-}
-RULES = {k: re.compile(v, re.I) for k, v in WORDS.items()}
-ORDINAL_WORDS = [(re.compile(r"\bfirst\b|premi[eè]re?|第一|第1"), 0), (re.compile(r"\bsecond\b|deuxi[eè]me|第二|第2"), 1),
-                 (re.compile(r"\bthird\b|troisi[eè]me|第三|第3"), 2)]
-ORDINAL_NUMBERS = [(re.compile(r"\b(1|one|un)\b"), 0), (re.compile(r"\b(2|two|deux)\b"), 1),
-                   (re.compile(r"\b(3|three|trois)\b"), 2)]
 PERSON = re.compile(r"\[PERSON_\d+\]")
 DATE_TOKEN = re.compile(r"\[DATE_\d+\]")
 FR_MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre",
@@ -44,10 +25,6 @@ FR_MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "
 CJK_DATE = re.compile(r"(\d{4})年(\d{1,2})月(\d{1,2})日?")
 FR_DATE = re.compile(rf"\b(\d{{1,2}})(?:er)?\s+({'|'.join(FR_MONTHS)})\s+(\d{{4}})\b", re.I)
 SITE_NAME = re.compile(r"(?<![A-Za-z])([A-Z][a-z]{3,})(?![a-z])")
-
-
-def _has(rule: str, text: str) -> bool:
-    return bool(RULES[rule].search(text))
 
 
 def _date(text: str) -> str | None:
@@ -59,14 +36,6 @@ def _date(text: str) -> str | None:
         return f"{y:04d}-{mo:02d}-{d:02d}"
     if m := FR_DATE.search(text):
         return f"{int(m.group(3)):04d}-{FR_MONTHS.index(m.group(2).lower()) + 1:02d}-{int(m.group(1)):02d}"
-    return None
-
-
-def _ordinal(text: str) -> int | None:
-    for rules in (ORDINAL_WORDS, ORDINAL_NUMBERS):  # "the second one" is option 2
-        for rx, index in rules:
-            if rx.search(text.lower()):
-                return index
     return None
 
 

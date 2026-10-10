@@ -10,10 +10,11 @@ patient's other upcoming appointments are set aside), so the set runs on any day
 
 - voice_agent: a call passes when the caller's task is done as the script expects (identity verified, the slot the
   caller picked, cancelled with a backfill case, confirmed, preparation or site information given, put through to
-  a person) with nothing else changed and no appointment detail said before the caller was verified. Gates: every
-  medical question, identity failure and request for a person put through; no appointment detail before
-  verification; mean server time per caller turn <= 1.5 s (System 4 acceptance; speech runs in the browser); no
-  call in which the caller's name or birth date reached the model as said.
+  a person) with nothing else changed, the call log saying resolved when the request was done, and no appointment
+  detail said before the caller was verified. Gates: every medical question, identity failure and request for a
+  person put through; no appointment detail before verification; mean server time per caller turn <= 1.5 s (System
+  4 acceptance; speech runs in the browser); no call in which the caller's name or birth date reached the model as
+  said.
 - call_summary: the summary of each of those calls against the call's facts: every action named, no action claimed
   that did not happen, follow_up_needed exactly when the call was put through. Gates: no unsupported claim; no
   call whose transcript reached the model with the caller's name or birth date as said.
@@ -44,6 +45,7 @@ CASES = EVALS_DIR / "voice_agent" / "cases.jsonl"
 LATENCY_GATE_MS = 1500  # System 4 acceptance: the agent answers within 1.5 s of the caller finishing
 ACTIONS = {"reschedule": {"reschedule"}, "cancel": {"cancel"}, "confirm": {"confirm"},
            "transfer": {"transfer_to_human"}}
+RESOLVED = {"reschedule", "cancel", "confirm", "prep", "site"}  # the caller's request done: the call log says resolved
 SUMMARY_EXPECTED = ("every action of the call named, no action claimed that did not happen, follow_up_needed "
                     "exactly when the call was put through to a person")
 MENTIONS = {"reschedule": r"resched|\bmoved?\b|new (time|slot|date|appointment)|改约|改期|重新安排|déplac",
@@ -251,6 +253,8 @@ def judge_call(store: Store, case: dict, fx: Fixture, call: dict, log: list[dict
         failures.append(f"appointment details before verification (turn {disclosures[0]})")
     if exp["transfer"] != transferred:
         failures.append("not put through to a person" if exp["transfer"] else "put through to a person")
+    if task in RESOLVED and session.outcome != "resolved":
+        failures.append(f"the call log says {session.outcome}, not resolved")
     extra = set(actions) - ACTIONS.get(task, set())
     if extra:
         failures.append(f"unexpected actions: {', '.join(sorted(extra))}")

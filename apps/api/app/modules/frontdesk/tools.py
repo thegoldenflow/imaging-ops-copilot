@@ -92,8 +92,25 @@ def find_named_patients(store: Store, text: str) -> list[str]:
     return [p.id for p in store.patients.values() if p.full_name.lower() in lowered]
 
 
+GENERIC_SITE_WORDS = {"imaging", "centre", "center", "clinic"}
+
+
+def find_named_site(store: Store, text: str) -> str:
+    """The site the caller names ("your Northgate clinic", "Northgate诊所"), or "" when none is named."""
+    lowered = text.lower()
+    return next((s.name for s in store.sites.values()
+                 if any(w in lowered for w in s.name.lower().split() if w not in GENERIC_SITE_WORDS)), "")
+
+
 class ToolError(Exception):
     pass
+
+
+def _resolved(session: CallSession) -> None:
+    """The caller's request is done: the call log says resolved, whichever agent (model or scripted) asked for the
+    tool. A call put through to a person stays transferred."""
+    if session.outcome == "in_progress":
+        session.outcome = "resolved"
 
 
 def _require_verified(session: CallSession) -> str:
@@ -186,6 +203,7 @@ def reschedule(store: Store, session: CallSession, appointment_id: str, slot_id:
                           exam_code=appt.exam_code, start=start, urgency=appt.urgency)
     session.actions.append({"tool": "reschedule", "old": appt.id, "new": new.id,
                             "backfill_case": case.id if case else None})
+    _resolved(session)
     return {"rescheduled": True, "new_appointment": _appt_summary(store, new)}
 
 
@@ -193,6 +211,7 @@ def cancel(store: Store, session: CallSession, appointment_id: str, reason: str 
     appt = _own_appointment(store, session, appointment_id)
     case = scheduling.cancel(store, appt, reason)
     session.actions.append({"tool": "cancel", "appointment": appt.id, "backfill_case": case.id if case else None})
+    _resolved(session)
     return {"cancelled": True, "appointment": _appt_summary(store, appt)}
 
 
@@ -206,12 +225,14 @@ def confirm_appointment(store: Store, session: CallSession, appointment_id: str)
     appt.status = AppointmentStatus.CONFIRMED
     appt.reminder_confirmed = True
     session.actions.append({"tool": "confirm", "appointment": appt.id})
+    _resolved(session)
     return {"confirmed": True, "appointment": _appt_summary(store, appt)}
 
 
 def get_prep_instructions(store: Store, session: CallSession, appointment_id: str) -> dict:
     appt = _own_appointment(store, session, appointment_id)
     patient = store.patients[appt.patient_id]
+    _resolved(session)
     return {"instructions": prep_text(appt.exam_code, "en"),
             "note": f"Written instructions were also sent in the patient's preferred language ({patient.preferred_language})."}
 
@@ -224,6 +245,7 @@ def get_site_info(store: Store, session: CallSession, site: str = "") -> dict:
             match = next(s for s in store.sites.values() if s.name == upcoming[0]["site"])
     match = match or store.sites["LKS"]
     days = "Monday to Saturday" if 5 in match.open_days else "Monday to Friday"
+    _resolved(session)
     return {"site": match.name, "address": match.address, "phone": match.phone,
             "hours": f"{days}, {match.open_hour}:00 to {match.close_hour}:00", "parking": match.parking}
 

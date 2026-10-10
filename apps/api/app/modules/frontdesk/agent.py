@@ -8,12 +8,12 @@ the model asks for goes through the Tool Gateway (allow-list, caller role,
 idempotency of reschedule and cancel, audit, trace; spec 6.4). ScriptedAgent is a
 deterministic fallback used when no API key is configured or the API is
 unavailable, so the phone flow always works; it is plain code, not an agent, and
-calls the same server-side tools directly. The agent's mock model (mock_agent.py)
-is for its eval (evals.py): in mock mode the phone line keeps the scripted agent.
+calls the same server-side tools directly. Either way the tools record the call's
+actions and its outcome. The agent's mock model (mock_agent.py) is for its eval
+(evals.py): in mock mode the phone line keeps the scripted agent.
 """
 
 import json
-import re
 import time
 from datetime import datetime
 
@@ -25,58 +25,57 @@ from app.llm.gateway import get_gateway
 from app.llm.prompts import VOICE_AGENT
 from app.llm.providers import ProviderRefusal, ProviderUnavailable
 from app.modules.frontdesk import mock_agent  # noqa: F401  (registers the agent's mock model)
+from app.modules.frontdesk.intents import TASKS, has, ordinal
 from app.modules.frontdesk.tools import (
     TOOL_DEFINITIONS,
     TOOL_IDS,
     CallSession,
     Turn,
     find_named_patients,
+    find_named_site,
     parse_dob,
     run_tool,
 )
 
 GREETING = ("Thank you for calling Lakeshore Imaging. I'm the automated assistant. "
             "To get started, please tell me your full name and date of birth.")
-
-MEDICAL = re.compile(r"\b(pain|hurt|symptom|bleed|dizzy|result|diagnos|cancer|tumou?r|safe|dangerous|"
-                     r"medication|medicine|pregnan|allerg|is it normal|worried)\w*", re.I)
-HUMAN = re.compile(r"\b(human|person|someone|agent|operator|representative|staff)\b|人工", re.I)
-CANCEL = re.compile(r"\bcancel\w*|取消", re.I)
-RESCHEDULE = re.compile(r"\b(reschedul\w*|move|change|another (day|time)|different (day|time))\b|改约|改期", re.I)
-PREP = re.compile(r"\b(prep\w*|instruction\w*|eat|fast\w*|drink|bring|wear)\b|须知|准备", re.I)
-SITE = re.compile(r"\b(where|address|direction\w*|hours|open|close|parking|located)\b|地址|营业", re.I)
-CONFIRM_APPT = re.compile(r"\bconfirm\b", re.I)
-YES = re.compile(r"\b(yes|yeah|yep|correct|sure|please do|go ahead|ok(ay)?)\b|是|好|对", re.I)
-NO = re.compile(r"\b(no|nope|don't|do not|never mind)\b|不", re.I)
-DONE = re.compile(r"\b(that's all|that is all|nothing else|bye|goodbye|thank you|thanks)\b|再见|谢谢", re.I)
-ORDINALS = {"first": 0, "1": 0, "one": 0, "second": 1, "2": 1, "two": 1, "third": 2, "3": 2, "three": 2}
+GOODBYE = "Thank you for calling Lakeshore Imaging. Goodbye!"
 
 
 def _say_appt(a: dict) -> str:
     return f"your {a['exam']} on {a['when']} at {a['site']}"
 
 
+def _say_site(info: dict) -> str:
+    return f"{info['site']} is at {info['address']}, open {info['hours']}. {info['parking']}"
+
+
 class ScriptedAgent:
+    """The phone line without the model: it understands the caller by keyword in English, French and Chinese
+    (intents.py) and answers in English. The tools record what was done and the call's outcome."""
+
     mode = "scripted"
 
     def respond(self, store: Store, session: CallSession, text: str) -> str:
         st = session.state
         tool = lambda name, **args: run_tool(store, session, name, args)  # noqa: E731
 
-        if HUMAN.search(text):
+        if has("human", text):
             tool("transfer_to_human", reason="Caller asked for a person")
             return "Of course. I'm transferring you to a member of our front desk team now."
-        if MEDICAL.search(text):
+        if has("medical", text):
             tool("transfer_to_human", reason="Medical question")
             return ("I'm not able to answer medical questions, but our staff can help. "
                     "I'm transferring you to a team member now.")
 
         if not session.verified_patient_id:
-            if SITE.search(text) and not find_named_patients(store, text):
-                info = tool("get_site_info", site="")
-                return f"{info['site']} is at {info['address']}, open {info['hours']}. {info['parking']}"
             names = find_named_patients(store, text)
+            if has("site", text) and not names:
+                return _say_site(self._site_info(store, session, text))
             dob = parse_dob(text)
+            if not names and not dob and has("done", text) and not any(has(k, text) for k in TASKS):
+                st["ended"] = True
+                return GOODBYE
             if names:
                 st["name"] = store.patients[names[0]].full_name
             if dob:
@@ -98,7 +97,8 @@ class ScriptedAgent:
             if not appts:
                 return f"Thank you, {result['first_name']}. I don't see any upcoming appointments. Can I help with anything else?"
             return (f"Thank you, {result['first_name']}, you're verified. I see {_say_appt(appts[0])}. "
-                    "Would you like to reschedule, cancel, hear the preparation instructions, or get directions?")
+                    "Would you like to reschedule, cancel or confirm it, hear the preparation instructions, or get "
+                    "directions?")
 
         appts = st.get("appointments") or tool("lookup_appointment")["appointments"]
         current = appts[0] if appts else None
@@ -106,9 +106,8 @@ class ScriptedAgent:
 
         if pending == "cancel":
             st.pop("pending")
-            if YES.search(text) and not NO.search(text):
+            if has("yes", text) and not has("no", text):
                 tool("cancel", appointment_id=current["appointment_id"], reason="Patient request (phone)")
-                session.outcome = "resolved"
                 st["appointments"] = tool("lookup_appointment")["appointments"]
                 return ("Done. Your appointment is cancelled and you'll receive a text confirmation. "
                         "Is there anything else I can help with?")
@@ -116,7 +115,7 @@ class ScriptedAgent:
 
         if pending == "pick_slot":
             slots = session.state.get("offered_slots", [])
-            choice = next((ORDINALS[w] for w in re.findall(r"[a-z0-9]+", text.lower()) if w in ORDINALS), None)
+            choice = ordinal(text)
             if choice is None:
                 choice = next((i for i, s in enumerate(slots) if s["when"].split(" at ")[1] in text), None)
             if choice is None or choice >= len(slots):
@@ -127,46 +126,50 @@ class ScriptedAgent:
         if pending == "confirm_slot":
             st.pop("pending")
             slot = st.pop("chosen_slot")
-            if YES.search(text) and not NO.search(text):
+            if has("yes", text) and not has("no", text):
                 result = tool("reschedule", appointment_id=current["appointment_id"], slot_id=slot["slot_id"])
-                session.outcome = "resolved"
                 st["appointments"] = tool("lookup_appointment")["appointments"]
                 return (f"You're all set for {_say_appt(result['new_appointment'])}. "
                         "You'll get a confirmation text. Anything else?")
             return "No problem, I haven't changed anything. Anything else?"
 
-        if current is None and (CANCEL.search(text) or RESCHEDULE.search(text) or PREP.search(text)):
+        intent = next((k for k in TASKS if has(k, text)), None)
+        if current is None and intent not in (None, "site"):
             return "I don't see an upcoming appointment for you. Would you like me to transfer you to a team member?"
-        if CANCEL.search(text):
+        if intent == "cancel":
             st["pending"] = "cancel"
             return f"Just to confirm, you'd like to cancel {_say_appt(current)}?"
-        if RESCHEDULE.search(text):
+        if intent == "reschedule":
             slots = tool("find_open_slots", appointment_id=current["appointment_id"])["slots"]
             if not slots:
                 return "I couldn't find open times in the next week. Let me transfer you to a team member."
             st["pending"] = "pick_slot"
             options = ", ".join(f"option {i + 1}, {s['when']}" for i, s in enumerate(slots))
             return f"I have {options}. Which would you like?"
-        if PREP.search(text):
+        if intent == "prep":
             info = tool("get_prep_instructions", appointment_id=current["appointment_id"])
-            session.outcome = "resolved"
             return f"{info['instructions']} I've also sent these instructions to you by text."
-        if SITE.search(text):
-            info = tool("get_site_info", site="")
-            return f"{info['site']} is at {info['address']}, open {info['hours']}. {info['parking']}"
-        if CONFIRM_APPT.search(text):
+        if intent == "site":
+            return _say_site(self._site_info(store, session, text))
+        if intent == "confirm":
             if not tool("confirm_appointment", appointment_id=current["appointment_id"])["confirmed"]:
                 return ("I can't confirm this appointment yet because a safety screening still needs staff review. "
                         "Our team will call you. Anything else?")
-            session.outcome = "resolved"
             return "Your appointment is confirmed. Anything else?"
-        if DONE.search(text) or NO.search(text):
+        if has("done", text) or has("no", text):
             if session.outcome == "in_progress":
                 session.outcome = "resolved"
             session.state["ended"] = True
-            return "Thank you for calling Lakeshore Imaging. Goodbye!"
-        return ("I can help you reschedule, cancel, hear preparation instructions, or get directions. "
-                "I can also transfer you to a person.")
+            return GOODBYE
+        return ("I can help you reschedule, cancel or confirm an appointment, give preparation instructions or "
+                "directions, or transfer you to a person.")
+
+    @staticmethod
+    def _site_info(store: Store, session: CallSession, text: str) -> dict:
+        """The site the caller names, else the one named earlier in the call, else theirs (or Lakeshore)."""
+        site = find_named_site(store, text) or session.state.get("site", "")
+        session.state["site"] = site
+        return run_tool(store, session, "get_site_info", {"site": site})
 
 
 class LlmAgent:
