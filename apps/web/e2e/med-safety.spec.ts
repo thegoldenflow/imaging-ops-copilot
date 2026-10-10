@@ -17,7 +17,7 @@ async function token(request: APIRequestContext, userId: string): Promise<string
 
 interface QueueItem { kind: string; id: string; encounter_id: string | null; unit_id: string | null; order_ref?: string; mrn?: string }
 
-let medrec = { id: "", mrn: "" }; // the planted Medicine A admission reconciliation (quetiapine without indication)
+let medrec = { id: "", mrn: "", doc: "" }; // the planted Medicine A admission reconciliation (quetiapine without indication)
 let allergyReview = ""; // the planted blocking allergy on Medicine A
 let interaction = { id: "", mrn: "" }; // the 8.2 case: naproxen added to warfarin
 
@@ -41,11 +41,39 @@ test.beforeAll(async ({ request }, testInfo) => {
   for (const item of items.filter((i) => i.kind === "medrec" && i.unit_id === "MEDA")) {
     const session = await (await request.get(`/api/med-safety/medrec/${item.id}`, { headers: auth })).json();
     if (session.kind === "admission" && session.items.some((x: { id: string }) => x.id === "new-51272")) {
-      medrec = { id: item.id, mrn: session.patient.mrn };
+      medrec = { id: item.id, mrn: session.patient.mrn, doc: session.document_id };
       break;
     }
   }
   expect(medrec.id, "the planted Medicine A admission reconciliation").not.toBe("");
+});
+
+test("the patient chart offers no Sign for a MedRec record: it links to the workbench", async ({ page, request }) => {
+  // the generic signing path refuses a MedRec record (WP6: only the workbench records every decision)
+  const generic = await request.post(`/api/hospital/documents/${medrec.doc}/sign`, {
+    headers: { Authorization: `Bearer ${await token(request, "U-PHAR-01")}` } });
+  expect(generic.status()).toBe(403);
+  expect((await generic.json()).detail).toContain("signed in Medication safety");
+
+  await login(page, "pharmacist");
+  await page.goto(`/hospital/patients/${medrec.mrn}`);
+  const row = page.getByTestId(`doc-${medrec.doc}`);
+  await expect(row).toContainText("Medication reconciliation record");
+  await expect(row).toContainText("Signed in Medication safety");
+  await expect(row.getByRole("button", { name: /sign/i })).toHaveCount(0);
+  await row.getByTestId("sign-in-med-safety").click();
+  await expect(page).toHaveURL(/\/med-safety\?encounter=/);
+  const panel = page.getByTestId("medrec-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByTestId("doc-status")).toContainText("preliminary");
+  await expect(panel.getByTestId("sign-button")).toBeDisabled(); // every discrepancy first
+  await shot(page, "ms-00-chart-link");
+
+  // the physician (a co-signer) gets the link too, never a Sign button
+  await login(page, "physician");
+  await page.goto(`/hospital/patients/${medrec.mrn}`);
+  await expect(page.getByTestId(`doc-${medrec.doc}`).getByTestId("sign-in-med-safety")).toBeVisible();
+  await expect(page.getByTestId(`doc-${medrec.doc}`).getByRole("button", { name: /sign/i })).toHaveCount(0);
 });
 
 test("pharmacist: queue, rule and AI flags, every item handled, sign; physician co-signs", async ({ page }) => {

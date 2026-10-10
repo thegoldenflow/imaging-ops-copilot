@@ -51,7 +51,9 @@ medications, allergies, laboratory results, body weight and diagnoses hospital-w
   reject), reason, change.
 - The record: DocumentReference type `medrec`, category admission or discharge, text/plain plus the JSON attachment
   `medrec-data` (items and, for a discharge, the discharge medication table); preliminary until the pharmacist
-  signs and a physician co-signs through the signing service (authenticator the pharmacist).
+  signs and a physician co-signs through the signing service (authenticator the pharmacist). Only `service.sign`
+  can sign it (it passes `flow=MEDREC_WORKBENCH`): the generic path (the chart's Sign endpoint, an approved
+  signDocumentFinal request) is refused with a denied `sign` audit event, and the chart links to the workbench.
 - The discharge medication table for 7.3: `discharge.discharge_medication_table(fhir, encounter_id)` and
   `GET /api/med-safety/encounters/{id}/discharge-medications` (new / changed / stopped / continued, each with its
   source references).

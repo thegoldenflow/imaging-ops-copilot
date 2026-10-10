@@ -24,7 +24,7 @@ from app.ehr import access, breakglass, consent
 from app.ehr.codes import MRN_SYSTEM
 from app.ehr.gateway import Actor, FhirConflict, FhirGateway, source_module
 from app.ehr.reference import UNITS
-from app.ehr.signing import signatures
+from app.ehr.signing import signatures, signing_flow
 
 router = APIRouter(prefix="/api")
 VIEWERS = (Role.PHYSICIAN, Role.NURSE, Role.PHARMACIST, Role.CLERK, Role.OPERATIONS_MANAGER)
@@ -65,12 +65,14 @@ def _document_view(doc, role: str) -> dict:
     required = list(entry.required_signoff_role) if entry else []
     missing = [r for r in required if r not in {s["role"] for s in signed}] if entry and entry.cosign else (
         [] if signed else required)
+    due = bool(entry and doc.docStatus == "preliminary" and role in required and role in missing)
+    flow = signing_flow(data)  # a MedRec record is signed in the pharmacist workbench, not with the chart's button
     return {
         "id": doc.id, "type": (doc.type.coding or [None])[0].display if doc.type.coding else doc.type.text,
         "doc_status": doc.docStatus, "date": doc.date, "description": data.get("description"), "module": module,
-        "tier": entry.tier if entry else None, "required_signoff_role": required,
-        "cosign": bool(entry and entry.cosign), "signatures": signed,
-        "can_sign": bool(entry and doc.docStatus == "preliminary" and role in required and role in missing),
+        "encounter_id": access.encounter_of(data), "tier": entry.tier if entry else None,
+        "required_signoff_role": required, "cosign": bool(entry and entry.cosign), "signatures": signed,
+        "signing_flow": flow, "can_sign": due and flow is None, "can_sign_in_flow": due and flow is not None,
         "text": _attachment_text(data),
     }
 

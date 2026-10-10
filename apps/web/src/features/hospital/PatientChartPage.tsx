@@ -183,9 +183,23 @@ function DocumentRow({ doc, onSigned }: { doc: ChartDocument; onSigned: () => vo
               <FileSignature className="size-4" /> {doc.cosign ? "Co-sign" : "Sign"}
             </Button>
           )}
+          {doc.can_sign_in_flow && doc.signing_flow === "medrec_workbench" && (
+            <Link
+              to={`/med-safety?encounter=${encodeURIComponent(doc.encounter_id ?? "")}&document=${encodeURIComponent(doc.id)}`}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand-600 px-3 text-xs font-medium text-white hover:bg-brand-700"
+              data-testid="sign-in-med-safety"
+            >
+              <FileSignature className="size-4" /> Sign in Medication safety
+            </Link>
+          )}
         </div>
       </div>
       {doc.description && <p className="mt-1 text-xs text-slate-500">{doc.description}</p>}
+      {doc.signing_flow === "medrec_workbench" && doc.doc_status !== "final" && (
+        <p className="mt-1 text-xs text-slate-500">
+          Signed in Medication safety: the pharmacist decides every discrepancy and signs, then a physician co-signs.
+        </p>
+      )}
       {doc.signatures.length > 0 && (
         <p className="mt-1 text-xs text-slate-600">
           {doc.signatures.map((s) => `${s.role}: ${s.name ?? s.by}${s.at ? ` (${dateTime(s.at)})` : ""}`).join(" · ")}

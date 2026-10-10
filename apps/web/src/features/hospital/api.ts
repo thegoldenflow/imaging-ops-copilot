@@ -31,11 +31,16 @@ export interface ChartDocument {
   date: string | null;
   description: string | null;
   module: string | null;
+  encounter_id: string | null;
   tier: "ops" | "documentation" | "clinical_ds" | null;
   required_signoff_role: string[];
   cosign: boolean;
   signatures: { role: string; by: string | null; name: string | null; at: string | null }[];
+  /** A document with its own signing flow is signed there, never with the chart's Sign button. */
+  signing_flow: "medrec_workbench" | null;
   can_sign: boolean;
+  /** The viewer's signature is due, in the document's own flow (a MedRec record: Medication safety). */
+  can_sign_in_flow: boolean;
   text: string | null;
 }
 

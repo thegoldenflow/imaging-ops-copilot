@@ -200,7 +200,7 @@ export interface SessionDetail {
 export interface EncounterOrders {
   encounter_id: string;
   orders: ({ ref: string; name: string; text: string; status: string; intent: string; authored: string | null; review: { id: string; severity: Severity; status: string; blocking: boolean } | null })[];
-  medrec: { id: string; kind: "admission" | "discharge"; status: string }[];
+  medrec: { id: string; kind: "admission" | "discharge"; status: string; document_id: string | null }[];
   patient: PatientHeader;
 }
 

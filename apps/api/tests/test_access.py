@@ -15,6 +15,7 @@ from app.core.models import Role
 from app.ehr.codes import MRN_SYSTEM, PRACTITIONER_ROLE, TASK_CODE, concept
 from app.ehr.fhirstore import unit_of
 from app.ehr.gateway import Actor, BreakGlassRequired, FhirAccessDenied, FhirConflict, FhirGateway, LocalBackend
+from app.ehr.signing import MEDREC_WORKBENCH, signatures
 from app.fhir.dt import ref, ref_id
 
 DISCHARGE, HANDOFF, MEDREC = "doc-demo-discharge", "doc-demo-handoff", "doc-demo-medrec"
@@ -234,13 +235,24 @@ def test_sign_nurse(fresh_state):
 
 
 def test_sign_pharmacist(fresh_state):
-    """Medication reconciliation is co-signed: the pharmacist's signature alone leaves it preliminary."""
+    """Medication reconciliation is co-signed: the pharmacist's signature alone leaves it preliminary. It is signed
+    only in the pharmacist workbench (WP6, which passes its flow): the generic path refuses it, audited."""
     store = fresh_state
-    first = gw(store, Role.PHARMACIST, "signing").sign_document(MEDREC)
+    for role in (Role.PHARMACIST, Role.PHYSICIAN):
+        with pytest.raises(FhirAccessDenied, match="signed in Medication safety"):
+            gw(store, role, "signing").sign_document(MEDREC)
+        event = _last(store)
+        assert (event.event_type, event.outcome, event.module, event.user_id) == (
+            "sign", "denied", "medication_reconciliation", _user(store, role).id)
+    doc = store.fhir.read("DocumentReference", MEDREC)
+    assert doc["docStatus"] == "preliminary" and signatures(doc) == []
+    first = gw(store, Role.PHARMACIST, "signing").sign_document(MEDREC, flow=MEDREC_WORKBENCH)
     assert (first.doc_status, first.missing_roles) == ("preliminary", ["physician"])
     with pytest.raises(FhirConflict):
-        gw(store, Role.PHARMACIST, "signing").sign_document(MEDREC)  # the same role twice
-    second = gw(store, Role.PHYSICIAN, "signing").sign_document(MEDREC)
+        gw(store, Role.PHARMACIST, "signing").sign_document(MEDREC, flow=MEDREC_WORKBENCH)  # the same role twice
+    with pytest.raises(FhirAccessDenied):  # the co-signature too
+        gw(store, Role.PHYSICIAN, "signing").sign_document(MEDREC)
+    second = gw(store, Role.PHYSICIAN, "signing").sign_document(MEDREC, flow=MEDREC_WORKBENCH)
     assert (second.doc_status, second.signed_roles) == ("final", ["pharmacist", "physician"])
     doc = store.fhir.read("DocumentReference", MEDREC)  # the pharmacist authenticates (7.2); the physician co-signed
     assert doc["authenticator"]["reference"] == f"Practitioner/{_user(store, Role.PHARMACIST).practitioner_id}"

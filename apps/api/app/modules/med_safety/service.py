@@ -17,7 +17,8 @@ journey workflow (6.5, WP4c):
 - Decisions: `decide_review` (accept the order or request a change, with a reason;
   only a pharmacist clears a blocking flag), `handle_item` (accept / modify / reject
   each discrepancy, reason required), `sign` (the pharmacist, when every item is
-  handled; then the physician's co-signature, through WP4's signing service).
+  handled; then the physician's co-signature, through WP4's signing service, which
+  refuses a MedRec record signed any other way).
 
 The module reads the EHR through FhirGateway as its agents (`agent:order_review`,
 `agent:medication_reconciliation`, the registry's data scope, hospital-wide, every
@@ -43,6 +44,7 @@ from app.ehr import access
 from app.ehr.clock import hospital_now
 from app.ehr.codes import MRN_SYSTEM, PRACTITIONER_ROLE, TASK_CODE, concept
 from app.ehr.gateway import Actor, FhirGateway
+from app.ehr.signing import MEDREC_WORKBENCH
 from app.ehr.signing import signatures as document_signatures
 from app.fhir.dt import fhir_datetime, parse, ref, ref_id
 from app.modules.med_safety import facts as F
@@ -666,7 +668,8 @@ def sign(store: Store, user: StaffUser, session_id: str, request=None) -> MedRec
     """The pharmacist signs a reconciliation whose every item is handled (the record is updated with the decisions,
     then signed through the signing service: a `sign` audit event; it stays preliminary until the co-signature);
     then the physician co-signs (final; the authenticator is the pharmacist). Modify decisions become Tasks for the
-    prescriber."""
+    prescriber. This is the only way a MedRec record becomes final: the signing service refuses it without
+    `flow=MEDREC_WORKBENCH`."""
     session = _medrec_session(store, session_id)
     role = str(user.role)
     fhir = FhirGateway(Actor.of(user, request), MEDREC)
@@ -682,7 +685,7 @@ def sign(store: Store, user: StaffUser, session_id: str, request=None) -> MedRec
         signatures = [*session.signatures, {"role": role, "by": user.id, "name": user.name, "at": now.isoformat()}]
         session = _save_session(store, session, signatures=signatures)
         session = _write_document(store, session, items, fhir, final=True)
-        fhir.sign_document(session.document_id)
+        fhir.sign_document(session.document_id, flow=MEDREC_WORKBENCH)
         tasks = []
         for item in items:
             if item.action == "modify":
@@ -700,7 +703,7 @@ def sign(store: Store, user: StaffUser, session_id: str, request=None) -> MedRec
             raise DecisionProblem("The physician co-signs after the pharmacist has signed")
         if not _in_scope(user, session.patient_id):
             raise DecisionDenied("This patient is outside your units")
-        fhir.sign_document(session.document_id)
+        fhir.sign_document(session.document_id, flow=MEDREC_WORKBENCH)
         now = hospital_now(store)
         signatures = [*session.signatures, {"role": role, "by": user.id, "name": user.name, "at": now.isoformat()}]
         return _save_session(store, session, status="final", signatures=signatures)
@@ -951,7 +954,7 @@ def encounter_view(store: Store, user: StaffUser, encounter_id: str, request=Non
                        "review": {"id": r.id, "severity": r.severity, "status": r.status, "blocking": r.blocking}
                        if r else None})
     return {"encounter_id": encounter_id, "orders": orders,
-            "medrec": [{"id": s.id, "kind": s.kind, "status": s.status} for s in
+            "medrec": [{"id": s.id, "kind": s.kind, "status": s.status, "document_id": s.document_id} for s in
                        (sessions(store).get(session_key(encounter_id, k)) for k in ("admission", "discharge"))
                        if s is not None],
             "patient": patient_header(user, access.patient_of(encounter.to_fhir()), encounter_id, request)}

@@ -402,6 +402,69 @@ def test_workbench_flow_over_http(client, login, fresh_state):
         .status_code == 403
 
 
+def test_a_medrec_record_is_signed_only_in_the_workbench(client, login, fresh_state):
+    """The generic path (the chart's Sign endpoint, the signing service without the workbench's flow, an approved
+    signDocumentFinal request) refuses a MedRec record with a denied `sign` audit event, even with every item handled;
+    the chart links to the workbench instead of offering Sign; the workbench signs and co-signs it."""
+    from types import SimpleNamespace
+
+    from app.agents.handlers import sign_document_final
+    from app.ehr.codes import MRN_SYSTEM
+    from app.ehr.gateway import FhirAccessDenied
+    from app.ehr.signing import signatures
+
+    store = fresh_state
+    pharmacist, physician = user(store, Role.PHARMACIST), user(store, Role.PHYSICIAN)
+    ph, md = login(pharmacist.id), login(physician.id)
+    encounter = encounter_of(store, QUETIAPINE)
+    session = handle_all(store, pharmacist, settled_session(store, encounter, "admission"))
+    assert S.unhandled(session) == []
+    doc_id = session.document_id
+    patient = store.fhir.read("Patient", session.patient_id)
+    mrn = next(i["value"] for i in patient["identifier"] if i["system"] == MRN_SYSTEM)
+
+    def chart_row(headers) -> dict:
+        documents = client.get(f"/api/hospital/patients/{mrn}", headers=headers).json()["documents"]
+        return next(d for d in documents if d["id"] == doc_id)
+
+    def refused(by, before: int) -> None:
+        denied = [e for e in store.audit.events()[before:] if e.event_type == "sign" and e.resource_id == doc_id]
+        assert [(e.outcome, e.user_id, e.module) for e in denied] == [("denied", by.id, S.MEDREC)]
+        assert "signed in Medication safety" in denied[0].reason
+
+    for headers in (ph, md):  # both signers get a link to the workbench, no Sign button
+        row = chart_row(headers)
+        assert (row["signing_flow"], row["can_sign"], row["can_sign_in_flow"], row["encounter_id"]) == (
+            "medrec_workbench", False, True, encounter)
+    for who, headers in ((pharmacist, ph), (physician, md)):
+        before = len(store.audit.events())
+        response = client.post(f"/api/hospital/documents/{doc_id}/sign", headers=headers)
+        assert response.status_code == 403 and "signed in Medication safety" in response.json()["detail"]
+        refused(who, before)
+    before = len(store.audit.events())
+    with pytest.raises(FhirAccessDenied, match="Medication safety"):
+        FhirGateway(Actor.of(pharmacist), "signing", LocalBackend(store)).sign_document(doc_id)
+    refused(pharmacist, before)
+    before = len(store.audit.events())
+    with pytest.raises(FhirAccessDenied, match="Medication safety"):  # the agent's tool, run as its approver
+        sign_document_final(SimpleNamespace(fhir=FhirGateway(Actor.of(pharmacist), S.MEDREC, LocalBackend(store))),
+                            doc_id)
+    refused(pharmacist, before)
+    doc = store.fhir.read("DocumentReference", doc_id)
+    assert doc["docStatus"] == "preliminary" and signatures(doc) == []
+    assert sessions(store).get(session_key(encounter, "admission")).status == "open"
+
+    signed = client.post(f"/api/med-safety/medrec/{session.id}/sign", headers=ph).json()
+    assert signed["status"] == "pharmacist_signed" and signed["document"]["doc_status"] == "preliminary"
+    assert client.post(f"/api/hospital/documents/{doc_id}/sign", headers=md).status_code == 403  # nor the co-signature
+    final = client.post(f"/api/med-safety/medrec/{session.id}/sign", headers=md).json()
+    assert final["status"] == "final" and final["document"]["doc_status"] == "final"
+    doc = store.fhir.read("DocumentReference", doc_id)
+    assert [s["role"] for s in signatures(doc)] == ["pharmacist", "physician"]
+    items = [RecItem.model_validate(i) for i in discharge._data(doc)["items"]]
+    assert any(i.discrepancy for i in items) and all(i.action for i in items if i.discrepancy)  # every decision
+    assert (chart_row(ph)["doc_status"], chart_row(ph)["can_sign_in_flow"]) == ("final", False)
+
 
 # ---------- the journey's steps (6.5: WP4c's activities call them; Temporal in tests/test_workflows.py) ----------
 

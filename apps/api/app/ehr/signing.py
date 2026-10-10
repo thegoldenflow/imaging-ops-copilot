@@ -18,6 +18,12 @@ A draft is created as `docStatus=preliminary` by the module that wrote it (its
 4. writes a `sign` audit event (refusals are `sign` events with outcome denied);
 5. for a draft an agent wrote (extension ai-run), adds the signer to the run's
    Provenance and records the signature as the trace's human action (6.4).
+
+Some documents have their own signing flow and the generic path (the chart's
+Sign button, the signDocumentFinal tool) refuses them (`signing_flow`): a
+medication reconciliation record is signed only in Medication safety's
+pharmacist workbench (WP6, spec 7.2), which records the pharmacist's decision on
+every discrepancy first and passes `flow=MEDREC_WORKBENCH`.
 """
 
 from __future__ import annotations
@@ -29,7 +35,7 @@ from typing import TYPE_CHECKING
 from app.core.store import get_store
 from app.ehr import access
 from app.ehr.clock import hospital_now
-from app.ehr.codes import EXT
+from app.ehr.codes import DOC_TYPES, EXT
 from app.fhir.dt import fhir_datetime, ref
 from app.fhir.types import validate
 
@@ -37,6 +43,12 @@ if TYPE_CHECKING:
     from app.ehr.gateway import FhirGateway
 
 SIGNATURE = EXT + "signature"
+MEDREC_WORKBENCH = "medrec_workbench"
+# Why the generic path refuses a document with its own flow (the refusal's message and audit detail).
+FLOW_REFUSALS = {
+    MEDREC_WORKBENCH: "Medication reconciliation records are signed in Medication safety (the pharmacist workbench): "
+                      "the pharmacist decides every discrepancy and signs, then a physician co-signs",
+}
 
 
 @dataclass
@@ -61,7 +73,23 @@ def signatures(document: dict) -> list[dict]:
     return out
 
 
-def sign(fhir: FhirGateway, document_id: str, *, at: datetime | None = None) -> SignResult:
+def signing_flow(document: dict) -> str | None:
+    """The flow a document must be signed in, or None when the generic path signs it.
+
+    A medication reconciliation record (type MedRec, or any document of the medication_reconciliation module): signed
+    elsewhere it would count as reconciled (the journey waits for it) with none of the pharmacist's decisions
+    recorded."""
+    from app.ehr.gateway import source_module
+
+    codes = {c.get("code") for c in (document.get("type") or {}).get("coding") or []}
+    if DOC_TYPES["medrec"][1] in codes or source_module(document) == "medication_reconciliation":
+        return MEDREC_WORKBENCH
+    return None
+
+
+def sign(fhir: FhirGateway, document_id: str, *, at: datetime | None = None, flow: str | None = None) -> SignResult:
+    """Sign a draft. `flow` names the module flow calling (MEDREC_WORKBENCH); documents with their own flow are
+    refused without it."""
     from app.ehr.gateway import FhirConflict, source_module
 
     doc = fhir.backend.read("DocumentReference", document_id)
@@ -91,6 +119,8 @@ def sign(fhir: FhirGateway, document_id: str, *, at: datetime | None = None) -> 
         deny(f"documents of module {module} are signed by {', '.join(entry.required_signoff_role) or 'nobody'}, "
              f"not the {role} role")
     fhir._require_patient("sign", "DocumentReference", document_id, patient, encounter)
+    if (own := signing_flow(doc)) is not None and flow != own:
+        deny(FLOW_REFUSALS[own])
     if doc.get("docStatus") != "preliminary":
         raise FhirConflict(f"DocumentReference/{document_id} is already {doc.get('docStatus')}")
     done = signatures(doc)

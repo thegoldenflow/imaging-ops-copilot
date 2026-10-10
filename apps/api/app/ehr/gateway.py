@@ -738,11 +738,12 @@ class FhirGateway:
 
     # ----- signing and consent (6.3) -----
 
-    def sign_document(self, document_id: str, *, at: datetime | None = None):
-        """Sign a draft (app/ehr/signing.py); the only way a DocumentReference becomes final."""
+    def sign_document(self, document_id: str, *, at: datetime | None = None, flow: str | None = None):
+        """Sign a draft (app/ehr/signing.py); the only way a DocumentReference becomes final. `flow`: the module flow
+        signing a document that has its own (a MedRec record: the pharmacist workbench)."""
         from app.ehr.signing import sign
 
-        return sign(self, document_id, at=at)
+        return sign(self, document_id, at=at, flow=flow)
 
     def record_consent(self, patient_id: str, category: str, permit: bool, *, at: datetime) -> tuple[dict, str]:
         """Write the patient's decision for one consent category; returns (Consent, previous state:

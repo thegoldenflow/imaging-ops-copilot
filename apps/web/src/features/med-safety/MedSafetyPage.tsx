@@ -2,12 +2,16 @@
 // its review result, right the reconciliation's discrepancy table with the actions and the sign button. Physicians
 // see their units' reviews (laboratory and imaging orders are theirs) and co-sign reconciliations.
 // AI output is advice: only rules block, and every decision is a person's, with a reason.
+// The patient chart links a MedRec record here (?encounter=…&document=…): it is signed only in this workbench.
 
+import { useQueryClient } from "@tanstack/react-query";
 import { ClipboardCheck, FileWarning } from "lucide-react";
-import { useState } from "react";
-import { EmptyState, PageHeader } from "../../components/ui";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Button, EmptyState, PageHeader } from "../../components/ui";
+import { ApiError } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { useReview, type QueueItem } from "./api";
+import { startMedrec, useEncounter, useReview, type QueueItem } from "./api";
 import { MedRecPanel } from "./MedRecPanel";
 import { QueuePanel } from "./QueuePanel";
 import { EncounterOrdersPanel, ReviewPanel } from "./ReviewPanel";
@@ -30,9 +34,56 @@ function ReviewSide({ reviewId }: { reviewId: string }) {
   return <MedRecPanel id={pick.id} />;
 }
 
+/** A chart's MedRec record that no reconciliation holds yet: the pharmacist opens one, which adopts the record. */
+function OpenReconciliation({ encounterId, onOpened }: { encounterId: string; onOpened: (sessionId: string) => void }) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const open = async (kind: "admission" | "discharge") => {
+    setBusy(true);
+    setError(null);
+    try {
+      const s = await startMedrec(encounterId, kind);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["ms-encounter", encounterId] }),
+        queryClient.invalidateQueries({ queryKey: ["ms-queue"] }),
+      ]);
+      onOpened(s.id);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not open the reconciliation");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div data-testid="open-reconciliation">
+      <EmptyState icon={<ClipboardCheck className="size-8" />} title="No reconciliation holds this record yet"
+        hint={user?.role === "pharmacist" ? "Open the reconciliation: it takes over the draft record, and you sign it here once every discrepancy is decided." : "The pharmacist opens the reconciliation; you co-sign it here after the pharmacist has signed."} />
+      {user?.role === "pharmacist" && (
+        <div className="flex justify-center gap-2">
+          <Button size="sm" variant="primary" loading={busy} onClick={() => open("admission")}>Open admission reconciliation</Button>
+          <Button size="sm" loading={busy} onClick={() => open("discharge")}>Open discharge reconciliation</Button>
+        </div>
+      )}
+      {error && <p className="mt-2 text-center text-sm text-rose-600" role="alert">{error}</p>}
+    </div>
+  );
+}
+
 export function MedSafetyPage() {
   const { user } = useAuth();
-  const [sel, setSel] = useState<Selection>({ reviewId: null, sessionId: null, encounterId: null });
+  const [params] = useSearchParams();
+  const linkEncounter = params.get("encounter");
+  const linkDocument = params.get("document");
+  const [sel, setSel] = useState<Selection>({ reviewId: null, sessionId: null, encounterId: linkEncounter });
+  const linked = useEncounter(linkEncounter);
+  const linkedSession = linked.data?.medrec.find((m) => m.document_id === linkDocument)?.id ?? null;
+  const onLinkedEncounter = Boolean(linkEncounter) && sel.encounterId === linkEncounter && !sel.reviewId;
+  useEffect(() => {
+    // the chart's record: select its reconciliation once it is known (unless another item was picked meanwhile)
+    if (linkedSession) setSel((s) => (s.encounterId === linkEncounter && !s.reviewId && !s.sessionId ? { ...s, sessionId: linkedSession } : s));
+  }, [linkedSession, linkEncounter]);
   const select = (item: QueueItem) => {
     if (item.kind === "order_review") setSel({ reviewId: item.id, sessionId: null, encounterId: item.encounter_id });
     else setSel({ reviewId: null, sessionId: item.id, encounterId: item.encounter_id });
@@ -58,6 +109,9 @@ export function MedSafetyPage() {
         <div className="min-w-0 lg:col-span-2 xl:col-span-1 xl:h-[calc(100vh-170px)] xl:overflow-y-auto">
           {sel.sessionId && <MedRecPanel id={sel.sessionId} />}
           {!sel.sessionId && sel.reviewId && <ReviewSide reviewId={sel.reviewId} />}
+          {!sel.sessionId && onLinkedEncounter && linked.data && !linkedSession && (
+            <OpenReconciliation encounterId={linkEncounter!} onOpened={(id) => setSel((s) => ({ ...s, sessionId: id }))} />
+          )}
         </div>
       </div>
       <p className="mt-3 text-[11px] text-slate-400">
