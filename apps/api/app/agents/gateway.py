@@ -243,11 +243,14 @@ class ToolGateway:
 
     @staticmethod
     def _target(run: AgentRun, tool: ToolSpec, args: dict) -> Target:
-        spec_target = tool.permission_policy.target
+        # A tool names its target by one argument; a tool with several (createWorkflowTask: the encounter, else
+        # the unit) takes the first one given. With none, the run's own encounter is the target.
+        spec_target = [(kind, arg) for kind, arg in tool.permission_policy.target.items()
+                       if len(tool.permission_policy.target) == 1 or args.get(arg) is not None]
         if not spec_target:
             return Target(patient_id=run.patient_id, encounter_id=run.encounter_id)
         fhir = runtime_fhir()
-        (kind, arg), = spec_target.items()
+        kind, arg = spec_target[0]
         value = args.get(arg)
         if kind == "unit":
             return Target(unit_id=value, ref=f"Location/{value}")

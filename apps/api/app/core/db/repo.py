@@ -290,6 +290,15 @@ class EntityTable(Generic[T]):
             return default
         return self._adopt([row])[0]
 
+    def forget(self, key: str) -> None:
+        """Drop this unit of work's copy of one row, so the next read sees what other transactions committed since
+        (e.g. after taking a lock that serialises work on it). Pending changes are written first."""
+        self.flush()
+        self._map.pop(key, None)
+        self._snap.pop(key, None)
+        self._absent.discard(key)
+        self._complete = self._store.detached
+
     def __getitem__(self, key: str) -> T:
         obj = self.get(key, _MISSING)
         if obj is _MISSING:

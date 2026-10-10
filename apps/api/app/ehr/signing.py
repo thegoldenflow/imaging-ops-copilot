@@ -115,4 +115,12 @@ def sign(fhir: FhirGateway, document_id: str, *, at: datetime | None = None) -> 
     from app.agents.runtime import record_signature
 
     record_signature(doc, signer, role, fhir.actor.id)  # an AI draft: the signer joins its Provenance and trace
+    from app.ehr.events import bus, platform_event
+
+    refs = {"document": f"DocumentReference/{document_id}",
+            **({"patient": f"Patient/{patient}"} if patient else {}),
+            **({"encounter": f"Encounter/{encounter}"} if encounter else {})}
+    bus.publish(platform_event("document.signed", at=at, actor=f"user:{fhir.actor.id}", refs=refs,
+                               key=f"document-signed|{document_id}|{role}",
+                               attrs={"role": role, "final": not missing, "module": module}))
     return SignResult(document_id, doc["docStatus"], signed, missing)

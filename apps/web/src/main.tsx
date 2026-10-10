@@ -24,6 +24,9 @@ import { PortalPatientPage } from "./features/portal/PortalPatientPage";
 import { PeerReviewPage } from "./features/peer-review/PeerReviewPage";
 import { ContrastPage } from "./features/contrast/ContrastPage";
 import { ControlTowerPage } from "./features/control-tower/ControlTowerPage";
+import { ReviewQueuePage } from "./features/workflows/ReviewQueuePage";
+import { WorkflowPage } from "./features/workflows/WorkflowPage";
+import { WorkflowsPage } from "./features/workflows/WorkflowsPage";
 import { EvalsPage } from "./features/evals/EvalsPage";
 import { ClinicalKnowledgePage } from "./features/clinical-kg/ClinicalKnowledge";
 import { MriSafetyPage } from "./features/mri-safety/MriSafetyPage";
@@ -111,6 +114,9 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/audit" element={<Guard path="/audit"><AuditPage /></Guard>} />
               <Route path="/break-glass-review" element={<Guard path="/break-glass-review"><BreakGlassReviewPage /></Guard>} />
               <Route path="/control-tower" element={<Guard path="/control-tower"><ControlTowerPage /></Guard>} />
+              <Route path="/workflows" element={<Guard path="/workflows"><WorkflowsPage /></Guard>} />
+              <Route path="/workflows/:workflowId" element={<Guard path="/workflows"><WorkflowPage /></Guard>} />
+              <Route path="/reviews" element={<Guard path="/reviews"><ReviewQueuePage /></Guard>} />
               <Route path="/hospital/patients" element={<Guard path="/hospital/patients"><PatientsPage /></Guard>} />
               <Route path="/hospital/patients/:mrn" element={<Guard path="/hospital/patients"><PatientChartPage /></Guard>} />
               <Route path="*" element={<EmptyState title="Page not found" />} />

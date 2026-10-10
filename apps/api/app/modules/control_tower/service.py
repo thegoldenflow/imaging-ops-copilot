@@ -9,7 +9,13 @@
 - The action drawer: `approve` (the decision on the exception's review Task is the
   approval record, then one Task per approved action for its owner role, written
   by the agent through createFlowTask), `reject` (with a reason), `defer` (with a
-  reminder time on the hospital clock). The AI never executes an action.
+  reminder time on the hospital clock). The AI never executes an action. Every
+  decision is published as `exception.decided`; while the exception's
+  CapacityExceptionWorkflow runs (6.5, app/workflows/capacity.py) the approved
+  actions are queued and the workflow executes them (`execute_actions`, with
+  Temporal's retries and the same idempotency keys), re-checks the occupancy an
+  hour later (`verify`) and records the outcome (`record_outcome`); without
+  Temporal they are executed in the request, as before.
 - Views: the bed manager (operations manager) sees the boards hospital-wide, a
   patient as MRN and bed only; a nurse or physician sees MRNs only for patients of
   their units (or whom they attend) and the prediction values; the patient card
@@ -19,9 +25,11 @@
 from __future__ import annotations
 
 import threading
+import zlib
 from datetime import datetime, timedelta
 
 from fastapi import Request
+from sqlalchemy import text
 
 from app.agents import approvals, registry
 from app.agents.runtime import runtime
@@ -84,8 +92,17 @@ def narrate_step(store: Store, limit: int = 2) -> None:
 # ---------- narration ----------
 
 
+def _lock_exception(store: Store, exception_id: str) -> None:
+    """One narration or execution per exception at a time (the narrator loop, a request and the workflow's
+    activity may all try): the second waits, then finds it done."""
+    if not store.detached:
+        store.conn().execute(text("SELECT pg_advisory_xact_lock(:k)"),
+                             {"k": zlib.crc32(f"flow-exception:{exception_id}".encode())})
+
+
 def narrate(store: Store, exception_id: str) -> X.FlowException:
-    exc = X.get(store, exception_id)
+    _lock_exception(store, exception_id)
+    exc = X.fresh(store, exception_id)  # another narrator may have finished while we waited for the lock
     if exc is None:
         raise LookupError(f"No exception {exception_id}")
     if exc.narration_status == "done":
@@ -175,25 +192,61 @@ def approve(store: Store, user: StaffUser, exception_id: str, action_ids: list[s
     unknown = [a for a in chosen if a not in menu]
     if unknown:
         raise DecisionProblem(f"Not actions of this exception: {', '.join(unknown)}")
-    recommended = {a["action_id"]: a for a in (exc.narration or {}).get("recommended_actions", [])}
     summary = f"approved {', '.join(chosen)}" + (f": {note}" if note else "")
     if exc.review_task_id:
         approvals.decide(user, exc.review_task_id, "approve", summary, source_ip=source_ip)
     else:
         _audit_without_review(store, user, exc, "approve", summary, source_ip)
     now = hospital_now(store)
+    workflow_id = _running_workflow(store, exc)
+    if workflow_id:  # the CapacityExceptionWorkflow executes them (6.5), with Temporal's retries
+        done = [{"action_id": a, "label": menu[a]["label"], "owner_role": menu[a]["owner_role"], "task_id": None,
+                 "status": "queued", "detail": "The workflow creates this Task"} for a in chosen]
+        run_id = None
+    else:
+        done, run_id = _execute(exc, _action_calls(exc, chosen, user.id), str(user.role))
+    exc = exc.model_copy(update=dict(status="approved", remind_at=None,
+                                     decision=_decision(user, "approved", now, note=note, actions=done,
+                                                        execution_run=run_id, workflow_id=workflow_id,
+                                                        executed_by="workflow" if workflow_id else "request")))
+    X.save(store, exc)
+    X.publish(exc, "exception.decided", now, actor=f"user:{user.id}", key=f"exception.decided|{exc.id}|approved",
+              attrs={"decision": "approved", "role": str(user.role)})
+    return exc
+
+
+def _running_workflow(store: Store, exc: X.FlowException) -> str | None:
+    """The exception's CapacityExceptionWorkflow, when Temporal is on and the workflow runs."""
+    from app.workflows import bridge
+
+    return bridge.running_capacity_workflow(store, exc.id)
+
+
+def _action_calls(exc: X.FlowException, action_ids: list[str], approved_by: str) -> list[tuple[dict, dict]]:
+    """The createFlowTask arguments of each approved action. Built only from what the exception stores, so the
+    request and the workflow (and every retry) send the same arguments and the gateway's idempotency key holds."""
+    menu = {m["action_id"]: m for m in exc.menu}
+    recommended = {a["action_id"]: a for a in (exc.narration or {}).get("recommended_actions", [])}
     priority = {"high": "urgent", "med": "asap", "low": "routine"}[exc.severity]
-    done: list[dict] = []
     calls = []
-    for action_id in chosen:
+    for action_id in action_ids:
         item = menu[action_id]
         why = recommended.get(action_id, {}).get("rationale") or item["why"]
         args = {"exception_id": exc.id, "action_id": action_id, "unit_id": exc.unit_id,
                 "description": f"{item['label']} ({why})"[:1000], "performer_role": item["owner_role"],
-                "priority": priority, "review_task_id": exc.review_task_id or exc.id, "approved_by": user.id}
+                "priority": priority, "review_task_id": exc.review_task_id or exc.id, "approved_by": approved_by}
         if item.get("encounter_id"):
             args["encounter_id"] = item["encounter_id"]
         calls.append((item, args))
+    return calls
+
+
+def _execute(exc: X.FlowException, calls: list[tuple[dict, dict]], approver_role: str | None,
+             already: dict[str, str] | None = None) -> tuple[list[dict], str | None]:
+    """One Task per approved action: by the agent through createFlowTask (idempotent per exception and action),
+    or, without a deployable agent, by the module (skipping actions whose Task was written before)."""
+    already = already or {}
+    done: list[dict] = []
     run_id = None
     try:
         with acting_as_system(), runtime.start(agent.AGENT_ID, user=None, context_id=exc.id) as run:
@@ -203,21 +256,79 @@ def approve(store: Store, user: StaffUser, exception_id: str, action_ids: list[s
                 done.append({"action_id": item["action_id"], "label": item["label"], "owner_role": item["owner_role"],
                              "task_id": (result.output or {}).get("task_id"), "status": result.status,
                              "detail": None if result.ok else (result.detail or result.reason)})
-            run.trace.human_action = {"role": str(user.role), "user_id": user.id, "decision": "approve",
-                                      "task_id": exc.review_task_id, "at": datetime.now().isoformat(timespec="seconds")}
+            run.trace.human_action = {"role": approver_role, "user_id": calls[0][1]["approved_by"] if calls else None,
+                                      "decision": "approve", "task_id": exc.review_task_id,
+                                      "at": datetime.now().isoformat(timespec="seconds")}
             run.finish(outcome="completed" if all(d["task_id"] for d in done) else "needs_human")
     except (registry.AgentNotDeployable, registry.UnregisteredAgent):  # no agent (prod mode before its eval passed)
         fhir = tower_fhir()
         for item, args in calls:
+            if already.get(item["action_id"]):
+                done.append({"action_id": item["action_id"], "label": item["label"], "owner_role": item["owner_role"],
+                             "task_id": already[item["action_id"]], "status": "ok", "detail": "written before"})
+                continue
             encounter = fhir.read("Encounter", args["encounter_id"]).to_fhir() if args.get("encounter_id") else None
             task = fhir.create(tools.flow_task(exc.id, item["action_id"], exc.unit_id, args["description"],
-                                               item["owner_role"], priority, exc.review_task_id, user.id,
-                                               encounter=encounter))
+                                               item["owner_role"], args["priority"], exc.review_task_id,
+                                               args["approved_by"], encounter=encounter))
             done.append({"action_id": item["action_id"], "label": item["label"], "owner_role": item["owner_role"],
                          "task_id": task.id, "status": "ok", "detail": "written without the agent"})
-    exc = exc.model_copy(update=dict(status="approved", remind_at=None,
-                                     decision=_decision(user, "approved", now, note=note, actions=done,
-                                                        execution_run=run_id)))
+    return done, run_id
+
+
+# ---------- the workflow's steps (6.5 CapacityExceptionWorkflow) ----------
+
+
+def execute_actions(store: Store, exception_id: str) -> X.FlowException:
+    """The approved actions of an exception, executed by its workflow (a retried activity replays the Tasks)."""
+    _lock_exception(store, exception_id)
+    exc = X.fresh(store, exception_id)
+    if exc is None:
+        raise LookupError(f"No exception {exception_id}")
+    decision = exc.decision or {}
+    if exc.status != "approved" or decision.get("decision") != "approved":
+        raise DecisionProblem(f"{exception_id} is {exc.status}, not approved")
+    actions = decision.get("actions") or []
+    already = {a["action_id"]: a["task_id"] for a in actions if a.get("task_id")}
+    calls = _action_calls(exc, [a["action_id"] for a in actions], decision["by"])
+    done, run_id = _execute(exc, calls, decision.get("role"), already)
+    exc = exc.model_copy(update=dict(decision={**decision, "actions": done,
+                                               "execution_run": run_id or decision.get("execution_run"),
+                                               "executed_at": hospital_now(store).isoformat()}))
+    X.save(store, exc)
+    return exc
+
+
+def verify(store: Store, exception_id: str) -> dict:
+    """An hour after execution: the unit's occupancy now against the facts the exception opened with, whether the
+    condition still holds, and how far the approved Tasks have got."""
+    exc = X.get(store, exception_id)
+    if exc is None:
+        raise LookupError(f"No exception {exception_id}")
+    snap = cache.get(store)
+    unit = next((u for u in snap.units if u.id == exc.unit_id), None)
+    live = {d.key for d in rules.evaluate(snap)}
+    fhir = tower_fhir()
+    tasks = []
+    for a in (exc.decision or {}).get("actions") or []:
+        task = fhir.read("Task", a["task_id"]) if a.get("task_id") else None
+        tasks.append({"action_id": a["action_id"], "task_id": a.get("task_id"),
+                      "status": task.status if task is not None else None})
+    return {"unit_id": exc.unit_id, "occupancy_before_pct": exc.facts.get("occupancy_pct"),
+            "occupancy_after_pct": round(100 * unit.occupancy) if unit else None,
+            "condition_present": exc.key in live, "checked_at": snap.now.isoformat(), "tasks": tasks}
+
+
+def record_outcome(store: Store, exception_id: str, decision: str, verified: dict | None = None) -> X.FlowException:
+    """The end of the loop (6.6 counts how often recommendations are taken and whether they worked)."""
+    exc = X.get(store, exception_id)
+    if exc is None:
+        raise LookupError(f"No exception {exception_id}")
+    outcome = {"decision": decision, "recorded_at": hospital_now(store).isoformat(),
+               "narration_source": (exc.narration or {}).get("source"),
+               "decided_by_role": (exc.decision or {}).get("role"), "verified": verified or None,
+               "resolved": None if not verified else not verified.get("condition_present")}
+    exc = exc.model_copy(update=dict(outcome=outcome))
     X.save(store, exc)
     return exc
 
@@ -232,9 +343,12 @@ def reject(store: Store, user: StaffUser, exception_id: str, reason: str, *,
         approvals.decide(user, exc.review_task_id, "reject", reason, source_ip=source_ip)
     else:
         _audit_without_review(store, user, exc, "reject", reason, source_ip)
+    now = hospital_now(store)
     exc = exc.model_copy(update=dict(status="rejected", remind_at=None,
-                                     decision=_decision(user, "rejected", hospital_now(store), note=reason)))
+                                     decision=_decision(user, "rejected", now, note=reason)))
     X.save(store, exc)
+    X.publish(exc, "exception.decided", now, actor=f"user:{user.id}", key=f"exception.decided|{exc.id}|rejected",
+              attrs={"decision": "rejected", "role": str(user.role)})
     return exc
 
 
@@ -254,6 +368,9 @@ def defer(store: Store, user: StaffUser, exception_id: str, minutes: int, note: 
                                      decision=_decision(user, "deferred", now, note=note,
                                                         remind_at=remind.isoformat())))
     X.save(store, exc)
+    X.publish(exc, "exception.decided", now, actor=f"user:{user.id}",
+              key=f"exception.decided|{exc.id}|deferred|{exc.reminders}",
+              attrs={"decision": "deferred", "role": str(user.role)})
     return exc
 
 
@@ -283,7 +400,7 @@ def exception_view(exc: X.FlowException, *, detail: bool = False) -> dict:
            "detected_at": exc.detected_at, "changed_at": exc.changed_at, "cleared_at": exc.cleared_at,
            "remind_at": exc.remind_at, "reminders": exc.reminders, "narration_status": exc.narration_status,
            "decision": exc.decision, "review_task_id": exc.review_task_id,
-           "narrative": (exc.narration or {}).get("narrative")}
+           "narrative": (exc.narration or {}).get("narrative"), "outcome": exc.outcome}
     if detail:
         n = exc.narration or {}
         out.update(facts=exc.facts, menu=exc.menu, engine_evidence=exc.evidence_refs, narration={
@@ -341,6 +458,14 @@ def unit_view(user: StaffUser, snap: Snapshot, unit_id: str) -> dict:
             "beds": cells, "now": snap.now}
 
 
+def _journey(encounter_id: str) -> dict | None:
+    """The encounter's InpatientJourneyWorkflow (6.5), for the card's link to the workflow view."""
+    from app.workflows import progress
+
+    run = progress.for_encounter(encounter_id)
+    return progress.summary(run) if run is not None else None
+
+
 CARD_FIELDS = ("mrn", "bed", "admitted_at", "expected_discharge", "name", "gender", "age", "reason", "attending",
                "flags", "vitals", "open_orders", "discharge")
 OPS_FIELDS = ("mrn", "bed", "admitted_at", "expected_discharge")  # 7.1: the bed manager sees only these
@@ -361,7 +486,7 @@ def patient_card(user: StaffUser, request: Request | None, encounter_id: str, sn
                   "status": enc.get("status"), "mrn": V.mrn(patient), "bed": V.current_location(enc),
                   "admitted_at": started,
                   "expected_discharge": started + timedelta(days=float(expected_days))
-                  if started and expected_days else None}
+                  if started and expected_days else None, "journey": _journey(encounter_id)}
     role = str(user.role)
     if role == "operations_manager":
         card["hidden"] = [f for f in CARD_FIELDS if f not in OPS_FIELDS]

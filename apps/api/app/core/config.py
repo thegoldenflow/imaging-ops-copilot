@@ -60,6 +60,19 @@ class Settings:
     # "demo" or "prod" (spec 6.4): in prod an agent runs only when its eval_status is passed and its
     # deployment_status prod_ready; in demo an agent that has not passed runs with a "not evaluated" flag.
     app_mode: str
+    # Durable workflows (spec 6.5). Unset address: Temporal is off, the workflow view says "offline" and every
+    # module works without it.
+    temporal_address: str | None
+    temporal_namespace: str
+    temporal_task_queue: str
+    # Run the workflow worker inside the API process (development, Playwright); otherwise `python -m app.workflows.worker`.
+    temporal_worker_in_api: bool
+    # Timer durations in seconds, passed in each workflow's start input (so a change never alters a running
+    # workflow's history). Temporal's timers run on the wall clock, not the simulated hospital clock.
+    workflow_signoff_timeout_s: int
+    workflow_escalation_timeout_s: int
+    workflow_followup_delay_s: int
+    workflow_verify_after_s: int
 
 
 def load_settings() -> Settings:
@@ -103,6 +116,14 @@ def load_settings() -> Settings:
         fhir_client_id=os.getenv("FHIR_CLIENT_ID") or None,
         fhir_token_url=os.getenv("FHIR_TOKEN_URL") or None,
         app_mode=app_mode,
+        temporal_address=os.getenv("TEMPORAL_ADDRESS", "").strip() or None,
+        temporal_namespace=os.getenv("TEMPORAL_NAMESPACE", "hospital-demo").strip(),
+        temporal_task_queue=os.getenv("TEMPORAL_TASK_QUEUE", "hospital-workflows").strip(),
+        temporal_worker_in_api=os.getenv("TEMPORAL_WORKER_IN_API", "0") == "1",
+        workflow_signoff_timeout_s=int(os.getenv("WORKFLOW_SIGNOFF_TIMEOUT_S", str(24 * 3600))),
+        workflow_escalation_timeout_s=int(os.getenv("WORKFLOW_ESCALATION_TIMEOUT_S", str(24 * 3600))),
+        workflow_followup_delay_s=int(os.getenv("WORKFLOW_FOLLOWUP_DELAY_S", str(48 * 3600))),
+        workflow_verify_after_s=int(os.getenv("WORKFLOW_VERIFY_AFTER_S", str(3600))),
     )
 
 

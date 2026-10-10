@@ -96,6 +96,7 @@ class AgentRun:
         self.patient_id = patient_id
         self.context_id = context_id
         self.attachments = attachments or {}
+        self.last_model: dict | None = None  # the last model call's de-identified input and output
         self._token = None
 
     @property
@@ -152,10 +153,14 @@ class AgentRun:
             values[name] = untrusted_text.block(name, redacted)
         token = traces._active.set(self.trace)
         try:
-            return get_gateway().structured(task=self.spec.agent_id, prompt=prompt, variables=values,
-                                            schema_cls=schema_cls, pseudonymizer=pseudo)
+            outcome = get_gateway().structured(task=self.spec.agent_id, prompt=prompt, variables=values,
+                                               schema_cls=schema_cls, pseudonymizer=pseudo)
         finally:
             traces._active.reset(token)
+        if outcome.status == "ok":  # kept for a low-confidence review (6.5): as the model saw and answered it
+            self.last_model = {"prompt_version": prompt.version, "variables": values,
+                               "output": pseudo.retokenize(outcome.data)}
+        return outcome
 
     # ----- the end -----
 
@@ -181,6 +186,10 @@ class AgentRun:
             fhir.record_provenance(prov, replace=True)
             trace.provenance_id = prov["id"]
         self.save()
+        if confidence is not None:  # below the registry threshold: a person reviews it (6.5)
+            from app.agents import reviews
+
+            reviews.maybe_open(self, confidence)
         return trace
 
 

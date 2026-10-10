@@ -55,6 +55,8 @@ from app.modules.reports.router import router as reports_router
 from app.modules.requisitions import service as requisitions
 from app.modules.requisitions.router import router as requisitions_router
 from app.modules.scheduling.router import router as scheduling_router
+from app.workflows import bridge as workflow_bridge
+from app.workflows.router import router as workflows_router
 
 logging.basicConfig(level=logging.INFO, format='{"level":"%(levelname)s","logger":"%(name)s","msg":"%(message)s"}')
 log = logging.getLogger("app")
@@ -123,6 +125,29 @@ async def _hospital_loop() -> None:
         await asyncio.sleep(max(0.1, 1 - (loop.time() - started)))
 
 
+async def _workflow_loop() -> None:
+    """Sends the workflow bridge's start and signal commands to Temporal (6.5); a no-op without TEMPORAL_ADDRESS.
+    Apart from the hospital loop, so an unreachable Temporal never slows the boards."""
+    while True:
+        await asyncio.sleep(1)
+        await asyncio.to_thread(_step, "workflow dispatch", workflow_bridge.dispatch_step)
+
+
+async def _workflow_worker() -> None:
+    """TEMPORAL_WORKER_IN_API=1: the workflow worker in this process (development, Playwright); otherwise it runs
+    on its own (`python -m app.workflows.worker`)."""
+    from app.workflows import worker
+
+    while True:
+        try:
+            await worker.run(threads=worker.IN_API_THREADS)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # Temporal not up yet, or gone: try again shortly
+            log.exception("in-process workflow worker stopped; restarting in 5 s")
+            await asyncio.sleep(5)
+
+
 async def _narrator_loop() -> None:
     """Writes the narrative and recommended actions of new Control Tower exceptions (a model call each), apart
     from the hospital loop so a slow model never delays the boards."""
@@ -137,7 +162,12 @@ async def lifespan(_: FastAPI):
     # rescanning the large, long-lived row cache (app/core/db/repo.py). Measured ~30% faster.
     gc.set_threshold(50_000, 50, 100)
     await asyncio.to_thread(init_db)  # migrate; generate the demo data on first start
-    loops = (_dispatch_loop, _intake_loop, _hospital_loop, _narrator_loop)
+    workflow_bridge.install()  # domain events -> Temporal (only with TEMPORAL_ADDRESS)
+    loops = [_dispatch_loop, _intake_loop, _hospital_loop, _narrator_loop]
+    if settings.temporal_address:
+        loops.append(_workflow_loop)
+        if settings.temporal_worker_in_api:
+            loops.append(_workflow_worker)
     tasks = [asyncio.create_task(loop()) for loop in loops] if settings.background_workers else []
     yield
     for task in tasks:
@@ -180,6 +210,7 @@ app.include_router(hospital_router)
 app.include_router(platform_router)
 app.include_router(agents_router)
 app.include_router(control_tower_router)
+app.include_router(workflows_router)
 
 
 @app.exception_handler(FhirAccessDenied)

@@ -31,7 +31,7 @@ Branch: `feat/hospital-platform`, cut from `feat/postgres` (phase 0 completion: 
 | De-identification | `app/llm/deid.py` | `Pseudonymizer(known_patients).redact(text)` / `.restore(value)`; regexes for phone, email, 10-digit health card, ISO and long dates | Done in WP4: the free-text layer is `app/llm/freetext_deid.py` (`FreeTextDeidentifier`, `deidentify`), sharing the `Pseudonymizer` token map (`alias`, `redact_known` added) |
 | Prompts | `app/llm/prompts.py` + per-module `Prompt(name, version, system, template)` | Versioned in code; version string recorded per call | New agents use `prompts/<agent>/<version>.md` files with the 4-line header (6.6); existing prompts are referenced from the registry |
 | Mock integrations | `app/integrations/mocks.py` | SMS, email, phone, OHIP mocks with latency/failure rate; `dispatch_due()` | 6.2 adapter contract (retry, timeout, circuit breaker, dead letters, correlation id) wraps these |
-| Background loop | `app/main.py` | `_step(name, fn)` per step in its own transaction; `_intake_loop` every 2 s | Simulator ticks and the EventBus → Temporal bridge run as steps |
+| Background loop | `app/main.py` | `_step(name, fn)` per step in its own transaction; `_intake_loop` every 2 s | Simulator ticks and the EventBus → Temporal bridge run as steps. Done in WP4c: `_workflow_loop` sends the bridge's outbox to Temporal every second (`workflow dispatch`); `_workflow_worker` runs the worker in the API process when `TEMPORAL_WORKER_IN_API=1` |
 | Seed | `app/seed.py` `populate(store, seed)` | Deterministic, `random.Random(seed)`, `seed_time` blob | Hospital generator runs from `populate` (own random stream, so imaging data does not change) |
 | Evals | `app/modules/evals/build.py`, `run.py` (`eval_*` functions, results to `evals/results/<task>.json`), `router.py` (AI evaluations page) | 6.6 adds `evals/<agent>/cases.jsonl`, `evals/runs/<timestamp>.json`, one runner for all agents |
 | Tests | `tests/conftest.py` | Session DB `ioc_test`, seeded once; each test in a rolled-back transaction; `client`, `login(user_id)` fixtures; mock provider with zero latency | New tests reuse the fixtures |
@@ -78,6 +78,17 @@ Java 21, Spring Boot, Temporal Java SDK 1.35, MySQL. Nothing is copyable into Py
 - Confidence gate: one `decide(...)` returning accepted or a list of reasons (below threshold, model asked for review, validation finding, ...); review items are rows; resolving one stores model output and correction (`intervention_memory`) for the golden set. Here that becomes `LowConfidenceReviewWorkflow` appending to `evals/<agent>/cases.jsonl`.
 - Insert-first idempotency (`INSERT ... ON CONFLICT DO NOTHING RETURNING` in PostgreSQL); provenance record with prompt version, model, input and output hashes.
 - Replay test from a captured history file; no worker-restart test exists there (written new here).
+
+Ported in WP4c (`app/workflows/`): signal handlers only record (`FlowBase._on_event` / `_on_control` into an inbox,
+deduplicated by event id); sign-off waits race absolute deadlines and keep waiting after escalating
+(`_await_signoff`); timer durations in the start input (`Timers`); time from `workflow.now()` only; idempotent start
+with the business key as workflow id (`journey-<encounter>`; "already running" is success; a closed run may be
+followed by a new one because the generator's ids repeat after a demo reset); persist first, then signal (the
+bridge's outbox `workflow_commands`, insert-first, then the dispatcher); insert-first idempotency also for the
+eval cases (by case id) and the waits; the confidence gate is the registry's `confidence_threshold` checked by the
+runtime at `finish`, its review record kept de-identified (`app/agents/reviews.py`); replay tests from captured
+histories (`tests/test_workflow_replay.py`) and a worker-restart test written new (`tests/test_workflows.py`, plus a
+real process kill in `scripts/workflow_demo.py`).
 
 ## 6. Naming map (extension spec → this code base)
 
@@ -127,3 +138,13 @@ Java 21, Spring Boot, Temporal Java SDK 1.35, MySQL. Nothing is copyable into Py
 | `explainException` (the recommend example of 6.4) | tool `explainException` (an `ai-review` Task for the bed manager and charge nurses); the approved action = tool `createFlowTask` (Task code `flow-action`) |
 | 7.1 evals | `evals/control_tower/` (`rules/cases.jsonl` 20 scenarios, `narrator/cases.jsonl` 30 exceptions, `report.json` / `report.md`, rating sheet), runner `apps/api/scripts/control_tower_eval.py` |
 | "fast-forward to 08:00 tomorrow" from the control bar | `POST /api/hospital/simulator/fast-forward/start` (background job, `app/ehr/simjobs.py`); the synchronous `/simulator/fast-forward` stays for scripts |
+| 6.5 `InpatientJourneyWorkflow`, `CapacityExceptionWorkflow`, `LowConfidenceReviewWorkflow` | `app/workflows/journey.py`, `capacity.py`, `review.py` (shared machinery `base.py`, ids and steps `model.py`); workflow ids `journey-<encounter>`, `capacity-<exception id>`, `review-<run id>` |
+| 6.5 activities `triageAssist` … `codingStub`, `detect` … `recordOutcome`, `createReviewTask` … `triggerRegression` | activity types `journey.<step>`, `capacity.<step>`, `review.<step>` in `app/workflows/activities.py` (plus `journey.context`, `journey.requestFollowupCall` / `bookFollowupCall`, `journey.news2Alert`, `workflows.recordProgress`, `workflows.openTask`) |
+| `await signal('signed' / 'approved' / 'rejected' / 'reviewed')` | one signal `event` whose payload `kind` is `signed` (with `final`), `decided` (with `decision`), `cleared`, `discharged` or `news2`; plus `control` (retry / skip) |
+| EventBus → `startWorkflow` / `signalWorkflow` | `app/workflows/bridge.py`: consumer `workflows.bridge`, outbox table `workflow_commands`, waits `workflow_waits`, dispatcher `dispatch_step`; Temporal client `app/workflows/client.py` |
+| "high-priority Task" / "notify ops_manager" after a sign-off timeout | Task `workflow-escalation` (priority urgent, the signer's role) / Task `workflow-notify` (priority stat, the operations manager), via the tool createWorkflowTask (registry entry `workflow_engine`) |
+| Workflow view; retry and skip for ops_manager and admin | web `/workflows`, `/workflows/:id` (`features/workflows/`), API `/api/workflows/...`; audit actions `workflow_retry`, `workflow_skip` (also `workflow_start`, `workflow_fault`) |
+| Temporal dev server in docker-compose, namespace `hospital-demo` | compose profile `workflows`: service `temporal` (`temporalio/temporal:1.8.3`, `server start-dev`, SQLite, UI on 8233) and `worker` (`python -m app.workflows.worker`); settings `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, `TEMPORAL_TASK_QUEUE`, `TEMPORAL_WORKER_IN_API`, `WORKFLOW_*_S` |
+| `recordOutcome` ("被驳回的建议也记 outcome") | `flow_exceptions.outcome` (decision, verification, resolved) |
+| `appendToEvalSet` → `evals/<agent>/cases.jsonl` (source=human_review), `triggerRegression` | `app/agents/evalsets.py` (`append_case`, `regression`; `AGENT_EVALS_DIR` moves the folder); the review record `app/agents/reviews.py` (table `agent_reviews`); correction API `POST /api/workflows/reviews/{id}`; review queue web `/reviews` |
+| Journey steps of WP6–WP8 | placeholders in `app/agents/library/journey_stubs.py`, run as `order_review`, `medication_reconciliation`, `discharge_summary`, `patient_instructions`, `followup_calls` |

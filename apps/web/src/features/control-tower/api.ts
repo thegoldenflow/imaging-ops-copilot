@@ -128,6 +128,19 @@ export interface Decision {
   remind_at?: string;
   actions?: { action_id: string; label: string; owner_role: OwnerRole; task_id: string | null; status: string; detail: string | null }[];
   execution_run?: string | null;
+  executed_by?: "workflow" | "request";
+  workflow_id?: string | null;
+}
+
+/** A durable workflow linked from the Control Tower (spec 6.5): the encounter's journey, the exception's loop. */
+export interface WorkflowLink {
+  id: string;
+  status: string;
+  current_step: string | null;
+  current_label: string | null;
+  current_status: string | null;
+  done: number;
+  total: number;
 }
 
 export interface ExceptionItem {
@@ -149,6 +162,7 @@ export interface ExceptionItem {
   decision: Decision | null;
   review_task_id: string | null;
   narrative: string | null;
+  outcome?: { decision: string; resolved: boolean | null; verified: { occupancy_before_pct: number | null; occupancy_after_pct: number | null; condition_present: boolean } | null } | null;
 }
 
 export interface MenuItem {
@@ -169,6 +183,7 @@ export interface RecommendedAction {
 }
 
 export interface ExceptionDetail extends ExceptionItem {
+  workflow?: WorkflowLink | null;
   facts: Record<string, unknown>;
   menu: MenuItem[];
   engine_evidence: string[];
@@ -263,6 +278,7 @@ export interface PatientCard {
   vitals_at?: string | null;
   open_orders?: number;
   discharge?: Explained | null;
+  journey?: WorkflowLink | null;
 }
 
 export function useBoard(fast: boolean) {
@@ -279,6 +295,9 @@ export const useException = (id: string | null) =>
     queryKey: ["ct-exception", id],
     queryFn: () => api<ExceptionDetail>(`/api/control-tower/exceptions/${id}`),
     enabled: Boolean(id),
+    // while the exception's workflow executes the approved actions, follow it until the Tasks exist
+    refetchInterval: (query) =>
+      query.state.data?.decision?.actions?.some((a) => a.status === "queued" && !a.task_id) ? 1000 : false,
   });
 
 export const useUnit = (id: string | null, fast: boolean) =>

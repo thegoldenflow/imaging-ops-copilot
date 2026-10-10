@@ -12,8 +12,11 @@ runtime as a system actor (registry entry `agent_runtime`):
 - `ai-review`: a recommendation in a person's review queue (submitForReview);
   accepting or rejecting it is recorded the same way.
 - `needs-human`: a tool that failed after its retries, for a person to do by hand.
+- `workflow-signoff` (6.5): a durable workflow waits for a person to confirm a step (e.g. the order review
+  placeholder); deciding it completes or rejects it the same way.
 
-Every decision is also written into the run's trace as `human_action`.
+Every decision is also written into the run's trace as `human_action`, and published on the event bus as
+`task.decided` (references only), which the workflow bridge turns into a signal for the waiting workflow.
 """
 
 from __future__ import annotations
@@ -40,6 +43,8 @@ if TYPE_CHECKING:
 APPROVAL = "approval-request"
 REVIEW = "ai-review"
 NEEDS_HUMAN = "needs-human"
+WORKFLOW_SIGNOFF = "workflow-signoff"
+DECIDABLE = (APPROVAL, REVIEW, WORKFLOW_SIGNOFF)
 OPEN = ("requested", "received", "accepted", "ready", "in-progress")
 ROLE_OF_CODE = {code: role for role, code in access.ROLE_CODE.items()}
 
@@ -167,8 +172,8 @@ def decide(user: StaffUser, task_id: str, decision: Literal["approve", "reject"]
     if task is None:
         raise LookupError(f"Task/{task_id} not found")
     code = code_of(task)
-    if code not in (APPROVAL, REVIEW):
-        raise DecisionError(f"Task/{task_id} is not an approval request or an AI recommendation")
+    if code not in DECIDABLE:
+        raise DecisionError(f"Task/{task_id} is not an approval request, an AI recommendation or a workflow sign-off")
     if task.get("status") not in OPEN:
         raise DecisionError(f"Task/{task_id} is already {task.get('status')}")
     roles = [ROLE_OF_CODE.get(c) for c in access.performer_codes(task)]
@@ -179,7 +184,7 @@ def decide(user: StaffUser, task_id: str, decision: Literal["approve", "reject"]
     if patient and not FhirGateway(Actor.of(user), "agent_runtime").is_in_scope(patient) \
             and breakglass.active_grant(get_store(), user.id, patient) is None:
         raise DecisionDenied("This patient is outside your units")
-    action = ("approve" if code == APPROVAL else "accept") if decision == "approve" else "reject"
+    action = ("approve" if code in (APPROVAL, WORKFLOW_SIGNOFF) else "accept") if decision == "approve" else "reject"
     now = hospital_now(get_store())
     task["status"] = "completed" if decision == "approve" else "rejected"
     task["lastModified"] = fhir_datetime(now)
@@ -204,10 +209,28 @@ def decide(user: StaffUser, task_id: str, decision: Literal["approve", "reject"]
         trace.human_action = {"role": str(user.role), "user_id": user.id, "decision": action, "task_id": task_id,
                               "at": datetime.now().isoformat(timespec="seconds")}
         traces.save(trace)
+    if code == REVIEW:
+        from app.agents import reviews
+
+        reviews.decided(task_id, action, user)
+    _publish_decision(task, code, action, user, now)
     return {"task_id": task_id, "kind": code, "status": task["status"], "decision": action, "agent_id": agent_id,
             "tool_id": given.get("tool"), "run_id": run_id,
             "args": json.loads(given["args"]) if given.get("args") else None,
             "on_behalf_of": given.get("on_behalf_of")}
+
+
+def _publish_decision(task: dict, code: str, action: str, user: StaffUser, at: datetime) -> None:
+    from app.ehr.events import bus, platform_event
+
+    refs: dict = {"task": f"Task/{task['id']}"}
+    if patient := access.patient_of(task):
+        refs["patient"] = f"Patient/{patient}"
+    if encounter := access.encounter_of(task):
+        refs["encounter"] = f"Encounter/{encounter}"
+    bus.publish(platform_event("task.decided", at=at, actor=f"user:{user.id}", refs=refs,
+                               key=f"task-decided|{task['id']}|{task.get('lastModified')}",
+                               attrs={"code": code, "decision": action, "role": str(user.role)}))
 
 
 def queue(user: StaffUser, *, limit: int = 50) -> list[dict]:
@@ -217,7 +240,7 @@ def queue(user: StaffUser, *, limit: int = 50) -> list[dict]:
         return []
     out = []
     fhir = _fhir()
-    for task in fhir.backend.search("Task", status=list(OPEN), code=[APPROVAL, REVIEW], order="-date", limit=500):
+    for task in fhir.backend.search("Task", status=list(OPEN), code=list(DECIDABLE), order="-date", limit=500):
         kind = code_of(task)
         if code not in access.performer_codes(task):
             continue
@@ -231,7 +254,9 @@ def queue(user: StaffUser, *, limit: int = 50) -> list[dict]:
                     "encounter_id": access.encounter_of(task), "focus": (task.get("focus") or {}).get("reference"),
                     "tool_id": given.get("tool"), "agent_id": given.get("agent") or _agent_of(task),
                     "run_id": given.get("run") or traces.run_of(task),
-                    "recommendation": given.get("recommendation")})
+                    "recommendation": given.get("recommendation"), "priority": task.get("priority"),
+                    "workflow_id": given.get("workflow"), "step": given.get("step"), "review_id": given.get("review"),
+                    "code": kind})
         if len(out) >= limit:
             break
     return out

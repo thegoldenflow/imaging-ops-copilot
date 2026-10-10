@@ -205,6 +205,12 @@ def create_flag(ctx: ToolContext, encounter_id: str, code: str, display: str) ->
             "subject": ref("Patient", _patient_of(ctx, encounter_id)), "encounter": ref("Encounter", encounter_id),
             "period": {"start": fhir_datetime(_now())}}
     stored = ctx.fhir.create(ctx.stamp(flag)).to_fhir()
+    from app.ehr.events import bus, platform_event  # 6.5: a NEWS2 flag reaches the patient's journey workflow
+
+    bus.publish(platform_event("flag.raised", at=_now(), actor=f"agent:{ctx.agent.agent_id}",
+                               refs={"flag": _ref(stored), "patient": stored["subject"]["reference"],
+                                     "encounter": f"Encounter/{encounter_id}"},
+                               key=f"flag-raised|{stored['id']}", attrs={"code": code}))
     return {"flag_id": stored["id"], "status": stored["status"], "_refs": [_ref(stored)]}
 
 

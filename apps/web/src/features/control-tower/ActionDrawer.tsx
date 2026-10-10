@@ -4,7 +4,8 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { AlarmClock, Check, CheckCircle2, FileSearch, FlaskConical, Loader2, ShieldCheck, Sparkles, X } from "lucide-react";
+import { AlarmClock, Check, CheckCircle2, FileSearch, FlaskConical, Loader2, ShieldCheck, Sparkles, Workflow, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../lib/api";
 import { useAgent } from "../../lib/agents";
@@ -161,6 +162,7 @@ function Body({ d }: { d: ExceptionDetail }) {
       )}
 
       <section aria-label="Decision" className="border-t border-ct-border pt-3">
+        <WorkflowLine d={d} />
         {d.decision && <DecisionSummary d={d} />}
         {live && d.can_decide && (
           <div className="space-y-2.5">
@@ -234,6 +236,20 @@ function ActionRow({ a, checked, onToggle, disabled }: { a: RecommendedAction; c
   );
 }
 
+function WorkflowLine({ d }: { d: ExceptionDetail }) {
+  const w = d.workflow;
+  if (!w) return null;
+  return (
+    <Link to={`/workflows/${encodeURIComponent(w.id)}`} className="mb-3 flex items-center gap-1.5 rounded-lg border border-ct-border p-2 text-xs text-ct-text hover:border-ct-accent" data-testid="exception-workflow">
+      <Workflow className="size-3.5 text-ct-accent" />
+      <span className="flex-1">Workflow {w.id} · {w.status === "running" ? `${w.current_label ?? "–"} (${w.done}/${w.total})` : w.status}</span>
+      {d.outcome?.verified && (
+        <span className="text-ct-muted">{d.outcome.verified.occupancy_after_pct != null ? `${d.outcome.verified.occupancy_before_pct}% → ${d.outcome.verified.occupancy_after_pct}%` : d.outcome.resolved ? "resolved" : "still present"}</span>
+      )}
+    </Link>
+  );
+}
+
 function DecisionSummary({ d }: { d: ExceptionDetail }) {
   const dec = d.decision!;
   return (
@@ -243,12 +259,13 @@ function DecisionSummary({ d }: { d: ExceptionDetail }) {
         {dec.decision === "approved" ? "Approved" : dec.decision === "rejected" ? "Rejected" : `Deferred until ${hhmm(dec.remind_at ?? null)}`} by {dec.name} ({ROLE_SHORT[dec.role as keyof typeof ROLE_SHORT] ?? dec.role}) at {hhmm(dec.at)}
       </p>
       {dec.note && <p className="text-ct-muted">“{dec.note}”</p>}
+      {dec.executed_by === "workflow" && <p className="text-ct-muted">Executed by the exception's durable workflow (retried by Temporal, idempotent Tasks).</p>}
       {dec.actions && (
         <ul className="space-y-1" data-testid="created-tasks">
           {dec.actions.map((a) => (
             <li key={a.action_id} className="flex items-center justify-between gap-2">
               <span className="min-w-0 truncate">{a.label}</span>
-              <span className="shrink-0 text-ct-muted">{a.task_id ? <>Task <code className="text-ct-text">{a.task_id}</code> → {ROLE_SHORT[a.owner_role]}</> : <span className="text-ct-critical">not created: {a.detail}</span>}</span>
+              <span className="shrink-0 text-ct-muted">{a.task_id ? <>Task <code className="text-ct-text">{a.task_id}</code> → {ROLE_SHORT[a.owner_role]}</> : a.status === "queued" ? <span className="inline-flex items-center gap-1 text-ct-info"><Loader2 className="size-3 animate-spin" />queued for the workflow</span> : <span className="text-ct-critical">not created: {a.detail}</span>}</span>
             </li>
           ))}
         </ul>

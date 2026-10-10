@@ -1,0 +1,329 @@
+{
+  "package": "WP4c durable workflows (spec 6.5)",
+  "run_at": "2026-10-09T20:40:41",
+  "temporalio": "1.33.0",
+  "status": "passed",
+  "tests": {
+    "total": 33,
+    "passed": 33,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 110.1
+  },
+  "criteria": [
+    {
+      "key": "medrec_retry",
+      "criterion": "The journey with an injected failure in the MedRec activity, automatically retried, leaves exactly one MedRec document in FHIR",
+      "status": "passed",
+      "tests": {
+        "test_a_failed_medrec_activity_is_retried_and_leaves_exactly_one_medrec_document": [
+          "passed"
+        ]
+      }
+    },
+    {
+      "key": "worker_restart",
+      "criterion": "Killing and restarting the worker resumes the journey without re-running completed steps",
+      "status": "passed",
+      "tests": {
+        "test_a_restarted_worker_resumes_the_journey_without_running_completed_steps_again": [
+          "passed"
+        ]
+      }
+    },
+    {
+      "key": "signoff_timeout",
+      "criterion": "A sign-off timeout (24 h; 24 s in the test) produces the escalation Task, then the operations manager is told",
+      "status": "passed",
+      "tests": {
+        "test_a_signoff_not_given_in_24_seconds_escalates_then_tells_the_operations_manager": [
+          "passed"
+        ]
+      }
+    },
+    {
+      "key": "low_confidence",
+      "criterion": "The low-confidence loop: after the human correction the eval set has one more case and the regression eval runs",
+      "status": "passed",
+      "tests": {
+        "test_low_confidence_output_is_corrected_added_as_an_eval_case_and_the_regression_runs": [
+          "passed"
+        ]
+      }
+    },
+    {
+      "key": "replay",
+      "criterion": "One Temporal replay test per workflow (plus the version-1 journey through patched())",
+      "status": "passed",
+      "tests": {
+        "test_captured_history_replays_against_the_current_code": [
+          "passed",
+          "passed",
+          "passed",
+          "passed",
+          "passed",
+          "passed"
+        ],
+        "test_every_workflow_has_a_replay_test": [
+          "passed"
+        ],
+        "test_the_version_1_journey_has_no_patch_marker_and_the_current_one_has": [
+          "passed"
+        ]
+      }
+    },
+    {
+      "key": "journey_end_to_end",
+      "criterion": "The whole journey from admission to the booked follow-up call",
+      "status": "passed",
+      "tests": {
+        "test_journey_runs_from_admission_to_the_booked_follow_up_call": [
+          "passed"
+        ]
+      }
+    },
+    {
+      "key": "privileged",
+      "criterion": "An activity calling a privileged tool is not retried; its failure becomes a Task; retry and skip by the operations manager are audited",
+      "status": "passed",
+      "tests": {
+        "test_a_failed_privileged_call_is_not_retried_and_waits_for_a_retry_or_skip": [
+          "passed"
+        ]
+      }
+    },
+    {
+      "key": "capacity",
+      "criterion": "Capacity exceptions: approved actions executed with idempotency keys, verified after 1 h; rejected and cleared ones record an outcome",
+      "status": "passed",
+      "tests": {
+        "test_capacity_workflow_executes_the_approval_and_checks_the_occupancy_an_hour_later": [
+          "passed"
+        ],
+        "test_rejected_and_cleared_exceptions_record_their_outcome_too": [
+          "passed"
+        ]
+      }
+    },
+    {
+      "key": "bridge_offline",
+      "criterion": "EventBus <-> Temporal bridge (insert-first outbox, order, outage), offline mode, roles and audit of retry and skip",
+      "status": "passed",
+      "tests": {
+        "test_without_temporal_the_bridge_is_off_and_the_view_says_offline": [
+          "passed"
+        ],
+        "test_domain_events_map_to_workflow_starts_and_signals": [
+          "passed"
+        ],
+        "test_the_outbox_takes_each_event_once_and_sends_in_order": [
+          "passed"
+        ],
+        "test_commands_wait_while_temporal_is_unreachable_and_go_out_when_it_is_back": [
+          "passed"
+        ],
+        "test_retry_and_skip_are_for_the_operations_manager_and_admin_and_audited": [
+          "passed"
+        ]
+      }
+    },
+    {
+      "key": "demo",
+      "criterion": "Demo script demo/workflows.md (3 minutes, a deliberate failure and the recovery)",
+      "status": "passed",
+      "tests": {
+        "demo/workflows.md": [
+          "present"
+        ]
+      }
+    }
+  ],
+  "real_server": {
+    "ran": true,
+    "exit_code": 0,
+    "transcript": [
+      "[   0.5 s] journey journey-stay-01003 for inpatient stay-01003 (Medicine A), Temporal 127.0.0.1:7233 namespace hospital-demo",
+      "[   0.5 s] deliberate failure set: the next 2 attempts of medRecAdmission fail after their work committed",
+      "[   0.5 s] worker process 18276 started",
+      "[  14.2 s] pharmacist confirmed the order review (Task/task-00523)",
+      "[  20.7 s] MedRec step done on attempt 3 of 4; MedRec documents in FHIR for the encounter: 1 (DocumentReference/documentrefe-00009)",
+      "[  20.7 s] worker process 18276 killed while the journey waits for the MedRec co-signature",
+      "[  25.0 s] pharmacist and physician signed; the signals are stored in Temporal, no worker runs: timeline still 'waiting'",
+      "[  25.0 s] worker process 11348 started (a new process with nothing in memory)",
+      "[  41.5 s] journey resumed after the sign-off: ward monitoring reached 16.5 s after the restart",
+      "[  41.5 s] step activities before the kill: journey.context, journey.triageAssist, journey.orderReview, journey.medRecAdmission; after the restart only journey.bedAssignment, journey.predictDuration ran; completed steps run again: none",
+      "[  41.5 s] done; the journey waits on the ward (open the workflow view, or skip it there as the bed manager)"
+    ],
+    "stderr": [],
+    "medrec_documents": 1,
+    "rerun_steps": "none",
+    "resume_seconds": 16.5
+  },
+  "results": {
+    "test_journey_runs_from_admission_to_the_booked_follow_up_call": {
+      "file": "tests.test_workflows",
+      "seconds": 45.3,
+      "status": "passed"
+    },
+    "test_a_failed_medrec_activity_is_retried_and_leaves_exactly_one_medrec_document": {
+      "file": "tests.test_workflows",
+      "seconds": 8.5,
+      "status": "passed"
+    },
+    "test_a_restarted_worker_resumes_the_journey_without_running_completed_steps_again": {
+      "file": "tests.test_workflows",
+      "seconds": 4.3,
+      "status": "passed"
+    },
+    "test_a_signoff_not_given_in_24_seconds_escalates_then_tells_the_operations_manager": {
+      "file": "tests.test_workflows",
+      "seconds": 4.1,
+      "status": "passed"
+    },
+    "test_a_failed_privileged_call_is_not_retried_and_waits_for_a_retry_or_skip": {
+      "file": "tests.test_workflows",
+      "seconds": 13.0,
+      "status": "passed"
+    },
+    "test_capacity_workflow_executes_the_approval_and_checks_the_occupancy_an_hour_later": {
+      "file": "tests.test_workflows",
+      "seconds": 12.1,
+      "status": "passed"
+    },
+    "test_rejected_and_cleared_exceptions_record_their_outcome_too": {
+      "file": "tests.test_workflows",
+      "seconds": 10.4,
+      "status": "passed"
+    },
+    "test_low_confidence_output_is_corrected_added_as_an_eval_case_and_the_regression_runs": {
+      "file": "tests.test_workflows",
+      "seconds": 3.5,
+      "status": "passed"
+    },
+    "test_a_journey_whose_encounter_is_gone_ends_without_asking_anyone": {
+      "file": "tests.test_workflows",
+      "seconds": 3.1,
+      "status": "passed"
+    },
+    "test_captured_history_replays_against_the_current_code[capacity]": {
+      "file": "tests.test_workflow_replay",
+      "seconds": 0.3,
+      "status": "passed"
+    },
+    "test_captured_history_replays_against_the_current_code[capacity_rejected]": {
+      "file": "tests.test_workflow_replay",
+      "seconds": 0.1,
+      "status": "passed"
+    },
+    "test_captured_history_replays_against_the_current_code[journey]": {
+      "file": "tests.test_workflow_replay",
+      "seconds": 0.3,
+      "status": "passed"
+    },
+    "test_captured_history_replays_against_the_current_code[journey_medrec_retry]": {
+      "file": "tests.test_workflow_replay",
+      "seconds": 0.2,
+      "status": "passed"
+    },
+    "test_captured_history_replays_against_the_current_code[journey_v1]": {
+      "file": "tests.test_workflow_replay",
+      "seconds": 0.3,
+      "status": "passed"
+    },
+    "test_captured_history_replays_against_the_current_code[review]": {
+      "file": "tests.test_workflow_replay",
+      "seconds": 0.1,
+      "status": "passed"
+    },
+    "test_every_workflow_has_a_replay_test": {
+      "file": "tests.test_workflow_replay",
+      "seconds": 0.0,
+      "status": "passed"
+    },
+    "test_the_version_1_journey_has_no_patch_marker_and_the_current_one_has": {
+      "file": "tests.test_workflow_replay",
+      "seconds": 0.0,
+      "status": "passed"
+    },
+    "test_without_temporal_the_bridge_is_off_and_the_view_says_offline": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.2,
+      "status": "passed"
+    },
+    "test_domain_events_map_to_workflow_starts_and_signals": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.0,
+      "status": "passed"
+    },
+    "test_the_outbox_takes_each_event_once_and_sends_in_order": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.1,
+      "status": "passed"
+    },
+    "test_commands_wait_while_temporal_is_unreachable_and_go_out_when_it_is_back": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.1,
+      "status": "passed"
+    },
+    "test_a_signal_for_a_workflow_that_does_not_run_is_dropped": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.0,
+      "status": "passed"
+    },
+    "test_people_and_modules_publish_what_workflows_wait_for": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.2,
+      "status": "passed"
+    },
+    "test_the_exception_stream_publishes_opened_decided_and_cleared": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.5,
+      "status": "passed"
+    },
+    "test_a_run_below_its_confidence_threshold_keeps_a_de_identified_case_for_review": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.5,
+      "status": "passed"
+    },
+    "test_the_timeline_keeps_the_newest_version_and_shows_retries": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.0,
+      "status": "passed"
+    },
+    "test_retry_and_skip_are_for_the_operations_manager_and_admin_and_audited": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.3,
+      "status": "passed"
+    },
+    "test_the_view_shows_nurses_only_their_units": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.3,
+      "status": "passed"
+    },
+    "test_a_journey_starts_from_the_view_only_for_an_inpatient_stay": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.2,
+      "status": "passed"
+    },
+    "test_deliberate_failures_are_a_demo_feature_and_audited": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.3,
+      "status": "passed"
+    },
+    "test_a_running_capacity_workflow_executes_the_approval_instead_of_the_request": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 1.0,
+      "status": "passed"
+    },
+    "test_a_low_confidence_review_is_corrected_by_the_agents_signer": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.4,
+      "status": "passed"
+    },
+    "test_an_exception_is_read_fresh_after_its_lock_so_it_is_narrated_once": {
+      "file": "tests.test_workflow_bridge",
+      "seconds": 0.4,
+      "status": "passed"
+    }
+  }
+}

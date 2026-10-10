@@ -89,7 +89,12 @@ def exception_detail(exception_id: str, user: StaffUser = Depends(require_roles(
         raise HTTPException(status_code=404, detail=f"No exception {exception_id}")
     if exc.narration_status == "pending" and exc.status in X.LIVE and exc.cleared_at is None:
         exc = service.narrate(store, exception_id)
-    return {**service.exception_view(exc, detail=True), "can_decide": service.can_decide(user, exc)}
+    from app.workflows import model as workflow_model
+    from app.workflows import progress
+
+    run = progress.get(workflow_model.capacity_id(exception_id))
+    return {**service.exception_view(exc, detail=True), "can_decide": service.can_decide(user, exc),
+            "workflow": progress.summary(run) if run is not None else None}
 
 
 class ApproveBody(BaseModel):

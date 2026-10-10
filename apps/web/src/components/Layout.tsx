@@ -33,6 +33,8 @@ import {
   Siren,
   Sparkles,
   TowerControl,
+  ListChecks,
+  Workflow,
 } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -58,6 +60,8 @@ export const NAV: NavItem[] = [
   { to: "/", label: "Home", icon: Home, roles: "all", section: "" },
   { to: "/control-tower", label: "Control Tower", icon: TowerControl, roles: ["operations_manager", "nurse", "physician"], section: "Hospital" },
   { to: "/hospital/patients", label: "Patients", icon: BedDouble, roles: HOSPITAL_CLINICAL, section: "Hospital" },
+  { to: "/reviews", label: "Review queue", icon: ListChecks, roles: HOSPITAL_CLINICAL, section: "Hospital" },
+  { to: "/workflows", label: "Workflows", icon: Workflow, roles: [...HOSPITAL_CLINICAL, "admin"], section: "Hospital" },
   { to: "/scheduling", label: "Scheduling", icon: CalendarClock, roles: ["front_desk", "technologist", "operations_manager", "medical_director", "admin"], section: "Operations" },
   { to: "/front-desk", label: "Front desk", icon: PhoneCall, roles: ["front_desk", "operations_manager", "admin"], section: "Operations" },
   { to: "/reading", label: "Reading room", icon: ScanLine, roles: ["radiologist", "medical_director", "admin"], section: "Operations" },

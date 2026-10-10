@@ -4,7 +4,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { BedDouble, Brush, EyeOff, KeyRound, Lock, Sparkles, UserRound, X } from "lucide-react";
+import { BedDouble, Brush, EyeOff, KeyRound, Lock, Sparkles, UserRound, Workflow, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ApiError } from "../../lib/api";
@@ -151,6 +151,15 @@ function CardBody({ c }: { c: PatientCard }) {
       )}
       {!c.hidden.length && c.mrn && (
         <Link to={`/hospital/patients/${c.mrn}`} className="inline-flex text-xs text-ct-accent hover:underline">Open the chart</Link>
+      )}
+      {c.journey && (
+        <Link to={`/workflows/${encodeURIComponent(c.journey.id)}`} className="flex items-center gap-1.5 rounded-lg border border-ct-border bg-ct-surface p-2 text-xs text-ct-text hover:border-ct-accent" data-testid="journey-link">
+          <Workflow className="size-3.5 text-ct-accent" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium">Patient journey · {c.journey.done} of {c.journey.total} steps</span>
+            <span className="block text-ct-muted">{c.journey.status === "running" ? `${c.journey.current_label ?? "–"} (${(c.journey.current_status ?? "").replace("waiting", "waiting for sign-off")})` : c.journey.status}</span>
+          </span>
+        </Link>
       )}
       <StatusPill tone="muted" icon={null}>read as {c.role.replace("_", " ")} through the FHIR gateway</StatusPill>
     </div>

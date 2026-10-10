@@ -130,6 +130,12 @@ MODULE_ENTITIES = {
         # Control Tower (7.1): the exception stream (the narrative may quote beds and MRN tokens: encrypted)
         EntitySpec("flow_exceptions", "app.modules.control_tower.exceptions:FlowException", encrypted=("narration",),
                    indexes=(("status",), ("key",))),
+        # Durable workflows (6.5): the timeline of each workflow for the workflow view (step details encrypted),
+        # and the low-confidence agent outputs a person reviews (de-identified model input and output, encrypted)
+        EntitySpec("workflow_runs", "app.workflows.progress:WorkflowRun", encrypted=("steps", "notes"),
+                   indexes=(("workflow_type", "status"), ("encounter_id",), ("exception_id",))),
+        EntitySpec("agent_reviews", "app.agents.reviews:AgentReview", encrypted=("input", "output", "correction"),
+                   indexes=(("run_id",), ("status",))),
     ]
 }
 
@@ -160,6 +166,7 @@ BLOBS = {
     "seed_time",  # the "now" the demo data was generated for (it ages from there)
     "hospital_plan",  # the day simulator's upcoming events (app/ehr)
     "hospital_clock",  # the hospital's simulated clock (app/ehr)
+    "workflow_faults",  # failures injected into workflow steps for the demo (app/workflows/faults.py)
 }
 
 # Derived per process from stored data; never written to the database.
@@ -225,7 +232,7 @@ app_meta = Table(
 # fhir_resources is defined in app/ehr/fhirstore.py (the hospital EHR's FHIR store), the event
 # log and its consumer cursors in app/ehr/events.py (a reset restarts the sequence, so they go together).
 FIXED_DATA_TABLES = ("module_state", "images", "audit_events", "fhir_resources", "domain_events", "event_consumers",
-                     "event_deliveries")
+                     "event_deliveries", "workflow_commands", "workflow_waits")
 
 
 # ---------- Pydantic model -> table ----------
@@ -334,6 +341,7 @@ def get_metadata() -> MetaData:
     """Metadata with every table defined (imports all model classes)."""
     import app.ehr.events  # noqa: F401  (defines the event log tables)
     import app.ehr.fhirstore  # noqa: F401  (defines fhir_resources)
+    import app.workflows.tables  # noqa: F401  (the workflow bridge's outbox and waits)
 
     for name in all_entity_names():
         mapping(name)

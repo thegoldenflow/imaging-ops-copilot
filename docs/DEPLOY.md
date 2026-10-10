@@ -189,6 +189,10 @@ docker compose -f docker-compose.prod.yml start api
 
 **换 PHI 密钥**：密文带密钥编号（`k1:`），目前只支持一把密钥，没有在线换钥工具。演示环境换钥的办法就是上面的清空重建。
 
+## 可选：持久化工作流（Temporal，规格 6.5）
+
+生产环境不必开。不设 `TEMPORAL_ADDRESS` 时工作流视图显示 "offline"，其余模块照常工作。要开的话，在服务器的 compose 里照搬仓库根目录 `docker-compose.yml` 的 `temporal`（单容器 dev server，SQLite，namespace `hospital-demo`，内存约 150 MB）和 `worker`（API 同一个镜像，命令 `python -m app.workflows.worker`）两个服务，给 `api` 加 `TEMPORAL_ADDRESS=temporal:7233`。演示时可在 `.env` 里把 `WORKFLOW_SIGNOFF_TIMEOUT_S` 等计时缩短（默认签字超时 24 小时、随访 48 小时，按墙钟走，不跟模拟的医院时钟）。worker 挂掉不丢东西：待发的启动和信号留在库里的 outbox 或 Temporal 里，worker 重启后从断点继续。
+
 ## 排查
 
 | 症状 | 原因 |

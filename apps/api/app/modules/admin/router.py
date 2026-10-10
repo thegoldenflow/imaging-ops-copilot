@@ -83,6 +83,9 @@ def reset_demo(user: StaffUser = Depends(current_user)):
     store = reset_store()
     store.audit.record(user_id=user.id, user_name=user.name, role=user.role, action="reset",
                        resource_type="demo_data", resource_id=None, reason="demo reset")
+    from app.workflows import bridge
+
+    bridge.on_reset()  # the running workflows refer to data that is gone (6.5); best effort, after the reset
     return {"ok": True, "version": store.version}
 
 

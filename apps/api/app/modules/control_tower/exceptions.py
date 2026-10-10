@@ -14,6 +14,10 @@ clears and later returns, that is a new exception. Facts are stored as the
 engine saw them when the exception opened or changed severity (the narrative
 quotes them); the board shows the live numbers next to it. `sync` writes only
 when something changed, so an idle board does not touch the database.
+
+Opening and clearing publish `exception.opened` / `exception.cleared` on the event bus, and the action drawer's
+decisions `exception.decided` (service.py): the CapacityExceptionWorkflow (6.5) runs on those. Its last step
+writes `outcome` (decision, executed Tasks, the occupancy re-checked an hour later).
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.core.store import Store
+from app.ehr.events import bus, platform_event
 from app.modules.control_tower.rules import SEVERITY_RANK, Detected
 
 TABLE = "flow_exceptions"
@@ -53,6 +58,7 @@ class FlowException(BaseModel):
     decision: dict | None = None  # {decision, by, name, role, at, note, actions[], remind_at}
     remind_at: datetime | None = None  # deferred until (hospital clock)
     reminders: int = 0
+    outcome: dict | None = None  # recorded by the CapacityExceptionWorkflow (6.5): decision, Tasks, verification
 
 
 def table(store: Store):
@@ -61,6 +67,12 @@ def table(store: Store):
 
 def get(store: Store, exception_id: str) -> FlowException | None:
     return table(store).get(exception_id)
+
+
+def fresh(store: Store, exception_id: str) -> FlowException | None:
+    """The exception as committed now (not this transaction's earlier copy): read it after taking its lock."""
+    table(store).forget(exception_id)
+    return get(store, exception_id)
 
 
 def save(store: Store, exc: FlowException) -> None:
@@ -74,6 +86,18 @@ def all_exceptions(store: Store) -> list[FlowException]:
 def current(store: Store) -> dict[str, FlowException]:
     """Exceptions whose condition has not cleared, by key."""
     return {e.key: e for e in all_exceptions(store) if e.cleared_at is None}
+
+
+def publish(exc: FlowException, event_type: str, at: datetime, *, actor: str = "system:control-tower",
+            attrs: dict | None = None, key: str | None = None) -> None:
+    """Tell the event bus (references and routing attributes only)."""
+    refs = {"location": f"Location/{exc.unit_id}"}
+    if exc.subject_ref.startswith(("Encounter/", "Appointment/")):
+        refs[exc.subject_ref.split("/", 1)[0].lower()] = exc.subject_ref
+    bus.publish(platform_event(event_type, at=at, actor=actor, refs=refs,
+                               key=key or f"{event_type}|{exc.id}",
+                               attrs={"exception_id": exc.id, "rule": exc.rule, "severity": exc.severity,
+                                      **(attrs or {})}))
 
 
 def sync(store: Store, detected: list[Detected], now: datetime) -> dict[str, list[str]]:
@@ -90,6 +114,7 @@ def sync(store: Store, detected: list[Detected], now: datetime) -> dict[str, lis
                                 evidence_refs=d.evidence_refs, menu=[m.model_dump() for m in d.menu],
                                 detected_at=now, changed_at=now)
             save(store, exc)
+            publish(exc, "exception.opened", now)
             changes["opened"].append(exc.id)
             continue
         dirty = False
@@ -114,6 +139,7 @@ def sync(store: Store, detected: list[Detected], now: datetime) -> dict[str, lis
             continue
         exc = exc.model_copy(update=dict(cleared_at=now, status="cleared" if exc.status in LIVE else exc.status))
         save(store, exc)
+        publish(exc, "exception.cleared", now, attrs={"decided": exc.status not in ("cleared",)})
         changes["cleared"].append(exc.id)
     return changes
 

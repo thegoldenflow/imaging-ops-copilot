@@ -141,7 +141,8 @@ test("exception -> AI narrative -> approve -> Tasks -> audit", async ({ page, re
   await drawer.getByTestId("approve").click();
   const tasks = drawer.getByTestId("created-tasks");
   await expect(tasks).toBeVisible();
-  await expect(tasks.locator("li").first()).toContainText("Task task-");
+  // with durable workflows on (6.5) the exception's workflow writes the Tasks a moment later ("queued" until then)
+  await expect(tasks.locator("li").first()).toContainText("Task task-", { timeout: 30_000 });
   await expect(drawer.getByTestId("decision")).toContainText("Approved by");
   await shot(page, "ct-07-approved");
   await page.keyboard.press("Escape");

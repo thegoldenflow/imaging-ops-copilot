@@ -74,6 +74,16 @@ EVENT_TYPES: dict[str, str] = {
     "appointment.cancelled": "SIU^S15: an operating-room case was cancelled",
     "consent.revoked": "platform: a patient withdrew a consent (no HL7 message)",
     "consent.granted": "platform: a patient gave a consent that was missing or withdrawn (no HL7 message)",
+    # WP4c (6.5): what people and the platform decide, so durable workflows can wait for it, and the steps
+    # those workflows complete, so the boards follow them.
+    "task.decided": "platform: a person approved, accepted or rejected a Task (approval, AI review, sign-off)",
+    "document.signed": "platform: a person signed a draft document (final, or waiting for a co-signature)",
+    "flag.raised": "platform: a safety flag was raised on an encounter (e.g. a NEWS2 score)",
+    "exception.opened": "platform: the Control Tower's rule engine found a capacity exception",
+    "exception.decided": "platform: an exception's recommendation was approved, rejected or deferred",
+    "exception.cleared": "platform: an exception's condition cleared",
+    "agent.low_confidence": "platform: an agent run's confidence fell below the agent's registry threshold",
+    "workflow.step_completed": "platform: a durable workflow completed or skipped a step",
 }
 
 MAX_ATTEMPTS = 3
@@ -228,6 +238,20 @@ def _lock_key(consumer: str) -> int:
     return int(uuid.uuid5(_EVENT_NS, "consumer:" + consumer).int % (2 ** 62))
 
 
+def _reset_running(store) -> bool:
+    """A demo reset holds REWRITE_LOCK exclusively while it truncates every table. A delivery transaction takes it
+    shared (or stops for this drain), so the drain and the reset's TRUNCATE never deadlock (WP4c: the workflow
+    bridge is the first subscriber in the API process)."""
+    from sqlalchemy import text
+
+    from app.core.store import REWRITE_LOCK
+
+    if store.detached:
+        return False
+    return not store.conn().execute(text("SELECT pg_try_advisory_xact_lock_shared(:key)"),
+                                    {"key": REWRITE_LOCK}).scalar()
+
+
 class InProcessEventBus:
     """Outbox in PostgreSQL, handlers in this process (see the module docstring)."""
 
@@ -326,6 +350,8 @@ class InProcessEventBus:
         done = 0
         while limit is None or done < limit:
             with unit_of_work() as store:
+                if _reset_running(store):
+                    break
                 cursor, _ = self._cursor(store, sub.consumer)
                 size = BATCH if limit is None else min(BATCH, limit - done)
                 batch = self._pending(store, sub, cursor, size)
@@ -356,8 +382,8 @@ class InProcessEventBus:
         t = event_deliveries
         try:
             with unit_of_work() as store:
-                if not store.try_lock(_lock_key(sub.consumer)):
-                    return []  # another process is delivering to this consumer
+                if _reset_running(store) or not store.try_lock(_lock_key(sub.consumer)):
+                    return []  # a demo reset runs, or another process is delivering to this consumer
                 cursor, _ = self._cursor(store, sub.consumer)
                 if batch[0].seq <= cursor:
                     return []  # handled by the other process; re-read on the next drain
@@ -393,8 +419,8 @@ class InProcessEventBus:
 
         try:
             with unit_of_work() as store:
-                if not store.try_lock(_lock_key(sub.consumer)):
-                    return "stop"  # another process is delivering to this consumer
+                if _reset_running(store) or not store.try_lock(_lock_key(sub.consumer)):
+                    return "stop"  # a demo reset runs, or another process is delivering to this consumer
                 cursor, _ = self._cursor(store, sub.consumer)
                 if event.seq <= cursor:
                     return "stop"  # already handled by the other process; re-read on the next drain

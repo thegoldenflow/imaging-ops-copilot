@@ -85,6 +85,20 @@ class Pseudonymizer:
         text = PHONE_RE.sub(lambda m: self._token("PHONE", m.group()), text)
         return text
 
+    def retokenize(self, value):
+        """The reverse of restore: put the tokens back into re-identified output (strings, lists and dicts), e.g.
+        to keep a model's answer as an eval case without the identifiers."""
+        if isinstance(value, str):
+            for token, original in sorted(self._reverse.items(), key=lambda kv: len(kv[1]), reverse=True):
+                if original and original in value:
+                    value = value.replace(original, token)
+            return value
+        if isinstance(value, list):
+            return [self.retokenize(v) for v in value]
+        if isinstance(value, dict):
+            return {k: self.retokenize(v) for k, v in value.items()}
+        return value
+
     def restore(self, value):
         """Re-identify tokens inside strings, lists and dicts (e.g. tool inputs)."""
         if isinstance(value, str):
