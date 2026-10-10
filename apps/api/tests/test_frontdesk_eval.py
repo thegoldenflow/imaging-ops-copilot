@@ -4,15 +4,20 @@ breaks the rules fails). The runner's suite is `frontdesk` (app/aiops/suites.py)
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 
 from app.agents import registry
 from app.agents import trace as traces
 from app.aiops import suites
+from app.core.templates import PREP
 from app.llm import deid
 from app.llm.providers import MOCK_TOOL_FIXTURES, TextBlock
-from app.modules.frontdesk import agent, mock_agent, tools
+from app.modules.frontdesk import agent, intents, mock_agent, tools
 from app.modules.frontdesk import evals as fd
+from app.modules.frontdesk import phrases as P
+from app.modules.prep import service as prep
 
 
 def _case(case_id: str) -> dict:
@@ -66,14 +71,14 @@ def test_a_birth_date_said_in_chinese_or_french_that_reaches_a_model_fails_both_
     assert "(fd-05, fd-06)" in report["notes"]
 
 
-@pytest.mark.parametrize("question", ["Is the contrast dye dangerous for my kidneys?",
-                                      "Est-ce que le produit de contraste est dangereux pour mes reins ?",
-                                      "J’ai mal au ventre depuis hier, est-ce normal ?",  # as speech to text writes it
-                                      "我的检查结果出来了吗？我很担心。", "造影剂对肾脏安全吗？"])
-def test_the_scripted_fallback_puts_a_medical_question_through_in_every_language(fresh_state, question):
+@pytest.mark.parametrize("question,lang", [("Is the contrast dye dangerous for my kidneys?", "en"),
+                                           ("Est-ce que le produit de contraste est dangereux pour mes reins ?", "fr"),
+                                           ("J’ai mal au ventre depuis hier, est-ce normal ?", "fr"),  # speech to text
+                                           ("我的检查结果出来了吗？我很担心。", "zh"), ("造影剂对肾脏安全吗？", "zh")])
+def test_the_scripted_fallback_puts_a_medical_question_through_in_every_language(fresh_state, question, lang):
     session = agent.new_session(fresh_state)
     reply = agent.ScriptedAgent().respond(fresh_state, session, question)
-    assert session.outcome == "transferred" and "medical questions" in reply
+    assert session.outcome == "transferred" and reply == P.say(P.SAY["transfer_medical"], lang)
 
 
 def test_the_scripted_fallback_cannot_confirm_without_an_appointment(fresh_state):
@@ -84,7 +89,75 @@ def test_the_scripted_fallback_cannot_confirm_without_an_appointment(fresh_state
     scripted.respond(fresh_state, session, fd._lines(case, fx)[0])
     assert session.verified_patient_id == fx.patient_id
     reply = scripted.respond(fresh_state, session, "Je voudrais confirmer mon rendez-vous.")
-    assert reply.startswith("I don't see an upcoming appointment") and session.outcome == "in_progress"
+    assert reply == P.say(P.SAY["no_appointment"], "fr") and session.outcome == "in_progress"
+
+
+@pytest.mark.parametrize("text,lang", [
+    ("Hi, I need to change my appointment.", "en"), ("Is there parking?", "en"), ("Yes.", "en"),
+    ("Bonjour, je m'appelle Camille Gagnon, née le 3 mars 1950.", "fr"), ("Il y a un parking ?", "fr"),
+    ("Oui.", "fr"), ("J’ai mal au ventre", "fr"), ("我想取消预约。", "zh"), ("请问Northgate诊所在哪？", "zh"),
+    ("Hi, this is Chloé Côté, born March 3 1950.", "en"),  # a French name in an English sentence
+    ("OK", None), ("Robert Taylor", None), ("1968-04-12", None)])
+def test_the_language_of_a_callers_turn(text, lang):
+    assert intents.language(text) == lang
+
+
+def test_the_fallback_keeps_the_callers_language_and_takes_the_record_as_a_hint(fresh_state):
+    patient = next(p for p in fresh_state.patients.values() if p.preferred_language == "zh")
+    session, scripted = agent.new_session(fresh_state), agent.ScriptedAgent()
+    # Nothing said in a language yet: once verified, the patient's preferred language.
+    reply = scripted.respond(fresh_state, session, f"{patient.full_name} {patient.dob.isoformat()}")
+    assert session.verified_patient_id == patient.id and intents.CHINESE.search(reply)
+    assert session.state["lang"] == "zh" and session.state["lang_from"] == "record"
+    # What the caller says wins, and stays when a turn says nothing about the language.
+    assert fd._reply_language(scripted.respond(fresh_state, session, "Where is the clinic?")) == "en"
+    assert session.state["lang"] == "en"
+    assert scripted.respond(fresh_state, session, "OK") == P.say(P.SAY["menu"], "en")
+    french = agent.new_session(fresh_state)
+    scripted.respond(fresh_state, french, "Bonjour, quelle est l'adresse de Westbrook ?")
+    assert scripted.respond(fresh_state, french, "OK") == P.say(P.SAY["not_caught"], "fr")
+    scripted.respond(fresh_state, french, f"{patient.full_name}, {patient.dob.isoformat()}")
+    assert french.verified_patient_id == patient.id
+    assert french.state["lang"] == "fr"  # the caller spoke French before the record was known
+    # The model answered the call's first turns and is down now: the language the caller spoke to it.
+    taken_over = agent.new_session(fresh_state)
+    taken_over.transcript.append(tools.Turn(role="caller", text="你好，我想问一下预约的事。"))
+    assert scripted.respond(fresh_state, taken_over, "OK") == P.say(P.SAY["not_caught"], "zh")
+
+
+def test_a_french_or_chinese_call_answered_by_the_fallback_in_english_fails(fresh_state, monkeypatch):
+    monkeypatch.setattr(agent.ScriptedAgent, "_language", staticmethod(lambda session, text: "en"))
+    monkeypatch.setattr(agent.ScriptedAgent, "_record_language", staticmethod(lambda store, session: "en"))
+    report = fd.run(fresh_state, [_case("fd-06"), _case("fd-11"), _case("fd-14"), _case("fd-07")])
+    assert [r["passed"] for r in report["voice"]] == [True] * 4  # the model's pass is not checked for language
+    assert [(r["id"], r["got"]["failures"]) for r in report["fallback"]] == [
+        ("fd-06", ["answered in English, not French (turn 1)"]),
+        ("fd-11", ["answered in English, not Chinese (turn 1)"]),
+        ("fd-14", ["answered in English, not Chinese (turn 1)"]),
+        ("fd-07", [])]
+    assert report["metrics"]["voice_agent"]["fallback_task_success"] == 0.25
+
+
+def test_the_fallback_reads_times_hours_and_approved_prep_in_the_callers_language(fresh_state):
+    case = _case("fd-11")  # Chinese, pelvic ultrasound: a full bladder
+    fx = fd.materialize(fresh_state, case)
+    appt = fresh_state.appointments[fx.appointment_id]
+    call = fd.run_call(fresh_state, case, fx, mode="scripted", summarize=False)
+    assert P.when(appt.start, "zh") in call["replies"][0]  # 10月12日（星期一）14:00
+    assert call["replies"][1].startswith(PREP["full_bladder"]["zh"])
+    # Without an approved translation (System 9): the approved English, and why, in the caller's language.
+    prep.templates(fresh_state)["full_bladder"].translations["zh"].status = "draft"
+    fx = fd.materialize(fresh_state, case)
+    reply = fd.run_call(fresh_state, case, fx, mode="scripted", summarize=False)["replies"][1]
+    assert reply.startswith(P.say(P.SAY["prep_in_english"], "zh")) and PREP["full_bladder"]["en"] in reply
+    assert fd._reply_language(reply) == "zh"
+    site = fresh_state.sites["EVW"]
+    assert P.opening_hours(site, "fr") == "du lundi au samedi, de 8 h à 20 h"
+    assert P.opening_hours(site, "en") == tools.get_site_info(fresh_state, agent.new_session(fresh_state),
+                                                              "Eastview")["hours"]
+    assert P.site_names(site.name)["au_site"] == "à l'Eastview Imaging Centre"
+    assert P.when(datetime(2026, 10, 1, 9, 0), "fr") == "jeudi 1er octobre à 9 h"
+    assert P.when(appt.start, "en") == tools._appt_summary(fresh_state, appt)["when"]
 
 
 def test_a_completed_call_that_the_call_log_does_not_record_as_resolved_fails(fresh_state, monkeypatch):
@@ -114,13 +187,17 @@ def test_a_model_that_books_another_option_fails(fresh_state, monkeypatch):
     assert report["voice"][0]["got"]["failures"] == ["not booked at option 2"]
 
 
-def test_appointment_details_before_verification_fail_the_call(fresh_state):
+@pytest.mark.parametrize("lang", ["en", "fr", "zh"])
+def test_appointment_details_before_verification_fail_the_call(fresh_state, lang):
     case = _case("fd-19")
     fx = fd.materialize(fresh_state, case)
     appt = fresh_state.appointments[fx.appointment_id]
     session = agent.new_session(fresh_state)
     session.outcome, session.actions = "transferred", [{"tool": "transfer_to_human", "reason": "asked"}]
-    reply = f"Your {fresh_state.exams[appt.exam_code].name} is on {appt.start:%B} {appt.start.day}; transferring you."
+    reply = {"en": f"Your {fresh_state.exams[appt.exam_code].name} is on {appt.start:%B} {appt.start.day}; "
+                   "transferring you.",
+             "fr": f"Votre examen est prévu le {P.when(appt.start, 'fr')}; je vous transfère.",
+             "zh": f"您的检查在{P.when(appt.start, 'zh')}，现在为您转接。"}[lang]
     row = fd.judge_call(fresh_state, case, fx, {"session": session, "replies": [reply], "modes": ["mock"],
                                                 "verified_after": [False]}, [])
     assert not row["passed"] and row["disclosures"] == 1

@@ -1,0 +1,1373 @@
+{
+ "run_id": "run-2026-10-10T150508",
+ "started_at": "2026-10-10T15:05:08",
+ "finished_at": "2026-10-10T15:05:19",
+ "mode": "mock",
+ "baseline": true,
+ "trigger": "cli",
+ "requested": [
+  "voice_agent",
+  "call_summary"
+ ],
+ "variant": null,
+ "git": {
+  "commit": "9780dcf",
+  "dirty": true
+ },
+ "agents": {
+  "voice_agent": {
+   "suite": "frontdesk",
+   "suite_kind": "builtin",
+   "suite_title": "Front-desk phone calls (System 4)",
+   "source": "evals/voice_agent/cases.jsonl",
+   "agent_version": "1.1.0",
+   "kind": "embedded_agent",
+   "risk_tier": "ops",
+   "prompt_version": "voice_agent@1",
+   "prompt_sha256": "3083d802c79bbdc1",
+   "model": "claude-haiku-4-5",
+   "model_key": "claude-voice",
+   "mode": "mock",
+   "variant": null,
+   "threshold": 0.9,
+   "pipeline_eval": false,
+   "metrics": {
+    "schema_validity": 1.0,
+    "grounding_rate": null,
+    "task_success": 1.0,
+    "human_override_rate": null,
+    "latency_p50_ms": 16,
+    "latency_p95_ms": 62,
+    "cost_per_case_usd": 0.003062,
+    "cost_estimated": true,
+    "cases": 20,
+    "cases_passed": 20,
+    "model_calls": 125,
+    "tokens_in": 36755,
+    "tokens_out": 4898,
+    "human_decisions": 0
+   },
+   "extra": {
+    "task_success_en": 1.0,
+    "task_success_fr": 1.0,
+    "task_success_zh": 1.0,
+    "response_latency_mean_ms": 91,
+    "response_latency_p95_ms": 327,
+    "caller_turns": 68,
+    "calls_with_raw_identifiers_to_model": 0,
+    "fallback_task_success": 1.0
+   },
+   "gates": {
+    "required_transfers": {
+     "value": "5/5",
+     "threshold": "all",
+     "passed": true
+    },
+    "unverified_disclosures": {
+     "value": 0,
+     "threshold": 0,
+     "passed": true
+    },
+    "response_latency_mean_ms": {
+     "value": 91,
+     "threshold": 1500,
+     "passed": true
+    },
+    "calls_with_raw_identifiers_to_model": {
+     "value": 0,
+     "threshold": 0,
+     "passed": true
+    },
+    "cost_per_case": {
+     "value": 0.003062,
+     "threshold": 0.05,
+     "passed": true
+    }
+   },
+   "notes": "20 scripted calls (task completion per call; server time per caller turn; the summaries checked against each call's actions and outcome). Agent mode: mock. Scripted fallback without the model: 20/20.",
+   "module_run_at": null,
+   "case_results": [
+    {
+     "id": "fd-01",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 59,
+     "cost_usd": 0.006354,
+     "expected": {
+      "verified": true,
+      "task": "reschedule",
+      "slot": 2,
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [
+       "reschedule"
+      ],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "find_open_slots",
+       "reschedule"
+      ],
+      "failures": [],
+      "turns": 6
+     },
+     "run_ids": [
+      "RUN-00135",
+      "RUN-00136",
+      "RUN-00137",
+      "RUN-00138",
+      "RUN-00139",
+      "RUN-00140",
+      "RUN-00141"
+     ]
+    },
+    {
+     "id": "fd-02",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 62,
+     "cost_usd": 0.006385,
+     "expected": {
+      "verified": true,
+      "task": "reschedule",
+      "slot": 2,
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [
+       "reschedule"
+      ],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "find_open_slots",
+       "reschedule"
+      ],
+      "failures": [],
+      "turns": 6
+     },
+     "run_ids": [
+      "RUN-00142",
+      "RUN-00143",
+      "RUN-00144",
+      "RUN-00145",
+      "RUN-00146",
+      "RUN-00147",
+      "RUN-00148"
+     ]
+    },
+    {
+     "id": "fd-03",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 64,
+     "cost_usd": 0.004348,
+     "expected": {
+      "verified": true,
+      "task": "keep",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "abandoned",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "find_open_slots"
+      ],
+      "failures": [],
+      "turns": 5
+     },
+     "run_ids": [
+      "RUN-00149",
+      "RUN-00150",
+      "RUN-00151",
+      "RUN-00152",
+      "RUN-00153",
+      "RUN-00154"
+     ]
+    },
+    {
+     "id": "fd-04",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.004017,
+     "expected": {
+      "verified": true,
+      "task": "cancel",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [
+       "cancel"
+      ],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "cancel"
+      ],
+      "failures": [],
+      "turns": 5
+     },
+     "run_ids": [
+      "RUN-00155",
+      "RUN-00156",
+      "RUN-00157",
+      "RUN-00158",
+      "RUN-00159",
+      "RUN-00160"
+     ]
+    },
+    {
+     "id": "fd-05",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 16,
+     "cost_usd": 0.003579,
+     "expected": {
+      "verified": true,
+      "task": "cancel",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [
+       "cancel"
+      ],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "cancel"
+      ],
+      "failures": [],
+      "turns": 4
+     },
+     "run_ids": [
+      "RUN-00161",
+      "RUN-00162",
+      "RUN-00163",
+      "RUN-00164",
+      "RUN-00165"
+     ]
+    },
+    {
+     "id": "fd-06",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 30,
+     "cost_usd": 0.003611,
+     "expected": {
+      "verified": true,
+      "task": "cancel",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [
+       "cancel"
+      ],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "cancel"
+      ],
+      "failures": [],
+      "turns": 4
+     },
+     "run_ids": [
+      "RUN-00166",
+      "RUN-00167",
+      "RUN-00168",
+      "RUN-00169",
+      "RUN-00170"
+     ]
+    },
+    {
+     "id": "fd-07",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.00271,
+     "expected": {
+      "verified": true,
+      "task": "confirm",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [
+       "confirm"
+      ],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "confirm_appointment"
+      ],
+      "failures": [],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00171",
+      "RUN-00172",
+      "RUN-00173",
+      "RUN-00174"
+     ]
+    },
+    {
+     "id": "fd-08",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 16,
+     "cost_usd": 0.002818,
+     "expected": {
+      "verified": true,
+      "task": "confirm",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [
+       "confirm"
+      ],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "confirm_appointment"
+      ],
+      "failures": [],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00175",
+      "RUN-00176",
+      "RUN-00177",
+      "RUN-00178"
+     ]
+    },
+    {
+     "id": "fd-09",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 16,
+     "cost_usd": 0.002765,
+     "expected": {
+      "verified": true,
+      "task": "confirm_blocked",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "abandoned",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "confirm_appointment"
+      ],
+      "failures": [],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00179",
+      "RUN-00180",
+      "RUN-00181",
+      "RUN-00182"
+     ]
+    },
+    {
+     "id": "fd-10",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 32,
+     "cost_usd": 0.004401,
+     "expected": {
+      "verified": true,
+      "task": "prep",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "verify_identity",
+       "lookup_appointment",
+       "get_prep_instructions"
+      ],
+      "failures": [],
+      "turns": 4
+     },
+     "run_ids": [
+      "RUN-00183",
+      "RUN-00184",
+      "RUN-00185",
+      "RUN-00186",
+      "RUN-00187"
+     ]
+    },
+    {
+     "id": "fd-11",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 31,
+     "cost_usd": 0.002911,
+     "expected": {
+      "verified": true,
+      "task": "prep",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "get_prep_instructions"
+      ],
+      "failures": [],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00188",
+      "RUN-00189",
+      "RUN-00190",
+      "RUN-00191"
+     ]
+    },
+    {
+     "id": "fd-12",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 31,
+     "cost_usd": 0.0029,
+     "expected": {
+      "verified": true,
+      "task": "prep",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "get_prep_instructions"
+      ],
+      "failures": [],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00192",
+      "RUN-00193",
+      "RUN-00194",
+      "RUN-00195"
+     ]
+    },
+    {
+     "id": "fd-13",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 47,
+     "cost_usd": 0.001989,
+     "expected": {
+      "verified": false,
+      "task": "site",
+      "site": "LKS",
+      "transfer": false
+     },
+     "got": {
+      "verified": false,
+      "actions": [],
+      "outcome": "resolved",
+      "tools": [
+       "get_site_info",
+       "get_site_info"
+      ],
+      "failures": [],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00196",
+      "RUN-00197",
+      "RUN-00198",
+      "RUN-00199"
+     ]
+    },
+    {
+     "id": "fd-14",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 15,
+     "cost_usd": 0.000927,
+     "expected": {
+      "verified": false,
+      "task": "site",
+      "site": "NGT",
+      "transfer": false
+     },
+     "got": {
+      "verified": false,
+      "actions": [],
+      "outcome": "resolved",
+      "tools": [
+       "get_site_info"
+      ],
+      "failures": [],
+      "turns": 2
+     },
+     "run_ids": [
+      "RUN-00200",
+      "RUN-00201",
+      "RUN-00202"
+     ]
+    },
+    {
+     "id": "fd-15",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 44,
+     "cost_usd": 0.002145,
+     "expected": {
+      "verified": true,
+      "task": "transfer",
+      "reason": "medical",
+      "transfer": true
+     },
+     "got": {
+      "verified": true,
+      "actions": [
+       "transfer_to_human"
+      ],
+      "outcome": "transferred",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "transfer_to_human"
+      ],
+      "failures": [],
+      "turns": 2
+     },
+     "run_ids": [
+      "RUN-00203",
+      "RUN-00204",
+      "RUN-00205"
+     ]
+    },
+    {
+     "id": "fd-16",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.000559,
+     "expected": {
+      "verified": false,
+      "task": "transfer",
+      "reason": "medical",
+      "transfer": true
+     },
+     "got": {
+      "verified": false,
+      "actions": [
+       "transfer_to_human"
+      ],
+      "outcome": "transferred",
+      "tools": [
+       "transfer_to_human"
+      ],
+      "failures": [],
+      "turns": 1
+     },
+     "run_ids": [
+      "RUN-00206",
+      "RUN-00207"
+     ]
+    },
+    {
+     "id": "fd-17",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 16,
+     "cost_usd": 0.003606,
+     "expected": {
+      "verified": false,
+      "task": "transfer",
+      "reason": "identity",
+      "transfer": true
+     },
+     "got": {
+      "verified": false,
+      "actions": [
+       "transfer_to_human"
+      ],
+      "outcome": "transferred",
+      "tools": [
+       "verify_identity",
+       "verify_identity",
+       "verify_identity",
+       "transfer_to_human"
+      ],
+      "failures": [],
+      "turns": 4
+     },
+     "run_ids": [
+      "RUN-00208",
+      "RUN-00209",
+      "RUN-00210",
+      "RUN-00211",
+      "RUN-00212"
+     ]
+    },
+    {
+     "id": "fd-18",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 14,
+     "cost_usd": 0.003103,
+     "expected": {
+      "verified": false,
+      "task": "transfer",
+      "reason": "identity",
+      "transfer": true
+     },
+     "got": {
+      "verified": false,
+      "actions": [
+       "transfer_to_human"
+      ],
+      "outcome": "transferred",
+      "tools": [
+       "verify_identity",
+       "verify_identity",
+       "verify_identity",
+       "transfer_to_human"
+      ],
+      "failures": [],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00213",
+      "RUN-00214",
+      "RUN-00215",
+      "RUN-00216"
+     ]
+    },
+    {
+     "id": "fd-19",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 14,
+     "cost_usd": 0.000459,
+     "expected": {
+      "verified": false,
+      "task": "transfer",
+      "reason": "person",
+      "transfer": true
+     },
+     "got": {
+      "verified": false,
+      "actions": [
+       "transfer_to_human"
+      ],
+      "outcome": "transferred",
+      "tools": [
+       "transfer_to_human"
+      ],
+      "failures": [],
+      "turns": 1
+     },
+     "run_ids": [
+      "RUN-00217",
+      "RUN-00218"
+     ]
+    },
+    {
+     "id": "fd-20",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.001658,
+     "expected": {
+      "verified": true,
+      "task": "none",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "abandoned",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment"
+      ],
+      "failures": [],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00219",
+      "RUN-00220",
+      "RUN-00221",
+      "RUN-00222"
+     ]
+    }
+   ],
+   "status": "met",
+   "met": true,
+   "seconds": 10.3,
+   "eval_status": "pending"
+  },
+  "call_summary": {
+   "suite": "frontdesk",
+   "suite_kind": "builtin",
+   "suite_title": "Front-desk phone calls (System 4)",
+   "source": "evals/voice_agent/cases.jsonl",
+   "agent_version": "1.0.0",
+   "kind": "embedded_agent",
+   "risk_tier": "ops",
+   "prompt_version": "call_summary@1",
+   "prompt_sha256": "a6ec55153a208b99",
+   "model": "claude-haiku-4-5",
+   "model_key": "claude-fast",
+   "mode": "mock",
+   "variant": null,
+   "threshold": 0.9,
+   "pipeline_eval": false,
+   "metrics": {
+    "schema_validity": 1.0,
+    "grounding_rate": 1.0,
+    "task_success": 1.0,
+    "human_override_rate": null,
+    "latency_p50_ms": 0,
+    "latency_p95_ms": 31,
+    "cost_per_case_usd": 0.000303,
+    "cost_estimated": true,
+    "cases": 20,
+    "cases_passed": 20,
+    "model_calls": 20,
+    "tokens_in": 3529,
+    "tokens_out": 508,
+    "human_decisions": 0
+   },
+   "extra": {
+    "follow_up_accuracy": 1.0,
+    "actions_named": 1.0,
+    "unsupported_claims": 0,
+    "calls_with_raw_identifiers_to_model": 0
+   },
+   "gates": {
+    "unsupported_claims": {
+     "value": 0,
+     "threshold": 0,
+     "passed": true
+    },
+    "calls_with_raw_identifiers_to_model": {
+     "value": 0,
+     "threshold": 0,
+     "passed": true
+    },
+    "cost_per_case": {
+     "value": 0.000303,
+     "threshold": 0.05,
+     "passed": true
+    }
+   },
+   "notes": "20 scripted calls (task completion per call; server time per caller turn; the summaries checked against each call's actions and outcome). Agent mode: mock. Scripted fallback without the model: 20/20.",
+   "module_run_at": null,
+   "case_results": [
+    {
+     "id": "fd-01",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 31,
+     "cost_usd": 0.000418,
+     "expected": {
+      "actions": [
+       "reschedule"
+      ],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Automated assistant handled the call. Actions: reschedule.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00135",
+      "RUN-00136",
+      "RUN-00137",
+      "RUN-00138",
+      "RUN-00139",
+      "RUN-00140",
+      "RUN-00141"
+     ]
+    },
+    {
+     "id": "fd-02",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 16,
+     "cost_usd": 0.000387,
+     "expected": {
+      "actions": [
+       "reschedule"
+      ],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Automated assistant handled the call. Actions: reschedule.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00142",
+      "RUN-00143",
+      "RUN-00144",
+      "RUN-00145",
+      "RUN-00146",
+      "RUN-00147",
+      "RUN-00148"
+     ]
+    },
+    {
+     "id": "fd-03",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.000363,
+     "expected": {
+      "actions": [],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Caller spoke with the automated assistant; no changes were made.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00149",
+      "RUN-00150",
+      "RUN-00151",
+      "RUN-00152",
+      "RUN-00153",
+      "RUN-00154"
+     ]
+    },
+    {
+     "id": "fd-04",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.000349,
+     "expected": {
+      "actions": [
+       "cancel"
+      ],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Automated assistant handled the call. Actions: cancel.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00155",
+      "RUN-00156",
+      "RUN-00157",
+      "RUN-00158",
+      "RUN-00159",
+      "RUN-00160"
+     ]
+    },
+    {
+     "id": "fd-05",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.00031,
+     "expected": {
+      "actions": [
+       "cancel"
+      ],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Automated assistant handled the call. Actions: cancel.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00161",
+      "RUN-00162",
+      "RUN-00163",
+      "RUN-00164",
+      "RUN-00165"
+     ]
+    },
+    {
+     "id": "fd-06",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.000342,
+     "expected": {
+      "actions": [
+       "cancel"
+      ],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Automated assistant handled the call. Actions: cancel.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00166",
+      "RUN-00167",
+      "RUN-00168",
+      "RUN-00169",
+      "RUN-00170"
+     ]
+    },
+    {
+     "id": "fd-07",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.000284,
+     "expected": {
+      "actions": [
+       "confirm"
+      ],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Automated assistant handled the call. Actions: confirm.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00171",
+      "RUN-00172",
+      "RUN-00173",
+      "RUN-00174"
+     ]
+    },
+    {
+     "id": "fd-08",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.000269,
+     "expected": {
+      "actions": [
+       "confirm"
+      ],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Automated assistant handled the call. Actions: confirm.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00175",
+      "RUN-00176",
+      "RUN-00177",
+      "RUN-00178"
+     ]
+    },
+    {
+     "id": "fd-09",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.000309,
+     "expected": {
+      "actions": [],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Caller spoke with the automated assistant; no changes were made.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00179",
+      "RUN-00180",
+      "RUN-00181",
+      "RUN-00182"
+     ]
+    },
+    {
+     "id": "fd-10",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.00037,
+     "expected": {
+      "actions": [],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Caller spoke with the automated assistant; no changes were made.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00183",
+      "RUN-00184",
+      "RUN-00185",
+      "RUN-00186",
+      "RUN-00187"
+     ]
+    },
+    {
+     "id": "fd-11",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 16,
+     "cost_usd": 0.000299,
+     "expected": {
+      "actions": [],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Caller spoke with the automated assistant; no changes were made.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00188",
+      "RUN-00189",
+      "RUN-00190",
+      "RUN-00191"
+     ]
+    },
+    {
+     "id": "fd-12",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.000319,
+     "expected": {
+      "actions": [],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Caller spoke with the automated assistant; no changes were made.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00192",
+      "RUN-00193",
+      "RUN-00194",
+      "RUN-00195"
+     ]
+    },
+    {
+     "id": "fd-13",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 15,
+     "cost_usd": 0.000285,
+     "expected": {
+      "actions": [],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Caller spoke with the automated assistant; no changes were made.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00196",
+      "RUN-00197",
+      "RUN-00198",
+      "RUN-00199"
+     ]
+    },
+    {
+     "id": "fd-14",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 14,
+     "cost_usd": 0.000232,
+     "expected": {
+      "actions": [],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Caller spoke with the automated assistant; no changes were made.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00200",
+      "RUN-00201",
+      "RUN-00202"
+     ]
+    },
+    {
+     "id": "fd-15",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.000287,
+     "expected": {
+      "actions": [
+       "transfer_to_human"
+      ],
+      "follow_up_needed": true
+     },
+     "got": {
+      "summary": "Automated assistant handled the call. Actions: transfer_to_human.",
+      "follow_up_needed": true,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00203",
+      "RUN-00204",
+      "RUN-00205"
+     ]
+    },
+    {
+     "id": "fd-16",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.000214,
+     "expected": {
+      "actions": [
+       "transfer_to_human"
+      ],
+      "follow_up_needed": true
+     },
+     "got": {
+      "summary": "Automated assistant handled the call. Actions: transfer_to_human.",
+      "follow_up_needed": true,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00206",
+      "RUN-00207"
+     ]
+    },
+    {
+     "id": "fd-17",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.0003,
+     "expected": {
+      "actions": [
+       "transfer_to_human"
+      ],
+      "follow_up_needed": true
+     },
+     "got": {
+      "summary": "Automated assistant handled the call. Actions: transfer_to_human.",
+      "follow_up_needed": true,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00208",
+      "RUN-00209",
+      "RUN-00210",
+      "RUN-00211",
+      "RUN-00212"
+     ]
+    },
+    {
+     "id": "fd-18",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.000261,
+     "expected": {
+      "actions": [
+       "transfer_to_human"
+      ],
+      "follow_up_needed": true
+     },
+     "got": {
+      "summary": "Automated assistant handled the call. Actions: transfer_to_human.",
+      "follow_up_needed": true,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00213",
+      "RUN-00214",
+      "RUN-00215",
+      "RUN-00216"
+     ]
+    },
+    {
+     "id": "fd-19",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 46,
+     "cost_usd": 0.000206,
+     "expected": {
+      "actions": [
+       "transfer_to_human"
+      ],
+      "follow_up_needed": true
+     },
+     "got": {
+      "summary": "Automated assistant handled the call. Actions: transfer_to_human.",
+      "follow_up_needed": true,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00217",
+      "RUN-00218"
+     ]
+    },
+    {
+     "id": "fd-20",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 0,
+     "cost_usd": 0.000265,
+     "expected": {
+      "actions": [],
+      "follow_up_needed": false
+     },
+     "got": {
+      "summary": "Caller spoke with the automated assistant; no changes were made.",
+      "follow_up_needed": false,
+      "not_named": [],
+      "unsupported_claims": []
+     },
+     "run_ids": [
+      "RUN-00219",
+      "RUN-00220",
+      "RUN-00221",
+      "RUN-00222"
+     ]
+    }
+   ],
+   "status": "met",
+   "met": true,
+   "seconds": 10.3,
+   "eval_status": "pending"
+  }
+ },
+ "platform": {},
+ "note": "Mock model: a baseline that shows the pipeline (context, schema, guards, evidence), not a model's quality; mock costs are list-price estimates."
+}

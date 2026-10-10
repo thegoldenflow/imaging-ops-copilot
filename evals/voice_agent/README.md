@@ -63,7 +63,10 @@ its tool calls through the Tool Gateway (allow-list, idempotency, audit, one tra
 | call_summary | Calls whose transcript reached the model with the caller's name or birth date as said | 0 (gate) |
 
 Monitored, not gated: the same 20 calls answered by the scripted fallback (the phone line with the model down), with
-the same judge.
+the same judge plus one check: every reply in the caller's language (the case's `language`). The judge tells the
+language by its own words, not the fallback's rules: Chinese characters, else more French than English words; the
+approved English preparation text, read out with a note when a language has no approved translation (System 9),
+counts for neither. The model's pass is not checked for language, since the mock model answers in English.
 
 Result 2026-10-10 (mock, `evals/runs/run-2026-10-10T114545.json`): both agents 20/20, every gate met, mean server
 time per caller turn 148 ms (p95 391 ms; no model latency with the mock). Scripted fallback 14/20:
@@ -87,6 +90,16 @@ preparation, site information) mark the call `resolved`, so the model agent's co
 pass, fd-03 (reschedule declined), fd-09 (confirmation blocked) and fd-20 (no appointment) still end `abandoned`: nothing
 was done and the model has no end-of-call signal (the scripted agent marks them resolved at the caller's goodbye).
 
+Result 2026-10-10 after the fallback's languages (mock, `evals/runs/run-2026-10-10T150508.json`): both agents 20/20,
+every gate met, scripted fallback 20/20 with the new language check (with the fallback's old English replies, the 9
+French and Chinese calls fail it). The fallback now answers in the caller's language: Chinese characters or more
+French than English words in a turn set it for the call, and a verified patient's preferred language is a hint until
+the caller speaks one (`apps/api/app/modules/frontdesk/intents.py`). Every reply, the times it reads out, the site's
+opening hours and parking note and the approved preparation instructions come in English, French or Chinese from
+`apps/api/app/modules/frontdesk/phrases.py` and the prep module. Two judge fixes on the way: the address check now
+finds the number after a Chinese character (地址是482; before, the Chinese site reply failed), and replies before
+verification are also checked for the appointment's date in French and Chinese (14 octobre, 10月14日).
+
 ## Known failure modes
 
 - The scripts, the judge and the mock model share an author: the mock numbers are optimistic and show the pipeline
@@ -94,7 +107,9 @@ was done and the model has no end-of-call signal (the scripted agent marks them 
   until a `--live` run.
 - The scripted fallback's keyword rules were extended alongside these scripts too, so its 20/20 is optimistic: a
   caller who words a request in a way no rule lists gets the menu again (a medical question errs towards being put
-  through). It understands English, French and Chinese but answers in English.
+  through). Its language is found the same way: a French turn without any listed word keeps the call's language,
+  and exam and site names stay in English (as in the SMS templates). The judge's language check has its own word
+  lists but the same author.
 - The scripts are fixed lines: a live model that orders the dialog differently (offers times before being asked,
   asks again before acting) can fail a call it would have handled with a real caller. Read the failing calls' traces.
 - The summary judge is keyword-based (action names, past-tense claims with a short negation window); a live summary

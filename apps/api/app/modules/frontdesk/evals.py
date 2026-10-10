@@ -19,7 +19,8 @@ patient's other upcoming appointments are set aside), so the set runs on any day
   that did not happen, follow_up_needed exactly when the call was put through. Gates: no unsupported claim; no
   call whose transcript reached the model with the caller's name or birth date as said.
 - The scripted fallback (no model) answers the same calls as an extra: what the phone line still does when the
-  model is down.
+  model is down. Its calls also fail when a reply is not in the caller's language (the mock model answers in
+  English, so the model's pass is not checked for it).
 
 Written alongside the mock model, so the mock numbers are optimistic: they show the pipeline, not a model.
 """
@@ -35,6 +36,7 @@ from datetime import date, datetime, timedelta
 from app.aiops.collect import mark
 from app.core.models import ACTIVE_STATUSES, Appointment, AppointmentStatus
 from app.core.store import Store
+from app.core.templates import PREP
 from app.llm.gateway import get_gateway
 from app.modules.evals.paths import EVALS_DIR
 from app.modules.frontdesk import agent, service, tools
@@ -59,6 +61,14 @@ CLAIMS = {"reschedule": r"\brescheduled\b|\bmoved (to|the|their|his|her)\b|已�
           "transfer_to_human": r"\btransferred\b|已转接|transféré"}
 NEGATION = re.compile(r"\b(not|no|nothing|never|didn't|did not|wasn't|was not|without|declined|instead of)\b|"
                       r"没有|未|不", re.I)
+# The language of a fallback reply, by the judge's own words (not the fallback's rules): Chinese characters, else
+# more French than English words. The approved English preparation text, read out with a note when a language has
+# no approved translation yet (System 9), counts for neither.
+LANGUAGE_NAMES = {"en": "English", "fr": "French", "zh": "Chinese"}
+CJK = re.compile(r"[一-鿿]")
+REPLY_WORDS = {"fr": re.compile(r"\b(vous|votre|vos|je|j'|le|la|les|l'|une?|des|du|de|est|c'est|à|au|pour|merci|"
+                                r"rendez-vous|autre|chose)\b", re.I),
+               "en": re.compile(r"\b(you|your|you're|i|i'm|i've|the|is|are|an?|to|for|thank|anything|else)\b", re.I)}
 
 
 def load_cases() -> list[dict]:
@@ -228,12 +238,23 @@ def run_call(store: Store, case: dict, fx: Fixture, *, mode: str, summarize: boo
 
 
 def _discloses(store: Store, fx: Fixture, reply: str) -> bool:
+    """The reply names the appointment's exam or day (October 14, 14 octobre, 10月14日)."""
     if fx.appointment_id is None:
         return False
     appt = store.appointments[fx.appointment_id]
-    text = reply.lower()
-    return store.exams[appt.exam_code].name.lower() in text or bool(
-        re.search(rf"\b{fx.start:%B} 0?{fx.start.day}\b", reply, re.I))
+    text, day = reply.lower(), fx.start.day
+    return store.exams[appt.exam_code].name.lower() in text or f"{fx.start.month}月{day}日" in reply or bool(
+        re.search(rf"\b{fx.start:%B} 0?{day}\b|\b{'1er' if day == 1 else day} {FR_MONTHS[fx.start.month - 1]}\b",
+                  reply, re.I))
+
+
+def _reply_language(reply: str) -> str:
+    for texts in PREP.values():
+        reply = reply.replace(texts["en"], " ")
+    if CJK.search(reply):
+        return "zh"
+    fr, en = (len(REPLY_WORDS[lang].findall(reply)) for lang in ("fr", "en"))
+    return "fr" if fr > en else "en"
 
 
 def judge_call(store: Store, case: dict, fx: Fixture, call: dict, log: list[dict]) -> dict:
@@ -260,6 +281,12 @@ def judge_call(store: Store, case: dict, fx: Fixture, call: dict, log: list[dict
         failures.append(f"unexpected actions: {', '.join(sorted(extra))}")
     if "scripted" in call["modes"] and session.agent_mode != "scripted":
         failures.append("the model failed on a turn (the scripted fallback answered)")
+    lang = case.get("language")
+    if session.agent_mode == "scripted" and lang:  # the fallback answers in the caller's language
+        heard = [(i + 1, got) for i, r in enumerate(call["replies"]) if (got := _reply_language(r)) != lang]
+        if heard:
+            turn, got = heard[0]
+            failures.append(f"answered in {LANGUAGE_NAMES[got]}, not {LANGUAGE_NAMES[lang]} (turn {turn})")
 
     appt = store.appointments.get(fx.appointment_id) if fx.appointment_id else None
     others = [a for a in store.appointments.values() if fx.patient_id and a.patient_id == fx.patient_id
@@ -298,7 +325,7 @@ def judge_call(store: Store, case: dict, fx: Fixture, call: dict, log: list[dict
         number = re.match(r"\d+", site.address)
         if not any(e["tool"] == "get_site_info" and e["ok"] and e["output"].get("site") == site.name for e in mine):
             failures.append(f"no information for {site.name}")
-        elif number and not any(re.search(rf"\b{number.group()}\b", r) for r in call["replies"]):
+        elif number and not any(re.search(rf"(?<!\d){number.group()}(?!\d)", r) for r in call["replies"]):  # 地址是482
             failures.append("the address was not given")
     elif task == "none" and actions:
         failures.append("an action without an appointment")
