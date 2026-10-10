@@ -9,6 +9,7 @@ from app.core.models import ACTIVE_STATUSES, Appointment, AppointmentStatus
 from app.core.store import Store, get_store
 from app.core.templates import format_when, render
 from app.integrations.mocks import CoverageResult, adapter, queue_message
+from app.llm.deid import Pseudonymizer
 from app.llm.gateway import get_gateway
 from app.llm.prompts import CALL_SUMMARY
 from app.llm.providers import mock_fixture
@@ -152,9 +153,13 @@ def summarize_call(store: Store, session: CallSession) -> dict | None:
     transcript = "\n".join(f"{t.role}: {t.text}" for t in session.transcript if t.role != "tool")
     actions = ", ".join(a["tool"] for a in session.actions) or "none"
     patients = [store.patients[session.verified_patient_id]] if session.verified_patient_id else []
+    # De-identified like the agent's turns: any patient's name (a caller who was not verified may have said one)
+    # and a birth date in any form said.
+    pseudo = Pseudonymizer(list(store.patients.values()))
     outcome = get_gateway().structured(
-        task="call_summary", prompt=CALL_SUMMARY, variables={"transcript": transcript, "actions": actions},
-        schema_cls=CallSummary, tier="fast", patients=patients,
+        task="call_summary", prompt=CALL_SUMMARY,
+        variables={"transcript": pseudo.redact(transcript, spoken_dates=True), "actions": actions},
+        schema_cls=CallSummary, tier="fast", patients=patients, pseudonymizer=pseudo,
     )
     if outcome.status == "ok":
         session.summary = outcome.data["summary"]

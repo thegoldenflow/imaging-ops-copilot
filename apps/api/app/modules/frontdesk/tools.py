@@ -14,6 +14,11 @@ from app.modules.scheduling import service as scheduling
 MONTHS = {m: i + 1 for i, m in enumerate(
     ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
      "november", "december"])}
+# French, with and without accents (speech to text may drop them).
+MONTHS |= {m: i + 1 for i, names in enumerate(
+    ["janvier", "février fevrier", "mars", "avril", "mai", "juin", "juillet", "août aout", "septembre", "octobre",
+     "novembre", "décembre decembre"]) for m in names.split()}
+CN_DIGITS = {c: i for i, c in enumerate("〇一二三四五六七八九")} | {"零": 0}
 
 
 class Turn(BaseModel):
@@ -37,23 +42,43 @@ class CallSession(BaseModel):
     latencies_ms: list[int] = []
 
 
+def _cn_number(s: str) -> int:
+    """12, or Chinese numerals: 一九八四 is 1984 (digit by digit), 十一 is 11, 二十 is 20."""
+    if s.isdigit():
+        return int(s)
+    if "十" not in s:
+        return int("".join(str(CN_DIGITS[c]) for c in s))
+    tens, _, ones = s.partition("十")
+    return CN_DIGITS.get(tens, 1) * 10 + CN_DIGITS.get(ones, 0)
+
+
 def parse_dob(text: str) -> date | None:
+    """A birth date as said: ISO or numeric (month first unless the first number cannot be a month; a two-digit
+    year is the latest one not in the future), Chinese (Arabic or Chinese numerals), or an English or French month
+    name before or after the day. Every form the phone agent's de-identification turns into a placeholder
+    (app/llm/deid.py SPOKEN_DATE_RES) reads here once the tool input is re-identified."""
     t = text.lower().replace(",", " ")
-    t = re.sub(r"(\d)(st|nd|rd|th)\b", r"\1", t)
-    if m := re.search(r"\b(19\d{2}|20\d{2})-(\d{1,2})-(\d{1,2})\b", t):
-        y, mo, d = map(int, m.groups())
-    elif m := re.search(r"\b(\d{1,2})/(\d{1,2})/(19\d{2}|20\d{2})\b", t):
-        mo, d, y = map(int, m.groups())
-    elif m := re.search(r"\b([a-z]+)\s+(\d{1,2})\s+(19\d{2}|20\d{2})\b", t):
+    t = re.sub(r"(\d)(st|nd|rd|th|er)\b", r"\1", t)
+    t = re.sub(r"(\d)\s+of\s+", r"\1 ", t)
+    if m := re.search(r"\b(19\d{2}|20\d{2})([-/.])(\d{1,2})\2(\d{1,2})\b", t):
+        y, mo, d = int(m[1]), int(m[3]), int(m[4])
+    elif m := re.search(r"\b(\d{1,2})([/.-])(\d{1,2})\2(19\d{2}|20\d{2}|\d{2})\b", t):
+        mo, d, y = int(m[1]), int(m[3]), int(m[4])
+        if mo > 12:  # 13/04/1968 is day first
+            mo, d = d, mo
+        if y < 100:
+            y += 2000 if y <= date.today().year % 100 else 1900
+    elif m := re.search(r"(19\d{2}|20\d{2}|[〇零一二三四五六七八九]{4})\s*年\s*(\d{1,2}|[一二三四五六七八九十]{1,3})\s*月"
+                        r"\s*(\d{1,2}|[一二三四五六七八九十]{1,3})", t):
+        y, mo, d = map(_cn_number, m.groups())
+    elif m := re.search(r"\b([^\W\d_]+)\s+(\d{1,2})\s+(19\d{2}|20\d{2})\b", t):
         if m.group(1) not in MONTHS:
             return None
         mo, d, y = MONTHS[m.group(1)], int(m.group(2)), int(m.group(3))
-    elif m := re.search(r"\b(\d{1,2})\s+([a-z]+)\s+(19\d{2}|20\d{2})\b", t):
+    elif m := re.search(r"\b(\d{1,2})\s+([^\W\d_]+)\s+(19\d{2}|20\d{2})\b", t):
         if m.group(2) not in MONTHS:
             return None
         d, mo, y = int(m.group(1)), MONTHS[m.group(2)], int(m.group(3))
-    elif m := re.search(r"(19\d{2}|20\d{2})年(\d{1,2})月(\d{1,2})", text):
-        y, mo, d = map(int, m.groups())
     else:
         return None
     try:

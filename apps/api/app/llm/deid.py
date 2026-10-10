@@ -17,6 +17,19 @@ HEALTH_CARD_RE = re.compile(r"\b\d{10}\b")
 ISO_DATE_RE = re.compile(r"\b(19|20)\d{2}-\d{2}-\d{2}\b")
 MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December"
 LONG_DATE_RE = re.compile(rf"\b({MONTHS})\s+\d{{1,2}}(st|nd|rd|th)?,?\s+(19|20)\d{{2}}\b", re.IGNORECASE)
+# Birth dates as callers say them (the phone agent, `redact(..., spoken_dates=True)`): Chinese with Arabic or
+# Chinese numerals, day first with an English or French month, numeric with the year first or last. Other text
+# keeps the patterns above. app/modules/frontdesk/tools.py `parse_dob` reads every form these restore to.
+FR_MONTHS = "janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre"
+CN_DIGITS, CN_NUMBERS = "〇零一二三四五六七八九", "一二三四五六七八九十"
+SPOKEN_DATE_RES = (
+    re.compile(r"(?:19|20)\d{2}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*[日号號]?"),
+    re.compile(rf"[{CN_DIGITS}]{{4}}\s*年\s*[{CN_NUMBERS}]{{1,3}}\s*月\s*[{CN_NUMBERS}]{{1,3}}\s*[日号號]?"),
+    re.compile(rf"\b\d{{1,2}}(?:st|nd|rd|th|er)?\s+(?:of\s+)?(?:{MONTHS}|{FR_MONTHS}),?\s+(?:19|20)\d{{2}}\b",
+               re.IGNORECASE),
+    re.compile(r"\b(?:19|20)\d{2}([/.-])\d{1,2}\1\d{1,2}\b"),
+    re.compile(r"(?<![\d/.-])\d{1,2}([/.-])\d{1,2}\1(?:19|20)?\d{2}(?![\d/.-]?\d)"),
+)
 
 
 class Pseudonymizer:
@@ -76,12 +89,16 @@ class Pseudonymizer:
                 text = re.sub(re.escape(value), self._token(self._known[value], value), text, flags=re.IGNORECASE)
         return text
 
-    def redact(self, text: str) -> str:
+    def redact(self, text: str, *, spoken_dates: bool = False) -> str:
+        """`spoken_dates`: also the birth dates as callers say them (SPOKEN_DATE_RES), before the phone pattern
+        takes a numeric one."""
         text = self.redact_known(text)
         text = EMAIL_RE.sub(lambda m: self._token("EMAIL", m.group()), text)
         text = HEALTH_CARD_RE.sub(lambda m: self._token("HEALTH_CARD", m.group()), text)
         text = ISO_DATE_RE.sub(lambda m: self._token("DATE", m.group()), text)
         text = LONG_DATE_RE.sub(lambda m: self._token("DATE", m.group()), text)
+        for regex in SPOKEN_DATE_RES if spoken_dates else ():
+            text = regex.sub(lambda m: self._token("DATE", m.group()), text)
         text = PHONE_RE.sub(lambda m: self._token("PHONE", m.group()), text)
         return text
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 from app.agents import registry
 from app.agents import trace as traces
 from app.aiops import suites
+from app.llm import deid
 from app.llm.providers import MOCK_TOOL_FIXTURES, TextBlock
 from app.modules.frontdesk import agent, mock_agent
 from app.modules.frontdesk import evals as fd
@@ -46,8 +47,18 @@ def test_each_caller_turn_is_an_agent_run_through_the_tool_gateway(fresh_state):
     assert len(runs) == len(call["replies"])
     done = [(c.tool_id, c.status) for t in runs for c in t.tool_calls]
     assert ("verifyCallerIdentity", "ok") in done and ("cancelAppointment", "ok") in done
-    assert call["raw_identifiers"] == []  # the name and the English birth date reached the model as placeholders
+    # The name and the English birth date reached the agent's model and the summary's as placeholders.
+    assert call["raw_identifiers"] == [] and call["summary_raw_identifiers"] == []
     assert fresh_state.appointments[fx.appointment_id].status == "cancelled"
+
+
+def test_a_birth_date_said_in_chinese_or_french_that_reaches_a_model_fails_both_gates(fresh_state, monkeypatch):
+    monkeypatch.setattr(deid, "SPOKEN_DATE_RES", ())  # the shared patterns only: ISO and English dates
+    report = fd.run(fresh_state, [_case("fd-05"), _case("fd-06")], fallback=False)
+    for agent_id in ("voice_agent", "call_summary"):
+        gate = report["gates"][agent_id]["calls_with_raw_identifiers_to_model"]
+        assert gate["value"] == 2 and not gate["passed"], agent_id
+    assert "(fd-05, fd-06)" in report["notes"]
 
 
 def test_the_scripted_fallback_handles_the_english_calls(fresh_state):

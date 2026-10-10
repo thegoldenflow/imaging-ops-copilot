@@ -13,6 +13,7 @@ from app.llm.deid import Pseudonymizer
 from app.llm.gateway import LlmGateway
 from app.llm.prompts import Prompt
 from app.llm.providers import ProviderResult, ProviderUnavailable
+from app.modules.frontdesk.tools import parse_dob
 
 
 def test_unauthenticated_request_is_rejected(client):
@@ -59,6 +60,25 @@ def test_deidentification_replaces_identifiers_and_restores_them():
         assert secret not in redacted
     assert "[PERSON_1]" in redacted
     assert pseudo.restore({"name": "[PERSON_1]"}) == {"name": "Robert Taylor"}
+
+
+@pytest.mark.parametrize("said", ["1968年4月12日", "1968 年 4 月 12 号", "一九六八年四月十二日", "12 avril 1968",
+                                  "12 April 1968", "12th of April, 1968", "04/12/1968", "1968/4/12", "04-12-68"])
+def test_a_birth_date_as_a_caller_says_it_becomes_a_placeholder_the_phone_tools_read(said):
+    pseudo = Pseudonymizer([_patient()])
+    redacted = pseudo.redact(f"This is Robert Taylor, born {said}, my number is 416-555-0177", spoken_dates=True)
+    assert said not in redacted and "[DATE_1]" in redacted and "[PHONE_1]" in redacted
+    assert parse_dob(pseudo.restore("[DATE_1]")) == date(1968, 4, 12)  # what verify_identity gets back
+    assert Pseudonymizer().redact(said) == said  # other text keeps the shared patterns
+
+
+@pytest.mark.parametrize("said, expected", [
+    ("née le 1er juillet 1967", date(1967, 7, 1)), ("4 fevrier 1990", date(1990, 2, 4)),
+    ("le 15 août 1975", date(1975, 8, 15)), ("13/04/1968", date(1968, 4, 13)),
+    ("二〇〇一年十月三十一日", date(2001, 10, 31)), ("我1984年5月11号出生", date(1984, 5, 11)),
+    ("May 11th, 1984", date(1984, 5, 11)), ("1984-05-11", date(1984, 5, 11)), ("my name is Robert", None)])
+def test_parse_dob_reads_french_chinese_and_day_first_dates(said, expected):
+    assert parse_dob(said) == expected
 
 
 class Echo(BaseModel):

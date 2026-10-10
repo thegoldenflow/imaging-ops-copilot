@@ -180,7 +180,7 @@ class LlmAgent:
         gateway = get_gateway()
         pseudo = self._pseudo.setdefault(session.id, Pseudonymizer(list(store.patients.values())))
         history = self._history.setdefault(session.id, [])
-        redacted = pseudo.redact(text)
+        redacted = pseudo.redact(text, spoken_dates=True)  # a birth date in any form the caller says it
         history.append({"role": "user", "content": redacted})
         with runtime.start("voice_agent", context_id=f"CallSession/{session.id}",
                            attachments={"store": store, "session": session}) as run:

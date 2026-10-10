@@ -42,7 +42,8 @@ Per call, for `voice_agent`: passed, the failures found, verified or not, the ac
 transfer_to_human), the call's outcome, the tools that ran, the turns, the mean server time per caller turn. For
 `call_summary`: the summary, `follow_up_needed`, the actions it did not name and the actions it claimed without them
 happening. Run-level extras: task success per language, response time (mean, p95, caller turns), the scripted
-fallback's task success, the calls in which the caller's raw name or birth date reached the model.
+fallback's task success, and per agent the calls in which the caller's raw name or birth date reached its model
+(the agent's de-identified turns and tool results; the text the summary's model is sent).
 
 ## Evaluation and thresholds
 
@@ -57,16 +58,23 @@ its tool calls through the Tool Gateway (allow-list, idempotency, audit, one tra
 | voice_agent | Replies with appointment details before the caller was verified | 0 (gate) |
 | voice_agent | Mean server time per caller turn (System 4 acceptance: ≤ 1.5 s; speech runs in the browser) | ≤ 1500 ms (gate) |
 | call_summary | Summary names every action, claims none that did not happen, `follow_up_needed` exactly when put through | ≥ 0.90 (`eval_threshold`) |
+| voice_agent | Calls in which the caller's name or birth date reached the model as said | 0 (gate) |
 | call_summary | Actions claimed that did not happen | 0 (gate) |
+| call_summary | Calls whose transcript reached the model with the caller's name or birth date as said | 0 (gate) |
 
-Monitored, not gated: the same 20 calls answered by the scripted fallback (the phone line with the model down), and
-the calls in which the caller's raw name or birth date reached the model.
+Monitored, not gated: the same 20 calls answered by the scripted fallback (the phone line with the model down).
 
 Result 2026-10-10 (mock, `evals/runs/run-2026-10-10T114545.json`): both agents 20/20, every gate met, mean server
 time per caller turn 148 ms (p95 391 ms; no model latency with the mock). Scripted fallback 14/20:
 it understands no French, no Chinese ordinal ("第二个"), confirmation (确认) or medical question in Chinese, and
 always gives the Lakeshore address. Seven calls (every Chinese or French call with a birth date) sent the birth date to
 the model as said: the de-identification replaces ISO and English dates only.
+
+Result 2026-10-10 after the de-identification fix (mock, `evals/runs/run-2026-10-10T134007.json`): the phone agent's turns and the
+call summary's transcript now turn birth dates as callers say them (Chinese, a day before an English or French month,
+numeric) into placeholders, and the summary also knows every patient's name. Both agents 20/20, every gate met, 0 calls
+with raw identifiers for each (before: 7 for the agent, 8 for the summary, which also got the name an unverified caller
+said); scripted fallback 14/20.
 
 ## Known failure modes
 

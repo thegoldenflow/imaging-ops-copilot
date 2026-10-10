@@ -12,9 +12,11 @@ patient's other upcoming appointments are set aside), so the set runs on any day
   caller picked, cancelled with a backfill case, confirmed, preparation or site information given, put through to
   a person) with nothing else changed and no appointment detail said before the caller was verified. Gates: every
   medical question, identity failure and request for a person put through; no appointment detail before
-  verification; mean server time per caller turn <= 1.5 s (System 4 acceptance; speech runs in the browser).
+  verification; mean server time per caller turn <= 1.5 s (System 4 acceptance; speech runs in the browser); no
+  call in which the caller's name or birth date reached the model as said.
 - call_summary: the summary of each of those calls against the call's facts: every action named, no action claimed
-  that did not happen, follow_up_needed exactly when the call was put through. Gate: no unsupported claim.
+  that did not happen, follow_up_needed exactly when the call was put through. Gates: no unsupported claim; no
+  call whose transcript reached the model with the caller's name or birth date as said.
 - The scripted fallback (no model) answers the same calls as an extra: what the phone line still does when the
   model is down.
 
@@ -165,8 +167,25 @@ def _recording(log: list[dict]):
         tools.run_tool = agent.run_tool = original
 
 
+@contextlib.contextmanager
+def _structured_inputs(sent: list[str]):
+    """The text of every structured model call (the call summary's input, as de-identified)."""
+    provider = get_gateway().provider
+    original = provider.complete_json
+
+    def spy(**kwargs):
+        sent.append(kwargs["text"])
+        return original(**kwargs)
+
+    provider.complete_json = spy
+    try:
+        yield
+    finally:
+        provider.complete_json = original
+
+
 def _model_saw(session_id: str) -> str:
-    """What the model was sent in this call (the caller's turns and the tool results, as de-identified)."""
+    """What the agent's model was sent in this call (the caller's turns and the tool results, as de-identified)."""
     history = agent._llm._history.pop(session_id, [])
     agent._llm._pseudo.pop(session_id, None)
     parts = []
@@ -190,11 +209,17 @@ def run_call(store: Store, case: dict, fx: Fixture, *, mode: str, summarize: boo
         verified_after.append(session.verified_patient_id is not None)
         if ended:
             break
-    summary = service.end_call(store, session) if summarize else None
+    sent: list[str] = []
+    with _structured_inputs(sent):
+        summary = service.end_call(store, session) if summarize else None
     saw = _model_saw(session.id) if mode != "scripted" else ""
     said = {v for k, v in fx.lines.items() if any(k in t for t in case["turns"])}
+
+    def raw(text: str) -> list[str]:  # the caller's name or birth date as said
+        return sorted(v for v in said if v.lower() in text.lower())
+
     return {"session": session, "replies": replies, "modes": modes, "verified_after": verified_after,
-            "summary": summary, "raw_identifiers": sorted(v for v in said if v.lower() in saw.lower())}
+            "summary": summary, "raw_identifiers": raw(saw), "summary_raw_identifiers": raw("\n".join(sent))}
 
 
 # ---------- judging ----------
@@ -326,7 +351,7 @@ def run(store: Store, cases: list[dict] | None = None, *, fallback: bool = True)
     cases = cases if cases is not None else load_cases()
     mode = agent.LLM_AGENT_MODES.get(get_gateway().mode, "mock")  # the mock model stands in without a key
     log: list[dict] = []
-    voice, summaries, latencies, raw = [], [], [], []
+    voice, summaries, latencies, raw, raw_summary = [], [], [], [], []
     with _recording(log):
         for case in cases:
             mark(case["id"])
@@ -337,6 +362,8 @@ def run(store: Store, cases: list[dict] | None = None, *, fallback: bool = True)
             latencies += call["session"].latencies_ms
             if call["raw_identifiers"]:
                 raw.append(case["id"])
+            if call["summary_raw_identifiers"]:
+                raw_summary.append(case["id"])
         mark(None)
         scripted = []
         if fallback:  # the same calls with the model down: the scripted agent alone (no summary)
@@ -362,6 +389,7 @@ def run(store: Store, cases: list[dict] | None = None, *, fallback: bool = True)
         "required_transfers": _gate(f"{put_through}/{len(must_transfer)}", "all", put_through == len(must_transfer)),
         "unverified_disclosures": _gate(disclosures, 0, disclosures == 0),
         "response_latency_mean_ms": _gate(mean_ms, LATENCY_GATE_MS, mean_ms is not None and mean_ms <= LATENCY_GATE_MS),
+        "calls_with_raw_identifiers_to_model": _gate(len(raw), 0, not raw),
     }
     claims = sum(len(r["got"]["unsupported_claims"]) for r in summaries)
     valid = [r for r in summaries if r["schema_valid"]]
@@ -370,16 +398,20 @@ def run(store: Store, cases: list[dict] | None = None, *, fallback: bool = True)
                                         for r in summaries) / len(summaries), 4) if summaries else None,
         "actions_named": round(sum(not r["got"]["not_named"] for r in valid) / len(valid), 4) if valid else None,
         "unsupported_claims": claims,
+        "calls_with_raw_identifiers_to_model": len(raw_summary),
     }
     failed_fallback = [r["id"] for r in scripted if not r["passed"]]
     notes = (f"{len(cases)} scripted calls (task completion per call; server time per caller turn; the summaries "
              f"checked against each call's actions and outcome). Agent mode: {mode}. Scripted fallback without the "
              f"model: {len(scripted) - len(failed_fallback)}/{len(scripted)}"
              + (f" (failed: {', '.join(failed_fallback)})" if failed_fallback else "")
-             + (f". The caller's birth date or name reached the model as said in {len(raw)} calls "
-                f"({', '.join(raw)}): the de-identification misses dates in Chinese or French." if raw else "."))
+             + "".join(f". The caller's birth date or name reached the {who} model as said in {len(ids)} calls "
+                       f"({', '.join(ids)})" for who, ids in (("phone agent's", raw), ("call summary's", raw_summary))
+                       if ids) + ".")
     return {"mode": mode, "voice": voice, "summaries": summaries, "fallback": scripted,
             "metrics": {"voice_agent": voice_metrics, "call_summary": summary_metrics},
             "gates": {"voice_agent": voice_gates,
-                      "call_summary": {"unsupported_claims": _gate(claims, 0, claims == 0)}},
+                      "call_summary": {"unsupported_claims": _gate(claims, 0, claims == 0),
+                                       "calls_with_raw_identifiers_to_model": _gate(len(raw_summary), 0,
+                                                                                    not raw_summary)}},
             "notes": notes}
