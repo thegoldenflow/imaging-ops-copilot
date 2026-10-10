@@ -40,6 +40,8 @@ from app.modules.inspection.router import router as inspection_router
 from app.modules.clinical_kg.router import router as clinical_kg_router
 from app.modules.control_tower import service as control_tower
 from app.modules.control_tower.router import router as control_tower_router
+from app.modules.documentation import service as documentation
+from app.modules.documentation.router import router as documentation_router
 from app.modules.med_safety import service as med_safety
 from app.modules.med_safety.router import router as med_safety_router
 from app.modules.inventory.router import router as inventory_router
@@ -154,12 +156,14 @@ async def _workflow_worker() -> None:
 
 async def _narrator_loop() -> None:
     """Writes the narrative and recommended actions of new Control Tower exceptions, then the AI commentary of
-    order reviews and the indication judgements of medication reconciliations (a model call each), apart from the
-    hospital loop so a slow model never delays the boards."""
+    order reviews and the indication judgements of medication reconciliations, and the patient instructions of
+    newly signed discharge summaries (a model call each), apart from the hospital loop so a slow model never delays
+    the boards."""
     while True:
         await asyncio.sleep(2)
         await asyncio.to_thread(_step, "control tower narration", control_tower.narrate_step)
         await asyncio.to_thread(_step, "medication safety AI", med_safety.ai_step)
+        await asyncio.to_thread(_step, "documentation intake", documentation.intake_step)
 
 
 @contextlib.asynccontextmanager
@@ -218,6 +222,7 @@ app.include_router(agents_router)
 app.include_router(control_tower_router)
 app.include_router(workflows_router)
 app.include_router(med_safety_router)
+app.include_router(documentation_router)
 
 
 @app.exception_handler(FhirAccessDenied)

@@ -73,9 +73,14 @@ def test_every_existing_agent_is_registered_with_its_prompt_version():
                    TRIAGE_PROMPT):
         spec = agents[prompt.name]
         assert spec.kind == "embedded_agent" and spec.prompt_version == prompt.version, prompt.name
-    # the 7.3-7.4 agents are registered with their WP4 rights; their code comes in WP7-WP8
-    for name in ("discharge_summary", "patient_instructions", "nursing_handoff", "followup_calls"):
-        assert agents[name].kind == "runtime_agent" and agents[name].deployment_status == "dev", name
+    # the 7.4 agent is registered with its WP4 rights; its code comes in WP8
+    assert agents["followup_calls"].kind == "runtime_agent" and agents["followup_calls"].deployment_status == "dev"
+    # WP7 (7.3): the three documentation agents
+    for name, module in (("discharge_summary", "summary_agent"), ("patient_instructions", "instructions_agent"),
+                         ("nursing_handoff", "handoff_agent")):
+        spec = agents[name]
+        assert spec.entrypoint == f"app.modules.documentation.{module}" and spec.prompt_version == f"{name}@1", name
+        assert spec.deployment_status == "demo" and spec.eval_status.status == "pending", name
     # WP6 (7.2): the order review's commentary and the reconciliation's indication judgements
     for name, module in (("order_review", "review_agent"), ("medication_reconciliation", "medrec_agent")):
         spec = agents[name]

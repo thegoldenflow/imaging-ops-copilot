@@ -21,7 +21,7 @@ from app.core.auth import client_ip, current_user, require_roles
 from app.core.models import Role, StaffUser
 from app.core.store import get_store
 from app.ehr import access, breakglass, consent
-from app.ehr.codes import MRN_SYSTEM
+from app.ehr.codes import EXT, MRN_SYSTEM
 from app.ehr.gateway import Actor, FhirConflict, FhirGateway, source_module
 from app.ehr.reference import UNITS
 from app.ehr.signing import signatures, signing_flow
@@ -67,12 +67,15 @@ def _document_view(doc, role: str) -> dict:
         [] if signed else required)
     due = bool(entry and doc.docStatus == "preliminary" and role in required and role in missing)
     flow = signing_flow(data)  # a MedRec record is signed in the pharmacist workbench, not with the chart's button
+    block = next((e.get("valueString") for e in data.get("extension") or [] if e.get("url") == EXT + "sign-block"),
+                 None)  # untraceable items (7.3): the signing service refuses it
     return {
         "id": doc.id, "type": (doc.type.coding or [None])[0].display if doc.type.coding else doc.type.text,
         "doc_status": doc.docStatus, "date": doc.date, "description": data.get("description"), "module": module,
         "encounter_id": access.encounter_of(data), "tier": entry.tier if entry else None,
         "required_signoff_role": required, "cosign": bool(entry and entry.cosign), "signatures": signed,
-        "signing_flow": flow, "can_sign": due and flow is None, "can_sign_in_flow": due and flow is not None,
+        "signing_flow": flow, "can_sign": due and flow is None and block is None,
+        "can_sign_in_flow": due and flow is not None, "sign_block": block,
         "text": _attachment_text(data),
     }
 

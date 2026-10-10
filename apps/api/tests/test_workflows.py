@@ -26,8 +26,10 @@ LONG = {"signoff_timeout_s": 24 * 3600, "escalation_timeout_s": 24 * 3600, "foll
         "verify_after_s": 3600}
 
 
-def _inpatient(store, *, unit="MEDA", consents=("ai_processing", "followup_call"), skip=0) -> tuple[dict, str]:
-    """An inpatient on the unit (the demo physician's and nurse's), with these consents permitted."""
+def _inpatient(store, *, unit="MEDA", consents=("ai_processing", "followup_call"), skip=0,
+               leaving: bool = False) -> tuple[dict, str]:
+    """An inpatient on the unit (the demo physician's and nurse's), with these consents permitted (`leaving`: with
+    discharge prescriptions, so WP6's discharge reconciliation and WP7's discharge summary can be done)."""
     fhir = FhirGateway(Actor.system("wp4c-test"), "workflow_engine")
     found = []
     for enc in sorted(store.fhir.search("Encounter", cls="IMP", status="in-progress", unit=unit), key=lambda e: e["id"]):
@@ -37,6 +39,9 @@ def _inpatient(store, *, unit="MEDA", consents=("ai_processing", "followup_call"
             continue
         pid = enc["subject"]["reference"].split("/")[1]
         states = consent_status(fhir, pid)
+        if leaving and not any(m.get("intent") == "plan" and m.get("status") == "active"
+                               for m in store.fhir.search("MedicationRequest", encounter=enc["id"])):
+            continue
         if all(states[c] == "permit" for c in consents):
             found.append((enc, pid))
     assert len(found) > skip, "no matching inpatient"
@@ -75,11 +80,6 @@ def _decide(ref: str, uid: str, decision: str = "approve") -> dict:
         return out
 
 
-def _sign(ref: str, uid: str):
-    with DB:
-        return FhirGateway(Actor.of(_user(uid)), "signing").sign_document(ref.split("/", 1)[1])
-
-
 def _sign_medrec(ref: str, uid: str):
     """The MedRec record signed where people sign it (WP6's workbench): the pharmacist handles every discrepancy and
     signs, then a physician co-signs."""
@@ -95,6 +95,41 @@ def _sign_medrec(ref: str, uid: str):
         return med_safety.sign(store, user, session.id)
 
 
+def _sign_discharge_medrec(enc: dict) -> None:
+    """WP6's discharge reconciliation, so the discharge summary has its signed discharge medication table."""
+    from app.modules.med_safety import service as med_safety
+
+    with DB:
+        store = get_store()
+        session = med_safety.settle(store, med_safety.reconcile(store, enc["id"], "discharge").id)
+        for item in med_safety.unhandled(session):
+            session = med_safety.handle_item(store, _user(PHARMACIST), session.id, item, "accept", "Intended")
+        med_safety.sign(store, _user(PHARMACIST), session.id)
+        med_safety.sign(store, _user(PHYSICIAN), session.id)
+
+
+def _document_step(ref: str, uid: str):
+    """A WP7 step: the draft signed in Documentation (the validator re-checks it), or the by-hand Task confirmed."""
+    from app.modules.documentation import service as documentation
+
+    if ref.startswith("Task/"):
+        return _decide(ref, uid)
+    with DB:
+        store, user, doc_id = get_store(), _user(uid), ref.split("/", 1)[1]
+        view = documentation.document_view(store, user, doc_id)
+        if view["blocking"]:  # an untraceable item (the planted note's medicine): the physician removes it
+            content = view["content"]
+            for issue in sorted({i["path"] for i in view["validation"]["issues"] if i["severity"] == "red"},
+                                reverse=True):
+                section, _, index = issue.rstrip("]").rpartition("[")
+                group = content
+                for part in section.split("."):
+                    group = group[part]
+                del group[int(index)]
+            documentation.save(store, user, doc_id, content)
+        return documentation.sign(store, user, doc_id)
+
+
 def _documents(store, encounter_id: str, code: str) -> list[dict]:
     return [d for d in store.fhir.search("DocumentReference", encounter=encounter_id)
             if any(c.get("code") == code for c in (d.get("type") or {}).get("coding") or [])]
@@ -104,7 +139,7 @@ def test_journey_runs_from_admission_to_the_booked_follow_up_call(fresh_state, m
     store = fresh_state
     with harness(monkeypatch) as h:
         with DB:
-            enc, pid = _inpatient(store)
+            enc, pid = _inpatient(store, leaving=True)
         wf = _admit(h, enc)
 
         s = h.wait_step(wf, "orderReview", ("waiting",))
@@ -121,14 +156,18 @@ def test_journey_runs_from_admission_to_the_booked_follow_up_call(fresh_state, m
         _sign_medrec(doc, PHYSICIAN)
 
         h.wait_step(wf, "wardMonitoring", ("waiting",))
+        _sign_discharge_medrec(enc)
         with DB:
             assert h.step(wf, "bedAssignment")["status"] == "done"
             bus.publish(_event("patient.discharged", enc))
 
+        # WP7: the AI draft of the discharge summary, signed by the physician; the instructions from it, by a nurse
         s = h.wait_step(wf, "draftDischargeSummary", ("waiting",))
-        _sign(s["waiting_for"]["refs"][0], PHYSICIAN)
+        assert s["waiting_for"]["refs"] == [f"DocumentReference/dsum-{enc['id']}"]
+        _document_step(s["waiting_for"]["refs"][0], PHYSICIAN)
         s = h.wait_step(wf, "draftPatientInstructions", ("waiting",))
-        _sign(s["waiting_for"]["refs"][0], NURSE)
+        assert s["waiting_for"]["refs"] == [f"DocumentReference/pinstr-{enc['id']}"]
+        _document_step(s["waiting_for"]["refs"][0], NURSE)
 
         h.wait_step(wf, "followupDelay", ("waiting",))
         h.skip(48 * 3600 + 60)
@@ -145,7 +184,8 @@ def test_journey_runs_from_admission_to_the_booked_follow_up_call(fresh_state, m
             assert all(v in ("done", "skipped") for v in statuses.values()), statuses
             appointment = next(r for r in h.step(wf, "scheduleFollowupCall")["refs"] if r.startswith("Appointment/"))
             assert store.fhir.read("Appointment", appointment.split("/")[1])["status"] == "booked"
-            assert len(_documents(store, enc["id"], "medrec")) == 1
+            assert [d["id"] for d in _documents(store, enc["id"], "medrec")
+                    if d["id"].endswith("-admission")] == [f"medrec-{enc['id']}-admission"]  # (and the discharge one)
             completed = [e for e in bus.events(store, types=["workflow.step_completed"], limit=200)
                          if e.attrs.get("workflow_id") == wf]
             assert {e.attrs["step"] for e in completed} >= {"orderReview", "medRecAdmission", "wardMonitoring"}
@@ -336,10 +376,13 @@ def test_a_failed_privileged_call_is_not_retried_and_waits_for_a_retry_or_skip(f
         h.wait_step(wf, "wardMonitoring", ("waiting",))
         with DB:
             bus.publish(_event("patient.discharged", enc))
+        # WP7 without a signed discharge medication table: nothing drafted, a Task says what is missing
         s = h.wait_step(wf, "draftDischargeSummary", ("waiting",))
-        _sign(s["waiting_for"]["refs"][0], PHYSICIAN)
+        assert s["waiting_for"]["refs"][0].startswith("Task/") and \
+            s["waiting_for"]["refs"][1] == f"DocumentReference/dsum-{enc['id']}"
+        _document_step(s["waiting_for"]["refs"][0], PHYSICIAN)
         s = h.wait_step(wf, "draftPatientInstructions", ("waiting",))
-        _sign(s["waiting_for"]["refs"][0], NURSE)
+        _document_step(s["waiting_for"]["refs"][0], NURSE)
         h.wait_step(wf, "followupDelay", ("waiting",))
         h.skip(61)
         s = h.wait_step(wf, "scheduleFollowupCall", ("waiting",))

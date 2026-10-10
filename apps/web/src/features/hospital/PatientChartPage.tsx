@@ -200,6 +200,11 @@ function DocumentRow({ doc, onSigned }: { doc: ChartDocument; onSigned: () => vo
           Signed in Medication safety: the pharmacist decides every discrepancy and signs, then a physician co-signs.
         </p>
       )}
+      {doc.sign_block && (
+        <p className="mt-1 text-xs text-rose-700" data-testid="sign-block">
+          Signing blocked by the validator: {doc.sign_block}. Fix it in Documentation.
+        </p>
+      )}
       {doc.signatures.length > 0 && (
         <p className="mt-1 text-xs text-slate-600">
           {doc.signatures.map((s) => `${s.role}: ${s.name ?? s.by}${s.at ? ` (${dateTime(s.at)})` : ""}`).join(" · ")}

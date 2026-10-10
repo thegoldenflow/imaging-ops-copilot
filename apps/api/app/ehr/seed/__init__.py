@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 
 from app.core.store import Store
 from app.ehr import codes as C
+from app.ehr.seed import documentation
 from app.ehr.seed import materialize as M
 from app.ehr.seed import medsafety
 from app.ehr.seed import people
@@ -157,6 +158,8 @@ def generate(store: Store, seed: int, wall_now: datetime) -> dict:
     # Medication safety (WP6): discharge prescriptions and planted cases, written last with their own random
     # streams and explicit ids, so nothing above changes
     medsafety_cases = medsafety.generate(b, tl, by_id, now)
+    # Documentation (WP7): discharge plans and planted cases, last of all, with their own random streams and ids
+    documentation_cases = documentation.generate(b, tl, by_id, now, medsafety_cases)
 
     events.sort(key=plan_order)
     store.modules["hospital_plan"] = {"generated_for": now.isoformat(), "horizon": tl.horizon.isoformat(), "seed": seed,
@@ -165,5 +168,5 @@ def generate(store: Store, seed: int, wall_now: datetime) -> dict:
     store.modules["hospital_clock"] = {"now": now.isoformat(), "rate": 0, "running": False}
     return {"now": now, "resources": b.written, "patients": len(patients), "events": len(events),
             "inpatients": len(occupied), "ed_now": sum(1 for v in tl.ed_visits if v.arrival <= now < v.end),
-            "medsafety": medsafety_cases}
+            "medsafety": medsafety_cases, "documentation": documentation_cases}
 

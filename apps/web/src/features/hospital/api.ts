@@ -41,6 +41,7 @@ export interface ChartDocument {
   can_sign: boolean;
   /** The viewer's signature is due, in the document's own flow (a MedRec record: Medication safety). */
   can_sign_in_flow: boolean;
+  sign_block?: string | null;
   text: string | null;
 }
 

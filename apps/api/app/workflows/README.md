@@ -20,9 +20,11 @@ orderReview and medRecAdmission are WP6's (`app/modules/med_safety/journey.py`):
 orders and the `order_review` agent opens the pharmacist's sign-off Task (confirmed in the review queue, or by the
 pharmacist's last order decision in Medication safety); the admission reconciliation, the
 `medication_reconciliation` agent's judgements and its draft record, signed in the workbench by the pharmacist and
-co-signed by a physician. The journey's steps whose modules come later are placeholders in
-`app/agents/library/journey_stubs.py`, run as the agents that will own them: the discharge documents (WP7), the
-follow-up call (WP8), NEWS2 flags (WP9's 8.1 stub), coding (8.1 roadmap card).
+co-signed by a physician. draftDischargeSummary and draftPatientInstructions are WP7's
+(`app/modules/documentation/journey.py`): the `discharge_summary` agent's traced draft signed by the physician (or a
+Task saying which input is missing), then the bilingual instructions from the signed summary, signed by a nurse. The
+journey's steps whose modules come later are placeholders in `app/agents/library/journey_stubs.py`, run as the agents
+that will own them: the follow-up call (WP8), NEWS2 flags (WP9's 8.1 stub), coding (8.1 roadmap card).
 
 ## Input resources
 

@@ -324,16 +324,38 @@ def news2_alert(args: dict) -> dict:
     return {"detail": f"nurse Task {task}", "refs": [f"Task/{task}"]}
 
 
+def _signoff_or_document(args: dict, step: str, result: stubs.StepResult, role: str, by_hand: str, doc_ref: str
+                         ) -> dict:
+    """WP7's steps: when the work went to a Task (missing input, no consent), the document written and signed in
+    Documentation from the template also completes the step."""
+    out = _signoff(args, step, result, role, by_hand)
+    if out["wait_for"] and doc_ref not in out["wait_for"]:
+        bridge.register_wait(doc_ref, args["workflow_id"], step)
+        out["wait_for"] = [*out["wait_for"], doc_ref]
+    return out
+
+
 @step_activity("journey.draftDischargeSummary", "draftDischargeSummary")
 def draft_discharge_summary(args: dict) -> dict:
-    result = _agent_step("discharge_summary", args["encounter_id"], stubs.discharge_summary)
-    return _signoff(args, "draftDischargeSummary", result, "physician", "Write the discharge summary")
+    """WP7's discharge summary: the agent's draft (traced, validated) for the physician to sign in Documentation
+    (app/modules/documentation/journey.py)."""
+    from app.modules.documentation import journey as documentation
+
+    result = documentation.discharge_summary_step(get_store(), args["encounter_id"])
+    return _signoff_or_document(args, "draftDischargeSummary", result, "physician",
+                                "Write the discharge summary in Documentation",
+                                documentation.doc_ref("discharge_summary", args["encounter_id"]))
 
 
 @step_activity("journey.draftPatientInstructions", "draftPatientInstructions")
 def draft_patient_instructions(args: dict) -> dict:
-    result = _agent_step("patient_instructions", args["encounter_id"], stubs.patient_instructions)
-    return _signoff(args, "draftPatientInstructions", result, "nurse", "Write the patient's discharge instructions")
+    """WP7's bilingual patient instructions from the signed summary, for a nurse to sign."""
+    from app.modules.documentation import journey as documentation
+
+    result = documentation.patient_instructions_step(get_store(), args["encounter_id"])
+    return _signoff_or_document(args, "draftPatientInstructions", result, "nurse",
+                                "Write the patient's discharge instructions in Documentation",
+                                documentation.doc_ref("patient_instructions", args["encounter_id"]))
 
 
 @step_activity("journey.requestFollowupCall", "scheduleFollowupCall")

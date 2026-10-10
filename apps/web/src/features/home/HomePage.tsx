@@ -169,6 +169,11 @@ const HOSPITAL: Step[] = [
     role: "pharmacist", userId: "U-PHAR-01", to: "/med-safety", system: "Medication safety",
   },
   {
+    title: "Documentation: the physician signs a discharge summary that cites its sources",
+    detail: "Draft a discharge summary with AI: every diagnosis, procedure and medication traces to a FHIR resource (click an item to see its sources). A medicine the AI took from a note is marked red and blocks the signature until it is removed. Then a nurse reviews the bilingual patient instructions and confirms the shift handoff.",
+    role: "physician", userId: "U-DOC-09", to: "/documentation", system: "Documentation",
+  },
+  {
     title: "Registration records a consent change",
     detail: "The clerk sees demographics and visits without clinical content. Record a withdrawal of SMS consent: it is audited and published as consent.revoked on the event bus.",
     role: "clerk", userId: "U-CLER-01", to: "/hospital/patients", system: "Consent",

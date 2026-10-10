@@ -2,17 +2,20 @@
 # kind: runtime_agent (hosted by the agent runtime) | embedded_agent (AI step inside its module) |
 # module (no model; registered for its EHR writes). Model ids come from the environment (model_policy.tier).
 agent_id: discharge_summary
-version: 0.1.0
+version: 0.2.0
 kind: runtime_agent
 owner: Clinical documentation team
-purpose: Discharge summary draft from the FHIR record (7.3).
+purpose: Discharge summary draft from the FHIR record (7.3), every item traced to its sources; resources fed in
+  chunks by type, segment summaries, then a synthesis; the DischargeSummaryValidator blocks untraceable items.
 risk_tier: documentation
 allowed_tools:
 - getEncounterBundle
+- getDischargeMedications
 - getMedications
 - getObservations
 - getDocuments
 - draftDocument
+- draftClinicalDocument
 - submitForReview
 - createTask
 - updateTask
@@ -36,12 +39,13 @@ model_policy:
   tier: reasoning
   max_tokens: 8000
   temperature_max: null
-prompt_version: null
+prompt_version: discharge_summary@1
 required_signoff_role:
 - physician
 consent_required:
 - ai_processing
 eval_status:
   status: pending
-deployment_status: dev
-entrypoint: null
+  note: mock baseline in evals/documentation (30 cases); a live-model run and the human rating are outstanding
+deployment_status: demo
+entrypoint: app.modules.documentation.summary_agent

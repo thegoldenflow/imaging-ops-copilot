@@ -127,6 +127,12 @@ def sign(fhir: FhirGateway, document_id: str, *, at: datetime | None = None, flo
     if any(s["role"] == role for s in done):
         raise FhirConflict(f"The {role} signature is already on this document")
 
+    # A draft whose items do not all trace to their sources (the documentation module's validators, spec 7.3) carries
+    # a sign block: refused on every path (the module's review, the chart's Sign button, signDocumentFinal).
+    block = next((e.get("valueString") for e in doc.get("extension") or [] if e.get("url") == EXT + "sign-block"), None)
+    if block is not None:
+        deny(f"the validator blocks signing: {block}")
+
     at = at or hospital_now(get_store())
     signer = ref("Practitioner", fhir.actor.practitioner_id, fhir.actor.name) if fhir.actor.practitioner_id else \
         {"reference": f"urn:demo-hospital:user:{fhir.actor.id}", "display": fhir.actor.name}
