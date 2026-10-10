@@ -78,6 +78,19 @@ def mock_fixture(task: str):
     return register
 
 
+# Mock tool-use fixtures: task name -> function(messages, tools) -> (content blocks, stop reason). A tool-using
+# agent with one runs its loop on the mock (its eval); without one the mock has no tool-use agent.
+MOCK_TOOL_FIXTURES: dict[str, Callable[[list, list], tuple[list, str]]] = {}
+
+
+def mock_tool_fixture(task: str):
+    def register(fn):
+        MOCK_TOOL_FIXTURES[task] = fn
+        return fn
+
+    return register
+
+
 class MockProvider:
     mode = "mock"
 
@@ -97,8 +110,17 @@ class MockProvider:
             input_tokens=len(text) // 4 + 1500 * len(images or []), output_tokens=len(json.dumps(data)) // 4,
         )
 
-    def tool_turn(self, **_) -> ProviderResult:
-        raise ProviderUnavailable("The mock provider has no tool-use agent; use the scripted agent")
+    def tool_turn(self, *, task=None, model="", messages=(), tools=(), **_) -> ProviderResult:
+        fixture = MOCK_TOOL_FIXTURES.get(task)
+        if fixture is None:
+            raise ProviderUnavailable("The mock provider has no tool-use agent; use the scripted agent")
+        time.sleep(self.latency_s)
+        content, stop_reason = fixture(list(messages), list(tools))
+        return ProviderResult(
+            data=None, model=f"mock:{model}", content=content, stop_reason=stop_reason,
+            input_tokens=len(json.dumps(list(messages), default=str)) // 4,
+            output_tokens=len(json.dumps(content, default=str)) // 4,
+        )
 
 
 class AnthropicProvider:
@@ -148,7 +170,7 @@ class AnthropicProvider:
             input_tokens=resp.usage.input_tokens, output_tokens=resp.usage.output_tokens,
         )
 
-    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024) -> ProviderResult:
+    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024, task=None) -> ProviderResult:
         resp = self._create(model=model, max_tokens=max_tokens, system=system, messages=messages, tools=tools)
         if resp.stop_reason == "refusal":
             raise ProviderRefusal("Model declined the request")
@@ -327,7 +349,7 @@ class GeminiProvider:
         return ProviderResult(data=data, model=resp.model_version or model,
                               input_tokens=tokens_in, output_tokens=tokens_out)
 
-    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024) -> ProviderResult:
+    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024, task=None) -> ProviderResult:
         resp = self._generate(model=model, contents=gemini_contents(messages), config=genai_types.GenerateContentConfig(
             system_instruction=system,
             max_output_tokens=max_tokens,

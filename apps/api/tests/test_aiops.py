@@ -176,20 +176,21 @@ def test_agents_without_an_adapter_are_found_through_common_cases_or_their_modul
     from app.agents import evalsets
 
     with evalsets.use_root(tmp_path):
-        folder = tmp_path / "call_summary"
+        folder = tmp_path / "prep_translation"
         folder.mkdir()
-        spec = registry.require_agent("call_summary")
+        spec = registry.require_agent("prep_translation")
         assert suites.suite_for(spec) is None  # no eval set yet
         (folder / "report.json").write_text(json.dumps({
             "passed": True, "mode": "mock", "metrics": {"intent_accuracy": 0.9},
-            "results": [{"id": "c1", "passed": True}, {"id": "c2", "passed": False, "agent_id": "call_summary"}]}))
+            "results": [{"id": "c1", "passed": True},
+                        {"id": "c2", "passed": False, "agent_id": "prep_translation"}]}))
         found = suites.suite_for(spec)
         assert found is not None and found.kind == "report"
         result = found.run(suites.Context(store=None, live=False))
         assert [r["passed"] for r in result.rows] == [True, False]
-        assert result.extra["call_summary"] == {"intent_accuracy": 0.9}
+        assert result.extra["prep_translation"] == {"intent_accuracy": 0.9}
         (folder / "cases.jsonl").write_text(json.dumps({"id": "x", "source": "authored", "input": {
-            "transcript": "t", "actions": "none"}, "expected": {"summary": "s"}}) + "\n")
+            "language": "fr", "text": "t"}, "expected": {"text": "s"}}) + "\n")
         assert suites.suite_for(spec).kind == "common"
 
 

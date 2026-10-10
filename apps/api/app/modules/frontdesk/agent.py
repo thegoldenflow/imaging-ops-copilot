@@ -8,7 +8,8 @@ the model asks for goes through the Tool Gateway (allow-list, caller role,
 idempotency of reschedule and cancel, audit, trace; spec 6.4). ScriptedAgent is a
 deterministic fallback used when no API key is configured or the API is
 unavailable, so the phone flow always works; it is plain code, not an agent, and
-calls the same server-side tools directly.
+calls the same server-side tools directly. The agent's mock model (mock_agent.py)
+is for its eval (evals.py): in mock mode the phone line keeps the scripted agent.
 """
 
 import json
@@ -23,6 +24,7 @@ from app.llm.deid import Pseudonymizer
 from app.llm.gateway import get_gateway
 from app.llm.prompts import VOICE_AGENT
 from app.llm.providers import ProviderRefusal, ProviderUnavailable
+from app.modules.frontdesk import mock_agent  # noqa: F401  (registers the agent's mock model)
 from app.modules.frontdesk.tools import (
     TOOL_DEFINITIONS,
     TOOL_IDS,
@@ -32,7 +34,6 @@ from app.modules.frontdesk.tools import (
     parse_dob,
     run_tool,
 )
-from app.modules.scheduling import service as scheduling
 
 GREETING = ("Thank you for calling Lakeshore Imaging. I'm the automated assistant. "
             "To get started, please tell me your full name and date of birth.")
@@ -154,12 +155,9 @@ class ScriptedAgent:
             info = tool("get_site_info", site="")
             return f"{info['site']} is at {info['address']}, open {info['hours']}. {info['parking']}"
         if CONFIRM_APPT.search(text):
-            appt = store.appointments[current["appointment_id"]]
-            if scheduling.confirm_blockers(store, appt):
+            if not tool("confirm_appointment", appointment_id=current["appointment_id"])["confirmed"]:
                 return ("I can't confirm this appointment yet because a safety screening still needs staff review. "
                         "Our team will call you. Anything else?")
-            appt.reminder_confirmed = True
-            session.actions.append({"tool": "confirm", "appointment": appt.id})
             session.outcome = "resolved"
             return "Your appointment is confirmed. Anything else?"
         if DONE.search(text) or NO.search(text):

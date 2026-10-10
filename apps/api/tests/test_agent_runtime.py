@@ -19,7 +19,7 @@ from app.ehr.consent import consent_status
 from app.ehr.gateway import Actor, FhirGateway
 from app.llm.gateway import LlmGateway, get_gateway, set_gateway
 from app.llm.prompts import Prompt
-from app.llm.providers import MOCK_FIXTURES, MockProvider, ProviderResult, TextBlock, ToolUseBlock
+from app.llm.providers import MOCK_FIXTURES, MOCK_TOOL_FIXTURES, MockProvider, ProviderResult, TextBlock, ToolUseBlock
 
 API = Path(__file__).resolve().parents[1]
 NURSE = "U-NURS-05"
@@ -304,8 +304,9 @@ def test_mock_fixtures_exist_for_every_agent_that_calls_a_model():
     import app.main  # noqa: F401  (the modules register their fixtures on import)
 
     for spec in registry.agents().values():
-        if spec.kind == "embedded_agent" and spec.agent_id != "voice_agent":  # the phone agent falls back to a script
-            assert spec.agent_id in MOCK_FIXTURES, spec.agent_id
+        if spec.kind == "embedded_agent":  # the phone agent's mock model answers with tool calls
+            fixtures = MOCK_TOOL_FIXTURES if spec.agent_id == "voice_agent" else MOCK_FIXTURES
+            assert spec.agent_id in fixtures, spec.agent_id
         if spec.kind == "runtime_agent" and spec.entrypoint:
             import_module(spec.entrypoint)
             assert spec.agent_id in MOCK_FIXTURES, spec.agent_id

@@ -21,5 +21,8 @@ consent_required: []
 eval_status:
   status: pending
   run_id: null
-  note: No eval set yet.
+  note: Eval set evals/voice_agent (the summaries of its 20 scripted calls); pending until a live run.
 deployment_status: demo
+# Release gate (6.6): the share of call summaries that name every action of the call, claim none that did not
+# happen and flag follow-up exactly when the call was put through; no unsupported claim at all (gate).
+eval_threshold: 0.9

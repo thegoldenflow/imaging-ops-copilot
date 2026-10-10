@@ -274,8 +274,8 @@ class LlmGateway:
             self._trace(spec, call, [])
             raise ProviderUnavailable(refusal)
         try:
-            result = self.provider.tool_turn(model=model, system=prompt.system, messages=messages, tools=tools,
-                                             max_tokens=spec.model_policy.max_tokens)
+            result = self.provider.tool_turn(task=task, model=model, system=prompt.system, messages=messages,
+                                             tools=tools, max_tokens=spec.model_policy.max_tokens)
         except (ProviderUnavailable, ProviderRefusal) as e:
             call = self._log(task=task, model=model, prompt=prompt, text=redacted_text, started=started,
                              outcome="unavailable", error=str(e))

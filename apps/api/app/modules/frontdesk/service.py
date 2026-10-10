@@ -12,7 +12,8 @@ from app.integrations.mocks import CoverageResult, adapter, queue_message
 from app.llm.gateway import get_gateway
 from app.llm.prompts import CALL_SUMMARY
 from app.llm.providers import mock_fixture
-from app.modules.frontdesk.tools import CallSession
+from app.modules.frontdesk.agent import agent_reply
+from app.modules.frontdesk.tools import CallSession, Turn
 from app.modules.scheduling import service as scheduling
 
 PUBLIC_BASE = "/prereg"
@@ -146,7 +147,8 @@ def _mock_summary(text: str, images: list, attempt: int) -> dict:
     return {"summary": summary, "follow_up_needed": follow_up}
 
 
-def summarize_call(store: Store, session: CallSession) -> None:
+def summarize_call(store: Store, session: CallSession) -> dict | None:
+    """Writes the call log's summary; returns the AI output (None when the summary is unavailable)."""
     transcript = "\n".join(f"{t.role}: {t.text}" for t in session.transcript if t.role != "tool")
     actions = ", ".join(a["tool"] for a in session.actions) or "none"
     patients = [store.patients[session.verified_patient_id]] if session.verified_patient_id else []
@@ -156,5 +158,26 @@ def summarize_call(store: Store, session: CallSession) -> None:
     )
     if outcome.status == "ok":
         session.summary = outcome.data["summary"]
-    else:
-        session.summary = f"Summary unavailable ({outcome.status}). Actions: {actions}."
+        return outcome.data
+    session.summary = f"Summary unavailable ({outcome.status}). Actions: {actions}."
+    return None
+
+
+# ---------- Call turns (the API and the phone eval) ----------
+
+def take_turn(store: Store, session: CallSession, text: str) -> tuple[str, str, bool]:
+    """One caller utterance: (the agent's reply, the agent mode used, whether the call is over)."""
+    session.transcript.append(Turn(role="caller", text=text))
+    reply, mode = agent_reply(store, session, text)
+    session.transcript.append(Turn(role="agent", text=reply))
+    return reply, mode, session.outcome == "transferred" or session.state.get("ended", False)
+
+
+def end_call(store: Store, session: CallSession) -> dict | None:
+    """Close the call and summarise it (the summary's AI output, or None)."""
+    if session.ended_at:
+        return None
+    session.ended_at = datetime.now()
+    if session.outcome == "in_progress":
+        session.outcome = "abandoned"
+    return summarize_call(store, session)

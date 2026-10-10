@@ -7,7 +7,8 @@ expected, got}`) and its own metrics and gates into extra columns. Each suite al
 
 How an agent finds its suite (first match wins):
 
-1. a built-in adapter below (the phase 0-4 imaging sets, WP4's de-identification, WP4c's triage set, WP5-WP7);
+1. a built-in adapter below (the phase 0-4 imaging sets, WP4's de-identification, WP4c's triage set, WP5-WP7, the
+   System 4 phone calls);
 2. `evals/<dir>/suite.yaml` (data: `agents`, optional `run` command, `report`), a module's own runner declared
    without code;
 3. `evals/<agent_id>/cases.jsonl` in the common format with prompt variables in `input`: replayed through the
@@ -385,7 +386,31 @@ DOCUMENTATION = Suite(id="documentation", agents=("discharge_summary", "patient_
                       title="Documentation agents (7.3)", kind="builtin", source="evals/documentation/cases.jsonl",
                       run=_documentation_run, cases=_documentation_cases)
 
-BUILTIN: list[Suite] = [*IMAGING, DEID, TRIAGE, CONTROL_TOWER, ORDER_REVIEW, MEDREC, DOCUMENTATION]
+
+# ---------- System 4 front desk: the phone agent and the call summary (one set of scripted calls) ----------
+
+
+def _frontdesk_run(ctx: Context) -> SuiteResult:
+    from app.modules.frontdesk import evals as fd
+
+    report = fd.run(ctx.store, fd.load_cases())
+    keep = ("agent_id", "id", "source", "passed", "schema_valid", "grounded", "latency_ms", "expected", "got")
+    rows = [{k: r[k] for k in keep if k in r} for r in report["voice"] + report["summaries"]]
+    return SuiteResult(rows=rows, extra=report["metrics"], gates={
+        agent: {name: _gate(g["value"], g["threshold"], g["passed"]) for name, g in gates.items()}
+        for agent, gates in report["gates"].items()}, notes=report["notes"])
+
+
+def _frontdesk_cases() -> list[dict]:
+    from app.modules.frontdesk import evals as fd
+
+    return fd.common_cases()
+
+
+FRONTDESK = Suite(id="frontdesk", agents=("voice_agent", "call_summary"), title="Front-desk phone calls (System 4)",
+                  kind="builtin", source="evals/voice_agent/cases.jsonl", run=_frontdesk_run, cases=_frontdesk_cases)
+
+BUILTIN: list[Suite] = [*IMAGING, DEID, TRIAGE, CONTROL_TOWER, ORDER_REVIEW, MEDREC, DOCUMENTATION, FRONTDESK]
 
 
 # ---------- platform suites (not one agent's quality) ----------

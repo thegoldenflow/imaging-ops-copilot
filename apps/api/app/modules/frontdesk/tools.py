@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 
 from pydantic import BaseModel, Field
 
-from app.core.models import ACTIVE_STATUSES, Appointment
+from app.core.models import ACTIVE_STATUSES, Appointment, AppointmentStatus
 from app.core.store import Store
 from app.core.templates import prep_text
 from app.modules.scheduling import service as scheduling
@@ -171,6 +171,19 @@ def cancel(store: Store, session: CallSession, appointment_id: str, reason: str 
     return {"cancelled": True, "appointment": _appt_summary(store, appt)}
 
 
+def confirm_appointment(store: Store, session: CallSession, appointment_id: str) -> dict:
+    """The caller will attend: confirmed as by an SMS reply, unless a guard (an MRI screening awaiting review)
+    blocks it."""
+    appt = _own_appointment(store, session, appointment_id)
+    if scheduling.confirm_blockers(store, appt):
+        return {"confirmed": False, "reason": "A safety screening still needs staff review; staff will call the "
+                                              "patient."}
+    appt.status = AppointmentStatus.CONFIRMED
+    appt.reminder_confirmed = True
+    session.actions.append({"tool": "confirm", "appointment": appt.id})
+    return {"confirmed": True, "appointment": _appt_summary(store, appt)}
+
+
 def get_prep_instructions(store: Store, session: CallSession, appointment_id: str) -> dict:
     appt = _own_appointment(store, session, appointment_id)
     patient = store.patients[appt.patient_id]
@@ -202,6 +215,7 @@ TOOLS = {
     "find_open_slots": find_open_slots,
     "reschedule": reschedule,
     "cancel": cancel,
+    "confirm_appointment": confirm_appointment,
     "get_prep_instructions": get_prep_instructions,
     "get_site_info": get_site_info,
     "transfer_to_human": transfer_to_human,
@@ -223,6 +237,8 @@ TOOL_DEFINITIONS = [
      "input_schema": _schema({"appointment_id": {"type": "string"}, "slot_id": {"type": "string"}}, ["appointment_id", "slot_id"])},
     {"name": "cancel", "description": "Cancel an appointment. Confirm with the caller first.",
      "input_schema": _schema({"appointment_id": {"type": "string"}, "reason": {"type": "string"}}, ["appointment_id", "reason"])},
+    {"name": "confirm_appointment", "description": "Confirm that the caller will attend an appointment, when they ask to confirm it.",
+     "input_schema": _schema({"appointment_id": {"type": "string"}}, ["appointment_id"])},
     {"name": "get_prep_instructions", "description": "Preparation instructions for an appointment.",
      "input_schema": _schema({"appointment_id": {"type": "string"}}, ["appointment_id"])},
     {"name": "get_site_info", "description": "Address, hours, phone and parking for a site.",
@@ -235,7 +251,8 @@ TOOL_DEFINITIONS = [
 # The tools in the tool registry (config/tools/<tool_id>.yaml, domain imaging_frontdesk): tool id -> name here.
 REGISTERED = {"verifyCallerIdentity": "verify_identity", "lookupAppointments": "lookup_appointment",
               "findOpenSlots": "find_open_slots", "rescheduleAppointment": "reschedule",
-              "cancelAppointment": "cancel", "getPrepInstructions": "get_prep_instructions",
+              "cancelAppointment": "cancel", "confirmAppointment": "confirm_appointment",
+              "getPrepInstructions": "get_prep_instructions",
               "getSiteInfo": "get_site_info", "transferToHuman": "transfer_to_human"}
 TOOL_IDS = {name: tool_id for tool_id, name in REGISTERED.items()}
 

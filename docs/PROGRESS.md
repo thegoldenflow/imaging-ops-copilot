@@ -99,7 +99,8 @@ Limits:
 - [x] New bookings schedule 72 h / 24 h reminders, confirmation with pre-registration link and prep instructions in the patient's language
 - [x] SMS reply C confirms, X cancels and releases the slot to backfill
 - [x] Mobile pre-registration in English, French, Chinese and Punjabi with mock OHIP / private insurance check
-- [ ] Measure speech-to-reply latency (≤ 1.5 s target) on a local machine with a real key
+- [x] Eval set: 20 scripted calls for `voice_agent` and `call_summary` (added after WP10b, see "System 4 eval set" below)
+- [ ] Measure speech-to-reply latency (≤ 1.5 s target) on a local machine with a real key (the eval's latency gate covers the server's part; a `--live` run measures it with the model)
 
 ## Phase 2 — Requisition intake pipeline (Systems 5–10)
 
@@ -825,7 +826,23 @@ Limits:
 - Per-case cost and latency need the harness to work case by case under the runner's marks; a report-only suite (a module's own report) has no cost or latency.
 - The failure list and dimensions read the traces of the window on each request (an indexed time query); fine for the demo's volume, a pre-aggregated table would be needed at hospital scale.
 - Alert Tasks have no screen besides AI Ops (admins cannot read Tasks through FhirGateway under the 6.3 RBAC; the `ai_ops` module reads and closes them on their behalf, audited).
-- Five agents have no eval set (see above).
+- Five agents had no eval set (see above); `voice_agent` and `call_summary` have one since (next section).
+
+### System 4 eval set · `voice_agent` and `call_summary` (6.6 follow-up) — done
+
+The imaging front desk's two agents were reported as "no eval set". Now `evals/voice_agent/cases.jsonl` holds the SPEC eval table's 20 scripted calls (11 English, 7 Mandarin, 2 French: reschedule, a declined reschedule, cancel, confirm, a confirmation blocked by an MRI screening awaiting review, preparation, site information without identity, medical questions before and after verification, identity failures, a request for a person, a caller without an appointment) in the common format, `input_refs` naming seeded patients; README in the folder. Harness `app/modules/frontdesk/evals.py`, built-in suite `frontdesk` (both agents, one set): each case books its own appointment for its patient inside the rolled-back transaction (the patient's other upcoming appointments set aside), so it runs on any day, and each call goes through the phone line's own path (`service.take_turn` / `end_call`, now shared with the API).
+
+- `voice_agent`: task completion per call (threshold 0.9); gates: medical, identity-failure and person calls put through (all), no appointment detail before verification (0), mean server time per caller turn ≤ 1.5 s (System 4 acceptance). `call_summary`: each summary against the call's actions and outcome (threshold 0.9); gate: no action claimed that did not happen.
+- A mock model for the phone agent (`app/modules/frontdesk/mock_agent.py`, `MOCK_TOOL_FIXTURES`; the gateway now passes the task to the provider's `tool_turn`): the mock provider had no tool-use agent, so without a key the agent's path (de-identified turns, the Tool Gateway, traces) never ran. The phone line keeps the scripted fallback in mock mode; the eval runs the fallback on the same calls as an extra.
+- New tool `confirmAppointment` (action, idempotent; `voice_agent` 1.1.0): the scripted fallback could confirm an appointment but the model agent had no tool for it. Both now confirm through it (status confirmed, as an SMS reply does; refused while an MRI screening awaits review). `summarize_call` returns the AI output, so the eval can read `follow_up_needed` (nothing new is stored).
+
+Results (2026-10-10, mock, own databases `ioc_voice_eval` / `ioc_test_voice_eval`): `run-2026-10-10T114545` (stamped `voice_agent@1`, `call_summary@1`): both 20/20, every gate met, mean server time per turn 148 ms (p95 391 ms; no model latency with the mock); both `pending` (mock baseline) on the AI Ops page with their pass rate against the bar. Prompt gate: 24 versions, 0 failing. `tests/test_frontdesk_eval.py` (8 tests: the set's shape, the 20 calls on the mock model, one agent run per turn through the Tool Gateway, the fallback on the English calls, and the judge failing a model that answers a medical question, books another option or reads out the appointment before verification, and a summary that claims an action); backend suite (`uv run pytest -q`, 659 tests): 658 passed; the one failure was the 5-second backfill check of `test_flagships.py` while another session's API held the CPU at 100% (it passes alone, as on the base commit). `npx tsc -b` passes. The scripts, judge and mock model share an author, so these numbers are optimistic; a `--live` run is needed to pass the agents.
+
+Findings (not fixed here):
+
+- De-identification: in 7 of 20 calls (every Chinese or French call with a birth date) the caller's birth date reached the model as said. `Pseudonymizer.redact`, which the phone agent uses, replaces ISO and English dates only (1984年5月11日 or 4 juillet 1967 pass); WP8's call centre uses the free-text de-identifier.
+- Scripted fallback 14/20: no French (keywords; `parse_dob` knows English months only), no Chinese ordinal (第二个), confirmation (确认) or medical question in Chinese (a Chinese medical question is not put through without the model), and it always gives the Lakeshore address.
+- Calls the model agent completes end as `abandoned` in the call log: only the scripted agent sets `resolved`.
 
 ### WP9 · Hospital storyline (8.2)
 
