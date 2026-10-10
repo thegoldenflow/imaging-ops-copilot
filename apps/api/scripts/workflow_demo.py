@@ -136,9 +136,16 @@ def main() -> None:
     proc.kill()
     proc.wait()
     say(f"worker process {proc.pid} killed while the journey waits for the MedRec co-signature")
-    with unit_of_work() as store:
+    with unit_of_work() as store:  # in Medication safety (WP6): every discrepancy handled, signed, co-signed
+        from app.modules.med_safety import service as med_safety
+        from app.modules.med_safety.models import sessions
+
+        session = sessions(store).find_by("document_id", doc.split("/")[1])[0]
+        pharmacist = store.staff.get(PHARMACIST)
+        for item in med_safety.unhandled(session):
+            session = med_safety.handle_item(store, pharmacist, session.id, item, "accept", "Checked with the patient")
         for uid in (PHARMACIST, PHYSICIAN):
-            FhirGateway(Actor.of(store.staff.get(uid)), "signing").sign_document(doc.split("/")[1])
+            med_safety.sign(store, store.staff.get(uid), session.id)
     pump()
     say("pharmacist and physician signed; the signals are stored in Temporal, no worker runs: timeline still "
         f"'{step(wf, 'medRecAdmission')['status']}'")

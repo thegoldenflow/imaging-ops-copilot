@@ -2,9 +2,10 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
 
 // Durable workflows (spec 6.5). Without Temporal (TEMPORAL_ADDRESS unset) the workflow view says "offline" and the
 // modules work. With Temporal and a worker (TEMPORAL_ADDRESS, TEMPORAL_WORKER_IN_API=1 for the API Playwright
-// starts): a patient journey with a deliberate MedRec failure that Temporal retries, sign-offs in the review queue,
-// a step skipped by the bed manager (audited), the follow-up booking approved by the clerk, and the Control
-// Tower's patient card linking to the journey. Each test skips when its mode is not the run's.
+// starts): a patient journey with a deliberate MedRec failure that Temporal retries, sign-offs in the review queue
+// and in Medication safety (the MedRec), a step skipped by the bed manager (audited), the follow-up booking approved
+// by the clerk, and the Control Tower's patient card linking to the journey. Each test skips when its mode is not
+// the run's.
 
 const SHOTS = process.env.E2E_SCREENSHOT_DIR;
 
@@ -49,6 +50,25 @@ async function waitStep(request: APIRequestContext, workflowId: string, key: str
 async function sign(request: APIRequestContext, ref: string, userId: string) {
   const r = await request.post(`/api/hospital/documents/${ref.split("/")[1]}/sign`, { headers: await as(request, userId) });
   expect(r.ok(), await r.text()).toBeTruthy();
+}
+
+/** The admission MedRec signed where it is signed (WP6's workbench API): the pharmacist handles every discrepancy
+ *  and signs, then the physician co-signs. */
+async function signMedRec(request: APIRequestContext, encounterId: string) {
+  const pharmacist = await as(request, "U-PHAR-01");
+  const stay = await (await request.get(`/api/med-safety/encounters/${encounterId}`, { headers: pharmacist })).json();
+  const id = (stay.medrec as { id: string; kind: string }[]).find((m) => m.kind === "admission")!.id;
+  const session = await (await request.get(`/api/med-safety/medrec/${id}`, { headers: pharmacist })).json();
+  for (const item of session.unhandled as string[]) {
+    const r = await request.post(`/api/med-safety/medrec/${id}/items/${item}`, {
+      headers: pharmacist, data: { action: "accept", reason: "Checked with the patient" } });
+    expect(r.ok(), await r.text()).toBeTruthy();
+  }
+  for (const userId of ["U-PHAR-01", "U-DOC-09"]) {
+    const r = await request.post(`/api/med-safety/medrec/${id}/sign`, { headers: await as(request, userId) });
+    expect(r.ok(), await r.text()).toBeTruthy();
+  }
+  return session.document_id as string;
 }
 
 /** A Medicine A inpatient with AI-processing and follow-up-call consent (the demo physician's unit). */
@@ -118,12 +138,12 @@ test("journey: a deliberate failure retried, sign-offs, a skip by the bed manage
   await signoff.getByTestId("approve").click();
   await expect(signoff).toHaveCount(0);
 
-  // MedRec: the injected failure after the draft was written is retried by Temporal; one draft, co-signed
+  // MedRec (WP6): the injected failure after the draft was written is retried by Temporal; one record, signed in
+  // Medication safety by the pharmacist and co-signed by the physician
   const medrec = await waitStep(request, wf, "medRecAdmission", "waiting");
   expect(medrec.attempts).toBe(2);
   const draft = medrec.waiting_for!.refs[0];
-  await sign(request, draft, "U-PHAR-01");
-  await sign(request, draft, "U-DOC-09");
+  expect(`DocumentReference/${await signMedRec(request, patient.encounter)}`).toBe(draft);
 
   // the bed manager skips ward monitoring (the patient left on paper in this demo); audited
   await switchTo(page, "operations_manager");

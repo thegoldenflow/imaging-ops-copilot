@@ -33,7 +33,7 @@ from app.agents.prompts import load as load_prompt
 from app.agents.runtime import AgentRun
 from app.modules.med_safety import knowledge
 from app.modules.med_safety import mocks  # noqa: F401  (registers the mock model)
-from app.modules.med_safety.document import render
+from app.modules.med_safety.document import record_id, render
 from app.modules.med_safety.reconcile import Judgement, RecItem, apply_judgements, candidates
 
 AGENT_ID = "medication_reconciliation"
@@ -95,6 +95,20 @@ def _describe(item: RecItem) -> dict:
     med = item.order or item.inpatient or item.home
     return {"item_id": item.id, "medication": med.name if med else "", "class": med.drug_class if med else "",
             "dose": med.text if med else "", "rxcui": med.rxcui if med else ""}
+
+
+def write_draft(run: AgentRun, session: dict, items: list[RecItem]) -> str | None:
+    """The draft record through draftMedRec; returns its id. The arguments depend only on the reconciliation and its
+    settled items (the record's own id is left out: the tool writes it when no other draft is named), so the same
+    call again, from a retried journey step, gets the first result back from the gateway's idempotency key."""
+    text, data = render(session, items)
+    named = session.get("document_id")
+    draft = run.tool("draftMedRec", {
+        "encounter_id": session["encounter_id"], "session_id": session["id"], "kind": session["kind"],
+        "text": text[:30000], "data": data,
+        **({"document_id": named} if named and named != record_id(session["encounter_id"], session["kind"]) else {}),
+        "source_refs": list(dict.fromkeys(r for i in items for r in i.evidence_refs))[:200]})
+    return (draft.output or {}).get("document_id")
 
 
 def judge(run: AgentRun, session: dict, items: list[RecItem]) -> JudgeResult:
@@ -161,13 +175,7 @@ def judge(run: AgentRun, session: dict, items: list[RecItem]) -> JudgeResult:
                                condition_refs=condition_refs)
     result.items = [i.model_copy(update={"ai_note": notes.get(i.id)}) if i.id in notes else i for i in settled]
     result.judged = len(judgements)
-    text, data = render(session, result.items)
-    draft = run.tool("draftMedRec", {
-        "encounter_id": session["encounter_id"], "session_id": session["id"], "kind": session["kind"],
-        "text": text[:30000], "data": data, **({"document_id": session["document_id"]}
-                                               if session.get("document_id") else {}),
-        "source_refs": list(dict.fromkeys(r for i in result.items for r in i.evidence_refs))[:200]})
-    result.document_id = (draft.output or {}).get("document_id")
+    result.document_id = write_draft(run, session, result.items)
     confidence = min((i.confidence for i in result.items if i.source == "ai" and i.confidence is not None),
                      default=1.0)
     run.finish(outcome="completed", confidence=confidence)

@@ -401,3 +401,100 @@ def test_workbench_flow_over_http(client, login, fresh_state):
     assert client.post(f"/api/med-safety/medrec/{session.id}/sign", headers=login(user(store, Role.NURSE).id)) \
         .status_code == 403
 
+
+
+# ---------- the journey's steps (6.5: WP4c's activities call them; Temporal in tests/test_workflows.py) ----------
+
+
+def _draft_calls(store, encounter_id: str) -> list[str]:
+    return sorted(c.status for t in traces.table(store).values()
+                  if t.agent_id == S.MEDREC and t.encounter_id == encounter_id
+                  for c in t.tool_calls if c.tool_id == "draftMedRec")
+
+
+def test_journey_order_review_step_signs_off_with_the_pharmacists_last_decision(fresh_state):
+    from datetime import timedelta
+
+    from app.agents.runtime import runtime
+    from app.fhir.dt import fhir_datetime
+    from app.modules.med_safety import journey as J
+
+    store = fresh_state
+    pharmacist = user(store, Role.PHARMACIST)
+    encounter = encounter_of(store, "medrx-ms-allergy-piperacillin")
+    as_of = fhir_datetime(hospital_now(store))
+    found = J.review_orders(store, encounter, as_of)
+    assert PIPERACILLIN in {r.order_ref for r in found}
+    assert J.review_orders(store, encounter, as_of) == found  # reviews are kept: a retry gets the same list
+    authored = next(r.authored_at for r in found if r.order_ref == PIPERACILLIN)
+    before = J.review_orders(store, encounter, fhir_datetime(authored - timedelta(seconds=1)))
+    assert PIPERACILLIN not in {r.order_ref for r in before}  # the journey's cut-off
+    text, priority = J.signoff_text(found, as_of)
+    assert priority == "stat" and "blocking" in text and "Medication safety" in text
+    S.comment(store, reviews(store)[PIPERACILLIN].id)  # the AI commentary arrives later: the text stays the same
+    assert J.signoff_text(J.review_orders(store, encounter, as_of), as_of) == (text, priority)
+
+    steps = []
+    for _ in range(2):  # Temporal's retry after the work committed: the gateway returns the first Task
+        with runtime.start(S.ORDER_REVIEW, user=None, encounter_id=encounter) as run:
+            steps.append(J.order_review_signoff(run, found, as_of))
+            run.finish(outcome="completed")
+    assert steps[0].wait_for == steps[1].wait_for and steps[0].signer == "pharmacist"
+    task_id = steps[0].wait_for[0].split("/")[1]
+    task = store.fhir.read("Task", task_id)
+    assert task["code"]["coding"][0]["code"] == "workflow-signoff" and task["priority"] == "stat"
+    assert task["performerType"][0]["coding"][0]["code"] == "pharmacist" and task["description"] == text
+
+    pending = sorted((r for r in reviews(store).find_by("encounter_id", encounter)
+                      if r.status == "pending" and r.kind == "medication"), key=lambda r: r.blocking)
+    assert pending[-1].order_ref == PIPERACILLIN
+    for n, review in enumerate(pending, 1):
+        S.decide_review(store, pharmacist, review.id, "request_change" if review.blocking else "accept_order",
+                        "Reviewed with the prescriber")
+        assert store.fhir.read("Task", task_id)["status"] == ("completed" if n == len(pending) else "requested")
+    approved = [e for e in store.audit.events() if e.event_type == "approve" and e.resource_id == task_id]
+    assert approved and approved[-1].user_id == pharmacist.id
+
+
+def test_journey_medrec_step_retried_replays_the_draft_and_skips_a_record_already_signed(fresh_state):
+    from app.fhir.dt import fhir_datetime
+    from app.modules.med_safety import journey as J
+
+    store = fresh_state
+    pharmacist, physician = user(store, Role.PHARMACIST), user(store, Role.PHYSICIAN)
+    encounter = encounter_of(store, QUETIAPINE)
+    as_of = fhir_datetime(hospital_now(store))
+    first = J.medrec_admission(store, encounter, as_of)
+    ref = f"DocumentReference/medrec-{encounter}-admission"
+    assert first.wait_for == [ref] and first.signer == "pharmacist" and not first.refused
+    again = J.medrec_admission(store, encounter, as_of)  # a retry: no second model call, the same draft replayed
+    assert again.wait_for == [ref]
+    assert _draft_calls(store, encounter) == ["ok", "replayed"]
+    llm = [t for t in traces.table(store).values() if t.agent_id == S.MEDREC and t.encounter_id == encounter
+           and t.llm_calls]
+    assert len(llm) == 1
+    assert len([d for d in store.fhir.search("DocumentReference", encounter=encounter)
+                if d["type"]["coding"][0]["code"] == "medrec"]) == 1
+
+    session = handle_all(store, pharmacist, S.reconcile(store, encounter, "admission"))
+    S.sign(store, pharmacist, session.id)
+    assert J.medrec_admission(store, encounter, as_of).wait_for == [ref]  # the co-signature still to come
+    S.sign(store, physician, session.id)
+    done = J.medrec_admission(store, encounter, as_of)  # signed in the workbench before the journey got here
+    assert done.wait_for == [] and "already signed final" in done.detail
+    assert _draft_calls(store, encounter) == ["ok", "replayed"]  # a signed record is not drafted again
+
+
+def test_journey_medrec_step_reconciles_the_orders_written_by_the_sign_off(fresh_state):
+    from datetime import timedelta
+
+    from app.fhir.dt import fhir_datetime
+    from app.modules.med_safety import journey as J
+
+    store = fresh_state
+    encounter = encounter_of(store, QUETIAPINE)
+    quetiapine = store.fhir.read("MedicationRequest", QUETIAPINE)
+    cutoff = fhir_datetime(parse(quetiapine["authoredOn"]) - timedelta(seconds=1))
+    J.medrec_admission(store, encounter, cutoff)
+    items = {i["id"] for i in S.reconcile(store, encounter, "admission").items}
+    assert "new-51272" not in items  # quetiapine was ordered after the order review's sign-off

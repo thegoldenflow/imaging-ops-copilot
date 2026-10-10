@@ -80,6 +80,21 @@ def _sign(ref: str, uid: str):
         return FhirGateway(Actor.of(_user(uid)), "signing").sign_document(ref.split("/", 1)[1])
 
 
+def _sign_medrec(ref: str, uid: str):
+    """The MedRec record signed where people sign it (WP6's workbench): the pharmacist handles every discrepancy and
+    signs, then a physician co-signs."""
+    from app.modules.med_safety import service as med_safety
+    from app.modules.med_safety.models import sessions
+
+    with DB:
+        store, user = get_store(), _user(uid)
+        session = sessions(store).find_by("document_id", ref.split("/", 1)[1])[0]
+        if uid == PHARMACIST:
+            for item in med_safety.unhandled(session):
+                session = med_safety.handle_item(store, user, session.id, item, "accept", "Checked with the patient")
+        return med_safety.sign(store, user, session.id)
+
+
 def _documents(store, encounter_id: str, code: str) -> list[dict]:
     return [d for d in store.fhir.search("DocumentReference", encounter=encounter_id)
             if any(c.get("code") == code for c in (d.get("type") or {}).get("coding") or [])]
@@ -99,11 +114,11 @@ def test_journey_runs_from_admission_to_the_booked_follow_up_call(fresh_state, m
         s = h.wait_step(wf, "medRecAdmission", ("waiting",))
         doc = s["waiting_for"]["refs"][0]
         assert doc.startswith("DocumentReference/")
-        _sign(doc, PHARMACIST)
+        _sign_medrec(doc, PHARMACIST)
         h.pump()
         with DB:
             assert h.step(wf, "medRecAdmission")["status"] == "waiting"  # co-signature still missing
-        _sign(doc, PHYSICIAN)
+        _sign_medrec(doc, PHYSICIAN)
 
         h.wait_step(wf, "wardMonitoring", ("waiting",))
         with DB:
@@ -175,7 +190,8 @@ def _to_medrec(h, store) -> tuple[dict, str, dict]:
 
 def test_a_failed_medrec_activity_is_retried_and_leaves_exactly_one_medrec_document(fresh_state, monkeypatch):
     """6.5 acceptance: a failure injected into the MedRec activity after its draft was written; Temporal retries
-    it (1 s, 4 s) and the Tool Gateway's idempotency key returns the first draft, so FHIR holds one."""
+    it (1 s, 4 s) and the Tool Gateway's idempotency key returns the first draft, so FHIR holds one. The retries
+    do not ask the model again: they send the stored reconciliation's draft (WP6), which the gateway replays."""
     store = fresh_state
     with harness(monkeypatch) as h:
         with DB:
@@ -190,7 +206,7 @@ def test_a_failed_medrec_activity_is_retried_and_leaves_exactly_one_medrec_docum
             from app.agents import trace as traces
 
             calls = [c.status for t in traces.table(store).values() if t.agent_id == "medication_reconciliation"
-                     and t.encounter_id == enc["id"] for c in t.tool_calls if c.tool_id == "draftDocument"]
+                     and t.encounter_id == enc["id"] for c in t.tool_calls if c.tool_id == "draftMedRec"]
             assert sorted(calls) == ["ok", "replayed", "replayed"]
             assert faults.pending() == {}
         _, attempts = _activities(h, wf)
@@ -209,8 +225,8 @@ def test_a_restarted_worker_resumes_the_journey_without_running_completed_steps_
 
         h.stop_worker()
         doc = s["waiting_for"]["refs"][0]
-        _sign(doc, PHARMACIST)
-        _sign(doc, PHYSICIAN)
+        _sign_medrec(doc, PHARMACIST)
+        _sign_medrec(doc, PHYSICIAN)
         h.pump()  # the signals reach Temporal and wait there for a worker
         with DB:
             assert h.step(wf, "medRecAdmission")["status"] == "waiting"  # nobody ran the workflow meanwhile
@@ -265,6 +281,49 @@ def test_a_signoff_not_given_in_24_seconds_escalates_then_tells_the_operations_m
                 assert t["status"] == "completed" and "Resolved" in t["note"][-1]["text"]
 
 
+def test_the_pharmacists_last_order_decision_in_the_workbench_signs_off_the_order_review(fresh_state, monkeypatch):
+    """WP6 in the journey: the order review step reviews the stay's orders by the rules and waits for the
+    pharmacist's sign-off Task; deciding the last flagged medication order in Medication safety confirms it, and the
+    reconciliation that follows writes the stay's own MedRec record."""
+    from app.modules.med_safety import service as med_safety
+    from app.modules.med_safety.models import reviews
+
+    store = fresh_state
+    with harness(monkeypatch) as h:
+        with DB:  # the stay with the planted penicillin-allergy order: a blocking flag
+            order = store.fhir.read("MedicationRequest", "medrx-ms-allergy-piperacillin")
+            enc = store.fhir.read("Encounter", order["encounter"]["reference"].split("/")[1])
+        wf = _admit(h, enc)
+        s = h.wait_step(wf, "orderReview", ("waiting",))
+        signoff = s["waiting_for"]["refs"][0]
+        with DB:
+            task = store.fhir.read("Task", signoff.split("/")[1])
+            assert task["code"]["coding"][0]["code"] == "workflow-signoff"
+            assert task["performerType"][0]["coding"][0]["code"] == "pharmacist"
+            assert task["priority"] == "stat" and "1 blocking" in task["description"], task["description"]
+            assert "MedicationRequest/medrx-ms-allergy-piperacillin" in s["refs"]
+            pending = sorted((r for r in reviews(store).find_by("encounter_id", enc["id"])
+                              if r.status == "pending" and r.kind == "medication"), key=lambda r: not r.blocking)
+            assert pending and pending[0].order_ref == "MedicationRequest/medrx-ms-allergy-piperacillin"
+        for n, review in enumerate(pending, 1):
+            with DB:
+                med_safety.decide_review(store, _user(PHARMACIST), review.id,
+                                         "request_change" if review.blocking else "accept_order",
+                                         "Reviewed with the prescriber")
+                status = store.fhir.read("Task", signoff.split("/")[1])["status"]
+                assert status == ("completed" if n == len(pending) else "requested")
+        h.wait_step(wf, "orderReview", ("done",))
+        s = h.wait_step(wf, "medRecAdmission", ("waiting",), timeout=90)
+        with DB:
+            task = store.fhir.read("Task", signoff.split("/")[1])
+            decided = {o["type"]["text"]: o["valueString"] for o in task["output"]}
+            assert decided["decision"] == "approve" and decided["decided_by"] == PHARMACIST
+            assert "Medication safety" in decided["note"]
+            assert s["waiting_for"]["refs"] == [f"DocumentReference/medrec-{enc['id']}-admission"]
+            doc = store.fhir.read("DocumentReference", f"medrec-{enc['id']}-admission")
+            assert doc["docStatus"] == "preliminary" and len(_documents(store, enc["id"], "medrec")) == 1
+
+
 def test_a_failed_privileged_call_is_not_retried_and_waits_for_a_retry_or_skip(fresh_state, monkeypatch, client, login):
     """bookAppointment is privileged: its activity runs once; the failure becomes a Task for the clerk and the step
     waits for the operations manager (retry, then skip; both audited)."""
@@ -272,8 +331,8 @@ def test_a_failed_privileged_call_is_not_retried_and_waits_for_a_retry_or_skip(f
     _timers(monkeypatch, followup_delay_s=60)
     with harness(monkeypatch) as h:
         enc, wf, s = _to_medrec(h, store)
-        _sign(s["waiting_for"]["refs"][0], PHARMACIST)
-        _sign(s["waiting_for"]["refs"][0], PHYSICIAN)
+        _sign_medrec(s["waiting_for"]["refs"][0], PHARMACIST)
+        _sign_medrec(s["waiting_for"]["refs"][0], PHYSICIAN)
         h.wait_step(wf, "wardMonitoring", ("waiting",))
         with DB:
             bus.publish(_event("patient.discharged", enc))

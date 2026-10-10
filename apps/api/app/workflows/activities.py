@@ -246,18 +246,27 @@ def triage_assist(args: dict) -> dict:
 
 @step_activity("journey.orderReview", "orderReview")
 def order_review(args: dict) -> dict:
+    """WP6's order review: the rules review the stay's orders written by `as_of`, and the order_review agent puts
+    the result in the pharmacist's queue as the sign-off Task the journey waits for (app/modules/med_safety/journey.py)."""
+    from app.modules.med_safety import journey as med_safety
+
+    as_of = args.get("as_of") or args.get("admitted_at")
+    found = med_safety.review_orders(get_store(), args["encounter_id"], as_of)
     result = _agent_step("order_review", args["encounter_id"],
-                         lambda run: stubs.order_review(run, args.get("as_of") or args.get("admitted_at")))
-    return _signoff(args, "orderReview", result, "pharmacist", "Review the admission orders")
+                         lambda run: med_safety.order_review_signoff(run, found, as_of))
+    return _signoff(args, "orderReview", result, "pharmacist", "Review the stay's orders in Medication safety")
 
 
 @step_activity("journey.medRecAdmission", "medRecAdmission")
 def med_rec_admission(args: dict) -> dict:
+    """WP6's admission reconciliation against the orders written by the order review's sign-off, the agent's
+    indication judgements and the draft record; the journey waits for the record to be signed final."""
+    from app.modules.med_safety import journey as med_safety
+
     as_of = args.get("orders_as_of") or args.get("as_of") or args.get("admitted_at")
-    result = _agent_step("medication_reconciliation", args["encounter_id"],
-                         lambda run: stubs.medrec_admission(run, as_of))
+    result = med_safety.medrec_admission(get_store(), args["encounter_id"], as_of)
     return _signoff(args, "medRecAdmission", result, "pharmacist",
-                    "Reconcile the home medications against the admission orders by hand")
+                    "Reconcile the home medications against the admission orders in Medication safety")
 
 
 @step_activity("journey.bedAssignment", "bedAssignment")

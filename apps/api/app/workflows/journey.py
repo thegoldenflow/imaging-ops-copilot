@@ -8,9 +8,10 @@ Steps, each an activity (app/workflows/activities.py) whose side effects go thro
     -> 48 h timer -> scheduleFollowupCall -> codingStub
 
 A sign-off step waits for a signal (the document signed final, the Task decided) racing the escalation deadlines
-(FlowBase._await_signoff). The steps whose modules come later (order review and medication reconciliation: WP6,
-discharge documents: WP7, the follow-up call: WP8, NEWS2: WP9's 8.1 stub, coding: the 8.1 roadmap card) are
-interfaces with placeholder implementations (app/agents/library/journey_stubs.py), clearly marked as such.
+(FlowBase._await_signoff). The order review and the admission medication reconciliation are WP6's
+(app/modules/med_safety/journey.py). The steps whose modules come later (discharge documents: WP7, the follow-up
+call: WP8, NEWS2: WP9's 8.1 stub, coding: the 8.1 roadmap card) are interfaces with placeholder implementations
+(app/agents/library/journey_stubs.py), clearly marked as such.
 """
 
 from __future__ import annotations

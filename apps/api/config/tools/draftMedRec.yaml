@@ -3,8 +3,9 @@
 # app/agents/jsonschema.py); fhir_writes is what the tool may write (agents' write rights derive from it).
 tool_id: draftMedRec
 description: 'Write (or update) the draft medication reconciliation record of an encounter: a DocumentReference with
-  docStatus preliminary, kind admission or discharge, a readable text and the structured reconciliation (7.2). Only
-  the signing service makes it final.'
+  docStatus preliminary, kind admission or discharge, a readable text and the structured reconciliation (7.2).
+  Without document_id it writes the record of the stay (medrec-<encounter>-<kind>), creating it or updating its
+  draft. Only the signing service makes it final; a signed record is not rewritten.'
 side_effect_level: recommend
 handler: app.modules.med_safety.tools:draft_medrec
 domain: fhir

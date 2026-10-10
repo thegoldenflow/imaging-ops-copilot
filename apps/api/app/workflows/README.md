@@ -15,10 +15,14 @@ Files: `model.py` (ids, inputs, step catalogues; pure, imported inside the sandb
 sign-off waits, escalation), `journey.py`, `capacity.py`, `review.py` (workflow code), `activities.py` (the work,
 each in its own transaction), `bridge.py` (events in, starts and signals out), `client.py` (the API's link to
 Temporal), `progress.py` (the timeline the view reads), `tools.py` (createWorkflowTask), `faults.py` (the demo's
-deliberate failures), `router.py` (`/api/workflows`), `worker.py` (`python -m app.workflows.worker`). The journey's
-steps whose modules come later are placeholders in `app/agents/library/journey_stubs.py`, run as the agents that
-will own them: orderReview and medRecAdmission (WP6), the discharge documents (WP7), the follow-up call (WP8),
-NEWS2 flags (WP9's 8.1 stub), coding (8.1 roadmap card).
+deliberate failures), `router.py` (`/api/workflows`), `worker.py` (`python -m app.workflows.worker`).
+orderReview and medRecAdmission are WP6's (`app/modules/med_safety/journey.py`): the rules review the stay's
+orders and the `order_review` agent opens the pharmacist's sign-off Task (confirmed in the review queue, or by the
+pharmacist's last order decision in Medication safety); the admission reconciliation, the
+`medication_reconciliation` agent's judgements and its draft record, signed in the workbench by the pharmacist and
+co-signed by a physician. The journey's steps whose modules come later are placeholders in
+`app/agents/library/journey_stubs.py`, run as the agents that will own them: the discharge documents (WP7), the
+follow-up call (WP8), NEWS2 flags (WP9's 8.1 stub), coding (8.1 roadmap card).
 
 ## Input resources
 
@@ -69,8 +73,12 @@ failure and a real worker-process kill against the docker dev server.
 - The journey's steps run in the spec's order, one after the other: a patient discharged while the order review
   waits for the pharmacist is noticed only when the journey reaches the ward step (the event waits in the inbox).
   A surgery booked after the journey passed the surgical branch is not predicted.
-- Placeholders write template drafts, not the WP6–WP8 modules' content; they are marked in the text and on the
-  timeline ("placeholder until WP6").
+- Placeholders write template drafts, not the WP7–WP8 modules' content; they are marked in the text and on the
+  timeline ("placeholder until WP7").
+- WP6's retried steps do not ask the model again: the reconciliation keeps its judgements, and the retry sends the
+  same draftMedRec call, which the gateway replays. The order review step waits for the pharmacist's sign-off Task,
+  not for each order's decision; flagged orders stay in Medication safety's queue after a sign-off given in the
+  review queue.
 - A worker that dies holds its workflows' next tasks on its sticky queue for about 10 seconds before Temporal hands
   them to another worker. Temporal's time-skipping test server never hands them over, so the tests run workers
   without a workflow cache (every task replays the whole history).

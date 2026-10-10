@@ -15,6 +15,7 @@ the AI flags and drafts, a pharmacist or physician decides and signs. Web: `apps
 | `tools.py` | handlers of getMedicationContext, getServiceOrderContext (read), submitOrderReview, draftMedRec (recommend) |
 | `knowledge.py` | keyword retrieval over `apps/api/knowledge/guidelines/` (synthetic summaries) |
 | `document.py`, `discharge.py` | the MedRec record's content; the discharge medication table for 7.3 |
+| `journey.py` | the journey's orderReview and medRecAdmission steps (6.5, WP4c's activities call them): the rules review and the pharmacist's sign-off Task; the admission reconciliation and its record for the signatures; retries replayed by the Tool Gateway |
 | `models.py`, `evals.py` | tables `order_reviews` and `medrec_sessions` (migration 0009); the eval harness |
 
 ## Input resources

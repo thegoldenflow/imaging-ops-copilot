@@ -1,11 +1,10 @@
 """medication safety (7.2): the order review queue and medication reconciliations
 
 Revision ID: 0009
-Revises: 0007
+Revises: 0008
 Create Date: 2026-10-09 18:37:57.227901
 
-Numbered 0009 on purpose: WP4c (Temporal) adds its own 0008 at the same time. Whichever merges second points its
-down_revision at the other's revision, a one-line change; until then this one follows 0007.
+Follows WP4c's 0008 (durable workflows); the two were written side by side and this one was rebased onto it.
 """
 
 from alembic import op
@@ -13,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = '0009'
-down_revision = '0007'
+down_revision = '0008'
 branch_labels = None
 depends_on = None
 

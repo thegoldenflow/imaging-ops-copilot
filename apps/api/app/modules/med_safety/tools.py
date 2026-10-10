@@ -31,6 +31,7 @@ from app.ehr import access
 from app.ehr.clock import hospital_now
 from app.ehr.codes import DOC_TYPES, MRN_SYSTEM, PRACTITIONER_ROLE, TASK_CODE, concept
 from app.fhir.dt import fhir_datetime, parse, ref, ref_id
+from app.modules.med_safety.document import record_id
 
 if TYPE_CHECKING:
     from app.agents.gateway import ToolContext
@@ -166,7 +167,7 @@ def medrec_document(patient_id: str, encounter_id: str, kind: str, text: str, da
     system, code, display = DOC_TYPES["medrec"]
     title = f"{display} ({kind})"
     json.loads(data)  # the structured part must be JSON
-    return {"resourceType": "DocumentReference", "id": f"medrec-{encounter_id}-{kind}", "status": "current",
+    return {"resourceType": "DocumentReference", "id": record_id(encounter_id, kind), "status": "current",
             "docStatus": "preliminary",
             "type": concept(system, code, display), "category": [concept(MEDREC_KIND, kind, f"{kind} reconciliation")],
             "subject": ref("Patient", patient_id), "date": when, "description": title,
@@ -184,14 +185,17 @@ def draft_medrec(ctx: ToolContext, encounter_id: str, session_id: str, kind: str
     when = fhir_datetime(hospital_now(get_store()))
     doc = medrec_document(patient_id, encounter_id, kind, text, data, when=when, source_refs=source_refs,
                           author=f"AI draft by {ctx.agent.label} (reconciliation {session_id})")
-    if document_id:
-        current = gateway.read("DocumentReference", document_id)
-        if current is None:
-            raise LookupError(f"DocumentReference/{document_id} not found")
+    target = document_id or doc["id"]  # another draft named (e.g. one already on the encounter), or the record's own
+    current = gateway.read("DocumentReference", target)
+    if current is None and document_id:
+        raise LookupError(f"DocumentReference/{document_id} not found")
+    if current is not None:
         existing = current.to_fhir()
         if access.encounter_of(existing) != encounter_id:
-            raise ValueError(f"DocumentReference/{document_id} belongs to another encounter")
-        doc = {**existing, **{k: v for k, v in doc.items() if k != "extension"}, "id": document_id}
+            raise ValueError(f"DocumentReference/{target} belongs to another encounter")
+        if existing.get("docStatus") != "preliminary":
+            raise ValueError(f"DocumentReference/{target} is signed ({existing.get('docStatus')}); it stays as it is")
+        doc = {**existing, **{k: v for k, v in doc.items() if k != "extension"}, "id": target}
         stored = gateway.update(ctx.stamp(doc)).to_fhir()
     else:
         stored = gateway.create(ctx.stamp(doc)).to_fhir()

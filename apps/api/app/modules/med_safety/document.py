@@ -18,6 +18,11 @@ from app.modules.med_safety.reconcile import CATEGORIES, TYPE_NAMES, RecItem, di
 SCHEMA = "medrec@1"
 
 
+def record_id(encounter_id: str, kind: str) -> str:
+    """The id of a stay's reconciliation record (one per kind)."""
+    return f"medrec-{encounter_id}-{kind}"
+
+
 def _line(item: RecItem) -> str:
     home = item.home.text if item.home else "-"
     home = f"{item.home.name} {home}" if item.home else "-"

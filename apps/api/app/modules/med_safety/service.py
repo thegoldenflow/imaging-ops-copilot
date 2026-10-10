@@ -313,8 +313,9 @@ def _conditions_for(conditions: list[dict], encounter_id: str) -> list[F.Conditi
             or access.encounter_of(c) == encounter_id]
 
 
-def _session_inputs(fhir: FhirGateway, encounters: list[dict]) -> dict[str, dict]:
-    """Per encounter: home medications, orders, discharge prescriptions and the diagnosis list (bulk reads)."""
+def _session_inputs(fhir: FhirGateway, encounters: list[dict], orders_as_of: datetime | None = None) -> dict[str, dict]:
+    """Per encounter: home medications, orders (those written by `orders_as_of`, when given), discharge prescriptions
+    and the diagnosis list (bulk reads)."""
     if not encounters:
         return {}
     enc_ids = [e["id"] for e in encounters]
@@ -326,7 +327,8 @@ def _session_inputs(fhir: FhirGateway, encounters: list[dict]) -> dict[str, dict
     out = {}
     for e in encounters:
         pid = access.patient_of(e)
-        mine = [r for r in requests if access.encounter_of(r) == e["id"]]
+        mine = [r for r in requests if access.encounter_of(r) == e["id"] and not (
+            orders_as_of and r.get("intent") == "order" and (parse(r.get("authoredOn")) or orders_as_of) > orders_as_of)]
         out[e["id"]] = {
             "patient_id": pid, "unit_id": _unit_of_encounter(e),
             "home": [F.med_from_statement(s) for s in home if access.patient_of(s) == pid],
@@ -358,8 +360,10 @@ def _new_session(store: Store, fhir: FhirGateway, encounter_id: str, kind: str, 
                          document_id=_existing_draft(fhir, encounter_id, kind))
 
 
-def reconcile(store: Store, encounter_id: str, kind: str = "admission", *, settle_now: bool = False) -> MedRecSession:
-    """The encounter's admission or discharge reconciliation (one per kind; a repeated call returns it)."""
+def reconcile(store: Store, encounter_id: str, kind: str = "admission", *, settle_now: bool = False,
+              orders_as_of: datetime | None = None) -> MedRecSession:
+    """The encounter's admission or discharge reconciliation (one per kind; a repeated call returns it). The journey
+    passes `orders_as_of`, the order review's sign-off: the admission orders are those written by then."""
     if kind not in ("admission", "discharge"):
         raise ValueError("kind is admission or discharge")
     table = sessions(store)
@@ -369,7 +373,7 @@ def reconcile(store: Store, encounter_id: str, kind: str = "admission", *, settl
         found = fhir.read("Encounter", encounter_id)
         if found is None:
             raise LookupError(f"Encounter/{encounter_id} not found")
-        inputs = _session_inputs(fhir, [found.to_fhir()])[encounter_id]
+        inputs = _session_inputs(fhir, [found.to_fhir()], orders_as_of)[encounter_id]
         if kind == "discharge" and not inputs["plans"]:
             raise DecisionProblem(f"Encounter/{encounter_id} has no discharge prescriptions yet")
         existing = _new_session(store, fhir, encounter_id, kind, inputs, hospital_now(store))
@@ -596,6 +600,9 @@ def decide_review(store: Store, user: StaffUser, review_id: str, decision: str, 
                      "at": now.isoformat(), "change_task_id": task_id},
         "commentary_status": commentary_status, "status": "resolved"})
     reviews(store)[review_key(review.order_ref)] = review
+    from app.modules.med_safety import journey
+
+    journey.confirm_signoff(store, user, review, source_ip=source_ip)
     return review
 
 

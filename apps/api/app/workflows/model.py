@@ -99,8 +99,8 @@ class StepDef:
 
 JOURNEY_STEPS = (
     StepDef("triageAssist", "Triage assist", "nurse", "auto"),
-    StepDef("orderReview", "Order review", "pharmacist", "signoff", "WP6"),
-    StepDef("medRecAdmission", "Admission medication reconciliation", "pharmacist", "signoff", "WP6"),
+    StepDef("orderReview", "Order review", "pharmacist", "signoff"),
+    StepDef("medRecAdmission", "Admission medication reconciliation", "pharmacist", "signoff"),
     StepDef("bedAssignment", "Bed assignment", "operations_manager", "auto"),
     StepDef("predictDuration", "Surgical duration prediction", "operations_manager", "auto"),
     StepDef("proposeSchedule", "OR booking check", "operations_manager", "signoff"),
