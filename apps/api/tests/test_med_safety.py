@@ -10,11 +10,16 @@ interface for 7.3, the workbench API and its RBAC.
 
 from __future__ import annotations
 
+import threading
+import time
+from contextlib import contextmanager
+
 import pytest
 
 from app.agents import registry
 from app.agents import trace as traces
 from app.core.models import Role
+from app.core.store import EngineSource, Store, get_engine
 from app.ehr import consent, simulator
 from app.ehr.clock import hospital_now
 from app.ehr.gateway import Actor, FhirGateway, LocalBackend
@@ -226,6 +231,46 @@ def test_review_decisions_need_the_right_person_and_a_reason(fresh_state):
 
 
 # ---------- reconciliation ----------
+
+
+@contextmanager
+def opened_elsewhere(encounter_id: str, kind: str = "admission"):
+    """The reconciliation opened in a second, real transaction (another request, or the background intake) that
+    commits a second later. Its committed row is deleted again afterwards."""
+    other = Store(EngineSource(get_engine()))
+    opened = S.reconcile(other, encounter_id, kind)  # holds the reconciliation's lock; the session is pending
+    timer = threading.Timer(1.0, other.commit)
+    timer.start()
+    try:
+        yield opened
+    finally:
+        timer.join()
+        other.close()
+        cleanup = Store(EngineSource(get_engine()))
+        del sessions(cleanup)[session_key(encounter_id, kind)]
+        cleanup.commit()
+
+
+def test_a_reconciliation_opened_by_another_transaction_is_returned_not_replaced(fresh_state):
+    """Two requests open the same reconciliation at once: the second waits for the first and returns its session
+    instead of writing its own over it under the same key."""
+    store = fresh_state
+    encounter = encounter_of(store, QUETIAPINE)
+    with opened_elsewhere(encounter) as opened:
+        started = time.monotonic()
+        assert S.reconcile(store, encounter, "admission").id == opened.id
+        assert time.monotonic() - started >= 0.8
+
+
+def test_the_intake_leaves_a_reconciliation_a_request_is_opening(fresh_state):
+    store = fresh_state
+    now = hospital_now(store)
+    admitted = S.module_fhir(S.MEDREC).search("Encounter", cls="IMP", status="in-progress",
+                                               date_from=now - S.ADMISSION_WINDOW)
+    encounter = next(e["id"] for e in admitted if session_key(e["id"], "admission") not in sessions(store))
+    with opened_elsewhere(encounter) as opened:
+        assert S.intake(store, force=True)["admission"] > 0
+        assert sessions(store)[session_key(encounter, "admission")].id == opened.id
 
 
 def test_admission_reconciliation_signed_and_cosigned(fresh_state):

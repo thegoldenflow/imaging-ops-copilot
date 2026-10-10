@@ -370,6 +370,8 @@ def reconcile(store: Store, encounter_id: str, kind: str = "admission", *, settl
         raise ValueError("kind is admission or discharge")
     table = sessions(store)
     existing = table.get(session_key(encounter_id, kind))
+    if existing is None:  # another transaction may be opening it right now: wait for it, then look again
+        existing = _fresh_session(store, encounter_id, kind)
     if existing is None:
         fhir = module_fhir(MEDREC)
         found = fhir.read("Encounter", encounter_id)
@@ -381,6 +383,17 @@ def reconcile(store: Store, encounter_id: str, kind: str = "admission", *, settl
         existing = _new_session(store, fhir, encounter_id, kind, inputs, hospital_now(store))
         table[session_key(encounter_id, kind)] = existing
     return settle(store, existing.id) if settle_now else existing
+
+
+def _fresh_session(store: Store, encounter_id: str, kind: str) -> MedRecSession | None:
+    """The reconciliation as committed now, read under its lock (held to the end of the transaction). The background
+    intake and a request (or two requests) can open the same one at once; both write it under the same key, so the
+    second must find the first's session instead of replacing it and the id the first caller got."""
+    key = session_key(encounter_id, kind)
+    _wait_lock(store, f"medrec:{key}")
+    if not store.detached:  # a detached store's table is the data itself: nothing to re-read
+        sessions(store).forget(key)
+    return sessions(store).get(key)
 
 
 def _items(session: MedRecSession) -> list[RecItem]:
@@ -479,7 +492,9 @@ def intake(store: Store, *, force: bool = False) -> dict[str, int]:
     todo = [(e, "admission") for e in admitted if session_key(e["id"], "admission") not in table]
     todo += [(e, "discharge") for e in leaving if session_key(e["id"], "discharge") not in table and (
         e.get("status") == "in-progress" or (parse((e.get("period") or {}).get("end")) or now) >= now - RECENT_DISCHARGE)]
-    inputs = _session_inputs(medrec, list({e["id"]: e for e, _ in todo}.values()))
+    # a request may be opening one of these right now: take its lock, look again, and leave those to it
+    todo = [(e, kind) for e, kind in todo if _fresh_session(store, e["id"], kind) is None]
+    inputs =_session_inputs(medrec, list({e["id"]: e for e, _ in todo}.values()))
     for encounter, kind in todo:
         if kind == "discharge" and not inputs[encounter["id"]]["plans"]:
             continue
