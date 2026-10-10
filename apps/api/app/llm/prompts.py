@@ -14,43 +14,48 @@ class Prompt:
         return self.template.format(**variables)
 
 
-CXR_DRAFT = Prompt(
-    name="cxr_draft",
-    version="cxr_draft@1",
-    system=(
-        "You draft preliminary chest radiograph reports for a radiologist to review. "
-        "Your draft is not a diagnosis; a radiologist edits and signs the final report. "
-        "Describe only what is visible. When unsure, say so in the uncertainties list rather than guessing. "
-        "Flag findings that would need prompt communication to the referring physician as urgent findings."
-    ),
-    template=(
-        "Exam: {exam_name}. Patient age: {age}. Sex: {sex}. Clinical indication: {indication}.\n"
-        "Draft a structured preliminary report for the attached image."
-    ),
-)
+class RegisteredPrompt:
+    """The prompt an embedded agent's registry entry points at, resolved at every use: moving the pointer in
+    config/agents/<agent_id>.yaml switches (or rolls back) the prompt without a code change or a restart."""
 
-VOICE_AGENT = Prompt(
-    name="voice_agent",
-    version="voice_agent@1",
-    system=(
-        "You are the phone receptionist for Lakeshore and partner imaging centres (Imaging Ops Copilot demo). "
-        "Keep every reply to one or two short spoken sentences.\n"
-        "Rules:\n"
-        "1. Before discussing any appointment, ask for the caller's full name and date of birth and call "
-        "verify_identity. Do not reveal anything about an appointment until verification succeeds.\n"
-        "2. Never answer medical questions (symptoms, results, medication, whether a test is safe or needed). "
-        "Call transfer_to_human for those.\n"
-        "3. Confirm with the caller before you cancel or reschedule.\n"
-        "4. Identifiers in the conversation may appear as placeholders like [PERSON_1] or [DATE_1]. "
-        "Pass them to tools exactly as written.\n"
-        "5. If you cannot help, offer to transfer to a person."
-    ),
-    template="{text}",
-)
+    def __init__(self, agent_id: str) -> None:
+        self.name = agent_id
 
-CALL_SUMMARY = Prompt(
-    name="call_summary",
-    version="call_summary@1",
-    system="Summarize a front-desk phone call for the call log. Be factual and brief.",
-    template="Transcript:\n{transcript}\n\nActions taken: {actions}",
-)
+    def _current(self) -> Prompt:
+        from app.agents import registry
+        from app.agents.prompts import PromptFileError, load
+
+        spec = registry.require_agent(self.name)
+        if not spec.prompt_version:
+            raise PromptFileError(f"{self.name} has no prompt_version in the agent registry")
+        return load(spec.prompt_version)
+
+    @property
+    def version(self) -> str:
+        return self._current().version
+
+    @property
+    def system(self) -> str:
+        return self._current().system
+
+    @property
+    def template(self) -> str:
+        return self._current().template
+
+    def render(self, **variables) -> str:
+        return self._current().render(**variables)
+
+    def __repr__(self) -> str:
+        return f"RegisteredPrompt({self.name!r})"
+
+
+def registered(agent_id: str) -> RegisteredPrompt:
+    return RegisteredPrompt(agent_id)
+
+
+# The prompts live in apps/api/prompts/<agent>/<n>.md (6.6); these names follow the registry pointer.
+CXR_DRAFT = registered("cxr_draft")
+
+VOICE_AGENT = registered("voice_agent")
+
+CALL_SUMMARY = registered("call_summary")

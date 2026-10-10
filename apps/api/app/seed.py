@@ -122,7 +122,9 @@ def build_store(seed: int | None = None) -> Store:
     return build(seed)
 
 
-def populate(s: Store, seed: int | None = None) -> None:
+def populate(s: Store, seed: int | None = None, *, hospital: bool = True) -> None:
+    """`hospital=False` leaves out the hospital EHR (its own random stream, generated last), for evals that need
+    the imaging data only (the referral summary eval builds three data sets)."""
     from app.core.config import settings
 
     rng = random.Random(settings.seed if seed is None else seed)
@@ -258,7 +260,8 @@ def populate(s: Store, seed: int | None = None) -> None:
     _add_requisitions(s, rng, now)
     _add_radiology_ops(s, rng, now)
     _add_business_compliance(s, rng, now)
-    _add_hospital(s, settings.seed if seed is None else seed, now)
+    if hospital:
+        _add_hospital(s, settings.seed if seed is None else seed, now)
 
 
 def _add_hospital(s: Store, seed: int, now: datetime) -> None:

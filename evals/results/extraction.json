@@ -1,6 +1,6 @@
 {
  "task": "extraction",
- "run_at": "2026-10-06T22:35:04",
+ "run_at": "2026-10-10T04:30:25",
  "mode": "mock",
  "model": "rule-based baseline",
  "n": 50,
@@ -71,6 +71,6 @@
    "style": "letter"
   }
  ],
- "seconds": 1.5,
+ "seconds": 4.6,
  "notes": "Field-level accuracy against generator labels. 30% of requisitions are free-text letters."
 }

@@ -1,0 +1,69 @@
+# Model registry (docs/SPEC-hospital.md 6.6; loader app/agents/models.py).
+#
+# Every model an agent may use is registered here. Model ids stay in the environment (CLAUDE.md): an entry names the
+# setting that holds its id (`model_id_env`) and the loader reads the id from the settings at startup, so changing a
+# model is still an environment change; this file records which models are approved for what.
+#
+# An agent's `model_policy.tier` (config/agents/<agent>.yaml) resolves to the entry of the active provider with that
+# tier (the mock provider stands in for Anthropic); `model_policy.model` may pin one entry by name instead. The agent
+# registry refuses a policy that resolves to no entry, or to one that is not approved for the agent (approved_tasks:
+# agent ids, or "*" for every registered agent), for its risk tier, or for the clinical text it reads.
+#
+# max_cost_per_case: USD per eval case or per run; the eval report and the AI Ops alerts compare costs with it.
+# data_handling: deidentified_clinical_text (may receive clinical text after de-identification, never identifiers)
+#                or no_clinical_text (operational text only).
+models:
+  claude-reasoning:
+    provider: anthropic
+    tier: reasoning
+    model_id_env: CLAUDE_MODEL_REASONING
+    approved_tasks: ["*"]
+    risk_tiers_allowed: [ops, documentation, clinical_ds]
+    max_cost_per_case: 0.25
+    data_handling: deidentified_clinical_text
+    note: Sonnet tier for reasoning, vision and clinical drafting.
+  claude-fast:
+    provider: anthropic
+    tier: fast
+    model_id_env: CLAUDE_MODEL_FAST
+    approved_tasks: ["*"]
+    risk_tiers_allowed: [ops, documentation, clinical_ds]
+    max_cost_per_case: 0.05
+    data_handling: deidentified_clinical_text
+    note: Haiku tier for extraction and classification.
+  claude-voice:
+    provider: anthropic
+    tier: voice
+    model_id_env: CLAUDE_MODEL_VOICE
+    approved_tasks: ["*"]
+    risk_tiers_allowed: [ops]
+    max_cost_per_case: 0.05
+    data_handling: deidentified_clinical_text
+    note: Latency-sensitive phone agents; operations only (no documentation or clinical decision support).
+  gemini-reasoning:
+    provider: gemini
+    tier: reasoning
+    model_id_env: GEMINI_MODEL_REASONING
+    approved_tasks: ["*"]
+    risk_tiers_allowed: [ops, documentation, clinical_ds]
+    max_cost_per_case: 0.25
+    data_handling: deidentified_clinical_text
+    note: Optional provider (Vertex AI); same approvals as the Claude reasoning tier.
+  gemini-fast:
+    provider: gemini
+    tier: fast
+    model_id_env: GEMINI_MODEL_FAST
+    approved_tasks: ["*"]
+    risk_tiers_allowed: [ops, documentation, clinical_ds]
+    max_cost_per_case: 0.05
+    data_handling: deidentified_clinical_text
+    note: Optional provider (Vertex AI).
+  gemini-voice:
+    provider: gemini
+    tier: voice
+    model_id_env: GEMINI_MODEL_VOICE
+    approved_tasks: ["*"]
+    risk_tiers_allowed: [ops]
+    max_cost_per_case: 0.05
+    data_handling: deidentified_clinical_text
+    note: Optional provider (Vertex AI); operations only.

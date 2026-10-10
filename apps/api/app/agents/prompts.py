@@ -5,8 +5,10 @@ A file starts with the four header lines of 6.6 (`author`, `change_note`,
 section. The version is `<agent_id>@<n>`; the agent registry's `prompt_version`
 points at the one in use, so a rollback is a one-line registry change.
 `{{UNTRUSTED_RULE}}` in the system section is replaced by the runtime's rule for
-untrusted text (app/agents/untrusted.py). The imaging agents keep their prompts
-in code (their `Prompt` constants); the registry records those versions too.
+untrusted text (app/agents/untrusted.py). Since WP10b the embedded (imaging)
+agents' prompts are files too; their modules hold `registered(agent_id)`, which
+follows the registry pointer at call time, so a rollback needs no restart. The
+prompt gate (app/aiops/promptgate.py) checks every header's `eval_run`.
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from functools import cache
 from pathlib import Path
 
 from app.agents.untrusted import UNTRUSTED_RULE
-from app.llm.prompts import Prompt
+from app.llm.prompts import Prompt, RegisteredPrompt, registered  # noqa: F401  (registered: the modules import it here)
 
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 HEADER = ("author", "change_note", "approved_by", "eval_run")
@@ -58,3 +60,16 @@ def _parse(version: str) -> tuple[dict[str, str], str, str]:
 def load(version: str) -> Prompt:
     _, system, template = _parse(version)
     return Prompt(name=version.partition("@")[0], version=version, system=system, template=template)
+
+
+def versions(agent_id: str) -> list[str]:
+    """Every prompt version on file for an agent, oldest first."""
+    folder = PROMPTS_DIR / agent_id
+    numbers = sorted(int(p.stem) for p in folder.glob("*.md") if p.stem.isdigit()) if folder.exists() else []
+    return [f"{agent_id}@{n}" for n in numbers]
+
+
+def text_of(version: str) -> str:
+    """What the model receives from this version (system and template), for the prompt hash."""
+    _, system, template = _parse(version)
+    return f"## system\n{system}\n## template\n{template}"

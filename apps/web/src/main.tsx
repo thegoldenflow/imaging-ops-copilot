@@ -5,7 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-route
 import { canSee, Layout, NAV } from "./components/Layout";
 import { EmptyState, Loading } from "./components/ui";
 import { AgentsPage } from "./features/admin/AgentsPage";
-import { AiUsagePage } from "./features/admin/AiUsagePage";
+import { AiOpsPage } from "./features/ai-ops/AiOpsPage";
 import { AuditPage } from "./features/admin/AuditPage";
 import { BacklogPage } from "./features/backlog/BacklogPage";
 import { CriticalPage } from "./features/critical/CriticalPage";
@@ -32,7 +32,6 @@ import { DocumentationPage } from "./features/documentation/DocumentationPage";
 import { CallCentrePage } from "./features/voice/CallCentrePage";
 import { FollowUpPage } from "./features/voice/FollowUpPage";
 import { PatientPortalPage, PrintPage } from "./features/documentation/PatientPages";
-import { EvalsPage } from "./features/evals/EvalsPage";
 import { ClinicalKnowledgePage } from "./features/clinical-kg/ClinicalKnowledge";
 import { MriSafetyPage } from "./features/mri-safety/MriSafetyPage";
 import { MriQuestionnairePage } from "./features/patient/MriQuestionnairePage";
@@ -113,9 +112,10 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/phipa" element={<Guard path="/phipa"><PhipaPage /></Guard>} />
               <Route path="/inspection" element={<Guard path="/inspection"><InspectionPage /></Guard>} />
               <Route path="/inspection/documents/:docId" element={<Guard path="/inspection"><DocumentPage /></Guard>} />
-              <Route path="/evals" element={<Guard path="/evals"><EvalsPage /></Guard>} />
+              <Route path="/evals" element={<Guard path="/ai-ops"><AiOpsPage defaultTab="imaging" /></Guard>} />
               <Route path="/agents" element={<Guard path="/agents"><AgentsPage /></Guard>} />
-              <Route path="/ai-usage" element={<Guard path="/ai-usage"><AiUsagePage /></Guard>} />
+              <Route path="/ai-usage" element={<Guard path="/ai-ops"><AiOpsPage defaultTab="calls" /></Guard>} />
+              <Route path="/ai-ops" element={<Guard path="/ai-ops"><AiOpsPage /></Guard>} />
               <Route path="/audit" element={<Guard path="/audit"><AuditPage /></Guard>} />
               <Route path="/break-glass-review" element={<Guard path="/break-glass-review"><BreakGlassReviewPage /></Guard>} />
               <Route path="/control-tower" element={<Guard path="/control-tower"><ControlTowerPage /></Guard>} />

@@ -567,10 +567,13 @@ def test_low_confidence_output_is_corrected_added_as_an_eval_case_and_the_regres
             assert case["source"] == "human_review" and case["id"] == f"hr-{result.run_id.lower()}"
             assert case["expected"] == {"category": "administrative", "urgency": result.urgency}
             assert case["model_output"]["category"] == "other"
-            report = __import__("json").loads((tmp_path / "patient_message_triage" / "report.json").read_text("utf-8"))
-            assert report["cases"] == authored + 1 and any(r["id"] == case["id"] for r in report["results"])
             final = reviews.get(review.id)
             assert final.status == "learned" and final.case_id == case["id"] and final.regression["cases"] == authored + 1
+            # the regression ran through the one eval runner (6.6): a run file next to the eval set
+            run = __import__("json").loads((tmp_path / "runs" / f"{final.regression['run_id']}.json").read_text("utf-8"))
+            entry = run["agents"]["patient_message_triage"]
+            assert run["trigger"] == f"regression:{result.run_id}" and entry["metrics"]["cases"] == authored + 1
+            assert any(c["id"] == case["id"] and c["source"] == "human_review" for c in entry["case_results"])
             from app.agents import trace as traces
 
             assert traces.get(result.run_id).human_action["decision"] == "corrected"

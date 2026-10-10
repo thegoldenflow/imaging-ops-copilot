@@ -1,0 +1,404 @@
+{
+ "run_id": "run-2026-10-10T043241",
+ "started_at": "2026-10-10T04:32:41",
+ "finished_at": "2026-10-10T04:32:44",
+ "mode": "mock",
+ "baseline": true,
+ "trigger": "cli",
+ "requested": [
+  "patient_message_triage"
+ ],
+ "variant": {
+  "agent": "patient_message_triage",
+  "prompt_version": "patient_message_triage@2"
+ },
+ "git": {
+  "commit": "a04ca7b",
+  "dirty": true
+ },
+ "agents": {
+  "patient_message_triage": {
+   "suite": "patient_message_triage",
+   "suite_kind": "builtin",
+   "suite_title": "Patient message triage (WP4b reference agent)",
+   "source": "evals/patient_message_triage/cases.jsonl",
+   "agent_version": "0.1.0",
+   "kind": "runtime_agent",
+   "risk_tier": "ops",
+   "prompt_version": "patient_message_triage@2",
+   "prompt_sha256": "bde7338e781250fd",
+   "model": "claude-haiku-4-5",
+   "model_key": "claude-fast",
+   "mode": "mock",
+   "variant": {
+    "prompt_version": "patient_message_triage@2"
+   },
+   "threshold": 0.9,
+   "pipeline_eval": false,
+   "metrics": {
+    "schema_validity": 1.0,
+    "grounding_rate": null,
+    "task_success": 0.8333,
+    "human_override_rate": null,
+    "latency_p50_ms": 16,
+    "latency_p95_ms": 31,
+    "cost_per_case_usd": 0.000476,
+    "cost_estimated": true,
+    "cases": 12,
+    "cases_passed": 10,
+    "model_calls": 12,
+    "tokens_in": 1478,
+    "tokens_out": 846,
+    "human_decisions": 0
+   },
+   "extra": {
+    "accuracy": 0.8333
+   },
+   "gates": {
+    "cost_per_case": {
+     "value": 0.000476,
+     "threshold": 0.05,
+     "passed": true
+    }
+   },
+   "notes": "Category and urgency (after the rule layer) of synthetic patient messages; cases from human review are appended by the low-confidence workflow.",
+   "module_run_at": null,
+   "case_results": [
+    {
+     "id": "authored-chest-pain",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 171,
+     "cost_usd": 0.000473,
+     "expected": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "got": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "run_ids": [
+      "RUN-02127"
+     ]
+    },
+    {
+     "id": "authored-reschedule",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 14,
+     "cost_usd": 0.00045,
+     "expected": {
+      "category": "scheduling",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "scheduling",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-02128"
+     ]
+    },
+    {
+     "id": "authored-work-form",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.000471,
+     "expected": {
+      "category": "administrative",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "administrative",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-02129"
+     ]
+    },
+    {
+     "id": "authored-wound",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 16,
+     "cost_usd": 0.000437,
+     "expected": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "got": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "run_ids": [
+      "RUN-02130"
+     ]
+    },
+    {
+     "id": "authored-visiting",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 31,
+     "cost_usd": 0.00046,
+     "expected": {
+      "category": "scheduling",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "scheduling",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-02131"
+     ]
+    },
+    {
+     "id": "authored-fall",
+     "source": "authored",
+     "passed": false,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 31,
+     "cost_usd": 0.000443,
+     "expected": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "got": {
+      "category": "other",
+      "urgency": "urgent"
+     },
+     "run_ids": [
+      "RUN-02132"
+     ],
+     "traces": [
+      {
+       "run_id": "RUN-02132",
+       "agent_id": "patient_message_triage",
+       "agent_version": "0.1.0",
+       "kind": "call",
+       "mode": "mock",
+       "model": "claude-haiku-4-5",
+       "prompt_version": "patient_message_triage@2",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": null,
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-02395",
+         "agent_id": "patient_message_triage",
+         "model": "claude-haiku-4-5",
+         "prompt_version": "patient_message_triage@2",
+         "status": "ok",
+         "tokens_in": 123,
+         "tokens_out": 64,
+         "cost_usd": 0.0,
+         "latency_ms": 31
+        }
+       ],
+       "tool_calls": [],
+       "output_refs": [
+        "LlmCall/LLM-02395"
+       ],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 123,
+       "tokens_out": 64,
+       "cost_usd": 0.0,
+       "provenance_id": null,
+       "started_at": "2026-10-10T04:32:43.721121",
+       "finished_at": "2026-10-10T04:32:44.016757"
+      }
+     ]
+    },
+    {
+     "id": "authored-parking",
+     "source": "authored",
+     "passed": false,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 31,
+     "cost_usd": 0.000458,
+     "expected": {
+      "category": "other",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "administrative",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-02133"
+     ],
+     "traces": [
+      {
+       "run_id": "RUN-02133",
+       "agent_id": "patient_message_triage",
+       "agent_version": "0.1.0",
+       "kind": "call",
+       "mode": "mock",
+       "model": "claude-haiku-4-5",
+       "prompt_version": "patient_message_triage@2",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": null,
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-02396",
+         "agent_id": "patient_message_triage",
+         "model": "claude-haiku-4-5",
+         "prompt_version": "patient_message_triage@2",
+         "status": "ok",
+         "tokens_in": 123,
+         "tokens_out": 67,
+         "cost_usd": 0.0,
+         "latency_ms": 31
+        }
+       ],
+       "tool_calls": [],
+       "output_refs": [
+        "LlmCall/LLM-02396"
+       ],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 123,
+       "tokens_out": 67,
+       "cost_usd": 0.0,
+       "provenance_id": null,
+       "started_at": "2026-10-10T04:32:44.059308",
+       "finished_at": "2026-10-10T04:32:44.151897"
+      }
+     ]
+    },
+    {
+     "id": "authored-fever-zh",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 16,
+     "cost_usd": 0.000614,
+     "expected": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "got": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "run_ids": [
+      "RUN-02134"
+     ]
+    },
+    {
+     "id": "authored-thanks",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 14,
+     "cost_usd": 0.00046,
+     "expected": {
+      "category": "other",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "other",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-02135"
+     ]
+    },
+    {
+     "id": "authored-bill",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 16,
+     "cost_usd": 0.000458,
+     "expected": {
+      "category": "administrative",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "administrative",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-02136"
+     ]
+    },
+    {
+     "id": "authored-pills",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 14,
+     "cost_usd": 0.000427,
+     "expected": {
+      "category": "clinical",
+      "urgency": "soon"
+     },
+     "got": {
+      "category": "clinical",
+      "urgency": "soon"
+     },
+     "run_ids": [
+      "RUN-02137"
+     ]
+    },
+    {
+     "id": "authored-followup-zh",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 16,
+     "cost_usd": 0.000557,
+     "expected": {
+      "category": "scheduling",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "scheduling",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-02138"
+     ]
+    }
+   ],
+   "status": "below",
+   "met": false,
+   "seconds": 1.8,
+   "eval_status": null
+  }
+ },
+ "platform": {},
+ "note": "Mock model: a baseline that shows the pipeline (context, schema, guards, evidence), not a model's quality; mock costs are list-price estimates."
+}

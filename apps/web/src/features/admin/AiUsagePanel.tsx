@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, EmptyState, ErrorState, Loading, PageHeader, Stat, Badge } from "../../components/ui";
+import { Card, EmptyState, ErrorState, Loading, Stat, Badge } from "../../components/ui";
 import { api } from "../../lib/api";
 import { dateTime, pct } from "../../lib/format";
 import { llmVendor } from "../../lib/llm";
@@ -36,7 +36,8 @@ const OUTCOME_TONE: Record<string, "green" | "amber" | "red"> = {
   unavailable: "red",
 };
 
-export function AiUsagePage() {
+/** The LLM call log by feature (the AI usage page before WP10b), now the "Model calls" tab of AI Ops. */
+export function AiUsagePanel() {
   const usage = useQuery({
     queryKey: ["ai-usage"],
     queryFn: () => api<{ mode: string; tasks: TaskRow[]; recent: Call[] }>("/api/admin/ai-usage"),
@@ -50,10 +51,7 @@ export function AiUsagePage() {
 
   return (
     <div>
-      <PageHeader
-        title="AI usage"
-        subtitle="Every AI call (Claude or Gemini) goes through one gateway: de-identified input, schema-checked output, logged without PHI."
-      />
+      <p className="mb-3 text-sm text-slate-500">Every AI call (Claude or Gemini) goes through one gateway: de-identified input, schema-checked output, logged without PHI.</p>
       {usage.isLoading && <Loading />}
       {usage.error && <ErrorState error={usage.error} onRetry={() => usage.refetch()} />}
       {usage.data && (

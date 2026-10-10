@@ -1,6 +1,6 @@
 {
  "task": "referral_summary",
- "run_at": "2026-10-07T00:39:01",
+ "run_at": "2026-10-10T04:30:20",
  "mode": "mock",
  "model": "rule-based baseline",
  "n": 3,
@@ -11,6 +11,6 @@
   "failed_calls": 0
  },
  "errors": [],
- "seconds": 4.0,
+ "seconds": 14.6,
  "notes": "Weekly summary drafted for three synthetic data sets. Every number must be a fact filled in by the server; drafts with their own digits fail validation."
 }

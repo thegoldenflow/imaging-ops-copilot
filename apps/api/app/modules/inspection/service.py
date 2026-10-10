@@ -24,7 +24,7 @@ from pydantic import BaseModel, model_validator
 from app.core.models import MessageOutbox, Modality, Role
 from app.core.store import Store
 from app.llm.gateway import get_gateway
-from app.llm.prompts import Prompt
+from app.agents.prompts import registered
 from app.llm.providers import mock_fixture
 from app.modules.inspection.policies import POLICIES
 
@@ -282,17 +282,7 @@ class QaOutput(BaseModel):
         return self
 
 
-QA_PROMPT = Prompt(
-    name="policy_qa",
-    version="policy_qa@1",
-    system=(
-        "You answer staff questions about clinic policies using only the policy excerpts provided. Each excerpt has an id "
-        "in square brackets. Cite every statement with the excerpt id and an exact quote copied from that excerpt. "
-        "If the excerpts do not answer the question, set found to false, say that the documents do not cover it, and "
-        "give no citations. Do not use outside knowledge."
-    ),
-    template="Question: {question}\n\nExcerpts:\n{excerpts}",
-)
+QA_PROMPT = registered("policy_qa")
 
 
 @mock_fixture("policy_qa")

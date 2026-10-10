@@ -23,3 +23,5 @@ eval_status:
   run_id: evals/deid/report.json@2026-10-08T20:24:59
   note: Pipeline gate recall >= 0.98, precision >= 0.90 met (0.993 / 0.999); synthetic notes, mock second pass.
 deployment_status: demo
+# Release gate (6.6): the share of eval cases that must succeed: share of notes with no leak and no wrong redaction; the span recall and precision gates apply too.
+eval_threshold: 0.9

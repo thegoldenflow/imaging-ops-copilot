@@ -23,6 +23,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
+from app.agents import models as agent_models
 from app.agents import registry as agent_registry
 from app.agents import trace as agent_trace
 from app.core.config import settings
@@ -54,6 +55,13 @@ PRICES = {
 }
 
 Tier = Literal["reasoning", "fast", "voice"]
+
+
+class _TierPolicy:
+    """A model_policy with just a tier (for `model_for`)."""
+
+    def __init__(self, tier: str) -> None:
+        self.model_policy = type("P", (), {"tier": tier, "model": None})()
 
 
 class LlmOutcome(BaseModel):
@@ -91,19 +99,34 @@ class LlmGateway:
         return self.provider.mode
 
     def model_for(self, tier: Tier) -> str:
+        """The id of the registered model of this provider and tier (config/models.yaml; the id itself comes from
+        the environment)."""
+        entry = agent_models.resolve(_TierPolicy(tier), self.mode)
+        if entry is not None:
+            return entry.id_from(settings)
         if self.mode == "gemini":
             return {"reasoning": settings.gemini_model_reasoning, "fast": settings.gemini_model_fast,
                     "voice": settings.gemini_model_voice}[tier]
         return {"reasoning": settings.model_reasoning, "fast": settings.model_fast, "voice": settings.model_voice}[tier]
 
-    @staticmethod
-    def _agent(task: str, prompt: Prompt):
-        """The task's registry entry and, when the call may not go ahead, why (UnregisteredAgent if none)."""
+    def model_for_agent(self, spec) -> str | None:
+        """The model an agent's model_policy names in the model registry for this provider (None: none registered)."""
+        entry = agent_models.resolve(spec, self.mode)
+        return entry.id_from(settings) if entry is not None else None
+
+    def _agent(self, task: str, prompt: Prompt):
+        """The task's registry entry, its model and, when the call may not go ahead, why (UnregisteredAgent if
+        none)."""
         spec = agent_registry.require_agent(task)
         refusal = agent_registry.gate(spec)
         if refusal is None and spec.prompt_version and spec.prompt_version != prompt.version:
             refusal = f"prompt {prompt.version} is not the registered prompt {spec.prompt_version} of {spec.label}"
-        return spec, refusal
+        model = self.model_for_agent(spec)
+        if model is None:
+            model = self.model_for(spec.model_policy.tier)
+            refusal = refusal or (f"{spec.label}: no {agent_models.provider_of(self.mode)} model in config/models.yaml "
+                                  f"for its model_policy")
+        return spec, model, refusal
 
     @staticmethod
     def _trace(spec, call: LlmCall, input_refs: list[str]) -> str | None:
@@ -178,8 +201,7 @@ class LlmGateway:
         dates of a resource), and re-identifies the output with the same map.
 
         `tier` is superseded by the agent registry's model_policy (the registry is the source of truth)."""
-        spec, refusal = self._agent(task, prompt)
-        model = self.model_for(spec.model_policy.tier)
+        spec, model, refusal = self._agent(task, prompt)
         refs = list(input_refs or []) + [f"Patient/{p.id}" for p in patients or []]
         flags = {"agent_version": spec.version, "eval_status": spec.eval_status.status, "evaluated": spec.evaluated}
 
@@ -244,8 +266,7 @@ class LlmGateway:
         `messages`; this logs the call and re-raises ProviderUnavailable/Refusal (a call the
         agent registry refuses raises ProviderUnavailable, so the caller falls back the same way).
         The tool calls the model asks for go through the Tool Gateway (app/agents/gateway.py)."""
-        spec, refusal = self._agent(task, prompt)
-        model = self.model_for(spec.model_policy.tier)
+        spec, model, refusal = self._agent(task, prompt)
         started = time.monotonic()
         if refusal is not None:
             call = self._log(task=task, model=model, prompt=prompt, text="", started=started, outcome="refused",

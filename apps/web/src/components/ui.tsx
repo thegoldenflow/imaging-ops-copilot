@@ -99,9 +99,9 @@ function NotEvaluated({ agent }: { agent: string }) {
       title={`${spec.agent_id} ${spec.version} has not passed its evaluation (${spec.eval_status.status}); it runs in demo mode only`}
       data-testid={`not-evaluated-${agent}`}
     >
-      <Badge tone="amber">
+      <Badge tone={spec.eval_status.status === "failed" ? "red" : "amber"}>
         <FlaskConical className="size-3" />
-        Not evaluated
+        {spec.eval_status.status === "failed" ? "Eval failed" : "Not evaluated"}
       </Badge>
     </span>
   );

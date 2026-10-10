@@ -25,7 +25,7 @@ from pydantic import BaseModel, model_validator
 from app.core.models import Patient
 from app.core.store import Store
 from app.llm.gateway import get_gateway
-from app.llm.prompts import Prompt
+from app.agents.prompts import registered
 from app.llm.providers import mock_fixture
 from app.modules.clinical_kg.glossary import english_names, glossary, norm
 from app.modules.clinical_kg.graph import LIST_RELATIONS, RELATION_LABELS, RELATIONS, Fact, Graph, get_graph
@@ -171,20 +171,7 @@ class ParseOutput(BaseModel):
     entities: list[Entity]
 
 
-PARSE_PROMPT = Prompt(
-    name="clinical_kg_parse",
-    version="clinical_kg_parse@1",
-    system=(
-        "You turn a clinician's question into a lookup in a Chinese medical knowledge graph. The graph links diseases "
-        "to symptoms (symptom), tests and exams (check), drugs (drug), treatments (treat), complications (acompany), "
-        "causes (cause) and affected groups (people). List every medical term in the question as an entity with its "
-        "standard Simplified Chinese medical name and kind (disease, symptom, check, drug or treat). intent is "
-        "disease_facts when the question asks about named diseases, symptoms_to_diseases when it gives symptoms or "
-        "findings and asks which diseases fit, otherwise unsupported. relations are the relations the question asks "
-        "for (empty for all). language is the language of the question. Do not answer the question."
-    ),
-    template="Question: {question}",
-)
+PARSE_PROMPT = registered("clinical_kg_parse")
 
 
 @mock_fixture("clinical_kg_parse")
@@ -256,19 +243,7 @@ class AnswerOutput(BaseModel):
         return self
 
 
-ANSWER_PROMPT = Prompt(
-    name="clinical_kg_answer",
-    version="clinical_kg_answer@1",
-    system=(
-        "You answer a clinician's question using only the knowledge-graph facts provided. Each fact line is "
-        "[fact id] disease | relation | value, in Chinese. Write short statements in the answer language; every "
-        "statement lists the ids of the facts it relies on. Add nothing that is not in the facts: no doses, no "
-        "advice, no ranking by likelihood beyond the number of matching symptoms given. In English, write each "
-        "Chinese term in English followed by the Chinese in parentheses. If the facts do not answer the question, set "
-        "found to false and give no statements. This is reference material for staff, not a diagnosis."
-    ),
-    template="Question: {question}\nAnswer language: {language}\nLookup: {lookup}\n\nFacts:\n{facts}",
-)
+ANSWER_PROMPT = registered("clinical_kg_answer")
 
 
 def _en(name: str) -> str | None:

@@ -24,3 +24,5 @@ eval_status:
   run_id: evals/results/extraction.json@2026-10-06T22:35:04
   note: Mock baseline only (rule-based stand-in for the model); no release threshold set yet (6.6).
 deployment_status: demo
+# Release gate (6.6): the share of eval cases that must succeed: a case passes only with all six fields right (field accuracy is reported as an extra).
+eval_threshold: 0.75

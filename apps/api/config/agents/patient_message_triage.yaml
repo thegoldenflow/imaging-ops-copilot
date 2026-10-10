@@ -36,3 +36,6 @@ eval_status:
 deployment_status: demo
 entrypoint: app.agents.library.patient_message_triage
 confidence_threshold: 0.7
+# Release gate (6.6): the share of eval cases that must succeed: category and urgency after the rule layer; 0.9 because
+# a patient's message about a red flag must not be filed as non-clinical (at most one miss in ten).
+eval_threshold: 0.9

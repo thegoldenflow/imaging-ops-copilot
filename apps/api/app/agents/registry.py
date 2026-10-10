@@ -25,6 +25,11 @@ Loading an unregistered agent raises `UnregisteredAgent`. `gate()` applies the
 release rule: in `APP_MODE=prod` an agent runs only with eval_status passed and
 deployment_status prod_ready; in demo mode an agent that has not passed runs and
 its output carries a "not evaluated" flag.
+
+Since WP10b (6.6) an agent's eval_status is derived from its latest eval run in
+`evals/runs/` against its `eval_threshold` (app/aiops/release.py); the YAML's
+`eval_status` is the value before the first run. `model_policy` must resolve to a
+registered model (config/models.yaml, app/agents/models.py).
 """
 
 from __future__ import annotations
@@ -40,7 +45,7 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from app.agents import jsonschema
+from app.agents import jsonschema, models
 from app.core.config import settings
 
 CONFIG = Path(__file__).resolve().parents[2] / "config"
@@ -88,6 +93,8 @@ class DataScope(_Strict):
 
 class ModelPolicy(_Strict):
     tier: Literal["reasoning", "fast", "voice"]  # model id from CLAUDE_MODEL_* / GEMINI_MODEL_* (never in the registry)
+    # a registered model (config/models.yaml) by name instead of the tier's model; None: the tier decides
+    model: str | None = None
     max_tokens: int = Field(ge=1, le=64000)
     # None: provider default, nothing sent (Claude Sonnet 5.5 refuses non-default sampling values)
     temperature_max: float | None = Field(default=None, ge=0, le=1)
@@ -97,6 +104,13 @@ class EvalStatus(_Strict):
     status: Literal["pending", "passed", "failed", "not_applicable"]
     run_id: str | None = None
     note: str = ""
+    # Filled by the release gate (app/aiops/release.py) from the latest eval run; the YAML value is the status
+    # before the agent's first run.
+    source: Literal["registry", "run"] = "registry"
+    task_success: float | None = None
+    threshold: float | None = None
+    mode: str | None = None
+    run_at: str | None = None
 
 
 class AgentSpec(_Strict):
@@ -117,6 +131,8 @@ class AgentSpec(_Strict):
     deployment_status: Literal["dev", "demo", "prod_ready"]
     entrypoint: str | None = None  # runtime agents: the module with the agent's code
     confidence_threshold: float | None = Field(default=None, ge=0, le=1)  # below it a person reviews (6.5)
+    # the release gate's bar (6.6): the share of eval cases that must succeed (None: the platform default)
+    eval_threshold: float | None = Field(default=None, ge=0, le=1)
 
     @model_validator(mode="after")
     def _consistent(self) -> AgentSpec:
@@ -277,6 +293,8 @@ def _cross_check(agents: dict[str, AgentSpec], tools: dict[str, ToolSpec]) -> No
                 raise RegistryError(f"{spec.agent_id}: {tool_id} is approved by the signers, and there are none")
         if spec.kind == "runtime_agent" and spec.deployment_status != "dev" and not spec.entrypoint:
             raise RegistryError(f"{spec.agent_id}: a runtime agent past dev needs its entrypoint")
+        if found := models.problems(spec):  # model_policy may name registered models only (6.6)
+            raise RegistryError("; ".join(found))
 
 
 @cache
@@ -294,10 +312,18 @@ _mode_override: list[str] = []
 
 def reload() -> None:
     _load.cache_clear()
+    models.reload()
+
+
+def _released(spec: AgentSpec | None) -> AgentSpec | None:
+    """A YAML entry with the eval_status of its latest eval run (the release gate, app/aiops/release.py)."""
+    from app.aiops import release
+
+    return release.effective(spec)
 
 
 def agents() -> dict[str, AgentSpec]:
-    out = dict(_load().agents)
+    out = {name: _released(spec) for name, spec in _load().agents.items()}
     for name, value in _agent_overrides.items():
         if value is None:
             out.pop(name, None)
@@ -311,7 +337,7 @@ def agent(agent_id: str | None) -> AgentSpec | None:
         return None
     if agent_id in _agent_overrides:
         return _agent_overrides[agent_id]
-    return _load().agents.get(agent_id)
+    return _released(_load().agents.get(agent_id))
 
 
 def require_agent(agent_id: str) -> AgentSpec:

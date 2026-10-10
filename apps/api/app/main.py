@@ -62,6 +62,8 @@ from app.modules.scheduling.router import router as scheduling_router
 from app.modules.voice_services import followup as voice_followup
 from app.modules.voice_services.router import router as voice_router
 from app.workflows import bridge as workflow_bridge
+from app.aiops import alerts as aiops_alerts
+from app.aiops.router import router as aiops_router
 from app.workflows.router import router as workflows_router
 
 logging.basicConfig(level=logging.INFO, format='{"level":"%(levelname)s","logger":"%(name)s","msg":"%(message)s"}')
@@ -169,6 +171,14 @@ async def _narrator_loop() -> None:
         await asyncio.to_thread(_step, "documentation intake", documentation.intake_step)
 
 
+async def _aiops_loop() -> None:
+    """Compares today's trace aggregates with the AI Ops alert thresholds (config/alerts.yaml, 6.6) every minute;
+    a breach opens one admin Task per alert, scope and day."""
+    while True:
+        await asyncio.sleep(60)
+        await asyncio.to_thread(_step, "ai ops alerts", aiops_alerts.check)
+
+
 @contextlib.asynccontextmanager
 async def lifespan(_: FastAPI):
     # Requests copy thousands of cached rows; with the default thresholds the cyclic GC keeps
@@ -176,7 +186,7 @@ async def lifespan(_: FastAPI):
     gc.set_threshold(50_000, 50, 100)
     await asyncio.to_thread(init_db)  # migrate; generate the demo data on first start
     workflow_bridge.install()  # domain events -> Temporal (only with TEMPORAL_ADDRESS)
-    loops = [_dispatch_loop, _intake_loop, _hospital_loop, _narrator_loop]
+    loops = [_dispatch_loop, _intake_loop, _hospital_loop, _narrator_loop, _aiops_loop]
     if settings.temporal_address:
         loops.append(_workflow_loop)
         if settings.temporal_worker_in_api:
@@ -227,6 +237,7 @@ app.include_router(workflows_router)
 app.include_router(med_safety_router)
 app.include_router(documentation_router)
 app.include_router(voice_router)
+app.include_router(aiops_router)
 
 
 @app.exception_handler(FhirAccessDenied)

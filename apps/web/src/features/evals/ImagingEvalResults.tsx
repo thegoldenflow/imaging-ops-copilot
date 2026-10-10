@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Badge, Card, EmptyState, ErrorState, Loading, PageHeader } from "../../components/ui";
+import { Badge, Card, EmptyState, ErrorState, Loading } from "../../components/ui";
 import { api } from "../../lib/api";
 import { dateTime, pct } from "../../lib/format";
 import { llmVendor } from "../../lib/llm";
@@ -17,11 +17,13 @@ const TITLES: Record<string, string> = {
   clinical_kg: "Clinical knowledge Q&A · 30 questions in English and Chinese",
 };
 
-export function EvalsPage() {
+/** The imaging suites' own result files (evals/results, the AI evaluations page before WP10b): the one runner
+ * refreshes them; now the "Imaging reports" tab of AI Ops. */
+export function ImagingEvalResults() {
   const q = useQuery({ queryKey: ["evals"], queryFn: () => api<{ results: Record<string, Result>; command: string; live_triage_agreement: { reviewed: number; agreement: number | null } }>("/api/evals") });
   return (
-    <div className="mx-auto max-w-5xl">
-      <PageHeader title="AI evaluations" subtitle="Each AI feature has a synthetic eval set that runs with one command and writes results to evals/results." />
+    <div>
+      <p className="mb-3 text-sm text-slate-500">The imaging features' own reports (evals/results), refreshed by the one runner (app.aiops.evalrun) or by their original command.</p>
       {q.isLoading && <Loading />}
       {q.error && <ErrorState error={q.error} onRetry={() => q.refetch()} />}
       {q.data && (

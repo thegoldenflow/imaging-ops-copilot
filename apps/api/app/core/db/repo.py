@@ -401,6 +401,18 @@ class EntityTable(Generic[T]):
             condition = m.table.c[field] == value
         return [o for o in self._adopt(self._select(condition).all()) if match(o)]
 
+    def since(self, column: str, start: Any) -> list[T]:
+        """Rows whose (indexed) column is at or after `start`, without loading the whole table (AI Ops windows)."""
+        def keep(obj: T) -> bool:
+            value = getattr(obj, column)
+            return value is not None and value >= start
+
+        if self._complete or self._store.detached:
+            return [o for o in self._map.values() if keep(o)]
+        self.flush()
+        table = self._codec.m.table
+        return [o for o in self._adopt(self._select(table.c[column] >= start).all()) if keep(o)]
+
     def claim_due(self, column: str, now: datetime, statuses: tuple[str, ...] | None = None) -> list[T]:
         """Rows due at `now` (column <= now, optional status filter), locked for this unit of work.
 

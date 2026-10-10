@@ -50,3 +50,5 @@ eval_status:
     The spec''s human rating of narrative accuracy (>= 4/5) has not been done, so the status stays pending.'
 deployment_status: demo
 entrypoint: app.modules.control_tower.agent
+# Release gate (6.6): the share of eval cases that must succeed: schema-valid, evidence resolvable and accepted by the guards.
+eval_threshold: 0.9

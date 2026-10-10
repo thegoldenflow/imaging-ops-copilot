@@ -571,16 +571,26 @@ def review_append_case(args: dict) -> dict:
 
 @step_activity("review.triggerRegression", "triggerRegression")
 def review_regression(args: dict) -> dict:
-    """The agent's eval over all its cases; heartbeats per case (a long run on a live model)."""
+    """The agent's eval over all its cases through the one eval runner (6.6): a run file in evals/runs, from which
+    the release gate derives the agent's eval_status; heartbeats per case (a long run on a live model)."""
+    from app.aiops import evalrun
+
     review = _review(args["review_id"])
     if not evalsets.supported(review.agent_id):
         return {"not_applicable": f"{review.agent_id} has no eval set yet"}
-    report = evalsets.regression(review.agent_id, heartbeat=lambda progress_: activity.heartbeat(progress_))
-    summary = {k: report[k] for k in ("cases", "passed", "accuracy", "gate", "status", "run_at", "mode")}
+    record = evalrun.run([review.agent_id], store=get_store(), platform=False, trigger=f"regression:{review.run_id}",
+                         progress=lambda _msg: None, on_case=lambda case: activity.heartbeat({"case": case}))
+    entry = record["agents"][review.agent_id]
+    m = entry.get("metrics") or {}
+    summary = {"cases": m.get("cases"), "passed": m.get("cases_passed"), "accuracy": m.get("task_success"),
+               "gate": entry.get("threshold"), "status": "passed" if entry.get("met") else "failed",
+               "run_at": record["started_at"], "mode": record["mode"], "run_id": record["run_id"],
+               "eval_status": entry.get("eval_status")}
     reviews.save(_review(args["review_id"]).model_copy(update=dict(regression=summary)))
-    return {**summary, "detail": f"{report['passed']} of {report['cases']} cases pass (accuracy {report['accuracy']}, "
-                                 f"gate {report['gate']}): {report['status']}",
-            "refs": [f"evals/{review.agent_id}/report.md"]}
+    return {**summary, "detail": f"{summary['passed']} of {summary['cases']} cases pass (task_success "
+                                 f"{summary['accuracy']}, threshold {summary['gate']}): {summary['status']}; "
+                                 f"run {record['run_id']}, eval_status {entry.get('eval_status')}",
+            "refs": [f"evals/runs/{record['run_id']}.json"]}
 
 
 ACTIVITIES = [record_progress, open_task, close_tasks, journey_context, triage_assist, order_review,

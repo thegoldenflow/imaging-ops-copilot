@@ -352,13 +352,13 @@ def persist(src: Store, into: Store) -> None:
     into.touch()
 
 
-def build_store(seed: int | None = None) -> Store:
-    """The demo data set, generated in memory (detached)."""
+def build_store(seed: int | None = None, *, hospital: bool = True) -> Store:
+    """The demo data set, generated in memory (detached); `hospital=False`: the imaging data only."""
     from app.seed import populate
 
     store = Store()
     with use_store(store):
-        populate(store, seed)
+        populate(store, seed, hospital=hospital)
     return store
 
 

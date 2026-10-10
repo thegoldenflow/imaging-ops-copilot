@@ -61,3 +61,5 @@ eval_status:
 deployment_status: demo
 entrypoint: app.modules.med_safety.review_agent
 confidence_threshold: 0.7
+# Release gate (6.6): the share of eval cases that must succeed: flagged concern types equal the labels; precision and recall gates apply too.
+eval_threshold: 0.8

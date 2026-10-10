@@ -1,0 +1,32 @@
+# AI Ops alerts (docs/SPEC-hospital.md 6.6; checked by app/aiops/alerts.py in the API's background loop every
+# minute and on request from the AI Ops page). A breach opens one admin Task per alert, scope and day.
+#
+# metric: a total of app/aiops/observe.py for today (cost_usd, failure_rate, schema_failures, timeouts, ...)
+# per:    agent | model | unit | hospital (the whole hospital's total)
+# op:     ">" or ">="; min_requests: below this many runs a rate is not judged
+#
+# DEMO VALUES: the thresholds are set low so the alerts can be triggered in the demo (mock calls are priced at the
+# model's list price, app/aiops/cost.py). A real deployment sets them from the budget and the agents' baselines.
+alerts:
+- id: agent_daily_cost
+  title: An agent's cost today is above its daily budget
+  metric: cost_usd
+  per: agent
+  op: ">"
+  threshold: 0.01
+  priority: urgent
+- id: hospital_daily_cost
+  title: The hospital's AI cost today is above the daily budget
+  metric: cost_usd
+  per: hospital
+  op: ">"
+  threshold: 0.05
+  priority: urgent
+- id: agent_failure_rate
+  title: An agent's failure rate today is above the limit
+  metric: failure_rate
+  per: agent
+  op: ">"
+  threshold: 0.5
+  min_requests: 5
+  priority: routine

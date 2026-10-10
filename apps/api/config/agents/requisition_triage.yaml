@@ -24,3 +24,5 @@ eval_status:
   run_id: evals/results/triage.json@2026-10-06T22:35:05
   note: Mock baseline only (rule-based stand-in for the model); no release threshold set yet (6.6).
 deployment_status: demo
+# Release gate (6.6): the share of eval cases that must succeed: exact priority agreement.
+eval_threshold: 0.85

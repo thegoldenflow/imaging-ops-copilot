@@ -1,6 +1,6 @@
 {
  "task": "implants",
- "run_at": "2026-10-06T22:35:05",
+ "run_at": "2026-10-10T04:28:08",
  "mode": "mock",
  "model": "rule-based baseline",
  "n": 30,
@@ -23,6 +23,6 @@
    "got": []
   }
  ],
- "seconds": 0.0,
+ "seconds": 0.6,
  "notes": "Exact match of device categories per answer, across English, French, Chinese and Punjabi."
 }

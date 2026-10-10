@@ -37,3 +37,5 @@ eval_status:
   note: mock baseline in evals/documentation (30 cases); a live-model run and the human rating are outstanding
 deployment_status: demo
 entrypoint: app.modules.documentation.instructions_agent
+# Release gate (6.6): the share of eval cases that must succeed: no red item, grade 8 or below, plain Chinese.
+eval_threshold: 0.9

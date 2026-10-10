@@ -23,3 +23,5 @@ eval_status:
   run_id: evals/results/policy_qa.json@2026-10-07T00:39:14
   note: Mock baseline only (rule-based stand-in for the model); no release threshold set yet (6.6).
 deployment_status: demo
+# Release gate (6.6): the share of eval cases that must succeed: right citation, or saying the documents do not cover it.
+eval_threshold: 0.8

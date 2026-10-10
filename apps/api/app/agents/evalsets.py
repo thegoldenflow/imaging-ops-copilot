@@ -130,6 +130,7 @@ def regression(agent_id: str, *, heartbeat: Callable[[dict], None] | None = None
     """Every case through the agent's current prompt (LLM gateway, mock or live), judged field by field."""
     from app.agents import registry
     from app.agents.prompts import load as load_prompt
+    from app.aiops.collect import mark
     from app.llm.deid import Pseudonymizer
     from app.llm.gateway import get_gateway
 
@@ -142,6 +143,7 @@ def regression(agent_id: str, *, heartbeat: Callable[[dict], None] | None = None
     results = []
     cases = load(agent_id)
     for i, case in enumerate(cases, 1):
+        mark(case["id"])
         outcome = get_gateway().structured(task=agent_id, prompt=prompt, variables=case["input"], schema_cls=schema,
                                            pseudonymizer=Pseudonymizer())
         if outcome.status == "ok":

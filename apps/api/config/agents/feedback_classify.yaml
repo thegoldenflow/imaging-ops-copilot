@@ -25,3 +25,5 @@ eval_status:
   run_id: evals/results/feedback.json@2026-10-07T00:23:49
   note: Mock baseline only (rule-based stand-in for the model); no release threshold set yet (6.6).
 deployment_status: demo
+# Release gate (6.6): the share of eval cases that must succeed: a case passes only with the sentiment and the exact theme set (theme F1 is an extra).
+eval_threshold: 0.75

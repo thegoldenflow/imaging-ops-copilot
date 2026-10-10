@@ -55,3 +55,5 @@ eval_status:
 deployment_status: demo
 entrypoint: app.modules.med_safety.medrec_agent
 confidence_threshold: 0.7
+# Release gate (6.6): the share of eval cases that must succeed: every row of the reconciliation typed as labelled.
+eval_threshold: 0.9

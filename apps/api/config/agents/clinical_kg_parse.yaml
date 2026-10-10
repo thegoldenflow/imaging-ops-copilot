@@ -26,3 +26,5 @@ eval_status:
   run_id: evals/results/clinical_kg.json@2026-10-07T05:40:40
   note: Mock baseline only (rule-based stand-in for the model); no release threshold set yet (6.6).
 deployment_status: demo
+# Release gate (6.6): the share of eval cases that must succeed: entities aligned and intent right.
+eval_threshold: 0.9

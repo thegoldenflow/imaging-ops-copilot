@@ -14,7 +14,7 @@ from app.core.store import Store, get_store
 from app.core.templates import LANGUAGES, PREP, PREP_FOR_EXAM, format_when
 from app.integrations.mocks import queue_message
 from app.llm.gateway import get_gateway
-from app.llm.prompts import Prompt
+from app.agents.prompts import registered
 from app.llm.providers import mock_fixture
 from app.modules.scheduling import service as scheduling
 
@@ -50,16 +50,7 @@ class TranslationOutput(BaseModel):
     text: str
 
 
-TRANSLATE_PROMPT = Prompt(
-    name="prep_translation",
-    version="prep_translation@1",
-    system=(
-        "Translate patient preparation instructions for a medical imaging appointment. Keep the meaning exact, "
-        "use plain language a patient understands, keep numbers and units unchanged, and add nothing. "
-        "A clinical staff member reviews every translation before it is sent."
-    ),
-    template="Target language: {language}\n\nEnglish text:\n{text}",
-)
+TRANSLATE_PROMPT = registered("prep_translation")
 
 _LANG_BY_NAME = {name: code for code, name in LANGUAGES.items()}
 

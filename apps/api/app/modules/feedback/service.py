@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from app.core.models import Appointment, AppointmentStatus, ImagingStudy, MessageOutbox
 from app.core.store import Store
 from app.llm.gateway import get_gateway
-from app.llm.prompts import Prompt
+from app.agents.prompts import registered
 from app.llm.providers import mock_fixture
 from app.modules.feedback.lexicon import SEED_COMMENTS, SENTIMENTS, THEMES, baseline
 from app.modules.scheduling import service as scheduling
@@ -42,17 +42,7 @@ class Classification(BaseModel):
     summary_en: str = Field(description="One short sentence in English")
 
 
-CLASSIFY_PROMPT = Prompt(
-    name="feedback_classify",
-    version="feedback_classify@1",
-    system=(
-        "You label patient satisfaction comments for an outpatient imaging clinic. The comment may be in English, "
-        "French, Chinese or Punjabi. Give the overall sentiment (positive, neutral, negative), every theme the comment "
-        f"actually mentions from: {', '.join(THEMES)}, and a one-sentence English summary. Use an empty theme list if "
-        "none applies. Staff review every label."
-    ),
-    template="Star rating: {rating}/5\nComment:\n{comment}",
-)
+CLASSIFY_PROMPT = registered("feedback_classify")
 
 
 @mock_fixture("feedback_classify")

@@ -12,7 +12,6 @@ import {
   Headset,
   PhoneOutgoing,
   FileText,
-  FlaskConical,
   History,
   Home,
   Inbox,
@@ -94,8 +93,7 @@ export const NAV: NavItem[] = [
   { to: "/phipa", label: "Access monitoring", icon: ShieldAlert, roles: ["medical_director", "admin"], section: "Business & compliance" },
   { to: "/inspection", label: "Inspection hub", icon: BookOpenCheck, roles: STAFF, section: "Business & compliance" },
   { to: "/agents", label: "AI agents", icon: Bot, roles: ["admin"], section: "Oversight" },
-  { to: "/ai-usage", label: "AI usage", icon: Activity, roles: ["operations_manager", "medical_director", "admin"], section: "Oversight" },
-  { to: "/evals", label: "AI evaluations", icon: FlaskConical, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Oversight" },
+  { to: "/ai-ops", label: "AI Ops", icon: Activity, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Oversight" },
   { to: "/audit", label: "Audit log", icon: ShieldCheck, roles: ["medical_director", "admin"], section: "Oversight" },
   { to: "/break-glass-review", label: "Break-glass review", icon: KeyRound, roles: ["admin"], section: "Oversight" },
 ];

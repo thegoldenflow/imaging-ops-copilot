@@ -1,6 +1,6 @@
 {
  "task": "policy_qa",
- "run_at": "2026-10-07T00:39:14",
+ "run_at": "2026-10-10T04:30:05",
  "mode": "mock",
  "model": "rule-based baseline",
  "n": 20,
@@ -38,6 +38,6 @@
    "answer": "Staff who want their own results use the patient portal or ask the front desk like any other patient."
   }
  ],
- "seconds": 1.2,
+ "seconds": 1.7,
  "notes": "16 answerable questions (expected policy cited with a verbatim quote) and 4 the documents do not cover (must say so). Citations are checked against the retrieved text by the server."
 }

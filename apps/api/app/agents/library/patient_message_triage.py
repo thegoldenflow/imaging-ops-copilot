@@ -187,7 +187,9 @@ def _section(text: str, start: str, end: str) -> str:
 @mock_fixture(AGENT_ID)
 def _mock(text: str, images: list, attempt: int) -> dict:
     message = _section(text, '<untrusted source="message">\n', "\n</untrusted>")
-    flags = _section(text, "Red flags found by the rule layer: ", "\n").strip()
+    # a prompt version without the rule layer's line (a candidate the AI Ops comparison evaluates) shows none
+    flags = (_section(text, "Red flags found by the rule layer: ", "\n").strip()
+             if "Red flags found by the rule layer: " in text else "none")
     try:
         resources = json.loads(_section(text, "de-identified):\n", "\n\nChannel:"))
     except json.JSONDecodeError:
