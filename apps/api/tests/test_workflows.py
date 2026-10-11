@@ -6,10 +6,16 @@ everything the activities write is rolled back with the test (tests/temporal_har
 
 from __future__ import annotations
 
+import contextvars
+import threading
+import time
 import uuid
 from datetime import datetime
 
+import psycopg.waiting
 import pytest
+from sqlalchemy import text
+from temporalio import activity
 
 from app.agents import approvals, evalsets, reviews
 from app.agents.runtime import runtime
@@ -667,3 +673,72 @@ def test_the_storylines_journey_starts_in_the_ed_and_waits_on_her_cards_and_her_
         markers = [e.marker_recorded_event_attributes.marker_name for e in h.history(wf).events
                    if e.HasField("marker_recorded_event_attributes")]
         assert markers == ["core_patch"]  # version 4's one marker (ED_PATCH: tests/test_workflow_replay.py)
+
+
+# ---------- the harness ----------
+
+_PROBE_LOCK = 0x7E57_5709  # held by the test while the probe's activity waits for it
+_STOPPING = threading.Event()  # the probe's worker told its activities it is shutting down
+
+
+def _note_the_shutdown() -> None:
+    activity.wait_for_worker_shutdown_sync()
+    _STOPPING.set()
+
+
+@step_activity(workflow_probe.ACTIVITY, workflow_probe.STEP, max_attempts=M.PRIVILEGED_MAX_ATTEMPTS)
+def _probe_waits_for_a_lock(args: dict) -> dict:
+    """Mid-query when the worker is told to stop: it waits for a lock the test holds."""
+    threading.Thread(target=contextvars.copy_context().run, args=(_note_the_shutdown,), daemon=True).start()
+    get_store().conn().execute(text("SELECT pg_advisory_xact_lock_shared(:key)"), {"key": _PROBE_LOCK})
+    return {"detail": "locked"}
+
+
+def test_stopping_the_worker_lets_an_activity_finish_the_query_it_is_in(fresh_state, monkeypatch):
+    """The harness's worker stops gracefully. A shutdown cancels the activities still running by raising inside
+    their threads, and on Windows that lands while psycopg waits for a result: the test's one connection is left
+    busy and refuses every command after it (the storyline test's teardown failed so on its rollback, with "another
+    command is already in progress", when a progress update was cut off). Here the activity waits for a lock the
+    test holds when the worker is told to stop; the lock is released only after a cancellation would have landed."""
+    from app.core import store as core_store
+    from app.core.store import get_engine
+    from app.workflows import worker
+    from tests.temporal_harness import TASK_QUEUE
+
+    store = fresh_state
+    monkeypatch.setattr(psycopg.waiting, "wait", psycopg.waiting.wait_select)  # wait the Windows way everywhere
+    monkeypatch.setattr(worker, "WORKFLOWS", [*worker.WORKFLOWS, workflow_probe.PrivilegedStepProbe])
+    monkeypatch.setattr(worker, "ACTIVITIES", [*worker.ACTIVITIES, _probe_waits_for_a_lock])
+    _STOPPING.clear()
+    waiting = text("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted "
+                   "AND objid::bigint = :key")
+    with harness(monkeypatch) as h, get_engine().connect() as holder:
+        holder.execute(text("SELECT pg_advisory_lock(:key)"), {"key": _PROBE_LOCK})
+        stopper = threading.Thread(target=h.stop_worker)
+        try:
+            with DB:
+                enc, pid = _inpatient(store)
+            wf = f"journey-probe-{uuid.uuid4().hex[:8]}"
+            h.loop.run(h.client.start_workflow(workflow_probe.PROBE, {"encounter_id": enc["id"], "patient_id": pid},
+                                               id=wf, task_queue=TASK_QUEUE))
+            deadline = time.monotonic() + 60
+            while not holder.execute(waiting, {"key": _PROBE_LOCK}).scalar_one():
+                assert time.monotonic() < deadline, "the probe's activity never started waiting for the lock"
+                time.sleep(0.1)
+            stopper.start()
+            assert _STOPPING.wait(30), "the worker never began to shut down"
+            time.sleep(1)  # without a grace period the cancellation is in the activity's thread by now
+        finally:
+            holder.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": _PROBE_LOCK})
+            holder.commit()
+        stopper.join(timeout=60)
+        assert not stopper.is_alive()
+        assert not core_store._busy(store.conn()), "the activity was cancelled mid-query"
+        with DB:
+            assert store.conn().execute(text("SELECT 1")).scalar_one() == 1
+        events = h.history(wf).events
+        scheduled = {e.event_id: e.activity_task_scheduled_event_attributes.activity_type.name for e in events
+                     if e.HasField("activity_task_scheduled_event_attributes")}
+        completed = [scheduled[e.activity_task_completed_event_attributes.scheduled_event_id] for e in events
+                     if e.HasField("activity_task_completed_event_attributes")]
+        assert workflow_probe.ACTIVITY in completed

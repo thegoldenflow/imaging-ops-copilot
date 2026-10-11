@@ -25,6 +25,7 @@ from sqlalchemy.engine import make_url  # noqa: E402
 from app.core.db.migrate import upgrade  # noqa: E402
 from app.core.db.repo import clear_process_cache  # noqa: E402
 from app.core.store import ConnectionSource, Store, get_engine, reset_store, set_ambient_store, unit_of_work  # noqa: E402
+from app.core.store import _busy, _release  # noqa: E402
 from app.integrations.mocks import reset_adapters  # noqa: E402
 from app.llm.gateway import LlmGateway, set_gateway  # noqa: E402
 from app.llm.providers import MockProvider  # noqa: E402
@@ -57,8 +58,11 @@ def fresh_state(database):
     set_gateway(None)
     set_ambient_store(None)
     store.expunge()
-    outer.rollback()
-    conn.close()
+    if _busy(conn):  # left mid-query (a workflow activity cancelled in its thread: tests/temporal_harness.py)
+        _release(conn)  # it refuses ROLLBACK: cancel the query and drop the connection, which ends the transaction
+    else:
+        outer.rollback()
+        conn.close()
     clear_process_cache()
 
 

@@ -139,3 +139,37 @@ def test_a_store_that_fails_to_build_holds_no_connection(monkeypatch):
         with unit_of_work():
             pass
     assert engine.pool.checkedout() == checked_out
+
+
+def test_a_test_whose_connection_is_left_mid_query_still_ends_cleanly(fresh_state, monkeypatch):
+    """What a workflow activity cancelled in its thread leaves behind (tests/temporal_harness.py): the test's one
+    connection still owes the result of a query. The check is the fixture's teardown (tests/conftest.py): it drops
+    that connection, its query cancelled, where a ROLLBACK fails with "another command is already in progress"."""
+    monkeypatch.setattr(psycopg.waiting, "wait", psycopg.waiting.wait_select)
+    conn = fresh_state.conn()
+    key = 0x7E57_7EA2
+    outcome: list[BaseException | None] = []
+
+    def activity():
+        try:
+            conn.execute(text("SELECT pg_advisory_xact_lock_shared(:key)"), {"key": key})
+            outcome.append(None)
+        except BaseException as exc:
+            outcome.append(exc)
+
+    with get_engine().connect() as holder:
+        holder.execute(text("SELECT pg_advisory_lock(:key)"), {"key": key})
+        worker = threading.Thread(target=activity)
+        try:
+            worker.start()
+            deadline = time.monotonic() + 10
+            while _lock_waiters(holder, key) == 0:
+                assert time.monotonic() < deadline, "the query never started waiting for the lock"
+                time.sleep(0.05)
+            _raise_in_thread(worker, Cancelled)
+            worker.join(timeout=10)
+        finally:
+            holder.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": key})
+            holder.commit()
+    assert len(outcome) == 1 and isinstance(outcome[0], Cancelled), outcome
+    assert store_module._busy(conn)

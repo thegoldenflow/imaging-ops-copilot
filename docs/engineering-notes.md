@@ -1,8 +1,9 @@
 # Engineering notes: concurrency and the database layer
 
 Small technical problems found while running the platform, each with its cause, the fix, the evidence and where the
-code lives. They come from two follow-ups after WP10 (2026-10-11, commits b95d2a3 and 5eed672); the full records are
-in [PROGRESS.md](PROGRESS.md) under "WP10 follow-up". Open items are at the end.
+code lives. They come from three follow-ups after WP10 (2026-10-11: commits b95d2a3 and 5eed672, and the fix to the
+workflow tests' harness); the full records are in [PROGRESS.md](PROGRESS.md) under "WP10 follow-up". Open items are at
+the end.
 
 ## 1. `functools.cache` is not a lock
 
@@ -98,13 +99,39 @@ in [PROGRESS.md](PROGRESS.md) under "WP10 follow-up". Open items are at the end.
   suites hold the CPU (7.1 s) and passes on its own (3.4 s). A failure of that kind has to be re-run in isolation
   before anyone draws a conclusion from it.
 
+## 7. A worker shutdown cancels what is still running
+
+- **Problem.** The storyline-journey workflow test passed, then sometimes failed at teardown: the fixture's rollback
+  raised "another command is already in progress" (1 of 10 runs on b95d2a3, 3 of 6 on 5eed672).
+- **Cause.** The test harness stops its worker with `Worker.shutdown()`. temporalio's default
+  `graceful_shutdown_timeout` is zero, so the shutdown at once raises `CancelledError` inside every running activity's
+  thread, as in note 2. In the tests, every activity uses the test's one connection (`ConnectionSource`), which has no
+  busy-connection check. A `workflows.recordProgress` cut off mid-query left that connection busy, and the fixture's
+  ROLLBACK was the next command sent into it.
+- **Fix.** The test worker stops with a 30-second grace period, so running activities finish first. If one still
+  runs after that and is cancelled mid-query, the fixture drops the busy connection (`_release`, as in note 2), and
+  closing the connection ends the outer transaction. Cancelling the query and then rolling back would not work: the
+  cancelled query's result still has to be read first. The harness also undoes its steps with an `ExitStack`.
+  Before, a worker start or stop that timed out under load skipped the rest of the teardown, and the Temporal test
+  server process kept running after pytest.
+- **Evidence.** A probe activity waits for an advisory lock that the test holds while the worker is told to stop, and
+  the lock is released 1 s after the worker has told its activities it is shutting down. With a zero grace period the
+  test failed in each of 3 runs, with the `CancelledError` inside psycopg's `wait_select`. With the fix, the
+  storyline test passed 8 of 8 runs on its own, and the backend suite passed (778 of 778). A second test leaves the
+  connection busy on purpose: without the fixture's check, its teardown fails with the original errors.
+- **Code.** `apps/api/tests/temporal_harness.py` (`GRACE`, `harness()`), `tests/conftest.py` (`fresh_state`);
+  `tests/test_workflows.py::test_stopping_the_worker_lets_an_activity_finish_the_query_it_is_in`,
+  `tests/test_db_threads.py::test_a_test_whose_connection_is_left_mid_query_still_ends_cleanly`.
+
 ## Open optimizations
 
 - **Shorter writes under the lock.** Use COPY instead of INSERT for `fhir_resources`, or give the activities that take
   the lock a longer start-to-close timeout. While the writes alone can exceed 30 s, an activity that starts waiting
   just as they begin can still time out. It is then retried, without tracebacks.
-- **Test harness shutdown.** `tests/temporal_harness.py` cancels in-flight activities when it stops the worker. One
-  cancelled mid-query leaves the test's shared connection busy, and the fixture's rollback then fails ("another
-  command is already in progress"). This is intermittent: on b95d2a3, 1 of 10 runs of the storyline-journey workflow
-  test. Fix it by letting running activities finish before the shutdown, or by cancelling the busy query in the
-  fixture, as `EngineSource` does.
+- **A failed unit of work in the tests.** The ambient branch of `unit_of_work()` only skips its `save()` when the
+  block raises, so the next unit of work's `save()` writes the changes a failed activity left pending, and its SQL
+  stays in the outer transaction. In production the activity's transaction is rolled back. A savepoint per ambient
+  unit of work would close the gap.
+- **The harness's start timeout.** `start_worker` gives the worker 120 s, including building it, which validates
+  each workflow in Temporal's sandbox, on the event loop. Under 100% CPU that limit was reached once. Where the time
+  went was not measured.

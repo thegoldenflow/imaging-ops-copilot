@@ -1140,7 +1140,42 @@ Not run: Playwright (no screen changed) and a live reset against a running worke
 Not changed (follow-ups):
 
 - The writes themselves take 18–30 s here, so an activity that starts waiting right at the start of them can still reach `recordProgress`'s 30-second timeout on a slow run (a storyline reset adds about 5 s). It is then retried as before, without tracebacks. Two options: COPY instead of INSERT for `fhir_resources`, or a longer start-to-close timeout for the activities that take the lock.
-- The Temporal test harness (`tests/temporal_harness.py`): `stop_worker` cancels in-flight activities, and one cancelled mid-query leaves the test's shared connection busy (the intermittent teardown error above). Either of two changes would fix it: let running activities finish before the shutdown (a graceful shutdown timeout), or have the fixture cancel a busy query, as `EngineSource` does. Under two extra CPU-bound processes, one run of the same test on b95d2a3 also hung until its 900-second timeout and left its Temporal test server running.
+- The Temporal test harness (`tests/temporal_harness.py`): `stop_worker` cancels in-flight activities, and one cancelled mid-query leaves the test's shared connection busy (the intermittent teardown error above). Either of two changes would fix it: let running activities finish before the shutdown (a graceful shutdown timeout), or have the fixture cancel a busy query, as `EngineSource` does. Under two extra CPU-bound processes, one run of the same test on b95d2a3 also hung until its 900-second timeout and left its Temporal test server running. Fixed afterwards (both changes): see the next entry.
+
+### WP10 follow-up · the workflow tests' worker lets its activities finish when it stops — done
+
+Follow-up to the entry above (2026-10-11); summarised in [engineering-notes.md](engineering-notes.md), note 7. The error: `test_workflows.py::test_the_storylines_journey_starts_in_the_ed_and_waits_on_her_cards_and_her_bed` passed, then sometimes failed at teardown. `fresh_state`'s `outer.rollback()` raised "another command is already in progress", after the pool's "Exception during reset or similar".
+
+The cause, confirmed in temporalio 1.33 and reproduced:
+
+- `Harness.stop_worker()` calls `Worker.shutdown()`. The SDK's default `graceful_shutdown_timeout` is zero, so the shutdown cancels every running activity at once, by raising `CancelledError` inside its thread.
+- In the tests, every activity uses the test's one connection (`ConnectionSource`). On Windows, psycopg waits for a result in a Python loop (`waiting.wait_select`), so the exception can land in the middle of a query. The connection then refuses every command until that result is read.
+- The ambient branch of `unit_of_work()` does not roll back, so the next command on the connection was the fixture's ROLLBACK.
+- The storyline test ends while its journey is still recording progress. A `workflows.recordProgress` was sometimes still running when the worker stopped.
+
+- [x] `tests/temporal_harness.py`: the test worker stops gracefully (`GRACE`, 30 s, passed as `graceful_shutdown_timeout`). It takes no new tasks and lets its running activities finish; only an activity still running after 30 s is cancelled. This also covers the restart test, which stops the worker in the middle of the test and then keeps using the same connection.
+- [x] `tests/temporal_harness.py` `harness()`: its steps are undone in reverse (`contextlib.ExitStack`), each of them even when another fails. Before, a `start_worker` that raised (its 120-second timeout) skipped the whole teardown, and a `stop_worker` that raised (its 60-second timeout) skipped `bridge.uninstall` and `_shutdown`; either way the Temporal test server process kept running after pytest. This happened during this work: under 100% CPU, with another session's suite running too, `start_worker` timed out once and left its test server running. A scratch plugin that makes `start_worker` raise now leaves no server behind.
+- [x] `tests/conftest.py` `fresh_state`: if the test's connection is still in the middle of a query (an activity cancelled after the grace period), the teardown cancels the query on the server and drops the connection, with `_release` from `app/core/store.py`, as `EngineSource` does. Closing the connection ends the outer transaction. Cancelling the query and then rolling back would not work, because the cancelled query's result still has to be read first.
+- [x] No app code changed.
+- [x] Tests (2):
+  - `test_workflows.py::test_stopping_the_worker_lets_an_activity_finish_the_query_it_is_in`: a probe activity waits for an advisory lock that the test holds, and the worker is told to stop. The test releases the lock 1 s after the worker has told its activities it is shutting down. The activity completes and the connection is idle. With a zero grace period (the old harness), the test failed in each of 3 runs: the `CancelledError` lands in `wait_select`, the activity's `_mark` gets "another command is already in progress", and the connection is left busy.
+  - `test_db_threads.py::test_a_test_whose_connection_is_left_mid_query_still_ends_cleanly`: an exception raised into a thread that waits on the test's connection leaves the connection busy. The check is the fixture's teardown. Without the new branch, the teardown fails exactly as the storyline test's did: "Exception during reset or similar", then "sending query failed: another command is already in progress".
+  - Both tests make psycopg use its Python wait loop on every platform, as `test_db_threads.py` already does.
+
+The hang: `_shutdown` cannot hang by itself, because it waits at most 60 s and ignores errors. The other waits in the harness have timeouts too, except the `DB` lock and the end of the process: Python waits there for the worker's activity threads, so an activity thread that never returned would keep pytest running after the test. The hang was not reproduced here, including the runs below under the load of a full suite. With the grace period, a passing test's worker no longer cancels anything when it stops. The test server is a separate process, so it outlives a run in two ways: the skipped teardown above (fixed), or pytest being killed while it hangs.
+
+Tests 2026-10-11 (Sunday's generated data, mock model, own test databases `ioc_test_teardown` and `ioc_test_teardown2`):
+
+- The storyline workflow test on its own: 8 of 8 runs passed (1 min 32 s to 4 min 29 s each; runs 5–7 were slow because the full suite ran at the same time).
+- Backend suite, including both new tests: 778 of 778 passed in 25 min 53 s, alongside the eight runs above, before the `ExitStack` change. On the final code, 778 of 778 passed again in 30 min 45 s. Neither run left a Temporal test server behind.
+- After the `ExitStack` change, `test_workflows.py`, `test_db_threads.py` and `test_workflow_replay.py` also passed on their own (26 of 26).
+- With the grace period set to zero (a scratch pytest plugin, the old behaviour), the new workflow test failed 3 of 3 runs. With the fixture's new branch switched off, the new `test_db_threads.py` test errored at teardown.
+- Not run: Playwright (no screen changed).
+
+Not changed (follow-ups):
+
+- `start_worker` gives the worker 120 s to start. That includes building it, which validates each workflow in Temporal's sandbox, on the event loop. Under 100% CPU the limit was reached once (above), and the test failed. Where the time went was not measured.
+- In the tests, a failed unit of work is not rolled back. The ambient branch of `unit_of_work()` only skips its `save()`, so changes a failed activity left pending are written by the next unit of work's `save()`, and its SQL stays in the outer transaction. In production the activity's transaction is rolled back. A savepoint per ambient unit of work would close the gap.
 
 ## Environment notes
 

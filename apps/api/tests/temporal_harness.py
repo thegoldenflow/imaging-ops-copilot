@@ -7,6 +7,11 @@ store of tests/conftest.py), so everything they write is rolled back with the te
 threads, so every database access goes through `DB` (activities through a patched unit of work, the test body
 explicitly with `with DB:`). Tests that need the server skip when it cannot be started.
 
+Stopping the worker lets its in-flight activities finish (`GRACE`). Temporal cancels the ones still running after
+that by raising inside their threads, and on Windows psycopg waits for a result in a Python loop, so the exception
+can land mid-query: the one shared connection then refuses every command until that result is read (the fixture's
+rollback failed with "another command is already in progress" when a `workflows.recordProgress` was cut off).
+
 Test workers keep no workflow cache (`max_cached_workflows=0`): every workflow task replays the whole history, so
 every test also checks that the workflow code is deterministic at every step. (With a cache, Temporal sends a
 workflow's next task to the worker that ran the last one, on a sticky queue; a real server hands it to another
@@ -38,6 +43,7 @@ from app.ehr.events import bus
 from app.workflows import activities, bridge, client, faults, progress, worker
 
 TASK_QUEUE = "hospital-workflows-test"
+GRACE = timedelta(seconds=30)  # in-flight activities finish when the worker stops (each is one short transaction)
 DB = threading.RLock()
 HISTORIES = Path(__file__).parent / "fixtures" / "workflows"  # captured histories for the replay tests
 
@@ -96,7 +102,8 @@ class Harness:
 
     def start_worker(self) -> None:
         async def start():
-            self.worker = worker.build(self.client, task_queue=TASK_QUEUE, threads=1, max_cached_workflows=0)
+            self.worker = worker.build(self.client, task_queue=TASK_QUEUE, threads=1, max_cached_workflows=0,
+                                       graceful_shutdown_timeout=GRACE)
             self._task = asyncio.ensure_future(self.worker.run())
             await asyncio.sleep(0.3)
             if self._task.done():  # it failed to start: say why
@@ -104,7 +111,7 @@ class Harness:
         self.loop.run(start())
 
     def stop_worker(self) -> None:
-        """Shut the worker down (its in-flight activities are cancelled), as when its process is killed."""
+        """Shut the worker down: it takes no more tasks, and its in-flight activities finish first (`GRACE`)."""
         if self.worker is None:
             return
         w, task = self.worker, self._task
@@ -186,15 +193,16 @@ def harness(monkeypatch):
 
     monkeypatch.setattr(core_store.Store, "conn", guarded_conn)
     h = Harness(loop, env)
-    with client.use(h.link):
+    # Undone in reverse, every step even when another fails: a worker start or stop that timed out under load used to
+    # skip the rest, and the test server kept running after pytest.
+    with contextlib.ExitStack() as undo:
+        undo.callback(_shutdown, h)
+        undo.enter_context(client.use(h.link))
         bridge.install()
+        undo.callback(bridge.uninstall)
         h.start_worker()
-        try:
-            yield h
-        finally:
-            h.stop_worker()
-            bridge.uninstall()
-            _shutdown(h)
+        undo.callback(h.stop_worker)
+        yield h
 
 
 def _shutdown(h: Harness) -> None:
