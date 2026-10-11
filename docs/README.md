@@ -11,6 +11,7 @@
 | [SPEC.md](SPEC.md) | The imaging centre's specification: 21 systems in phases 0–4 (in Chinese) |
 | [SPEC-hospital.md](SPEC-hospital.md) | The hospital platform extension: phases 6–8, work packages WP0–WP10 (in Chinese) |
 | [audit-baseline.md](audit-baseline.md) | WP0's reuse audit, the owner's decisions and the spec-name → code-name map |
+| [engineering-notes.md](engineering-notes.md) | Concurrency and database-layer problems found while running the platform (thread-safe table mappings, cancelled queries, lock scope, process caches), each with its cause, fix, evidence and code; open optimizations |
 | [RATIONALE-db-temporal.md](RATIONALE-db-temporal.md) | Why PostgreSQL and (later) Temporal, and the options the owner chose from |
 | [prompts/translate-kg-terminology.md](prompts/translate-kg-terminology.md) | The prompt for translating knowledge-graph terms to English |
 
