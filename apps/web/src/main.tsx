@@ -46,6 +46,8 @@ import { PatientChartPage } from "./features/hospital/PatientChartPage";
 import { PatientsPage } from "./features/hospital/PatientsPage";
 import { HomePage } from "./features/home/HomePage";
 import { StorylinePage } from "./features/storyline/StorylinePage";
+import { RoadmapPage } from "./features/roadmap/RoadmapPage";
+import { SafetyPage } from "./features/roadmap/SafetyPage";
 import { PreRegPage } from "./features/patient/PreRegPage";
 import { ReferrerPage } from "./features/referrer/ReferrerPage";
 import { ReadingRoomPage } from "./features/reports/ReadingRoomPage";
@@ -131,6 +133,8 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/documentation/print/:docId" element={<Guard path="/documentation"><PrintPage /></Guard>} />
               <Route path="/documentation/portal/:docId" element={<Guard path="/documentation"><PatientPortalPage /></Guard>} />
               <Route path="/hospital/patients" element={<Guard path="/hospital/patients"><PatientsPage /></Guard>} />
+              <Route path="/roadmap" element={<Guard path="/roadmap"><RoadmapPage /></Guard>} />
+              <Route path="/safety" element={<Guard path="/safety"><SafetyPage /></Guard>} />
               <Route path="/hospital/patients/:mrn" element={<Guard path="/hospital/patients"><PatientChartPage /></Guard>} />
               <Route path="*" element={<EmptyState title="Page not found" />} />
             </Route>

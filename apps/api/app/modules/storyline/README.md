@@ -5,7 +5,7 @@ Mandarin-speaking, on warfarin for atrial fibrillation, falls at home and breaks
 → a person signs → audit trail". The guided page is `/storyline` (web `features/storyline/`); the demo script is
 `demo/hospital_journey.md`.
 
-## Inputs
+## Input resources
 
 - The hospital's EHR as the generator and the day simulator write it, plus the storyline's preset
   (`app/ehr/seed/journey.py`, the spec's `demo/seed_journey.py`): the patient `pat-j0001` and her imaging-centre
@@ -20,7 +20,7 @@ Mandarin-speaking, on warfarin for atrial fibrillation, falls at home and breaks
 - The modules of WP5–WP8 for steps 5–11, unchanged in how they work: the Control Tower, medication safety,
   documentation, voice services.
 
-## Outputs
+## Output schema
 
 - `GET /api/storyline`: per step the AI proposal (a Task or an exception, its agent and run), the signature or
   approval, the EHR records written and their audit events; the hospital clock, Temporal's state, the journey.
@@ -31,7 +31,7 @@ Mandarin-speaking, on warfarin for atrial fibrillation, falls at home and breaks
 - With Temporal, her InpatientJourneyWorkflow starts at the registration (`journey-stay-j0001`, version 4 from the
   ED, `JourneyInput.ed_visit`) and strings steps 2–12 together.
 
-## Eval set and thresholds
+## Eval set and threshold
 
 There is no model of its own to judge. The eval is the walk: `scripts/storyline_report.py` drives the twelve steps
 through the HTTP API as the cast (`walk.py`) and writes `evals/storyline/report_<mode>.json` and `.md` (each

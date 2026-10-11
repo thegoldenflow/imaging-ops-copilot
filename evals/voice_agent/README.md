@@ -45,7 +45,7 @@ happening. Run-level extras: task success per language, response time (mean, p95
 fallback's task success, and per agent the calls in which the caller's raw name or birth date reached its model
 (the agent's de-identified turns and tool results; the text the summary's model is sent).
 
-## Evaluation and thresholds
+## Eval set and threshold
 
 Each call runs through the phone line's own code (`service.take_turn` per caller turn, `service.end_call`): the
 registered agent with the configured model (its mock model `mock_agent.py` without a key), each turn de-identified,

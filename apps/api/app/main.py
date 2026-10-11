@@ -62,6 +62,7 @@ from app.modules.requisitions.router import router as requisitions_router
 from app.modules.scheduling.router import router as scheduling_router
 from app.modules.storyline import service as storyline
 from app.modules.storyline.router import router as storyline_router
+from app.modules.roadmap.router import router as roadmap_router
 from app.modules.voice_services import followup as voice_followup
 from app.modules.voice_services.router import router as voice_router
 from app.workflows import bridge as workflow_bridge
@@ -244,6 +245,7 @@ app.include_router(documentation_router)
 app.include_router(voice_router)
 app.include_router(aiops_router)
 app.include_router(storyline_router)
+app.include_router(roadmap_router)
 
 
 @app.exception_handler(FhirAccessDenied)

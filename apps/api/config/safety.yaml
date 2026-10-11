@@ -1,0 +1,145 @@
+# Safety tiers and the architecture narrative (docs/SPEC-hospital.md 8.3 and 6.7; loader app/modules/roadmap/safety.py).
+#
+# Only the words live here: definitions, allowed AI actions, regulatory notes, the Level 0-4 mapping, guardrails,
+# honest boundaries and the positioning sentences. Everything countable comes from the registries and the eval runs
+# when the page or docs/safety-tiers.md is built: the agents and modules of each tier and their sign-off roles
+# (apps/api/config/agents/), the tools of each side-effect level (apps/api/config/tools/), the latest results of
+# the guardrails' evals (evals/runs/). The audience talk tracks are in docs/interview-narrative.md, not on screen.
+
+tiers:
+  - id: ops
+    name: Operations
+    definition: Does not touch individual clinical decisions; affects operations and scheduling only.
+    spec_examples: Control Tower, call centre, supplies and staffing
+    allowed_ai_actions: [predict, narrate, recommend actions]
+    spec_signoff: operations manager, charge nurse, clerk
+    regulatory: Privacy (PHIPA) and audit are enough; no medical-device question.
+  - id: documentation
+    name: Documentation
+    definition: Drafts clinical documents from content already in the record.
+    spec_examples: Discharge summary, patient instructions, nursing handoff, follow-up record
+    allowed_ai_actions: [summarise, draft, rewrite in plain language, translate]
+    spec_signoff: physician, nurse
+    regulatory: "The physician's signature is the hard gate and the traceability validator the technical gate; a draft is not the record."
+  - id: clinical_ds
+    name: Clinical decision support
+    definition: Gives judgement-type suggestions on diagnosis or treatment.
+    spec_examples: Order review, medication-reconciliation discrepancies, critical values and alerts, imaging report drafts
+    allowed_ai_actions: [flag, rank, draft]
+    never: [block, execute]
+    spec_signoff: pharmacist, physician
+    regulatory: "Health Canada's software as a medical device (SaMD) territory. A general-purpose model has no clinical validation; the demo proves the pipeline and claims no clinical performance."
+
+# The second axis (spec 6.4, 8.3): tools by side effect, independent of the module's tier. An ops module that calls a
+# privileged tool (a bed move) still needs a recorded human approval for that call.
+side_effect_levels:
+  - id: read
+    meaning: Read only.
+    precondition: The caller's role and data scope checks pass.
+  - id: recommend
+    meaning: Produces a suggestion or a draft; changes no state.
+    precondition: Checks pass; the output only goes to a review queue.
+  - id: action
+    meaning: Changes business state; low risk or reversible.
+    precondition: Checks pass, an idempotency key, an audit event.
+  - id: privileged
+    meaning: High risk or irreversible.
+    precondition: "A recorded human approval (a completed approval Task plus the approver's approve or sign audit event), or the call is refused; two audit events; no automatic retry."
+
+# The platform supplement's Level 0-4 risk scale is retired; this is how it maps onto the two axes.
+level_mapping:
+  - level: "0-1"
+    tiers: [ops]
+    tools: [read, recommend]
+  - level: "2"
+    tiers: [ops]
+    tools: [action]
+  - level: "3"
+    tiers: [documentation, clinical_ds]
+    tools: [recommend]
+  - level: "4"
+    tiers: [ops, documentation, clinical_ds]
+    tools: [privileged]
+    note: Never executed without a recorded approval.
+
+# Guardrails gathered from the sections that define them. `code` paths are tested to exist; `evidence` names the eval or
+# the tests; `live` pulls the latest result from evals/runs (agent: an agent's gates; platform: a platform suite).
+guardrails:
+  - id: phi_minimisation
+    title: PHI minimisation
+    rule: "Everything sent to a model is de-identified first (structured fields, FHIR resources, free text with a model second pass); patients appear only as a hash of their MRN."
+    spec: "6.3"
+    code: [apps/api/app/llm/freetext_deid.py, apps/api/app/llm/fhir_deid.py, apps/api/app/agents/runtime.py]
+    evidence: evals/deid (recall >= 0.98, precision >= 0.90)
+    live: {agent: deid_check, gates: [recall, precision]}
+  - id: injection
+    title: Prompt-injection defence and privilege blocking
+    rule: "Patient and outside text sits in an untrusted block it cannot close; the Tool Gateway authorises from the registry and the caller's identity only, never from what a model claims."
+    spec: "6.4"
+    code: [apps/api/app/agents/untrusted.py, apps/api/app/agents/gateway.py]
+    evidence: "evals/injection (attack calls executed: 0)"
+    live: {platform: injection}
+  - id: schema_grounding
+    title: Output schema and grounding
+    rule: "Structured output must pass its JSON Schema (one retry, then a person); every evidence reference must resolve to a record."
+    spec: "6.6"
+    code: [apps/api/app/llm/gateway.py, apps/api/app/agents/jsonschema.py, apps/api/app/aiops/suites.py]
+    evidence: schema_validity and grounding_rate in every eval run
+  - id: signature_gate
+    title: No signature, no record
+    rule: "A draft becomes final only through the signing service, by a role the registry names; red validator findings block the signature."
+    spec: "6.3, 7.3"
+    code: [apps/api/app/ehr/signing.py, apps/api/app/modules/documentation/validator.py]
+    evidence: tests/test_access.py, tests/test_documentation.py
+  - id: clinical_escalation
+    title: Medical questions go to a nurse
+    rule: "The call centre and the follow-up call never answer a clinical question; red-flag rules run before the model and escalate on their own."
+    spec: "7.4"
+    code: [apps/api/app/modules/voice_services/redflags.py, apps/api/app/modules/voice_services/callcenter.py]
+    evidence: evals/followup (red-flag recall >= 0.95, rules alone with the model down)
+    live: {agent: followup_calls, gates: [module_verdict]}
+  - id: privileged_approval
+    title: Approval before high-risk actions
+    rule: "A privileged tool runs only after a recorded human approval of exactly those arguments, on the approver's authority."
+    spec: "6.4"
+    code: [apps/api/app/agents/gateway.py, apps/api/app/agents/approvals.py]
+    evidence: tests/test_tool_gateway.py
+  - id: release_gate
+    title: Release gate
+    rule: "An agent whose latest eval run is below its threshold is watermarked in demo mode and refused in prod mode; a mock run never passes an agent."
+    spec: "6.6"
+    code: [apps/api/app/aiops/release.py, apps/api/app/agents/registry.py]
+    evidence: tests/test_aiops.py, tests/test_prompt_gate.py
+  - id: cost_limits
+    title: Rate and cost limits
+    rule: "Daily cost and failure-rate thresholds per agent and for the hospital open an admin Task when crossed."
+    spec: "6.6"
+    code: [apps/api/config/alerts.yaml, apps/api/app/aiops/alerts.py]
+    evidence: tests/test_aiops.py
+  - id: audit
+    title: Every refusal and override is audited
+    rule: "Gateway refusals, approvals, signatures, break-glass access and human corrections are events in the hash-chained, append-only audit log."
+    spec: "6.3, 6.4"
+    code: [apps/api/app/core/audit.py, apps/api/app/ehr/breakglass.py]
+    evidence: tests/test_audit_extension.py
+
+# Said unprompted when asked (spec 8.3).
+honest_boundaries:
+  - id: synthetic
+    text: "All data is synthetic: the hospital comes from this project's own Synthea-style generator and the imaging centre from its seeded generator. There is no real patient anywhere."
+  - id: pipeline_not_performance
+    text: "Model metrics show that the pipeline works, not clinical performance. A real deployment would retrain on the hospital's own history, validate retrospectively, then run prospectively in shadow mode."
+  - id: mock_baselines
+    text: "Every committed eval result is a mock-model baseline; runs on a real model (Claude or Gemini) and the human rating sheets are still to be done."
+    text_when_live: "Some committed eval results come from a real model (see evals/README.md); the mock baselines and the human rating sheets that are still open are listed there."
+    live: runs
+  - id: drug_tables
+    text: "The pharmacy rule tables are simplified demo versions; production needs a commercial drug knowledge base."
+  - id: no_hl7_engine
+    text: "There is no real HL7 interface engine: ADT, order and result messages come from the day simulator. A real system replaces only the event source."
+
+# Spec 6.7: kept from the platform supplement for the architecture page and the interview.
+positioning:
+  - "One healthcare AI operations platform running many governed clinical and operational workflows."
+  - "The same platform primitives power dozens of workflows."
+definition_of_done: "Definition of done (the supplement's ten items, merged into each section's acceptance criteria): every module ships code, unit tests, an eval set with a threshold, demo data and a demo script; it is registered with a risk tier and a signer before it may write."

@@ -4,6 +4,8 @@ import {
   BedDouble,
   Bot,
   KeyRound,
+  Layers,
+  Map as MapIcon,
   CalendarClock,
   ClipboardCheck,
   ClipboardList,
@@ -56,7 +58,7 @@ interface NavItem {
   label: string;
   icon: typeof Home;
   roles: Role[] | "all";
-  section: "" | "Hospital" | "Operations" | "Intake pipeline" | "Radiology ops" | "Business & compliance" | "Oversight";
+  section: "" | "Hospital" | "Operations" | "Intake pipeline" | "Radiology ops" | "Business & compliance" | "Oversight" | "Architecture";
 }
 
 const STAFF: Role[] = ["front_desk", "technologist", "radiologist", "operations_manager", "medical_director", "admin"];
@@ -98,6 +100,8 @@ export const NAV: NavItem[] = [
   { to: "/ai-ops", label: "AI Ops", icon: Activity, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Oversight" },
   { to: "/audit", label: "Audit log", icon: ShieldCheck, roles: ["medical_director", "admin"], section: "Oversight" },
   { to: "/break-glass-review", label: "Break-glass review", icon: KeyRound, roles: ["admin"], section: "Oversight" },
+  { to: "/safety", label: "Safety tiers", icon: Layers, roles: "all", section: "Architecture" },
+  { to: "/roadmap", label: "Roadmap", icon: MapIcon, roles: "all", section: "Architecture" },
 ];
 
 export function canSee(item: NavItem, role: Role) {

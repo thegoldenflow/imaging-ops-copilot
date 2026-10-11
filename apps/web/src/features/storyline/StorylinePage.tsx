@@ -9,8 +9,8 @@ import {
   ArrowRight, CheckCircle2, ChevronDown, ChevronRight, Clock3, Copy, FastForward, Map, Quote, RotateCcw, ShieldCheck,
   Sparkles, UserRound, Workflow,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AiBadge, Badge, Button, Card, EmptyState, ErrorState, Loading, PageHeader } from "../../components/ui";
 import { useAuth } from "../../lib/auth";
 import { ROLE_LABEL } from "../../lib/types";
@@ -124,11 +124,20 @@ function YouCard({ data }: { data: Storyline }) {
 
 function StepCard({ step, data }: { step: StoryStep; data: Storyline }) {
   const current = step.n === data.current;
-  const [open, setOpen] = useState(current);
+  // /storyline#step-N (the roadmap cards link here): open that step and scroll to it.
+  const targeted = useLocation().hash === `#step-${step.n}`;
+  const [open, setOpen] = useState(current || targeted);
+  const ref = useRef<HTMLLIElement>(null);
   useEffect(() => { if (current) setOpen(true); }, [current]);
+  useEffect(() => {
+    if (targeted) {
+      setOpen(true);
+      ref.current?.scrollIntoView({ block: "start" });
+    }
+  }, [targeted]);
   const status = STATUS[step.status];
   return (
-    <li className={clsx("rounded-xl border bg-white", current ? "border-brand-300 shadow-sm" : "border-slate-200")}
+    <li ref={ref} id={`step-${step.n}`} className={clsx("scroll-mt-4 rounded-xl border bg-white", current ? "border-brand-300 shadow-sm" : "border-slate-200")}
       data-testid={`story-step-${step.n}`} data-status={step.status}>
       <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center gap-3 p-3 text-left">
         <span className={clsx("grid size-7 shrink-0 place-items-center rounded-full text-sm font-semibold",

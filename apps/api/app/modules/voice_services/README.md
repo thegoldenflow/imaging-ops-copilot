@@ -63,7 +63,7 @@ rules-only fallback and the nurse's actions). Web: `apps/web/src/features/voice/
   `followup.escalated`, `followup.handled`.
 - Patient-facing sentences come from `phrases.py`, never from the model.
 
-## Evaluation and thresholds
+## Eval set and threshold
 
 `evals/call_center/`, `evals/followup/`, `evals/voice_bilingual/` (READMEs there; runner
 `apps/api/scripts/voice_eval.py`, cases from `scripts/gen_voice_eval.py`); the prompt-injection extension in
@@ -72,6 +72,8 @@ put through to a person 100%; follow-up red-flag recall ≥ 0.95 on 50 scripts (
 rules alone with the model down; bilingual 10 English + 10 Chinese with the same outcome per pair; injection 0
 unauthorised actions. Over-escalation is recorded, not gated. Tests: `tests/test_voice_services.py`,
 `tests/test_voice_eval.py`; Playwright `e2e/voice-services.spec.ts`.
+
+Release gate (6.6): `call_center` eval_threshold 0.8, `followup_calls` eval_threshold 0.8 in the agent registry (`apps/api/config/agents/`); the runner `uv run python -m app.aiops.evalrun` judges every agent against it, and the latest results of every agent are in [evals/README.md](../../../../../evals/README.md).
 
 ## Known failure modes
 

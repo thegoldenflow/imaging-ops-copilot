@@ -36,7 +36,7 @@ per-feature contributions, from which the one-sentence explanation is written
 exactly to the raw prediction (tested). For the bed manager the sentence names the factors without their
 clinical values.
 
-## Evaluation and thresholds
+## Eval set and threshold
 
 `scripts/train_flow_models.py [--rebuild] [--check]` trains each model on the earlier dates and tests on the
 last 20% of the dates (a time split, never random), then writes `report.json` and `report.md`:

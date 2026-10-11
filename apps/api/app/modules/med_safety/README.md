@@ -61,7 +61,7 @@ medications, allergies, laboratory results, body weight and diagnoses hospital-w
   Task when there is one; a change request is an `order-change-request` Task for the physician); reconciliation
   items `write` audit events, signatures `sign` events. The order's status never changes here.
 
-## Eval location and thresholds
+## Eval set and threshold
 
 | Eval | Where | Gate | Mock result (2026-10-09) |
 | --- | --- | --- | --- |
@@ -73,6 +73,8 @@ medications, allergies, laboratory results, body weight and diagnoses hospital-w
 Runner: `scripts/med_safety_eval.py` (`--live`, `--check`); cases from `scripts/gen_med_safety_eval.py`. The
 backend suite runs both as gates (`tests/test_med_safety_eval.py`). The agents' eval_status stays `pending`: the
 mock was written by the author of the labels, so its scores are optimistic; a live run is outstanding.
+
+Release gate (6.6): `order_review` eval_threshold 0.8, `medication_reconciliation` eval_threshold 0.9 in the agent registry (`apps/api/config/agents/`); the runner `uv run python -m app.aiops.evalrun` judges every agent against it, and the latest results of every agent are in [evals/README.md](../../../../../evals/README.md).
 
 ## Known failure modes
 

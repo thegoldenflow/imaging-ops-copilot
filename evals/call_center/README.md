@@ -21,7 +21,7 @@ Per script: the intent recognised on the opening turn and its source (model or r
 the call's outcome (resolved, requested, transferred), its actions (identity_verified, reschedule_requested,
 cancel_requested, lookup, faq, prep_given, nurse_line, transfer, …) and the server time per caller turn.
 
-## Evaluation and thresholds
+## Eval set and threshold
 
 | Metric | Gate |
 | --- | --- |

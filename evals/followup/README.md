@@ -23,7 +23,7 @@ Per script: escalated or not, by whom (`rules`, `model`, `low_confidence`, `mode
 urgent, routine), the rule codes, the classifier's status and confidence; the write-back (the call's Communication,
 patient-reported Observations, nurse Tasks).
 
-## Evaluation and thresholds
+## Eval set and threshold
 
 | Metric | Gate |
 | --- | --- |

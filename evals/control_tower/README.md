@@ -27,7 +27,7 @@ fields plus `action_id`, the engine's menu entry each action comes from (its wor
 engine's). It goes into the review queue of the bed manager and the charge nurses as an `ai-review` Task
 (`explainException`); approving creates one `flow-action` Task per action for its owner role (`createFlowTask`).
 
-## Evaluation and thresholds
+## Eval set and threshold
 
 | Eval | Metric | Gate |
 | --- | --- | --- |

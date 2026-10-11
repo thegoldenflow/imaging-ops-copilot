@@ -1,5 +1,21 @@
 # Progress
 
+## Overall status
+
+As of 2026-10-11: phases 0–4 (the imaging centre's 21 systems) are done in demo scope on `main`; the hospital
+platform extension (phases 6–8, `docs/SPEC-hospital.md`) has every work package done, WP0–WP10 with WP4b, WP4c and
+WP10b, on `feat/hospital-platform` (WP10 on its own branch until the merge). A newcomer gets the whole demo running
+from README.md in about 25 minutes (WP10's check below). Open across the project:
+
+- Every eval result is a mock-model baseline: runs on a real model (Claude or Gemini) are still to be done, and the
+  two human rating sheets (Control Tower narratives, documentation) are unscored ([evals/README.md](../evals/README.md)).
+- Real-key checks of the Gemini provider and the clinical knowledge Q&A; `terminology_en.jsonl` to generate.
+- Merging `feat/hospital-platform` into `main` is the owner's step.
+- Known date-dependent tests and follow-ups are listed in the sections below (WP9 and WP10).
+
+The table below lists the demo build's deviations from the original imaging spec; the hospital work packages record
+their own deviations in their sections.
+
 ## Demo-scope decisions (agreed with the owner)
 
 Time is short and the goal is a working demo, so the first batch deviates from the spec's stack in these ways (the database rows were closed on branch `feat/postgres`):
@@ -995,7 +1011,68 @@ Follow-ups (not WP9):
 - Five tests depend on the day the test data is generated for. On Sunday 2026-10-11 they fail on the base commit too: the two capacity-workflow tests expect at least three exceptions at 07:00, and three MedRec tests expect the AI step to run where it is now refused. They passed on Saturday's data. The Playwright test "pharmacist: queue, rule and AI flags…" in `med-safety.spec.ts` fails the same day on the base commit too.
 - The in-process storyline walk spends most of its time on PostgreSQL round trips under load: each audit event is its own savepoint in the test's transaction.
 
-### WP10 · Roadmap cards and documentation (8.1, 8.3)
+### WP10 · Roadmap cards and documentation (8.1, 8.3) — done
+
+Read-only audit first (spec 8.1, 8.3, 8.4, 6.3 "four fixed sections", 6.6, 6.7; every work package's section above; the hand-overs in the shared notes folder; the agent and tool registries; the storyline's stubs; `evals/` runs and module reports; README, `.env.example`, `docker-compose.yml`, `docs/DEPLOY.md`). Findings that shaped the plan: the three 8.1 stubs on preset data are registry modules `critical_value_routing`, `deterioration_alert`, `coding_assist` (cards in `app/modules/storyline/stubs.py`, steps 4, 8, 12); the MPI link `pat-j0001` ↔ `PT-J0001` is preset in step 3 and has no registry entry; `GET /api/agents` and `GET /api/agents/tools` give any signed-in user the registries; the storyline page has no per-step anchor; nine modules already have READMEs with the four sections but their third heading is spelled four ways and none quotes the registry's `eval_threshold` (added by WP10b afterwards); AI Ops, the agent runtime, the EHR platform (gateway, event bus, simulator, access, consent, signing) and the LLM call layer have no module README; `app/aiops/runs.latest_for` and `release.derive` already give each agent's latest run and status; the API does not create a database that does not exist; Playwright's Vite server needs `VITE_API_PROXY_TARGET` besides `PW_API_PORT`.
+
+Tasks:
+
+- [x] Roadmap and safety data: `apps/api/config/roadmap.yaml` (one card per row of the 8.1 table in the spec's order: pain, data source, risk tier, what it reuses with the files it would reuse, how the demo handles it, the registry entry and storyline step where there is one, the fixed footer) and `apps/api/config/safety.yaml` (the words only: tier definitions, allowed AI actions, regulatory notes, the side-effect levels' preconditions, the Level 0–4 mapping, nine guardrails with their code paths and evidence, five honest boundaries, the 6.7 positioning sentences). Module `app/modules/roadmap/` (`service.py`, `router.py`, README): the views join the YAML with the agent and tool registries (each tier's registered entries and the union of their sign-off roles, each level's registered tools, which levels each tier's entries reach), the storyline's steps and the eval runs (the guardrails' latest gates, the number of live runs); `check()` lists every drift (a card's tier against its registry entry, a stub step without a card, a tier, level or tool the YAML does not describe, missing reuse or code paths). `GET /api/roadmap`, `GET /api/roadmap/safety`, any signed-in user
+- [x] Web (`apps/web/src/features/roadmap/`, nav section **Architecture**, every role): **Roadmap** (`/roadmap`: 14 cards with filters by tier and "in the storyline", the fixed footer "Roadmap item, not implemented. Architecture: docs/data-model.md and the registry (apps/api/config/agents/)." on every card; the critical-value, deterioration and coding stubs show their registry entry (kind, tier, signer, tools, deployment, eval status, YAML path) and link to their storyline step; the MPI card links to step 3, where the preset `pat-j0001` ↔ `PT-J0001` link is used) and **Safety tiers** (`/safety`: positioning sentences with the registry counts, the three tiers with what the AI may and may never do, the signers from the registry, the regulatory note and the registered entries; the second axis with the registered tools per level and the tier × level matrix; the Level 0–4 mapping; guardrails with the latest run's gates; honest boundaries with the run facts; definition of done). `/storyline#step-N` opens and scrolls to that step
+- [x] Tests: `tests/test_roadmap.py` (9: one card per row of the spec's 8.1 table in order with the spec's tiers and preset rows, `check()` clean against the repository, the stubs' step and registry links, drift reported when a registry tier changes, every registry entry in exactly one tier and every tool in one level, tiers and positioning sentences as in the spec, guardrails and boundaries following the run files including a live run, both endpoints for six roles, `docs/safety-tiers.md` current); Playwright `e2e/roadmap.spec.ts` (2: the 14 cards and footers, the registry entries, the filter, a stub's link into the storyline; the tiers, signers, levels, matrix, mapping, guardrails with the run id the API reports, boundaries)
+- [x] Docs from the registries: `docs/safety-tiers.md`, generated by `apps/api/scripts/safety_doc.py` (`--check`; eval numbers left out so it changes only with the YAML or the registries); `docs/interview-narrative.md` (the spec's talk tracks for the medical director, the operations director and the technical lead, each sentence with the screen or file that proves it; honest boundaries; likely questions)
+- [x] Module READMEs with the four fixed sections (`Input resources`, `Output schema`, `Eval set and threshold`, `Known failure modes`). New: agent runtime and Tool Gateway (`app/agents/`), AI Ops (`app/aiops/`), EHR platform (`app/ehr/`: generator, FHIR store and gateway, events, simulator, access, break-glass, consent, signing), LLM call layer and de-identification (`app/llm/`), roadmap and the three stubs (`app/modules/roadmap/`), and one README for the 13 imaging-centre agents (`app/modules/README.md`). Aligned: the third heading of the 9 hospital module READMEs and 11 eval-set READMEs (spelled four ways before); each module README with agents now quotes their registry `eval_threshold` in a "Release gate (6.6)" paragraph. `tests/test_module_readmes.py`: the four sections in order in 24 READMEs, every agent with a model named once with its registry threshold (a README cannot quote a stale bar), every relative link in the newcomer docs and module READMEs resolves
+- [x] Eval summary `evals/README.md`, generated by `apps/api/scripts/eval_summary.py` (reads only: the run files through `app/aiops/runs.py`, the registry's thresholds and effective status, the module reports, the rating sheets; never runs an eval or touches `evals/results/`): 23 agents with eval set, threshold, latest result, module gates, run and release status; the platform suites (injection, workflows, simulator), flow models and storyline reports; the voice module reports; the two human rating sheets with their scored rows (0 of 30, 0 of 90). It says plainly that all 8 committed runs are mock baselines, that real-model runs are still to be done, and that the rating sheets are unscored
+- [x] README.md as the newcomer's path (what's inside, prerequisites, database, backend with key generation and seeding, web, optional Temporal, optional real model / HAPI / all-in-Docker, demo logins per role, the two storylines, evals, tests and Playwright, configuration table, troubleshooting with Windows notes, layout); `apps/api/.env.example` (APP_MODE, database creation, the workflow timers for a demo, Temporal inside Compose, CLINICAL_KG_DIR); `docs/DEPLOY.md` (the hospital EHR in the same database, HAPI not for servers, measured memory, the `workflows` profile, ports, troubleshooting) and an optional `workflows` profile in `docker-compose.prod.yml` (Temporal dev server and the worker); `demo/README.md` and `docs/README.md` indexes; Playwright's Vite server now follows `PW_API_PORT` (no separate `VITE_API_PROXY_TARGET` needed); product name checked
+- [x] Newcomer check (results below)
+- [x] Backend suite, `npx tsc -b`, Playwright (results below); this section and the overall status
+
+Results (2026-10-11, Sunday's generated data, mock model; own databases `ioc_test_wp10` and `ioc_wp10`, API on 9449, Vite on 5229):
+
+- **Backend, full suite** (`uv run pytest -q`, 769 tests, 21 min 51 s): 764 passed, 5 failed. The five are the known Sunday failures the `sunday-tests` session is fixing (they fail on the base commit the same day): `test_med_safety.py` `test_admission_reconciliation_signed_and_cosigned`, `test_workbench_flow_over_http`, `test_journey_medrec_step_retried_replays_the_draft_and_skips_a_record_already_signed` (the MedRec AI step refused) and `test_workflows.py` `test_capacity_workflow_executes_the_approval_and_checks_the_occupancy_an_hour_later`, `test_rejected_and_cleared_exceptions_record_their_outcome_too` ("2 >= 3" exceptions at 07:00). The new `test_roadmap.py` (9) and `test_module_readmes.py` (45) pass.
+- **`npx tsc -b`:** passes.
+- **Playwright:** full suite against the API on 9449 (46 tests, 27 min, the API restarted first): 40 passed, 2 skipped (the online workflow specs; Temporal off), 4 failed. One is the known Sunday failure of `med-safety.spec.ts` "pharmacist: queue, rule and AI flags…" (it fails on the base commit the same day, with the backend MedRec tests). Three ran late in the run, after `hospital-storyline.spec.ts` had reset the demo many times, and missed 5-second expectations: `storyline.spec.ts` (login cards, the backfill candidate) and `radiology-ops.spec.ts` (an exam marked completed); run alone on a freshly started API, `storyline.spec.ts` and `radiology-ops.spec.ts` pass 6 of 6. The new `roadmap.spec.ts` passes 2 of 2 (also on its own, 2.4 min with Vite's start), and `hospital-storyline.spec.ts` passed in the full run.
+- **Generated docs:** `scripts/safety_doc.py --check` current; `scripts/eval_summary.py` wrote `evals/README.md` and nothing else (`git status` on `evals/` before and after).
+
+Newcomer check (2026-10-11, literally from README.md: a fresh clone of this branch, a fresh database `ioc_newcomer`, API on 9451, mock model):
+
+| Step | Time |
+| --- | --- |
+| `git clone` | 12 s |
+| `docker compose up -d postgres` | 15 s (the container was already running on this machine; the clone used the existing Compose project, `-p imaging-ops-copilot`, since a second Postgres would collide on 5433) |
+| `cp .env.example .env`, `uv sync` (warm uv cache), PHI keys | 1 min 35 s |
+| `uv run python -m app.seed` | 2 min 58 s |
+| API start | about 1 min (the first page then about 20 s while caches fill) |
+| `npm install` (warm npm cache), `npm run dev` | 1 min 20 s + 8 s |
+| Login, Control Tower, Storyline pages | checked in the browser |
+| Temporal (the shared dev server, own namespace and task queue), `.env`, API restart, worker | about 2 min; Workflows status online, 1 worker |
+| Storyline **Reset to the start** | 2 min 31 s; the storyline at 07:00 with Temporal online |
+| **Total, clone to the whole demo running** | **25 min** (1,498 s), including about 5 minutes lost to the path-length problem below |
+
+Gaps found and fixed in README.md: (1) cloned under the session's scratchpad (a 150-character path), `uv run` failed with "DLL load failed while importing _collections_cy: The filename or extension is too long" (Windows' 260-character limit inside `.venv\Lib\site-packages`); a junction did not help (uv resolves it), so the clone moved to `D:\ioc-nc` (removed afterwards), and the README now says to clone into a short path, with a troubleshooting row; (2) the first page after the API starts takes 10–30 s; (3) the storyline and demo resets take 1–3 minutes, not "about a minute"; (4) starting the API takes about a minute even on a seeded database. Still manual by design: choosing a free port on Windows, creating a database for a non-default name, and (on this shared machine only) a Temporal namespace of one's own. A newcomer on a clean machine also downloads the Python and npm packages (the caches were warm here), a few minutes more.
+
+Found during the check, not fixed (not WP10): the standalone worker's first activities can race while building a table's row codec (`app/core/db/repo.py` `_codec` → `schema.mapping`, no lock): two threads create the same SQLAlchemy `Table` ("Table 'sites' is already defined for this MetaData instance"), and the pooled connection of the failed activity then reports "another command is already in progress". Temporal retries the activities and the worker recovers (status online, 1 worker), but the log fills with tracebacks right after a worker start and during a demo reset. A lock around the codec's first build would fix it.
+
+Notes and deviations:
+
+- Spec names → here: the roadmap "UI cards" are the **Roadmap** page (`/roadmap`) built from `apps/api/config/roadmap.yaml`; 8.3's table, "the picture for the medical director", is the **Safety tiers** page (`/safety`) and `docs/safety-tiers.md`; the talk tracks (three audiences) are `docs/interview-narrative.md`, off screen; "each module README, four sections" are the READMEs listed above; "eval report summary" is `evals/README.md`.
+- The fixed footer is in English per CLAUDE.md ("Roadmap item, not implemented. Architecture: docs/data-model.md and the registry (apps/api/config/agents/)."); the storyline's stub cards keep their own note, which says the same.
+- The MPI card is a card in the spec, but the storyline uses its preset link in step 3, so it is listed with the stubs under "In the storyline" and links to step 3; it has no registry entry, since nothing writes for it.
+- Built from the registries: the tiers' entries and signers, the tools per level, the counts and the guardrails' latest results are read live; only the words are in YAML. The signers shown are the registry's (they include the imaging roles), next to the spec's wording in the doc.
+- The safety doc leaves eval numbers out, so it does not change with every eval run; the boundary about mock baselines switches its text once a live run is committed (and the doc check then asks for a regeneration).
+- `followup_calls`: its newest run (`run-2026-10-10T063931`, the WP8 stamp run) found no eval set, so the release gate says "not evaluated in the latest run" although `run-2026-10-10T062526` judged its module gates; the summary shows both and the one command that brings them together (`uv run python -m app.aiops.evalrun followup_calls`). Not run here, to leave the committed runs as they are.
+- Imaging modules (phases 0–4): one combined README for their 13 agents rather than one per module; the imaging modules without a model (systems 2, 7, 10–15, 17, 18, 20 and most of 21) got no README of their own (their behaviour and limits are in this file, phases 1–4).
+- Product name: no real clinic name in code, UI or the new docs; `docs/SPEC.md` (the owner's spec, which links the job posting) and CLAUDE.md's rule are the only places the employer's name appears, unchanged.
+- `docs/DEPLOY.md` stays in Chinese, as the owner wrote it; the README says so.
+- `docker-compose.prod.yml` gains an optional `workflows` profile (Temporal dev server and worker; no stack change, Temporal is optional in production as decided on 2026-10-08); validated with `docker compose config`, not deployed.
+- Memory measured for DEPLOY.md: the API about 650 MB after seeding and a few pages (was "about 250 MB" before the hospital extension), Temporal's dev server about 200 MB.
+
+Limits:
+
+- The roadmap cards are words: nothing behind them is implemented beyond the three stubs on preset data.
+- The safety page reads every run file holding a platform suite once the runs change (cached afterwards); with hundreds of runs the first request slows down.
+- The eval summary and the safety doc are refreshed by their scripts, not automatically: the summary after a run (`scripts/eval_summary.py`), the doc after a registry change (the backend suite fails until `scripts/safety_doc.py` has run).
+- The newcomer check ran on this machine with warm package caches and an already running Postgres container; a cold machine adds the downloads.
 
 ## Environment notes
 

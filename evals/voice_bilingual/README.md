@@ -18,7 +18,7 @@ follow-up), every agent reply in the caller's language (a Chinese reply contains
 write-back (Communication, Task, Observation as expected); per pair: the
 same outcome in both languages.
 
-## Evaluation and thresholds
+## Eval set and threshold
 
 | Metric | Gate |
 | --- | --- |

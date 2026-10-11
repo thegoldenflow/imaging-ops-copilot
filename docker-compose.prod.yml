@@ -50,5 +50,47 @@ services:
       # Loopback only; Caddy on the host terminates HTTPS and proxies here.
       - "127.0.0.1:${WEB_PORT:-8088}:80"
 
+  # Optional: durable workflows (docs/SPEC-hospital.md 6.5; not needed in production, every module works without
+  # them). Start with `docker compose -f docker-compose.prod.yml --profile workflows up -d` and set
+  # TEMPORAL_ADDRESS=temporal:7233 in .env (the API reads it from there). Temporal's single-container dev server keeps
+  # its history in a SQLite file in a volume; its web UI is published on loopback only (ssh -L 8233:127.0.0.1:8233).
+  temporal:
+    image: temporalio/temporal:1.8.3
+    container_name: ioc_temporal
+    profiles: ["workflows"]
+    restart: unless-stopped
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--namespace", "hospital-demo",
+              "--db-filename", "/home/temporal/temporal.db", "--ui-port", "8233", "--log-level", "warn"]
+    ports:
+      - "127.0.0.1:${TEMPORAL_UI_PORT:-8233}:8233"
+    volumes:
+      - temporaldata:/home/temporal
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "namespace", "describe", "--namespace", "hospital-demo",
+             "--address", "127.0.0.1:7233"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    image: ${API_IMAGE:?set API_IMAGE=<dockerhub user>/imaging-ops-api:<tag> in .env}
+    container_name: ioc_worker
+    profiles: ["workflows"]
+    restart: unless-stopped
+    command: ["python", "-m", "app.workflows.worker"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://ioc:${POSTGRES_PASSWORD}@postgres:5432/ioc
+      TEMPORAL_ADDRESS: temporal:7233
+    healthcheck:
+      disable: true # the image's check calls the HTTP API, which the worker does not serve
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+
 volumes:
   pgdata:
+  temporaldata:

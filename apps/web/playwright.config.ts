@@ -27,6 +27,8 @@ export default defineConfig({
       command: `npx vite --host 127.0.0.1 --port ${webPort} --strictPort`,
       url: `http://127.0.0.1:${webPort}`,
       reuseExistingServer: true,
+      // Vite proxies /api to the API above unless VITE_API_PROXY_TARGET says otherwise.
+      env: { VITE_API_PROXY_TARGET: process.env.VITE_API_PROXY_TARGET ?? apiUrl },
     },
   ],
 });

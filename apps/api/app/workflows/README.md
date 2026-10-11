@@ -57,7 +57,7 @@ that will own them: the follow-up call (WP8), NEWS2 flags (WP9's 8.1 stub), codi
 - Audit: `workflow_retry`, `workflow_skip`, `workflow_start`, `workflow_fault` (event type write, module
   workflow_engine) besides the tool calls' own events.
 
-## Evaluation and thresholds
+## Eval set and threshold
 
 No model is judged here; the acceptance criteria are the eval (`scripts/workflow_eval.py` → `evals/workflows/`):
 the journey with failures injected into the MedRec activity after its draft was written, retried (1 s, 4 s), leaves

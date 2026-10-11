@@ -18,7 +18,7 @@ medications and write the draft record (`service.settle`).
 One row per medication, keyed `ok-`, `om-`, `dc-`, `new-<rxcui>` and `dup-<class>`, typed match, omission,
 dose_change, duplicate_therapy, new or new_without_indication. Labels: `expected.items`, the type of every row.
 
-## Evaluation and thresholds
+## Eval set and threshold
 
 | Metric | Gate |
 | --- | --- |

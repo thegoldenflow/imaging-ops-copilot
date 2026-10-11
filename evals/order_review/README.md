@@ -25,7 +25,7 @@ Concern types: interaction, renal, allergy, dose, duplicate_therapy, duplicate_t
 age_related, other. Labels: `expected.concerns` (the types a pharmacist reviewer would want flagged) and, for
 medication orders, `expected.indicated` (whether the diagnosis list holds an indication).
 
-## Evaluation and thresholds
+## Eval set and threshold
 
 | Metric | Gate |
 | --- | --- |

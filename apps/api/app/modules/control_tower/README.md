@@ -34,12 +34,14 @@ API's hospital loop refreshes after every event drain (every second).
   a reason, defer with a reminder on the hospital clock. Audit: `approve` (accept / reject) on the review Task,
   `tool_call` per Task, `write` for a deferral.
 
-## Evaluation and thresholds
+## Eval set and threshold
 
 - Rule engine: 20 scripted scenarios, all must match (`evals/control_tower/rules/`).
 - Narrator: 30 exceptions from the seeded hospital, 100% schema-valid and 100% resolvable evidence; human rating
   >= 4/5 pending (`evals/control_tower/`).
 - Flow models: the spec's baselines and gates on a time split (`apps/api/models/flow/`).
+
+Release gate (6.6): `control_tower` eval_threshold 0.9 in the agent registry (`apps/api/config/agents/`); the runner `uv run python -m app.aiops.evalrun` judges every agent against it, and the latest results of every agent are in [evals/README.md](../../../../../evals/README.md).
 
 ## Known failure modes
 

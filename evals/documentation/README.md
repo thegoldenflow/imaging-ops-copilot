@@ -29,7 +29,7 @@ documentation service (the demo physician and nurse).
 - Labels (`expected`): diagnosis and procedure codes, follow-up clinics, pending tests, the patient's language;
   medication categories are checked against the signed discharge medication table.
 
-## Evaluation and thresholds
+## Eval set and threshold
 
 | Metric | Gate |
 | --- | --- |

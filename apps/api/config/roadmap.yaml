@@ -1,0 +1,207 @@
+# Roadmap module stubs (docs/SPEC-hospital.md 8.1; loader app/modules/roadmap/service.py).
+#
+# One card per row of the spec's 8.1 table, in the spec's order. These modules are not implemented: the cards show
+# that the platform (registry, Tool Gateway, review queue, workflows, evals) can grow them. Three of them run once in
+# the hospital storyline on preset data (registry modules, kind `module`, eval not applicable), and the MPI link of
+# the storyline's patient is preset too.
+#
+# Fields:
+#   id           stable card id (the web page's anchor)
+#   title        the module
+#   pain         the problem it addresses
+#   data_source  the FHIR resources or systems it would read
+#   risk_tier    ops | documentation | clinical_ds (spec 8.3); for a card with a `registry` entry it must equal the
+#                entry's risk_tier (tested)
+#   reuses       what it reuses (spec wording), and reuse_refs: the files in this repository that it would reuse
+#                (tested to exist)
+#   demo         card (a card only) | preset (walked through once in the storyline on preset data)
+#   demo_note    how the demo handles it
+#   registry     the registry entry (apps/api/config/agents/<id>.yaml) when one exists
+#   storyline    the storyline step key (app/modules/storyline/script.py) that walks through it
+#   spec_ref     the supplement system (6.7) it absorbs, where there is one
+
+footer: "Roadmap item, not implemented. Architecture: docs/data-model.md and the registry (apps/api/config/agents/)."
+
+cards:
+  - id: critical_value_routing
+    title: Critical lab value routing
+    pain: Critical results are not seen in time.
+    data_source: Observation (LOINC) and a critical-value threshold table
+    risk_tier: clinical_ds
+    reuses: 7.1 exception flow, 7.4 escalation
+    reuse_refs:
+      - apps/api/app/modules/control_tower/exceptions.py
+      - apps/api/app/modules/voice_services/redflags.py
+      - apps/api/app/agents/approvals.py
+    demo: preset
+    demo_note: "A preset INR of 3.8 against a preset threshold of 3.5 is routed to the ED physician as a review card to acknowledge."
+    registry: critical_value_routing
+    storyline: inr
+
+  - id: deterioration_alert
+    title: Nursing deterioration alert
+    pain: Deterioration is noticed late.
+    data_source: Vital-sign Observations scored as NEWS2
+    risk_tier: clinical_ds
+    reuses: 7.1 exception flow, Flag
+    reuse_refs:
+      - apps/api/app/modules/control_tower/rules.py
+      - apps/api/config/tools/createFlag.yaml
+      - apps/api/app/workflows/journey.py
+    demo: preset
+    demo_note: "A preset NEWS2 score of 7 on the first post-operative night raises a NEWS2 flag and a nurse card."
+    registry: deterioration_alert
+    storyline: news2
+
+  - id: pathology_structured_report
+    title: Structured pathology reports
+    pain: Free-text pathology reports are hard to search.
+    data_source: DiagnosticReport (pathology)
+    risk_tier: documentation
+    reuses: 7.3 documentation pipeline
+    reuse_refs:
+      - apps/api/app/modules/documentation/validator.py
+      - apps/api/app/modules/reports/service.py
+    demo: card
+    demo_note: Card only.
+
+  - id: inpatient_imaging_priority
+    title: Inpatient imaging priority queue
+    pain: Inpatient imaging is queued together with outpatient exams.
+    data_source: ServiceRequest.priority and Encounter.class
+    risk_tier: ops
+    reuses: Imaging modules and 7.1
+    reuse_refs:
+      - apps/api/app/modules/triage/service.py
+      - apps/api/app/modules/backlog/service.py
+      - apps/api/app/modules/control_tower/snapshot.py
+    demo: card
+    demo_note: Card only.
+
+  - id: coding_assist
+    title: Health-records coding assistance
+    pain: Coder workload and coding consistency.
+    data_source: Signed discharge summary, suggested as ICD-10-CA and CCI codes
+    risk_tier: documentation
+    reuses: 7.3 output
+    reuse_refs:
+      - apps/api/app/modules/documentation/document.py
+      - apps/api/app/agents/approvals.py
+    demo: preset
+    demo_note: "One preset coding suggestion (ICD-10-CA S72.0 with W19, I48, Z92.1; CCI 1.VA.53) from the signed discharge summary, accepted by the clerk as coder."
+    registry: coding_assist
+    storyline: coding
+
+  - id: ohip_claim_precheck
+    title: OHIP claim pre-check
+    pain: Claims come back rejected.
+    data_source: Encounter, Procedure and codes
+    risk_tier: ops
+    reuses: Rule engine
+    reuse_refs:
+      - apps/api/app/modules/billing/service.py
+      - apps/api/app/integrations/mocks.py
+    demo: card
+    demo_note: Card only.
+
+  - id: supply_chain
+    title: Ward supply chain
+    pain: Wards run out of supplies and nurses search for them.
+    data_source: Supply master data and consumption records
+    risk_tier: ops
+    reuses: The warehouse agent, reskinned as a whole
+    reuse_refs:
+      - apps/api/app/modules/inventory/service.py
+    demo: card
+    demo_note: Card only.
+
+  - id: staffing_demand_forecast
+    title: Staffing demand forecast
+    pain: Nurse staffing does not match patient volume.
+    data_source: The 7.1 admission and occupancy forecasts
+    risk_tier: ops
+    reuses: 7.1 models
+    reuse_refs:
+      - apps/api/app/modules/control_tower/flowmodels.py
+      - apps/api/models/flow/README.md
+    demo: card
+    demo_note: Card only.
+
+  - id: outpatient_consult_triage
+    title: Outpatient consult triage
+    pain: Referral backlog.
+    data_source: ServiceRequest (consult)
+    risk_tier: clinical_ds
+    reuses: 7.2 review service
+    reuse_refs:
+      - apps/api/app/modules/med_safety/service.py
+      - apps/api/app/modules/triage/service.py
+    demo: card
+    demo_note: Card only.
+
+  - id: mpi
+    title: Master patient index (MPI)
+    pain: The same patient appears more than once across data sources.
+    data_source: Patient identifiers and demographics
+    risk_tier: ops
+    reuses: 6.1 master index
+    reuse_refs:
+      - apps/api/app/ehr/imaging.py
+      - apps/api/app/ehr/gateway.py
+    demo: preset
+    demo_note: "Card only; no matching logic. In the storyline one preset link (hospital patient pat-j0001 to imaging-centre record PT-J0001) lets her hip imaging go through the imaging centre's own pipeline."
+    storyline: imaging
+    spec_ref: Supplement system 24 (Master Patient Identity)
+
+  - id: integration_health
+    title: Integration health and data quality panel
+    pain: Interface failures and missing fields go unnoticed.
+    data_source: Adapter metrics and schema validation failures
+    risk_tier: ops
+    reuses: 6.2 adapter contract
+    reuse_refs:
+      - apps/api/app/integrations/contract.py
+      - apps/api/app/ehr/hl7.py
+    demo: card
+    demo_note: "Card only. The parts that exist: circuit states and dead letters on the admin integrations API (GET /api/admin/integrations)."
+    spec_ref: Supplement system 27 (Integration Health & Data Quality)
+
+  - id: knowledge_retrieval
+    title: Unified knowledge retrieval service
+    pain: Each module runs its own retrieval (RAG).
+    data_source: Guidelines, SOPs and policy documents
+    risk_tier: documentation
+    reuses: The 7.2 and 7.4 retrieval
+    reuse_refs:
+      - apps/api/app/modules/med_safety/knowledge.py
+      - apps/api/app/modules/voice_services/kb.py
+      - apps/api/app/modules/inspection/policies.py
+    demo: card
+    demo_note: Card only; each module keeps its own retrieval.
+    spec_ref: Supplement system 30 (Knowledge & Retrieval Service)
+
+  - id: nl_ops_analytics
+    title: Natural-language operations analytics
+    pain: Managers wait for reports to get answers.
+    data_source: Metrics service and SQL
+    risk_tier: ops
+    reuses: The warehouse project's text-to-SQL
+    reuse_refs:
+      - apps/api/app/modules/referrals/service.py
+    demo: card
+    demo_note: "Card only. The closest existing piece: the referral weekly summary, whose every number is filled in from queries."
+    spec_ref: Supplement system 39 (Executive Intelligence & NL Analytics)
+
+  - id: extension_packs
+    title: Workforce scheduling, lab operations, revenue cycle
+    pain: The supplement's 8B extension packs B, D and F.
+    data_source: Their own systems
+    risk_tier: ops
+    reuses: The 6.4-6.6 platform layer
+    reuse_refs:
+      - apps/api/app/agents/gateway.py
+      - apps/api/app/workflows/base.py
+      - apps/api/app/aiops/evalrun.py
+    demo: card
+    demo_note: Card only.
+    spec_ref: Supplement 8B extension packs B, D, F
