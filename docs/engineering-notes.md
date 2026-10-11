@@ -1,9 +1,9 @@
 # Engineering notes: concurrency and the database layer
 
 Small technical problems found while running the platform, each with its cause, the fix, the evidence and where the
-code lives. They come from three follow-ups after WP10 (2026-10-11: commits b95d2a3 and 5eed672, and the fix to the
-workflow tests' harness); the full records are in [PROGRESS.md](PROGRESS.md) under "WP10 follow-up". Open items are at
-the end.
+code lives. They come from four follow-ups after WP10 (2026-10-11: commits b95d2a3 and 5eed672, the fix to the workflow
+tests' harness, and COPY for the demo reset's writes); the full records are in [PROGRESS.md](PROGRESS.md) under "WP10
+follow-up". Open items are at the end.
 
 ## 1. `functools.cache` is not a lock
 
@@ -90,7 +90,7 @@ the end.
   | Step | Time |
   | --- | --- |
   | TRUNCATE of 64 tables | 1.3 s |
-  | Inserts | 20.9 s, of which `fhir_resources` (64,653 rows) 14.0 s and `appointments` 3.0 s |
+  | Inserts (COPY since note 8) | 20.9 s, of which `fhir_resources` (64,653 rows) 14.0 s and `appointments` 3.0 s |
   | Encoding (now before the lock) | 4–6 s |
   | Generating (before the lock) | 14–18 s |
 
@@ -123,11 +123,44 @@ the end.
   `tests/test_workflows.py::test_stopping_the_worker_lets_an_activity_finish_the_query_it_is_in`,
   `tests/test_db_threads.py::test_a_test_whose_connection_is_left_mid_query_still_ends_cleanly`.
 
+## 8. Bulk writes under a lock: COPY, with the INSERT's values
+
+- **Problem.** After note 3 a reset held `REWRITE_LOCK` only while it wrote, but the writes alone took 14–21 s under
+  light load and up to 44 s under heavy load. An activity that started waiting for the lock as they began could still
+  reach `workflows.recordProgress`'s 30-second start-to-close timeout: it waited longer than 30 s in 3 of 6 timed
+  resets.
+- **Cause.** `persist` wrote its 64 tables with batched INSERTs (2,000 rows per `executemany`), which the server runs
+  as one INSERT per row. `fhir_resources` (64,653 rows, 94 MB, mostly encrypted resource bodies) took most of the
+  time, `appointments` most of the rest.
+- **Fix.** `persist` writes every table with COPY (psycopg's `cursor.copy` and `write_row`) on the reset's own
+  connection, inside its transaction. Each value first goes through its column's SQLAlchemy bind processor, as for an
+  INSERT. Without that step JSONB goes wrong in two ways: psycopg sends a Python list as a PostgreSQL array, and
+  `None` arrives as SQL NULL where the INSERT stored JSON `null` (`module_state.data` is NOT NULL). The lock, TRUNCATE
+  ... RESTART IDENTITY, the id sequences and rollback are unchanged.
+- **Evidence.** INSERT and COPY resets alternated on a seeded test database, three rounds:
+
+  | | INSERT | COPY |
+  | --- | --- | --- |
+  | Writes, rounds 2–3 (lighter load, close to note 3's) | 14.5–17.4 s | 6.6–6.7 s |
+  | Lock held, rounds 2–3 | 15.8–19.2 s | 8.0–8.2 s |
+  | `fhir_resources` / `appointments`, rounds 2–3 | 8.9–11.0 s / 2.8–3.2 s | 5.6–5.7 s / 0.4 s |
+  | Writes / lock held, round 1 (heavy load) | 31.7 s / 39.3 s | 17.3 s / 23.5 s |
+  | Wait of an activity arriving as the writes begin, all 6 runs | 15.7–53.8 s | 7.9–23.3 s |
+
+  A test writes the real generated data set both ways and compares every table row by row, as PostgreSQL's text form
+  of the whole row (`t::text`), which tells SQL NULL from JSON `null`. It fails with a COPY writer that sends JSONB
+  `None` as SQL NULL.
+- **Where the rest goes.** On this machine, sending the 94 MB from Windows through Docker Desktop's port forward is
+  slow (7–9 MB/s; a container on the compose network sent it 2–9 times faster). PostgreSQL's own work for
+  `fhir_resources`, with 8 indexes and WAL, took 4.5–7.0 s.
+- **Code.** `apps/api/app/core/store.py` (`persist`, `_copy_rows`); `tests/test_persist.py`.
+
 ## Open optimizations
 
-- **Shorter writes under the lock.** Use COPY instead of INSERT for `fhir_resources`, or give the activities that take
-  the lock a longer start-to-close timeout. While the writes alone can exceed 30 s, an activity that starts waiting
-  just as they begin can still time out. It is then retried, without tracebacks.
+- **Writes under heavy load.** With COPY the writes take 6–7 s, but 12–17 s when other suites hold the CPU, with the
+  lock held up to 23.5 s, and a storyline reset adds about 5 s under the lock. If the 30-second timeout needs more
+  margin: a longer start-to-close timeout for the activities that take the lock (the owner's decision: it changes
+  workflow timing), or COPY into temporary tables before the lock is taken and `INSERT ... SELECT` under it.
 - **A failed unit of work in the tests.** The ambient branch of `unit_of_work()` only skips its `save()` when the
   block raises, so the next unit of work's `save()` writes the changes a failed activity left pending, and its SQL
   stays in the outer transaction. In production the activity's transaction is rolled back. A savepoint per ambient

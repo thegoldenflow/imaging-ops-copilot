@@ -21,8 +21,9 @@ from contextvars import ContextVar
 from datetime import datetime
 from typing import Any
 
-from psycopg import pq
-from sqlalchemy import Connection, Engine, Table, create_engine, select, text
+import psycopg
+from psycopg import pq, sql
+from sqlalchemy import Connection, Dialect, Engine, Table, create_engine, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.core.audit import AuditLog
@@ -355,7 +356,7 @@ def unit_of_work() -> Iterator[Store]:
 
 
 def encode_rows(src: Store) -> list[tuple[Table, list[dict]]]:
-    """Every row of a detached store as persist() inserts it (PHI encrypted, JSON encoded), table by table. CPU work
+    """Every row of a detached store as persist() writes it (PHI encrypted, JSON encoded), table by table. CPU work
     only, so reset_store() does it before it takes the lock."""
     if not src.detached:
         raise ValueError("encode_rows() reads a detached store")
@@ -365,9 +366,23 @@ def encode_rows(src: Store) -> list[tuple[Table, list[dict]]]:
                    (schema.audit_events, src.audit.encoded_rows()), (fhir_resources, src.fhir.encoded_rows())]
 
 
+def _copy_rows(cursor: psycopg.Cursor, dialect: Dialect, table: Table, rows: list[dict]) -> None:
+    """COPY rows into a table, with the values an INSERT of the same rows would send: each column's bind processor
+    runs first (JSONB's wraps the value, so None becomes JSON null, as with INSERT). The columns are the first
+    row's keys; columns left out get their defaults (identity `seq`, `updated_at`)."""
+    columns = [table.c[key] for key in rows[0]]
+    procs = [(c.key, c.type.dialect_impl(dialect).bind_processor(dialect)) for c in columns]
+    stmt = sql.SQL("COPY {} ({}) FROM STDIN").format(
+        sql.Identifier(table.name), sql.SQL(", ").join(sql.Identifier(c.name) for c in columns))
+    with cursor.copy(stmt) as copy:
+        for row in rows:
+            copy.write_row([row[key] if proc is None else proc(row[key]) for key, proc in procs])
+
+
 def persist(src: Store, into: Store, rows: list[tuple[Table, list[dict]]] | None = None) -> None:
     """Replace everything in the database with the contents of a detached store (`rows`: its encode_rows(), when the
-    caller has them already)."""
+    caller has them already). The rows are written with COPY, in the same transaction: a reset runs this under its
+    lock, and COPY takes about half as long as INSERT (docs/engineering-notes.md, note 8)."""
     if not src.detached or into.detached:
         raise ValueError("persist() copies a detached store into a database store")
     rows = encode_rows(src) if rows is None else rows
@@ -376,9 +391,10 @@ def persist(src: Store, into: Store, rows: list[tuple[Table, list[dict]]] | None
     tables = ", ".join(f'"{t}"' for t in schema.data_tables())
     conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY"))
     into.rewritten = True
-    for table, encoded in rows:
-        for i in range(0, len(encoded), 2000):
-            conn.execute(table.insert(), encoded[i:i + 2000])
+    with conn.connection.dbapi_connection.cursor() as cursor:
+        for table, encoded in rows:
+            if encoded:
+                _copy_rows(cursor, conn.dialect, table, encoded)
     for prefix, n in src._counters.items():
         name = _ensure_sequence(prefix)
         conn.execute(text("SELECT setval(:seq, :n)"), {"seq": name, "n": n})

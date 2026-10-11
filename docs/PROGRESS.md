@@ -1139,7 +1139,7 @@ Not run: Playwright (no screen changed) and a live reset against a running worke
 
 Not changed (follow-ups):
 
-- The writes themselves take 18–30 s here, so an activity that starts waiting right at the start of them can still reach `recordProgress`'s 30-second timeout on a slow run (a storyline reset adds about 5 s). It is then retried as before, without tracebacks. Two options: COPY instead of INSERT for `fhir_resources`, or a longer start-to-close timeout for the activities that take the lock.
+- The writes themselves take 18–30 s here, so an activity that starts waiting right at the start of them can still reach `recordProgress`'s 30-second timeout on a slow run (a storyline reset adds about 5 s). It is then retried as before, without tracebacks. Two options: COPY instead of INSERT for `fhir_resources`, or a longer start-to-close timeout for the activities that take the lock. COPY done afterwards: see "the demo reset writes its rows with COPY" below.
 - The Temporal test harness (`tests/temporal_harness.py`): `stop_worker` cancels in-flight activities, and one cancelled mid-query leaves the test's shared connection busy (the intermittent teardown error above). Either of two changes would fix it: let running activities finish before the shutdown (a graceful shutdown timeout), or have the fixture cancel a busy query, as `EngineSource` does. Under two extra CPU-bound processes, one run of the same test on b95d2a3 also hung until its 900-second timeout and left its Temporal test server running. Fixed afterwards (both changes): see the next entry.
 
 ### WP10 follow-up · the workflow tests' worker lets its activities finish when it stops — done
@@ -1176,6 +1176,40 @@ Not changed (follow-ups):
 
 - `start_worker` gives the worker 120 s to start. That includes building it, which validates each workflow in Temporal's sandbox, on the event loop. Under 100% CPU the limit was reached once (above), and the test failed. Where the time went was not measured.
 - In the tests, a failed unit of work is not rolled back. The ambient branch of `unit_of_work()` only skips its `save()`, so changes a failed activity left pending are written by the next unit of work's `save()`, and its SQL stays in the outer transaction. In production the activity's transaction is rolled back. A savepoint per ambient unit of work would close the gap.
+
+### WP10 follow-up · the demo reset writes its rows with COPY — done
+
+Follow-up to "the demo reset holds its lock only while it writes" (2026-10-11); summarised in [engineering-notes.md](engineering-notes.md), note 8. Under `REWRITE_LOCK` the reset still wrote its rows with batched INSERTs: the lock was held 18–20 s in that entry's timings, and the inserts took 20.9 s in its breakdown, 14.0 s of it for `fhir_resources` (64,653 rows). A workflow activity that started waiting for the lock as the writes began could reach `workflows.recordProgress`'s 30-second start-to-close timeout on a slow run.
+
+- [x] `app/core/store.py` `persist`: every table's rows go in with PostgreSQL COPY (`_copy_rows`: psycopg's `cursor.copy` and `write_row`), on the reset's own connection and inside its transaction. Nothing else changed: the lock is taken where it was, and TRUNCATE ... RESTART IDENTITY, the id sequences, `seeded_at` and rollback work as before. The rows are still those of `encode_rows()`, with PHI encrypted.
+- [x] The values are those an INSERT sends: each column's SQLAlchemy bind processor runs before COPY gets the value. This matters for JSONB. Its processor wraps the value, so a list stays JSON (psycopg would otherwise send it as a PostgreSQL array), and `None` becomes JSON `null`, as INSERT stored it, rather than SQL NULL. The columns are the first row's keys, as with INSERT; columns left out (`seq`, `module_state.updated_at`) get their defaults.
+- [x] `tests/test_persist.py` (1). The real generated data set is written once with INSERT (the old loop, patched in) and once with COPY, each in a savepoint of the test's transaction. Every data table is then compared row by row, as the MD5 of PostgreSQL's text form of the whole row (`t::text`). That covers every column type (text, bigint, double precision, boolean, timestamp, date, JSONB, bytea), and the text form tells SQL NULL from JSON `null`. The test adds values that COPY's text format has to escape (tab, newline, backslash, the literal `\N`, quotes, non-ASCII), JSON nulls and an image holding all 256 byte values. With a scratch COPY writer that sends JSONB `None` as SQL NULL, the test fails.
+
+Timings 2026-10-11 (own test database `ioc_test_copy`, seeded; this machine, with other sessions' suites running). Same probe as the entry above, plus a second activity-like waiter that asks for the shared lock as soon as the reset has it, so it waits for all of the writes; this is the case the timeout is about. INSERT and COPY resets alternated, one reset each, in three rounds. The load fell during the run: the unchanged generation step took 24–35 s in round 1 and 13–22 s in rounds 2 and 3, against 14–18 s in the entry above.
+
+| Round | Rows written with | TRUNCATE | `fhir_resources` | `appointments` | All writes | Lock held | Waiter at 2 s waited | Waiter at the start of the writes waited |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 (heavy load) | INSERT | 6.9 s | 20.8 s | 5.6 s | 31.7 s | 39.3 s | 0.6 s | 39.0 s |
+| 1 (heavy load) | COPY | 5.7 s | 14.5 s | 0.9 s | 17.3 s | 23.5 s | 0.1 s | 23.3 s |
+| 2 | INSERT | 1.4 s | 11.0 s | 3.2 s | 17.4 s | 19.2 s | 0.0 s | 19.1 s |
+| 2 | COPY | 1.1 s | 5.6 s | 0.4 s | 6.6 s | 8.0 s | 0.1 s | 7.9 s |
+| 3 | INSERT | 1.0 s | 8.9 s | 2.8 s | 14.5 s | 15.8 s | 0.1 s | 15.7 s |
+| 3 | COPY | 1.2 s | 5.7 s | 0.4 s | 6.7 s | 8.2 s | 0.2 s | 8.1 s |
+
+- Earlier the same day, three INSERT resets and then three COPY resets ran one after the other (not alternated, under heavier load). INSERT: writes 20.8–43.8 s (`fhir_resources` 14.0–32.8 s, `appointments` 3.1–4.8 s), lock held 28.0–54.4 s. COPY: writes 11.6–14.3 s (`fhir_resources` 9.8–12.3 s, `appointments` 0.6–0.7 s), lock held 13.6–18.6 s.
+- The waiter at the start of the writes, over all runs: with INSERT 15.7–53.8 s, over 30 s in 3 of 6 resets; with COPY 7.9–23.3 s, under 30 s in all 6.
+- TRUNCATE (1.0–8.8 s) is unchanged code and follows the load.
+- Where the rest of the `fhir_resources` time goes (94 MB of COPY data, mostly the encrypted resource bodies). Building the value lists took 0.2–0.4 s and psycopg's formatting 1.0–1.2 s. Most of the rest is the transfer and PostgreSQL's own work. From Windows, through Docker Desktop's port forward, the formatted data took 10–14 s to send into a temporary table without indexes (7–9 MB/s), while reading the same data back took 3–4.6 s. In a second comparison, alternating at a busier moment, sending it from Windows took 20–39 s into a temporary table and 21–34 s into `fhir_resources`; from a container on the compose network (the deployed path) it took 4.2–4.8 s and 10.5–12.9 s. PostgreSQL alone (`INSERT ... SELECT` from a temporary table) took 1.3–2.6 s into a temporary table and 4.5–7.0 s into `fhir_resources`, with its 8 indexes and WAL.
+
+Tests 2026-10-11 (Sunday's generated data, mock model, own test database `ioc_test_copy`):
+
+- `tests/test_persist.py`, `test_reset_lock.py`, `test_db.py` and `test_ehr_store.py`: 22 of 22 passed.
+- Backend suite: 779 of 779 passed in 14 min 53 s.
+- Not run: Playwright (no screen changed) and a live reset against a running worker and Temporal.
+
+Not changed (follow-ups):
+
+- Under heavy load the writes still take 12–17 s and the lock is held up to 23.5 s (a storyline reset adds about 5 s of preset and audit under the lock), so the 30-second timeout has less margin then. Two options if that margin is needed: a longer start-to-close timeout for the activities that take the lock (it changes workflow timing: the owner's decision), or sending the rows before the lock is taken (COPY into temporary tables first, then `INSERT ... SELECT` under the lock, 4.5–7.0 s for `fhir_resources` above).
 
 ## Environment notes
 
