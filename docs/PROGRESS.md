@@ -1099,7 +1099,48 @@ Tests 2026-10-11 (Sunday's generated data, mock model, own test database `ioc_te
 
 Not changed (follow-ups):
 
-- `reset_store` takes the demo-reset lock before it generates the data, so the lock is held for the whole reset, which takes 1–3 minutes. Activities that wait for the lock longer than their timeouts are cancelled and retried until the reset ends (now without the rollback and pool tracebacks). Generating the detached store before taking the lock would leave only the TRUNCATE and the inserts under it.
+- `reset_store` takes the demo-reset lock before it generates the data, so the lock is held for the whole reset, which takes 1–3 minutes. Activities that wait for the lock longer than their timeouts are cancelled and retried until the reset ends (now without the rollback and pool tracebacks). Generating the detached store before taking the lock would leave only the TRUNCATE and the inserts under it. Done afterwards: see the next entry.
+
+### WP10 follow-up · the demo reset holds its lock only while it writes — done
+
+Follow-up to the entry above (2026-10-11). `reset_store` took `REWRITE_LOCK` exclusively and only then generated the data set. Workflow activities (`activities._work()`, `pg_advisory_xact_lock_shared`) and the API's background steps therefore waited for the whole reset, and `workflows.recordProgress` (30-second start-to-close timeout) timed out and was retried until the reset ended.
+
+- [x] `app/core/store.py`: `reset_store` generates the detached store (`build_store`) and encodes its rows before it takes the lock. Encoding is the new `encode_rows`: PHI encryption and JSON, about 5 s, which used to run inside `persist`. Only `persist` (TRUNCATE, the inserts, the id sequences, `seeded_at`) and `clear_process_cache` run under the lock. `persist(src, into)` still works on its own and encodes the rows itself when it is not given them. The lock is still transaction-scoped, as before, so it also covers what the caller writes after the reset in the same transaction (the audit record, the storyline's preset, `bridge.on_reset`, which only submits the terminate call) and the commit.
+- [x] Generation needs neither the database nor the lock. To check, `build_store()` ran with `DATABASE_URL` on a closed port while every engine's statements, `get_engine()`, `ambient_store()` and both process caches were recorded. It ran no SQL and used no engine, no ambient store and no row cache. It had one hidden dependency, now fixed. Module state of kind "cache" (`noshow`, `phipa_cache`, `inspection_index`) went into the process-wide `_PROCESS_CACHE`, even for a detached store. The PHIPA seed calls `detect()`, which returns the cached `phipa_cache` entry whenever the audit event counts match, and the inspection seed drops `inspection_index`. While generation ran under the lock, no background step in the process could run in between; now one can. `app/core/db/repo.py` therefore gives a detached store caches of its own. This also applies to the evals' detached data sets, which no longer share a no-show model or a PHIPA result.
+- [x] Callers of `reset_store`: the admin reset (`/demo/reset`); the daily reset (`maybe_daily_reset`, inside `_step`, which holds the lock shared and upgrades it in the same transaction, as before); the storyline reset (`storyline.service.reset`: the reset, then `preset.plant` on the database store, under the lock); first-start seeding (`init_db`, under `_INIT_LOCK`); `python -m app.seed`; and the test fixture. None of them reads anything before the reset that generation needs, and `persist` has no other caller.
+- [x] Two resets at once both generate at the same time (two threads in one process, or two processes), then write one after the other: the second waits for the first's transaction, and the last to commit wins, as before. Two concurrent generations in one process give the same data as one generation alone (compared decoded, collection by collection). They differ only in critical cases, feedback survey tokens and the outbox, and two sequential runs differ there too (wall-clock times and random tokens).
+- [x] `tests/test_reset_lock.py` (3). An empty detached store stands in for the generated one, and every reset is rolled back.
+  - An activity that takes the lock shared while the reset generates goes ahead. One that starts while the reset writes waits until the reset's transaction ends.
+  - Two concurrent resets both reach a barrier inside generation (it breaks if one generated under the other's lock), then write in turn. The second is seen waiting in `pg_locks`.
+  - A detached store's caches stay its own.
+  - All three fail on the previous code.
+
+Timings 2026-10-11 (own test database `ioc_test_lockscope`, seeded; this machine, with other sessions running). A prober tried the shared lock every 0.2 s, and an activity-like waiter took it 2 s into each reset:
+
+| Reset | Generate | Encode | Persist (under the lock) | Lock held | Waiter at 2 s waited |
+| --- | --- | --- | --- | --- | --- |
+| Before, run 1 / run 2 | 18.6 s / 17.8 s | inside persist | 55.5 s / 35.5 s | 74.0 s / 52.6 s | 72.0 s / 51.4 s |
+| After, run 1 / run 2 | 17.7 s / 14.4 s | 5.8 s / 4.0 s | 18.3 s / 20.3 s | 18.1 s / 20.3 s | 0.0 s / 0.1 s |
+| After, storyline reset | 18.1 s | 5.9 s | 22.8 s, then 4.7 s preset and audit | 27.6 s | 0.1 s |
+
+Before run 1 seeded an empty database, so the first data rewrite (run 2) is the one to compare. Persist varies with the load on the shared PostgreSQL: a separate breakdown measured TRUNCATE (64 tables) at 1.3 s and the inserts at 20.9 s, of which `fhir_resources` (64,653 rows) took 14.0 s and `appointments` 3.0 s. A whole reset took 39–54 s here, less than the README's "1–3 minutes", which was measured under heavier load (not changed).
+
+Tests 2026-10-11 (Sunday's generated data, mock model, own test database `ioc_test_lockscope`):
+
+- `tests/test_reset_lock.py`, `test_db_threads.py`, `test_db.py` and `test_ehr_store.py`: 24 of 24 passed.
+- Backend suite, run 1: 775 passed, 1 failed and 1 error, in 28 min.
+  - The failure was `test_flagships.py::test_cancellation_produces_ranked_backfill_within_5_seconds`: 7.1 s against its 5-second limit while the machine was busy. It passes on its own (3.4 s), as already noted under WP9.
+  - The error was at the teardown of `test_workflows.py::test_the_storylines_journey_starts_in_the_ed_and_waits_on_her_cards_and_her_bed`: "another command is already in progress" on the test's shared connection. It is intermittent and predates this change. Run on its own, that test errored on b95d2a3 in 1 of 10 runs and with this change in 3 of 6; the samples are too small to compare rates.
+  - This change cannot reach that test. It never calls the reset code, and it uses only database stores, whose caches are unchanged.
+  - Cause: when the harness stops the worker, it cancels the in-flight activities. A `workflows.recordProgress` cancelled in the middle of a query (psycopg's wait loop on Windows, see the entry above) leaves the shared `ConnectionSource` connection busy, and the fixture's rollback then fails.
+- Backend suite, run 2: 776 of 776 passed in 20 min 38 s.
+
+Not run: Playwright (no screen changed) and a live reset against a running worker and Temporal.
+
+Not changed (follow-ups):
+
+- The writes themselves take 18–30 s here, so an activity that starts waiting right at the start of them can still reach `recordProgress`'s 30-second timeout on a slow run (a storyline reset adds about 5 s). It is then retried as before, without tracebacks. Two options: COPY instead of INSERT for `fhir_resources`, or a longer start-to-close timeout for the activities that take the lock.
+- The Temporal test harness (`tests/temporal_harness.py`): `stop_worker` cancels in-flight activities, and one cancelled mid-query leaves the test's shared connection busy (the intermittent teardown error above). Either of two changes would fix it: let running activities finish before the shutdown (a graceful shutdown timeout), or have the fixture cancel a busy query, as `EngineSource` does. Under two extra CPU-bound processes, one run of the same test on b95d2a3 also hung until its 900-second timeout and left its Temporal test server running.
 
 ## Environment notes
 

@@ -22,7 +22,7 @@ from datetime import datetime
 from typing import Any
 
 from psycopg import pq
-from sqlalchemy import Connection, Engine, create_engine, select, text
+from sqlalchemy import Connection, Engine, Table, create_engine, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.core.audit import AuditLog
@@ -354,28 +354,31 @@ def unit_of_work() -> Iterator[Store]:
 # ---------- Seeding and reset ----------
 
 
-def persist(src: Store, into: Store) -> None:
-    """Replace everything in the database with the contents of a detached store."""
+def encode_rows(src: Store) -> list[tuple[Table, list[dict]]]:
+    """Every row of a detached store as persist() inserts it (PHI encrypted, JSON encoded), table by table. CPU work
+    only, so reset_store() does it before it takes the lock."""
+    if not src.detached:
+        raise ValueError("encode_rows() reads a detached store")
+    rows = [(schema.mapping(name).table, getattr(src, name).encoded_rows()) for name in schema.STORE_ENTITIES]
+    rows += [(schema.mapping(table.name).table, table.encoded_rows()) for table in src.modules.tables()]
+    return rows + [(schema.module_state, src.modules.encoded_rows()), (schema.images, src.images.encoded_rows()),
+                   (schema.audit_events, src.audit.encoded_rows()), (fhir_resources, src.fhir.encoded_rows())]
+
+
+def persist(src: Store, into: Store, rows: list[tuple[Table, list[dict]]] | None = None) -> None:
+    """Replace everything in the database with the contents of a detached store (`rows`: its encode_rows(), when the
+    caller has them already)."""
     if not src.detached or into.detached:
         raise ValueError("persist() copies a detached store into a database store")
+    rows = encode_rows(src) if rows is None else rows
     conn = into.conn()
     into.expunge()
     tables = ", ".join(f'"{t}"' for t in schema.data_tables())
     conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY"))
     into.rewritten = True
-
-    def insert_rows(table, rows: list[dict]) -> None:
-        for i in range(0, len(rows), 2000):
-            conn.execute(table.insert(), rows[i:i + 2000])
-
-    for name in schema.STORE_ENTITIES:
-        insert_rows(schema.mapping(name).table, getattr(src, name).encoded_rows())
-    for table in src.modules.tables():
-        insert_rows(schema.mapping(table.name).table, table.encoded_rows())
-    insert_rows(schema.module_state, src.modules.encoded_rows())
-    insert_rows(schema.images, src.images.encoded_rows())
-    insert_rows(schema.audit_events, src.audit.encoded_rows())
-    insert_rows(fhir_resources, src.fhir.encoded_rows())
+    for table, encoded in rows:
+        for i in range(0, len(encoded), 2000):
+            conn.execute(table.insert(), encoded[i:i + 2000])
     for prefix, n in src._counters.items():
         name = _ensure_sequence(prefix)
         conn.execute(text("SELECT setval(:seq, :n)"), {"seq": name, "n": n})
@@ -400,11 +403,17 @@ REWRITE_LOCK = 0x5EED_DA7A
 
 
 def reset_store(seed: int | None = None) -> Store:
-    """Regenerate the demo data and write it over the current database contents."""
+    """Regenerate the demo data and write it over the current database contents.
+
+    The data set is generated and encoded first, in memory (no database access), and only then is the lock taken:
+    workflow activities and background steps keep running meanwhile and wait only while the tables are rewritten.
+    The lock is transaction-scoped, so what the caller writes after the reset, and its commit, are covered too."""
     store = get_store()
+    data = build_store(seed)
+    rows = encode_rows(data)
     if not store.detached:
         store.conn().execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": REWRITE_LOCK})
-    persist(build_store(seed), store)
+    persist(data, store, rows)
     clear_process_cache()
     return store
 

@@ -684,7 +684,13 @@ class ModuleSpace:
     def __init__(self, store: Store) -> None:
         self._store = store
         self._tables: dict[str, EntityTable | ListTable] = {}
+        self._own_caches: dict[str, Any] = {}  # detached only
         self.expunge()
+
+    def _caches(self) -> dict[str, Any]:
+        """The process's caches, derived from the database. A detached store (the generator, the evals) keeps its own:
+        a reset generates its data set while other units of work in the process use theirs."""
+        return self._own_caches if self._store.detached else _PROCESS_CACHE
 
     def expunge(self) -> None:
         for table in self._tables.values():
@@ -732,7 +738,7 @@ class ModuleSpace:
         if kind == "table":
             return self.table(name)
         if kind == "cache":
-            return _PROCESS_CACHE.get(name, default)
+            return self._caches().get(name, default)
         value = self._load(name)
         return default if value is _MISSING else value
 
@@ -750,7 +756,7 @@ class ModuleSpace:
         if kind == "table":
             raise TypeError(f"{name} is a table; write its entries instead of replacing it")
         if kind == "cache":
-            _PROCESS_CACHE[name] = value
+            self._caches()[name] = value
             return
         if kind == "config" and not isinstance(value, schema.config_model(name)):
             raise TypeError(f"{name} must be a {schema.config_model(name).__name__}")
@@ -763,7 +769,7 @@ class ModuleSpace:
             self.table(name).clear()
             return default
         if kind == "cache":
-            return _PROCESS_CACHE.pop(name, default)
+            return self._caches().pop(name, default)
         value = self._load(name)
         self._values.pop(name, None)
         self._deleted.add(name)
@@ -791,9 +797,10 @@ class ModuleSpace:
                         table.update(content)
             return table
         if kind == "cache":
-            if name not in _PROCESS_CACHE:
-                _PROCESS_CACHE[name] = factory()
-            return _PROCESS_CACHE[name]
+            caches = self._caches()
+            if name not in caches:
+                caches[name] = factory()
+            return caches[name]
         value = self._load(name)
         if value is _MISSING:
             value = factory()
