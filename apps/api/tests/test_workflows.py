@@ -596,3 +596,71 @@ def test_a_journey_whose_encounter_is_gone_ends_without_asking_anyone(fresh_stat
             step = h.step(wf, "medRecAdmission")
             assert step["status"] == "failed" and "gone" in step["detail"] and step["tasks"] == []
             assert not [t for t in store.fhir.search("Task", code="workflow-failed")]
+
+
+def test_the_storylines_journey_starts_in_the_ed_and_waits_on_her_cards_and_her_bed(fresh_state, monkeypatch):
+    """WP9 (spec 8.2) with Temporal: the clerk's registration starts her journey from the ED (version 4); the
+    triage, imaging and critical-value cards are its sign-offs, decided by the people they are for; while she boards
+    the bed step waits, and her admission (the bed the early Surgery discharges free) signals it on to the order
+    review. The whole twelve-step walk, offline, is tests/test_storyline.py; online, the Playwright storyline."""
+    from datetime import timedelta
+
+    from app.ehr import accepted, simulator
+    from app.ehr import storyline as ehr_story
+    from app.ehr.seed import journey as preset
+    from app.fhir.dt import parse
+    from app.modules.storyline import script as S
+    from app.modules.storyline import service as storyline
+    from app.modules.storyline import stubs
+
+    store = fresh_state
+    _timers(monkeypatch)
+    with harness(monkeypatch) as h:
+        with DB:
+            accepted.install()
+            storyline.install()
+            preset.plant(store, "U-ADMIN")
+            accepted.record(store, {"kind": "registration", "patient_id": S.PATIENT, "complaint": "fall",
+                                    "mode": "ambulance"}, operator=S.CAST["clerk"])
+        h.pump()
+        wf = S.JOURNEY
+        for step, kind, uid in (("triageAssist", "triage", S.CAST["triage_nurse"]),
+                                ("imagingOrders", "imaging_order", S.CAST["ed_physician"])):
+            h.wait_step(wf, step, ("waiting",))
+            with DB:
+                card = stubs.find_card(store, kind)
+            _decide(f"Task/{card['id']}", uid)
+            assert h.wait_step(wf, step, ("done",))["refs"]
+        h.wait_step(wf, "criticalValue", ("waiting",))
+        with DB:
+            simulator.advance(store, parse(storyline.beats(store)["inr"]))
+        h.wait(lambda: stubs.find_card(store, "critical"), what="the critical-value card")
+        with DB:
+            card = stubs.find_card(store, "critical")
+        _decide(f"Task/{card['id']}", S.CAST["ed_physician"])
+        h.wait_step(wf, "criticalValue", ("done",))
+
+        boarding = h.wait_step(wf, "bedAssignment", ("waiting",))
+        assert "Boarding" in boarding["detail"]
+        with DB:  # the bed manager's approval of the early rounds (the Control Tower's part: tests/test_storyline.py)
+            simulator.advance(store, parse(storyline.beats(store)["decision"]))
+            bus.drain()
+            ehr_story.early_rounds(store, parse(simulator.clock(store)["now"]))
+        for _ in range(20):
+            with DB:
+                if store.fhir.read("Encounter", S.STAY) is not None:
+                    break
+                simulator.advance(store, parse(simulator.clock(store)["now"]) + timedelta(minutes=30))
+            h.pump()
+        h.wait_step(wf, "orderReview", ("waiting",), timeout=90)
+        with DB:
+            bed = h.step(wf, "bedAssignment")
+            assert bed["status"] == "done" and "SURG-" in (bed["detail"] or "")
+            assert progress.get(wf).meta.get("started_in") == "ED"
+        scheduled = [a for a in _activities(h, wf)[0] if a.startswith("journey.")]  # not workflows.recordProgress
+        assert scheduled[:5] == ["journey.edTriage", "journey.imagingOrders", "journey.criticalValue",
+                                 "journey.context", "journey.bedAssignment"]
+        h.capture(wf, "journey_ed")
+        markers = [e.marker_recorded_event_attributes.marker_name for e in h.history(wf).events
+                   if e.HasField("marker_recorded_event_attributes")]
+        assert markers == ["core_patch"]  # version 4's one marker (ED_PATCH: tests/test_workflow_replay.py)

@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | `unit_occupancy` (per inpatient unit) | occupied beds >= 95% | high: net gap >= 2, or no free bed while an ED patient waits for the unit; med: net gap >= 1 or no free bed; low: otherwise (expected discharges cover the demand) |
 | `ed_boarding` (the ED) | >= 3 admitted patients waiting for a bed for more than 2 h | high: >= 5 such boarders, or one waiting >= 4 h; med: otherwise |
-| `or_overrun` (per OR case not finished) | predicted duration >= booked duration + 30 min | high: >= 60 min over, or the room's list predicted to end >= 30 min after the block (16:00); med: otherwise |
+| `or_overrun` (per OR case not finished) | predicted duration >= booked duration + 30 min; or >= 15 min over when that takes a case booked to end by the block end (16:00) past it (block overtime risk, WP9) | high: >= 60 min over, or the room's list predicted to end >= 30 min after the block (16:00); med: >= 30 min over; low: the block overtime risk alone |
 | `preop_gap` (per booked OR case) | a pre-op check (consent, fasting, labs, blood group) still open with < 4 h to the booked start | high: < 2 h to go, or the consent is open; med: two or more items open; low: one item open |
 
 The engine is the source of truth for everything the narrator may say: each
@@ -43,6 +43,7 @@ class RuleConfig:
     boarding_high_count: int = 5
     boarding_high_minutes: int = 240
     or_overrun_minutes: int = 30
+    or_block_overrun_minutes: int = 15  # fewer minutes over, but past the block end when booked to end by then
     or_high_minutes: int = 60
     preop_hours: float = 4.0
     preop_high_hours: float = 2.0
@@ -102,6 +103,11 @@ def unit_occupancy(snap: Snapshot, cfg: RuleConfig = CONFIG) -> list[Detected]:
         else:
             severity = "low"
         overflow = {o: units[o].free for o in OVERFLOW.get(u.id, []) if o in units}
+        # An overflow unit without a free bed whose own patients are ready to leave (WP9, 8.2 step 5): rounding
+        # there early is how the overflow beds come back
+        overflow_ready = {o: sorted((c for c in snap.beds.get(o, []) if c.discharge and c.discharge.value >= DISCHARGE_READY),
+                                    key=lambda c: -c.discharge.value) for o, free in overflow.items() if free == 0}
+        overflow_ready = {o: cells for o, cells in overflow_ready.items() if cells}
         facts = {
             "unit": u.id, "unit_name": u.name, "beds": u.beds, "occupied": u.occupied, "occupancy_pct": pct,
             "free_beds": u.free, "cleaning_beds": u.cleaning, "alc_patients": u.alc, "ed_boarders": u.ed_boarders,
@@ -113,6 +119,11 @@ def unit_occupancy(snap: Snapshot, cfg: RuleConfig = CONFIG) -> list[Detected]:
                                           "explanation": c.discharge.sentence} for c in ready[:5]],
             "overflow_free_beds": overflow, "threshold_pct": round(100 * cfg.occupancy),
         }
+        if overflow_ready:
+            facts["overflow_discharge_ready"] = {o: len(cells) for o, cells in overflow_ready.items()}
+            facts["overflow_discharge_ready_patients"] = [
+                {"unit": o, "bed": c.id, "encounter": c.encounter_id, "probability": round(c.discharge.value, 2),
+                 "explanation": c.discharge.sentence} for o, cells in overflow_ready.items() for c in cells[:5]]
         gap = f"short of {_plural(u.net_gap, 'bed')}" if u.net_gap > 0 else "expected discharges cover the demand"
         summary = (f"{u.name} is at {pct}% ({u.occupied} of {u.beds} beds) with {_plural(u.free, 'free bed')}. "
                    f"{_plural(u.expected_admissions, 'admission')} expected and "
@@ -140,6 +151,16 @@ def unit_occupancy(snap: Snapshot, cfg: RuleConfig = CONFIG) -> list[Detected]:
                 label=f"Use the {_plural(best[1], 'free bed')} on {name} as overflow for {u.name}",
                 why=f"{name} is {u.name}'s overflow unit and has {_plural(best[1], 'free bed')}",
                 effect=f"room for up to {_plural(best[1], 'patient')} from {u.name}"))
+        for o, cells in list(overflow_ready.items())[:1]:
+            name = UNIT_BY_ID[o].name
+            beds = ", ".join(c.id for c in cells[:5])
+            menu.append(MenuItem(
+                action_id="overflow_discharge_rounds", owner_role="physician",
+                label=f"Early discharge rounds on {name}, the overflow unit for {u.name}: "
+                      f"{_plural(len(cells[:5]), 'patient')} likely to leave within 24 h ({beds})",
+                why=f"{name} has no free bed and {_plural(len(cells), 'patient')} with a discharge probability of at "
+                    f"least {DISCHARGE_READY}",
+                effect=f"up to {_plural(len(cells[:5]), 'overflow bed')} for {u.name} earlier today"))
         if u.electives_24h:
             menu.append(MenuItem(
                 action_id="review_electives", owner_role="operations_manager",
@@ -164,6 +185,8 @@ def unit_occupancy(snap: Snapshot, cfg: RuleConfig = CONFIG) -> list[Detected]:
             why=f"{_plural(u.expected_discharges, 'discharge')} expected in 24 h",
             effect="bed availability known earlier"))
         evidence = [f"Location/{u.id}"] + [f"Encounter/{c.encounter_id}" for c in ready[:5] if c.encounter_id]
+        evidence += [f"Encounter/{c.encounter_id}" for cells in list(overflow_ready.values())[:1] for c in cells[:5]
+                     if c.encounter_id]
         evidence += [f"Encounter/{e.encounter_id}" for e in boarders[:5]]
         evidence += [f"ServiceRequest/{e.bed_request_id}" for e in boarders[:5] if e.bed_request_id]
         out.append(Detected(
@@ -232,22 +255,37 @@ def ed_boarding(snap: Snapshot, cfg: RuleConfig = CONFIG) -> list[Detected]:
 # ---------- OR overrun ----------
 
 
+def block_overtime(booked_start: datetime, booked_end: datetime, predicted_end: datetime | None,
+                   overrun_minutes: int | None, cfg: RuleConfig = CONFIG) -> int:
+    """Minutes a case booked to end by the block end (16:00) is predicted to run past it, when it is at least
+    `or_block_overrun_minutes` over its booking (the block overtime risk, WP9); 0 otherwise."""
+    block_end = booked_start.replace(hour=OR_DAY[1], minute=0, second=0, microsecond=0)
+    if predicted_end is None or overrun_minutes is None or overrun_minutes < cfg.or_block_overrun_minutes \
+            or booked_end > block_end:
+        return 0
+    return max(0, int((predicted_end - block_end).total_seconds() // 60))
+
+
 def or_overrun(snap: Snapshot, cfg: RuleConfig = CONFIG) -> list[Detected]:
     out = []
     block_end_hour = OR_DAY[1]
     for case in snap.or_cases:
         if case.status in ("fulfilled", "cancelled") or case.overrun_minutes is None:
             continue
-        if case.overrun_minutes < cfg.or_overrun_minutes:
+        block_end = case.booked_start.replace(hour=block_end_hour, minute=0, second=0, microsecond=0)
+        case_past_block = block_overtime(case.booked_start, case.booked_end, case.predicted_end,
+                                         case.overrun_minutes, cfg)
+        block_risk = case_past_block > 0
+        if case.overrun_minutes < cfg.or_overrun_minutes and not block_risk:
             continue
         room = next((r for r in snap.or_rooms if r.id == case.room), None)
         # the room's elective list against its block (emergency cases after hours are not part of the block)
         room_end = max((c.predicted_end for c in snap.or_cases if c.room == case.room and c.predicted_end
                         and c.status != "cancelled" and c.urgency != "emergent"), default=case.predicted_end)
-        block_end = case.booked_start.replace(hour=block_end_hour, minute=0, second=0, microsecond=0)
         past_block = max(0, int((room_end - block_end).total_seconds() // 60)) \
             if room_end and room and room.block and case.booked_start < block_end else 0
-        severity: Severity = "high" if case.overrun_minutes >= cfg.or_high_minutes or past_block >= 30 else "med"
+        severity: Severity = "high" if case.overrun_minutes >= cfg.or_high_minutes or past_block >= 30 else \
+            "med" if case.overrun_minutes >= cfg.or_overrun_minutes else "low"
         following = sorted((c for c in snap.or_cases if c.room == case.room and c.status == "booked"
                             and c.booked_start > case.booked_start), key=lambda c: c.booked_start)
         nxt = following[0] if following else None
@@ -260,10 +298,13 @@ def or_overrun(snap: Snapshot, cfg: RuleConfig = CONFIG) -> list[Detected]:
                  "prediction": case.predicted.sentence if case.predicted else None,
                  "next_case": {"case": nxt.appointment_id, "procedure": nxt.procedure,
                                "booked_start": _hhmm(nxt.booked_start)} if nxt else None,
-                 "post_op_unit": case.post_op_unit, "threshold_minutes": cfg.or_overrun_minutes}
+                 "post_op_unit": case.post_op_unit, "threshold_minutes": cfg.or_overrun_minutes,
+                 "booked_end": _hhmm(case.booked_end), "case_minutes_past_block": case_past_block,
+                 "block_overtime_risk": block_risk, "block_threshold_minutes": cfg.or_block_overrun_minutes}
         summary = (f"{case.procedure} in {case.room} (booked {case.booked_start:%H:%M}, {case.booked_minutes} min) is "
                    f"predicted to take {case.predicted_minutes} min, {case.overrun_minutes} min over its booking; "
-                   f"the room's list is predicted to end at {_hhmm(room_end)}.")
+                   + (f"it would end at {_hhmm(case.predicted_end)}, past the {block_end_hour:02d}:00 block end."
+                      if block_risk else f"the room's list is predicted to end at {_hhmm(room_end)}."))
         menu = [MenuItem(action_id="resequence_room", owner_role="operations_manager",
                          label=f"Ask the OR coordinator to re-sequence {case.room}'s list after this case",
                          why=f"the case is predicted to run {case.overrun_minutes} min over",
@@ -300,7 +341,8 @@ def or_overrun(snap: Snapshot, cfg: RuleConfig = CONFIG) -> list[Detected]:
             evidence.append(f"Appointment/{nxt.appointment_id}")
         out.append(Detected(
             key=f"or_overrun:{case.appointment_id}", rule="or_overrun", severity=severity,
-            title=f"{case.room}: {case.procedure} predicted {case.overrun_minutes} min over", summary=summary,
+            title=f"{case.room}: {case.procedure} predicted {case.overrun_minutes} min over"
+                  + (f", past the {block_end_hour:02d}:00 block end" if block_risk else ""), summary=summary,
             unit_id="OR", subject_ref=f"Appointment/{case.appointment_id}", facts=facts, evidence_refs=evidence,
             menu=menu))
     return out

@@ -376,8 +376,9 @@ def test_registry_entries_are_valid():
         assert entry.tier in ("ops", "documentation", "clinical_ds"), name
         if entry.tier != "ops":
             assert entry.required_signoff_role, f"{name}: documentation and clinical_ds modules need a signer"
-            # a draft document, or (7.4, WP8) the follow-up call's record
-            assert entry.allows("DocumentReference", "preliminary") or entry.allows("Communication", "completed"), name
+            # a draft document, or (7.4, WP8) the follow-up call's record, or (8.2, WP9) only suggestion cards a person
+            # decides (the ED's cards and the 8.1 roadmap stubs)
+            assert entry.allows("DocumentReference", "preliminary") or entry.allows("Communication", "completed") or                 set(entry.allowed_tools) <= {"suggestEhrAction", "submitForReview", "createFlag"}, name
     assert entries["medication_reconciliation"].cosign and entries["discharge_summary"].consent_required == [
         "ai_processing"]
 

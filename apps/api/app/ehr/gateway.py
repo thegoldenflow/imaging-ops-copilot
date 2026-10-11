@@ -50,7 +50,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from pydantic import BaseModel
@@ -766,6 +766,39 @@ class FhirGateway:
         if current.get("status") not in CANCELLABLE:
             raise FhirConflict(f"Appointment/{appointment_id} is {current.get('status')}; it cannot be cancelled")
         return validate(self._cancel(current, reason, patient))
+
+    def adjust_or_booking(self, appointment_id: str, minutes: int, *, reason: str) -> FhirModel:
+        """The OR coordinator changes a booked operating-room case's duration (WP9, spec 8.2 step 7): the booked
+        end moves with it, everything else stays (procedure, surgeon, room, ASA class, urgency, request). The
+        operations manager only (6.3 has no OR-coordinator role), or the privileged tool adjustOrBooking on such an
+        approver's authority; the module's tools must allow booked appointments. Audited with the old and new
+        durations."""
+        if self.policy is not None and (self.role != "operations_manager" or self.actor.kind != "user"):
+            self._deny("update", "Appointment", appointment_id, "only the OR coordinator (operations manager) adjusts "
+                                                                "an operating-room booking")
+        current = self.backend.read("Appointment", appointment_id)
+        if current is None:
+            raise LookupError(f"Appointment/{appointment_id} not found")
+        patient = access.patient_of(current)
+        self._registry_entry("update", "Appointment", appointment_id, "booked", patient=patient)
+        if current.get("status") != "booked":
+            raise FhirConflict(f"Appointment/{appointment_id} is {current.get('status')}; only a booked case is adjusted")
+        rooms = [ref_id(p.get("actor")) for p in current.get("participant") or []
+                 if ((p.get("actor") or {}).get("reference") or "").startswith("Location/OR-")]
+        if not rooms:
+            raise FhirConflict(f"Appointment/{appointment_id} is not an operating-room case")
+        if not 15 <= int(minutes) <= 600:
+            raise ValueError("an OR booking lasts 15 to 600 minutes")
+        start = parse(current["start"])
+        before = current.get("minutesDuration")
+        adjusted = {**current, "end": fhir_datetime(start + timedelta(minutes=int(minutes))),
+                    "minutesDuration": int(minutes)}
+        validate(adjusted)
+        stored = self.backend.update(adjusted)
+        self._audit("update", "Appointment", appointment_id,
+                    detail=f"OR booking {before} -> {int(minutes)} min: {reason[:160]}", patient=patient,
+                    encounter=access.encounter_of(stored))
+        return validate(stored)
 
     def _require_booker(self, action: str, appointment_id: str, patient: str | None, verb: str) -> None:
         if self.policy is not None and (self.role not in access.BOOKERS or self.actor.kind != "user"):

@@ -252,6 +252,8 @@ def order_review(args: dict) -> dict:
 
     as_of = args.get("as_of") or args.get("admitted_at")
     found = med_safety.review_orders(get_store(), args["encounter_id"], as_of)
+    if (done := med_safety.decided_before(found)) is not None:  # decided in the workbench before the journey asked
+        return {"refs": done.refs[:30], "wait_for": [], "detail": done.detail}
     result = _agent_step("order_review", args["encounter_id"],
                          lambda run: med_safety.order_review_signoff(run, found, as_of))
     return _signoff(args, "orderReview", result, "pharmacist", "Review the stay's orders in Medication safety")
@@ -292,10 +294,14 @@ def predict_duration(args: dict) -> dict:
                     and c.status in ("booked", "arrived")), key=lambda c: c.booked_start)
     if not cases:
         return {"not_applicable": "no operating-room case for this patient on today's list"}
+    from app.modules.control_tower.rules import block_overtime
+
     c = cases[0]
+    past_block = block_overtime(c.booked_start, c.booked_end, c.predicted_end, c.overrun_minutes)
     return {"case": {"appointment_id": c.appointment_id, "room": c.room, "procedure": c.procedure,
                      "booked_minutes": c.booked_minutes, "predicted_minutes": c.predicted_minutes,
-                     "overrun_minutes": c.overrun_minutes},
+                     "overrun_minutes": c.overrun_minutes, "minutes_past_block": past_block,
+                     "predicted_end": c.predicted_end.strftime("%H:%M") if c.predicted_end else None},
             "detail": f"{c.procedure or 'Surgery'} in {c.room}: predicted {c.predicted_minutes or '?'} min against "
                       f"{c.booked_minutes} booked", "refs": [f"Appointment/{c.appointment_id}"]}
 
@@ -304,12 +310,25 @@ def predict_duration(args: dict) -> dict:
 def propose_schedule(args: dict) -> dict:
     case = args.get("case") or {}
     overrun = case.get("overrun_minutes")
-    if overrun is None or overrun < 30:
+    past_block = case.get("minutes_past_block") or 0  # block overtime risk (WP9): >= 15 min over and past 16:00
+    if overrun is None or (overrun < 30 and not past_block):
         return {"detail": "The booking fits the prediction; nothing to change"}
+    # the OR coordinator may have adjusted the booking already (WP9: from the Control Tower, before the journey asked);
+    # read as predictDuration reads the OR list, through the Control Tower's scope
+    from app.modules.control_tower.snapshot import tower_fhir
+
+    booked = tower_fhir().read("Appointment", case["appointment_id"])
+    now_minutes = (booked.to_fhir().get("minutesDuration") if booked is not None else None) or 0
+    if now_minutes >= (case.get("booked_minutes") or 0) + overrun:
+        return {"refs": [f"Appointment/{case['appointment_id']}"],
+                "detail": f"The OR coordinator already adjusted the booking to {now_minutes} min (predicted "
+                          f"{(case.get('booked_minutes') or 0) + overrun} min)"}
+    block = f", ending at {case.get('predicted_end')}, {past_block} min past the 16:00 block end" if past_block else ""
     task = _engine_task(args, "proposeSchedule", "signoff",
                         f"OR booking: {case.get('procedure') or 'the case'} in {case.get('room')} is predicted to run "
-                        f"{overrun} min over its {case.get('booked_minutes')} min booking. Adjust the list or confirm "
-                        f"it.", "operations_manager", priority="asap", focus=f"Appointment/{case['appointment_id']}")
+                        f"{overrun} min over its {case.get('booked_minutes')} min booking{block}. Adjust the booking "
+                        f"in the Control Tower or confirm it.", "operations_manager", priority="asap",
+                        focus=f"Appointment/{case['appointment_id']}")
     ref = f"Task/{task}"
     bridge.register_wait(ref, args["workflow_id"], "proposeSchedule")
     return {"refs": [ref, f"Appointment/{case['appointment_id']}"], "wait_for": [ref], "signer": "operations_manager",
@@ -421,6 +440,58 @@ def book_followup_call(args: dict) -> dict:
 def coding_stub(args: dict) -> dict:
     """8.1 roadmap card (coding assistance): nothing is written."""
     return {"detail": "Coding suggestion is a roadmap card (8.1); nothing written"}
+
+
+# ---------- version 4: the journey from the ED (WP9, the storyline's cards) ----------
+
+
+def _card_step(task_id: str | None, role: str, what: str, *, pending: str | None = None) -> dict:
+    """What a sign-off step on a storyline card waits for: the card's decision, nothing when a person already
+    decided it (before the journey got here), or (`pending`) the card a later event writes (a wait by step)."""
+    if task_id is None:
+        if pending is None:
+            raise StepError(f"No {what} card yet")
+        return {"wait_step": True, "signer": role, "detail": pending}
+    task = _fhir().read("Task", task_id)
+    if task is not None and task.status in ("completed", "rejected"):
+        return {"refs": [f"Task/{task_id}"], "detail": f"{what.capitalize()} already decided ({task.status})"}
+    return {"refs": [f"Task/{task_id}"], "wait_for": [f"Task/{task_id}"], "signer": role,
+            "detail": f"{what.capitalize()} card for the {role}"}
+
+
+@step_activity("journey.edTriage", "triageAssist")
+def ed_triage(args: dict) -> dict:
+    """8.2 step 2: the triage assist's card (CTAS and admission probability) for the triage nurse."""
+    from app.modules.storyline import stubs as story
+
+    return _card_step(story.ensure_triage_card(get_store()), "nurse", "triage suggestion")
+
+
+@step_activity("journey.imagingOrders", "imagingOrders")
+def imaging_orders(args: dict) -> dict:
+    """8.2 step 3: the imaging-order card (urgency and protocol per exam from the imaging pipeline)."""
+    from app.modules.storyline import stubs as story
+
+    return _card_step(story.ensure_imaging_card(get_store()), "physician", "imaging orders")
+
+
+@step_activity("journey.criticalValue", "criticalValue")
+def critical_value(args: dict) -> dict:
+    """8.2 step 4 (8.1 stub): the critical-value card; until the INR is back, a wait for the card by step."""
+    from app.modules.storyline import stubs as story
+
+    return _card_step(story.ensure_critical_card(get_store()), "physician", "critical value",
+                      pending="Waiting for the INR result: the critical-value router (roadmap stub) sends it to "
+                              "the ED physician")
+
+
+@step_activity("journey.codingSuggestion", "codingStub")
+def coding_suggestion(args: dict) -> dict:
+    """8.2 step 12 (8.1 stub): the coding card for the coder, from the signed discharge summary."""
+    from app.modules.storyline import stubs as story
+
+    return _card_step(story.ensure_coding_card(get_store()), "clerk", "coding suggestion",
+                      pending="Waiting for the signed discharge summary")
 
 
 # ---------- CapacityExceptionWorkflow ----------
@@ -597,6 +668,6 @@ ACTIVITIES = [record_progress, open_task, close_tasks, journey_context, triage_a
               med_rec_admission, bed_assignment, predict_duration, propose_schedule, news2_alert,
               draft_discharge_summary, draft_patient_instructions, schedule_followup_call, request_followup_call,
               book_followup_call,
-              coding_stub, capacity_detect, capacity_explain, capacity_execute, capacity_verify,
+              coding_stub, ed_triage, imaging_orders, critical_value, coding_suggestion, capacity_detect, capacity_explain, capacity_execute, capacity_verify,
               capacity_record_outcome, review_create_task, review_write_corrected, review_append_case,
               review_regression]

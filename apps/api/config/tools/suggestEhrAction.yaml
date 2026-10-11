@@ -1,0 +1,96 @@
+# Tool registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# side_effect_level read / recommend / action / privileged; schemas are JSON Schema (the subset in
+# app/agents/jsonschema.py); fhir_writes is what the tool may write (agents' write rights derive from it).
+tool_id: suggestEhrAction
+description: 'A suggestion card for a person (CDS Hooks style, WP9): an AI review Task carrying the EHR action it
+  stands for (register an ED arrival, document a triage, place imaging orders). Nothing is recorded until the person
+  accepts it; the EHR then records the action with that person as the operator (app/ehr/accepted.py).'
+side_effect_level: recommend
+handler: app.agents.handlers:suggest_ehr_action
+domain: fhir
+fhir_writes:
+  Task:
+  - requested
+input_schema:
+  type: object
+  properties:
+    patient_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    encounter_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    reviewer_role:
+      type: string
+      enum:
+      - physician
+      - nurse
+      - clerk
+    summary:
+      type: string
+      minLength: 1
+      maxLength: 300
+    recommendation:
+      type: string
+      minLength: 1
+      maxLength: 4000
+    action:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - registration
+          - triage
+          - imaging_order
+      required:
+      - kind
+    evidence_refs:
+      type: array
+      items:
+        type: string
+        pattern: ^[A-Z][A-Za-z]+/[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+      maxItems: 50
+    priority:
+      type: string
+      enum:
+      - routine
+      - urgent
+      - asap
+      - stat
+  required:
+  - patient_id
+  - reviewer_role
+  - summary
+  - recommendation
+  - action
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    task_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    status:
+      type: string
+  required:
+  - task_id
+  - status
+  additionalProperties: false
+permission_policy:
+  roles:
+  - clerk
+  - nurse
+  - physician
+  - system
+  target:
+    encounter: encounter_id
+    patient: patient_id
+idempotency:
+  required: true
+  window_hours: 24
+timeout_ms: 5000
+retry:
+  max_attempts: 2
+  backoff_ms: 50
+audit_level: detailed

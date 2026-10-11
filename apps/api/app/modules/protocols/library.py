@@ -63,6 +63,13 @@ PROTOCOLS = [
              indications=["osteoarthritis", "knee pain", "knee"]),
     Protocol(id="XR-LS-2V", name="Lumbar spine X-ray, 2 views", modality=Modality.XR, exam_code="XR_LSPINE", contrast=False, minutes=10,
              indications=["mechanical back pain", "lifting", "back pain"]),
+    # Hospital imaging (WP9: the ED's hip-fracture orders). Hospital exams, not booked at the imaging centre's sites:
+    # the exam codes are the EHR's order codes (app/ehr/reference.py IMAGING_ORDERS). Named and indexed so that the
+    # imaging centre's own requests rank as before (no generic words such as "x-ray" or "contrast" in the names).
+    Protocol(id="XR-HIP-2V", name="Hip X-rays, AP pelvis and lateral hip", modality=Modality.XR, exam_code="XR_HIP", contrast=False, minutes=10,
+             indications=["hip fracture", "neck of femur", "femoral neck", "hip pain"]),
+    Protocol(id="CT-HIP-FX", name="CT hip, fracture protocol (no contrast)", modality=Modality.CT, exam_code="CT_HIP", contrast=False, minutes=15,
+             indications=["hip fracture", "neck of femur", "femoral neck", "occult fracture", "preoperative planning"]),
 ]
 
 BY_ID = {p.id: p for p in PROTOCOLS}

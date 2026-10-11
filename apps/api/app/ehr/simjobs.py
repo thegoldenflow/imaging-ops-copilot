@@ -36,15 +36,17 @@ def current() -> dict | None:
         return dict(_job) if _job else None
 
 
-def start(store: Store, hour: int = 8, *, operator: str, run_async: bool = True) -> dict:
-    """Start fast-forwarding to `hour`:00 tomorrow; raises SimulatorBusy when a job is already running."""
+def start(store: Store, hour: int = 8, *, operator: str, run_async: bool = True,
+          until: datetime | None = None) -> dict:
+    """Start fast-forwarding to `hour`:00 tomorrow (or to `until`: the storyline's next beat, WP9); raises
+    SimulatorBusy when a job is already running."""
     global _job
     with _lock:
         if _job and _job["status"] == "running":
             raise simulator.SimulatorBusy("A fast-forward is already running")
         simulator.pause(store)  # the background tick must not move the clock meanwhile
         now = parse(simulator.clock(store)["now"])
-        target = min(simulator.next_morning(now, hour), parse(store.modules["hospital_plan"]["horizon"]))
+        target = min(until or simulator.next_morning(now, hour), parse(store.modules["hospital_plan"]["horizon"]))
         _job = {"id": uuid.uuid4().hex[:12], "status": "running", "start": now.isoformat(),
                 "target": target.isoformat(), "now": now.isoformat(), "progress": 0.0, "events": 0,
                 "operator": operator, "started_at": datetime.now().isoformat(timespec="seconds"), "error": None}

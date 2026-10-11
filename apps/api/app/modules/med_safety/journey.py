@@ -22,6 +22,8 @@ stored with the reconciliation, and the retry sends the same draft again, which 
 
 from __future__ import annotations
 
+import time
+
 from app.agents import approvals, registry
 from app.agents.library.journey_stubs import StepResult
 from app.agents.runtime import AgentRun, runtime
@@ -82,6 +84,19 @@ def signoff_text(found: list[OrderReview], as_of: str | None) -> tuple[str, str]
     return f"{head}: {body}"[:1000], PRIORITY.get(severity, "routine")
 
 
+def decided_before(found: list[OrderReview]) -> StepResult | None:
+    """The pharmacist decided every flagged medication order of the stay in the workbench before the journey asked
+    (WP9: the storyline's pharmacist works while the journey still waits for her bed): the sign-off those decisions
+    give (`confirm_signoff`) is there already, so the step records it instead of asking again. None otherwise (a
+    flagged order still pending, or nothing flagged: the pharmacist confirms the review)."""
+    flagged = [r for r in found if r.findings and r.kind == "medication"]
+    if not flagged or any(r.status == "pending" for r in flagged):
+        return None
+    return StepResult(refs=[r.order_ref for r in found],
+                      detail=f"{len(found)} orders reviewed by the rules, {len(flagged)} flagged; every flagged order "
+                             f"already decided by the pharmacist in Medication safety")
+
+
 def order_review_signoff(run: AgentRun, found: list[OrderReview], as_of: str | None) -> StepResult:
     """The order_review agent puts the review in the pharmacist's queue (createTask through the Tool Gateway)."""
     description, priority = signoff_text(found, as_of)
@@ -106,6 +121,7 @@ def confirm_signoff(store: Store, user: StaffUser, review: OrderReview, *, sourc
     if any(r.status == "pending" and r.kind == "medication"
            for r in reviews(store).find_by("encounter_id", review.encounter_id)):
         return []
+    _RECHECK[review.encounter_id] = (review, user.id, time.monotonic() + RECHECK_S)
     done = []
     for task in approvals.queue(user, limit=200):
         if task["kind"] == approvals.WORKFLOW_SIGNOFF and task["encounter_id"] == review.encounter_id \
@@ -116,6 +132,32 @@ def confirm_signoff(store: Store, user: StaffUser, review: OrderReview, *, sourc
             except (approvals.DecisionError, approvals.DecisionDenied):  # decided meanwhile: the order decision stands
                 continue
             done.append(task["task_id"])
+    return done
+
+
+# The journey's sign-off Task can be written while the pharmacist's last decision is being saved: the activity read
+# the order as still pending, and the decision looked for a Task not yet committed, so neither saw the other (WP9's
+# Temporal run hit it). For two minutes after such a decision the API's background loop asks again.
+RECHECK_S, RECHECK_EVERY_S = 120.0, 5.0
+_RECHECK: dict[str, tuple[OrderReview, str, float]] = {}  # encounter -> (the last decided review, user id, until)
+_LAST = {"at": 0.0}
+
+
+def recheck_signoffs(store: Store) -> list[str]:
+    """Background step (after the intake): `confirm_signoff` again for the stays decided in the last two minutes."""
+    if not _RECHECK or time.monotonic() - _LAST["at"] < RECHECK_EVERY_S:
+        return []
+    _LAST["at"] = time.monotonic()
+    done: list[str] = []
+    for encounter_id, (review, user_id, until) in list(_RECHECK.items()):
+        user = store.staff.get(user_id)
+        if time.monotonic() > until or user is None:
+            _RECHECK.pop(encounter_id, None)
+            continue
+        found = confirm_signoff(store, user, review)
+        if found:
+            _RECHECK.pop(encounter_id, None)
+            done += found
     return done
 
 

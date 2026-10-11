@@ -4,7 +4,9 @@ The histories in tests/fixtures/workflows/ were recorded by tests/test_workflows
 from complete runs. A code change that would make a running workflow take a different path (and so break when its
 worker restarts) fails here; such a change needs `workflow.patched(...)`. `journey_v1.json` was recorded before the
 journey's coding step existed, `journey_v2.json` before WP8 placed the follow-up call itself (version 2: the call
-booked after a clerk's approval): each replays through the `patched` branches for old executions.
+booked after a clerk's approval): each replays through the `patched` branches for old executions. `journey_ed.json`
+(WP9) is a journey started in the ED for the storyline's patient (version 4, `journey-ed-phase`), recorded up to
+the order review after her admission.
 
 No server and no database: Temporal's Replayer runs the workflow code against the recorded events.
 """
@@ -21,11 +23,12 @@ from temporalio.client import WorkflowHistory
 from temporalio.worker import Replayer
 
 from app.workflows import model as M
-from app.workflows.journey import CODING_PATCH, FOLLOWUP_PATCH
+from app.workflows.journey import CODING_PATCH, ED_PATCH, FOLLOWUP_PATCH
 from app.workflows.worker import WORKFLOWS
 
 HISTORIES = Path(__file__).parent / "fixtures" / "workflows"
 EXPECTED = {"journey": M.JOURNEY, "journey_v1": M.JOURNEY, "journey_v2": M.JOURNEY, "journey_medrec_retry": M.JOURNEY,
+            "journey_ed": M.JOURNEY,
             "capacity": M.CAPACITY, "capacity_rejected": M.CAPACITY, "review": M.REVIEW}
 
 
@@ -69,3 +72,4 @@ def test_the_version_1_journey_has_no_patch_marker_and_the_current_one_has():
     assert _patches("journey_v1") == []
     assert _patches("journey_v2") == [CODING_PATCH]
     assert _patches("journey") == [FOLLOWUP_PATCH, CODING_PATCH]
+    assert _patches("journey_ed") == [ED_PATCH]  # the ED path asks for no other patch (WP9)

@@ -1,5 +1,5 @@
-import { ArrowRight, CheckCircle2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ArrowRight, CheckCircle2, Route as RouteIcon } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { Badge, Card, PageHeader } from "../../components/ui";
 import { useAuth } from "../../lib/auth";
 import { ROLE_LABEL, type Role } from "../../lib/types";
@@ -269,6 +269,21 @@ export function HomePage() {
         title={`Welcome, ${user.name.split(" ").slice(-2).join(" ")}`}
         subtitle="Follow the demo storyline below, or use the menu to explore your role's tools."
       />
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3" data-testid="storyline-card">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-sm font-semibold text-slate-900"><RouteIcon className="size-4 text-brand-600" />Storyline 7 · one patient through the hospital (10 minutes)</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Wang Xiuying, 72, Mandarin, on warfarin, breaks her hip: the call centre, triage, imaging, a critical INR, a full
+              Orthopedics, medication safety, the OR, a NEWS2 night, the discharge documents, a Chinese follow-up call and
+              coding. Twelve steps, each one AI proposes, a person signs, the audit trail records it.
+            </p>
+          </div>
+          <Link to="/storyline" className="flex shrink-0 items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700">
+            Open the guided storyline<ArrowRight className="size-3.5" />
+          </Link>
+        </div>
+      </Card>
       {flowFirst && flow}
       {hospitalFirst && <StoryCard title="Storyline 5 · hospital platform: roles, break-glass, consent, signing" steps={HOSPITAL} onGo={go} userId={user.id} />}
       {hospitalFirst && flow}

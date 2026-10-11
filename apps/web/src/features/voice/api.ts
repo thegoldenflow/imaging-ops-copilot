@@ -71,13 +71,16 @@ export interface ApptView {
 
 export interface CallRequest {
   task_id: string;
-  kind: "reschedule" | "cancel";
+  kind: "reschedule" | "cancel" | "registration";
   description: string;
   authored_on: string;
   mrn?: string | null;
   appointment?: ApptView;
   proposed?: ApptView;
   run_id: string;
+  // registration (WP9): the EHR registers the ED arrival when the clerk confirms
+  recommendation?: string | null;
+  args?: { complaint?: string; mode?: string; call?: string };
 }
 
 export interface RedFlag {

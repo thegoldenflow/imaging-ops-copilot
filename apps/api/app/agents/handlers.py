@@ -154,6 +154,35 @@ def submit_for_review(ctx: ToolContext, encounter_id: str, reviewer_role: str, s
     return {"task_id": stored["id"], "status": stored["status"], "_refs": [_ref(stored)]}
 
 
+def suggest_ehr_action(ctx: ToolContext, patient_id: str, reviewer_role: str, summary: str, recommendation: str,
+                       action: dict, encounter_id: str | None = None, evidence_refs: list[str] | None = None,
+                       priority: str = "routine") -> dict:
+    """A suggestion card for a person (CDS Hooks style): an `ai-review` Task carrying the EHR action the
+    suggestion stands for. Nothing is recorded now; when the person accepts it, the EHR records the action with
+    that person as the operator (app/ehr/accepted.py). Rejecting it leaves the record as it is."""
+    import json
+
+    from app.agents.approvals import REVIEW
+
+    if encounter_id and access.patient_of(_encounter(ctx, encounter_id)) != patient_id:
+        raise ValueError(f"Encounter/{encounter_id} is not a visit of Patient/{patient_id}")
+    if ctx.fhir.read("Patient", patient_id) is None:
+        raise LookupError(f"Patient/{patient_id} not found")
+    now = fhir_datetime(_now())
+    task = {"resourceType": "Task", "status": "requested", "intent": "proposal", "priority": priority,
+            "code": concept(TASK_CODE, REVIEW, "Review an AI recommendation"), "description": summary,
+            "for": ref("Patient", patient_id), "authoredOn": now, "lastModified": now,
+            "performerType": [concept(PRACTITIONER_ROLE, access.ROLE_CODE[reviewer_role])],
+            "input": [{"type": {"text": "recommendation"}, "valueString": recommendation},
+                      {"type": {"text": "ehr_action"}, "valueString": json.dumps(action, sort_keys=True)},
+                      *([{"type": {"text": "evidence"}, "valueString": ", ".join(evidence_refs)}]
+                        if evidence_refs else [])]}
+    if encounter_id:
+        task["encounter"] = ref("Encounter", encounter_id)
+    stored = ctx.fhir.create(ctx.stamp(task)).to_fhir()
+    return {"task_id": stored["id"], "status": stored["status"], "_refs": [_ref(stored)]}
+
+
 # ---------- action ----------
 
 
@@ -281,6 +310,12 @@ def book_appointment(ctx: ToolContext, appointment_id: str) -> dict:
 def append_encounter_location(ctx: ToolContext, encounter_id: str, bed_id: str) -> dict:
     ctx.fhir.append_encounter_location(encounter_id, bed_id)
     return {"encounter_id": encounter_id, "bed_id": bed_id, "_refs": [f"Encounter/{encounter_id}"]}
+
+
+def adjust_or_booking(ctx: ToolContext, appointment_id: str, minutes: int, reason: str) -> dict:
+    stored = ctx.fhir.adjust_or_booking(appointment_id, minutes, reason=reason).to_fhir()
+    return {"appointment_id": appointment_id, "minutes": stored["minutesDuration"],
+            "_refs": [f"Appointment/{appointment_id}"]}
 
 
 def send_patient_sms(ctx: ToolContext, encounter_id: str, body: str) -> dict:

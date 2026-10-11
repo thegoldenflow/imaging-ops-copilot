@@ -48,6 +48,10 @@ WP4B_ADDITIONS = {"registration": {"Appointment": {"booked"}}}
 # patient-reported Observations.
 WP8_CHANGES = {"followup_calls": ("documentation", ["nurse"], False, ["followup_call"],
                                   {"Communication": {"*"}, "Task": {"requested"}, "Observation": {"preliminary"}})}
+# Changed in WP9 on purpose (8.2 step 7): the Control Tower's module records the OR coordinator's own adjustment of
+# a booked case (adjustOrBooking, privileged: the coordinator's approval record).
+WP9_CHANGES = {"control_tower": ("ops", ["operations_manager", "nurse"], False, [],
+                                 {"Task": {"*"}, "Encounter.location": {"append"}, "Appointment": {"booked"}})}
 
 
 class Out(BaseModel):
@@ -103,7 +107,7 @@ def test_every_existing_agent_is_registered_with_its_prompt_version():
 
 def test_wp4_registry_entries_moved_over_unchanged():
     agents = registry.agents()
-    for name, (tier, signers, cosign, consents, writes) in {**WP4_ENTRIES, **WP8_CHANGES}.items():
+    for name, (tier, signers, cosign, consents, writes) in {**WP4_ENTRIES, **WP8_CHANGES, **WP9_CHANGES}.items():
         spec = agents[name]
         assert (spec.risk_tier, spec.required_signoff_role, spec.cosign, spec.consent_required) == (
             tier, signers, cosign, consents), name

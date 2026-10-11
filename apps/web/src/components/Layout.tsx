@@ -31,6 +31,7 @@ import {
   Radiation,
   PhoneCall,
   RotateCcw,
+  Route as RouteIcon,
   ScanLine,
   ShieldCheck,
   Siren,
@@ -62,6 +63,7 @@ const STAFF: Role[] = ["front_desk", "technologist", "radiologist", "operations_
 
 export const NAV: NavItem[] = [
   { to: "/", label: "Home", icon: Home, roles: "all", section: "" },
+  { to: "/storyline", label: "Hospital storyline", icon: RouteIcon, roles: "all", section: "" },
   { to: "/control-tower", label: "Control Tower", icon: TowerControl, roles: ["operations_manager", "nurse", "physician"], section: "Hospital" },
   { to: "/hospital/patients", label: "Patients", icon: BedDouble, roles: HOSPITAL_CLINICAL, section: "Hospital" },
   { to: "/reviews", label: "Review queue", icon: ListChecks, roles: HOSPITAL_CLINICAL, section: "Hospital" },

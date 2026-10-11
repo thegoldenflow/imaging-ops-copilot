@@ -175,6 +175,35 @@ def fast_forward(store: Store, hour: int = 8) -> AdvanceResult:
     return _advance(store, next_morning(parse(clock(store)["now"]), hour))
 
 
+def apply_now(store: Store, event: dict, *, operator: str | None = None,
+              correlation_id: str | None = None) -> AdvanceResult:
+    """Apply one event at the hospital clock's current time, without moving the clock: a person's action in the
+    EHR (the registration clerk registers an arrival, the triage nurse documents the triage, the ED physician
+    places an order; app/ehr/accepted.py), which the simulated EHR records as it records the plan, with the person
+    as the operator (EVN-5, event actor `user:<id>`). The event's plan entries (visit, stay, order) must exist; the
+    event itself need not be in the plan. Returns what was written and published."""
+    _locked(store)
+    plan = _plan(store)
+    now = parse(clock(store)["now"])
+    event = {**event, "at": event.get("at") or now.isoformat()}
+    handler = getattr(_Run, "_on_" + event["kind"], None)
+    if handler is None:
+        raise ValueError(f"No simulator handler for {event['kind']!r}")
+    run = _Run(store, plan, now, now)
+    run.i = run.lo = _first_after(run.events, now)  # anything it plans goes after the clock
+    run.t = now
+    run.ctx = {**run._scenario(event), **({"operator": operator} if operator else {}),
+               **({"correlation_id": correlation_id} if correlation_id else {})}
+    if handler(run, event) is not False:
+        run.applied[event["kind"]] += 1
+    run._flush()
+    c = clock(store)
+    c["applied"] = c.get("applied", 0) + sum(run.applied.values())
+    _save_clock(store, c)
+    store.modules["hospital_plan"] = plan
+    return run.result()
+
+
 def run(store: Store, rate: float = DEFAULT_RATE, *, wall_now: datetime | None = None) -> dict:
     _locked(store)
     if not 0 < rate <= 3600:
@@ -576,7 +605,8 @@ class _Run:
             return False
         unit = self._first_unit(sdict)
         planned = sdict["beds"][0][0] if sdict["beds"] else None
-        bed = self._free_bed([unit, *OVERFLOW.get(unit, [])], prefer=planned)
+        # a plan entry may name the units it is admitted to (the storyline: Orthopedics, then its overflow Surgery)
+        bed = self._free_bed(sdict.get("bed_units") or [unit, *OVERFLOW.get(unit, [])], prefer=planned)
         if bed is None:
             self._defer_stay(sdict["id"])
             return False
@@ -586,6 +616,9 @@ class _Run:
         elif bed != planned:
             sdict["beds"][0][0] = bed
         if bed != planned:
+            self.plan_changed = True
+        if sdict["beds"][0][1] != self.t.isoformat():  # the first bed starts at the admission (a retry may come
+            sdict["beds"][0][1] = self.t.isoformat()  # before the time a bed was planned from, WP9)
             self.plan_changed = True
         s = self._stay(sdict["id"])
         ed = None
@@ -618,7 +651,8 @@ class _Run:
         """No free bed: the patient keeps boarding, and the stay's remaining events move 30 minutes later."""
         orders = {oid for oid, o in self.plan["orders"].items() if o["encounter"] == sid}
         tail = self.events[self.i + 1:]
-        moved = [x for x in tail if x.get("stay") == sid or x.get("order") in orders]
+        # events planned for a fixed time (`fixed`: the storyline's offered bed, night vital signs, discharge) stay
+        moved = [x for x in tail if (x.get("stay") == sid or x.get("order") in orders) and not x.get("fixed")]
         moved_ids = {id(x) for x in moved}
         del self.events[self.i + 1:]
         self.events.extend(x for x in tail if id(x) not in moved_ids)
@@ -740,6 +774,43 @@ class _Run:
             self.vitals += 1
             self._msg("ORU^R01", f"vitals|{enc['id']}|{mark.isoformat()}", cls="IMP", patient=pid, visit=enc["id"],
                       location=_current(enc), section="VS", results=(f"Observation/{rid}",))
+
+    def _on_vitals(self, e: dict):
+        """Spot vital signs the plan holds for an inpatient between rounds (a nurse's observations), with the
+        early-warning score the EHR's flowsheet shows with them (NEWS2; the storyline presets the value, 8.1)."""
+        enc = self._stay_encounter(e["stay"])
+        rid = f"vit-{e['stay']}-{e['tag']}"
+        if enc is None or self.fhir.read("Observation", rid):
+            return False
+        pid = ref_id(enc["subject"])
+        M.vitals_panel(self.b, types.SimpleNamespace(id=pid), enc["id"], self.t, e["values"], rid=rid)
+        results = [f"Observation/{rid}"]
+        if e.get("news2") is not None:
+            score = f"news2-{e['stay']}-{e['tag']}"
+            self.b.observation(pid, enc["id"], C.NEWS2, self.t, value=int(e["news2"]), category="survey",
+                               system=C.LOCAL, rid=score)
+            results.append(f"Observation/{score}")
+        self.vitals += 1
+        self._msg("ORU^R01", self._key(e), cls="IMP", patient=pid, visit=enc["id"], location=_current(enc),
+                  section="VS", results=tuple(results))
+
+    def _on_prescriptions(self, e: dict):
+        """Discharge prescriptions the plan holds for a stay (MedicationRequest intent plan, category discharge),
+        written as the attending prepares the discharge. No HL7 message: pharmacy orders are not on this
+        interface; the medication-safety intake finds them in the EHR."""
+        enc = self._stay_encounter(e["stay"])
+        if enc is None:
+            return False
+        attending = (self.plan["stays"].get(e["stay"]) or {}).get("attending")
+        pid = ref_id(enc["subject"])
+        for n, med in enumerate(e["meds"], start=1):
+            rid = f"medrx-dc-{e['stay']}-{n:02d}"
+            if self.fhir.read("MedicationRequest", rid):
+                continue
+            self.b.medication_request(pid, enc["id"], med["rxcui"], self.t, intent="plan", category="discharge",
+                                      requester=attending, dose=med.get("dose"), per_day=med.get("per_day"),
+                                      prn=bool(med.get("prn")), reason=med.get("reason"), note=med.get("note"),
+                                      rid=rid)
 
     # ----- orders and results -----
 

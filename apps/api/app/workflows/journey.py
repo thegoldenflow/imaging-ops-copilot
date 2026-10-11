@@ -7,6 +7,11 @@ Steps, each an activity (app/workflows/activities.py) whose side effects go thro
     -> wardMonitoring (NEWS2 signals, until the discharge) -> draftDischargeSummary -> draftPatientInstructions
     -> 48 h timer -> scheduleFollowupCall -> codingStub
 
+Started in the ED (version 4, WP9: the storyline's patient, `JourneyInput.ed_visit`), the journey is spec 8.2's
+steps 2-12: triageAssist, imagingOrders, criticalValue (sign-offs on the storyline's cards) -> bedAssignment (waits
+for the `admitted` signal while she boards) -> orderReview -> medRecAdmission -> surgery -> ward -> documents ->
+48 h -> follow-up call -> codingStub (a sign-off on the coding card).
+
 A sign-off step waits for a signal (the document signed final, the Task decided) racing the escalation deadlines
 (FlowBase._await_signoff). The order review and the admission medication reconciliation are WP6's
 (app/modules/med_safety/journey.py), the discharge summary and the patient instructions WP7's
@@ -28,6 +33,7 @@ with workflow.unsafe.imports_passed_through():
 
 CODING_PATCH = "journey-coding-step"  # version 2 (see the end of run)
 FOLLOWUP_PATCH = "journey-followup-call"  # version 3: WP8 schedules the follow-up call itself (no clerk booking)
+ED_PATCH = "journey-ed-phase"  # version 4 (WP9): a journey started in the ED (`ed_visit`), spec 8.2 steps 2-12
 
 
 @workflow.defn(name=M.JOURNEY)
@@ -53,6 +59,12 @@ class InpatientJourneyWorkflow(FlowBase):
         self.started_at = workflow.now()
         self.meta = {"encounter_id": inp.encounter_id, "patient_id": inp.patient_id, "started_by": inp.started_by}
         base = {"workflow_id": workflow.info().workflow_id, "encounter_id": inp.encounter_id}
+        # Version 4 (WP9): started at the ED registration (the storyline's patient). `patched` is asked only for such
+        # a journey, so a journey started at the admission, old or new, records no marker and runs as before.
+        if inp.ed_visit and workflow.patched(ED_PATCH):
+            return await self._from_ed(inp, base)
+        for key in ("imagingOrders", "criticalValue"):
+            self._not_applicable(key, "the journey started at the admission (its ED steps were before it)")
 
         # The encounter as the EHR has it now: patient, unit and bed, admission time, the ED visit before it.
         await self._begin("triageAssist")
@@ -72,19 +84,7 @@ class InpatientJourneyWorkflow(FlowBase):
         await self._signoff("medRecAdmission", "journey.medRecAdmission",
                             {**args, "orders_as_of": (review or {}).get("decided_at") or args["as_of"]})
         await self._auto("bedAssignment", "journey.bedAssignment", args)
-
-        await self._begin("predictDuration")
-        prediction = await self._activity("predictDuration", "journey.predictDuration", args)
-        if prediction is not None and prediction.get("not_applicable"):
-            self._not_applicable("predictDuration", prediction["not_applicable"])
-            self._not_applicable("proposeSchedule", "no operating-room case")
-            await self._publish()
-        elif prediction is not None:
-            await self._finish("predictDuration", detail=prediction.get("detail"), refs=prediction.get("refs"))
-            await self._signoff("proposeSchedule", "journey.proposeSchedule", {**args, "case": prediction.get("case")})
-        else:
-            self._not_applicable("proposeSchedule", "the prediction was skipped")
-
+        await self._surgery(args)
         await self._ward(args)
         await self._signoff("draftDischargeSummary", "journey.draftDischargeSummary", args)
         await self._signoff("draftPatientInstructions", "journey.draftPatientInstructions", args)
@@ -109,6 +109,67 @@ class InpatientJourneyWorkflow(FlowBase):
         else:
             self._not_applicable("codingStub", "started before the coding step existed (version 1)")
         return await self._complete()
+
+    async def _from_ed(self, inp: M.JourneyInput, base: dict) -> dict:
+        """Version 4 (WP9, spec 8.2): the journey of a patient registered in the ED for a planned stay. The ED steps
+        are sign-offs on the storyline's cards (triage, imaging orders, the critical value); the journey then waits
+        while she boards (the bed manager decides in the Control Tower, the CapacityExceptionWorkflow) until the
+        EHR admits her, and goes on as an admission's journey; the coding suggestion is a sign-off too."""
+        ed = inp.ed_visit
+        self.meta.update({"ed_visit": ed, "started_in": "ED"})
+        ed_args = {**base, "ed_visit": ed, "patient_id": inp.patient_id}
+        await self._signoff("triageAssist", "journey.edTriage", ed_args)
+        await self._signoff("imagingOrders", "journey.imagingOrders", ed_args)
+        await self._signoff("criticalValue", "journey.criticalValue", ed_args)
+        key = "bedAssignment"
+        await self._begin(key, M.WAITING, "Boarding in the ED until a bed is free (the bed manager decides in the "
+                                          "Control Tower)")
+        await workflow.wait_condition(lambda: self._control_for(key, ("skip",)) is not None or any(
+            e.get("kind") == "admitted" for e in self.inbox))
+        if (control := self._control_for(key, ("skip",))) is not None:
+            self.controls.remove(control)
+            await self._finish(key, M.SKIPPED, f"Skipped by {control.get('by') or 'a person'} while she waited")
+            return await self._complete("failed")
+        admitted = next(e for e in self.inbox if e.get("kind") == "admitted")
+        self.inbox.remove(admitted)
+        context = await self._activity(key, "journey.context", base)
+        if context is None or context.get("missing"):
+            self._step(key)["detail"] = (context or {}).get("missing") or "No context"
+            return await self._complete("failed")
+        self.meta.update({k: context.get(k) for k in ("patient_id", "unit_id", "bed_id", "admitted_at")})
+        args = {**base, "admitted_at": context.get("admitted_at"), "ed_visit": ed,
+                "patient_id": context.get("patient_id"), "as_of": context.get("as_of")}
+        await self._auto(key, "journey.bedAssignment", args)
+        review = await self._signoff("orderReview", "journey.orderReview", args)
+        await self._signoff("medRecAdmission", "journey.medRecAdmission",
+                            {**args, "orders_as_of": (review or {}).get("decided_at") or args["as_of"]})
+        await self._surgery(args)
+        await self._ward(args)
+        await self._signoff("draftDischargeSummary", "journey.draftDischargeSummary", args)
+        await self._signoff("draftPatientInstructions", "journey.draftPatientInstructions", args)
+        delay = timedelta(seconds=self.timers.followup_delay_s)
+        await self._begin("followupDelay", M.WAITING, f"Until {_iso(workflow.now() + delay)} (wall clock)")
+        await workflow.sleep(delay)
+        await self._finish("followupDelay")
+        await self._auto("scheduleFollowupCall", "journey.scheduleFollowupCall",
+                         {**args, "discharged_at": self.meta.get("discharged_at")})
+        await self._signoff("codingStub", "journey.codingSuggestion", args)
+        return await self._complete()
+
+    async def _surgery(self, args: dict) -> None:
+        """The surgical branch: the duration predicted for the patient's case on today's OR list, and the OR
+        coordinator's decision when it runs over (or past the block end)."""
+        await self._begin("predictDuration")
+        prediction = await self._activity("predictDuration", "journey.predictDuration", args)
+        if prediction is not None and prediction.get("not_applicable"):
+            self._not_applicable("predictDuration", prediction["not_applicable"])
+            self._not_applicable("proposeSchedule", "no operating-room case")
+            await self._publish()
+        elif prediction is not None:
+            await self._finish("predictDuration", detail=prediction.get("detail"), refs=prediction.get("refs"))
+            await self._signoff("proposeSchedule", "journey.proposeSchedule", {**args, "case": prediction.get("case")})
+        else:
+            self._not_applicable("proposeSchedule", "the prediction was skipped")
 
     # ---------- step kinds ----------
 
@@ -137,10 +198,11 @@ class InpatientJourneyWorkflow(FlowBase):
         s = self._step(key)
         s["detail"], s["refs"] = out.get("detail"), list(out.get("refs") or [])
         waits = list(out.get("wait_for") or [])
-        if not waits:
+        by_step = bool(out.get("wait_step"))  # WP9: the work item comes later; its writer registers the wait
+        if not waits and not by_step:
             await self._finish(key)
             return out
-        got = await self._await_signoff(key, waits, role=out.get("signer") or self._def(key).owner)
+        got = await self._await_signoff(key, waits, role=out.get("signer") or self._def(key).owner, by_step=by_step)
         if got["outcome"] == "skipped":
             await self._finish(key, M.SKIPPED, f"Skipped by {got.get('by') or 'a person'} while waiting")
         else:

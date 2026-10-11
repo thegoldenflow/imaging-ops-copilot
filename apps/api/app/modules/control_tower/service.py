@@ -215,6 +215,29 @@ def approve(store: Store, user: StaffUser, exception_id: str, action_ids: list[s
     return exc
 
 
+def adjust_booking(store: Store, user: StaffUser, appointment_id: str, minutes: int | None = None, note: str = "",
+                   *, source_ip: str | None = None) -> dict:
+    """The OR coordinator (operations manager) sets a booked case to the predicted duration, or to `minutes`
+    (WP9, spec 8.2 step 7): FhirGateway.adjust_or_booking, audited. An open "OR booking check" sign-off of the
+    patient's journey (6.5 proposeSchedule) waits for exactly this decision, so it is approved with the same note."""
+    snap = refresh(store)
+    case = next((c for c in snap.or_cases if c.appointment_id == appointment_id), None)
+    if case is None:
+        raise LookupError(f"No OR case {appointment_id} on today's list")
+    target = int(minutes or case.predicted_minutes or case.booked_minutes)
+    reason = note.strip() or f"booked {case.booked_minutes} min, predicted {case.predicted_minutes} min"
+    fhir = FhirGateway(Actor.of(user), MODULE)
+    fhir.adjust_or_booking(appointment_id, target, reason=reason)
+    decided = []
+    for task in approvals.queue(user, limit=200):
+        if task.get("focus") == f"Appointment/{appointment_id}" and task.get("step") == "proposeSchedule":
+            approvals.decide(user, task["task_id"], "approve", f"Booking adjusted to {target} min: {reason}"[:500],
+                             source_ip=source_ip)
+            decided.append(task["task_id"])
+    return {"appointment_id": appointment_id, "previous_minutes": case.booked_minutes, "minutes": target,
+            "predicted_minutes": case.predicted_minutes, "signoffs_approved": decided}
+
+
 def _running_workflow(store: Store, exc: X.FlowException) -> str | None:
     """The exception's CapacityExceptionWorkflow, when Temporal is on and the workflow runs."""
     from app.workflows import bridge

@@ -231,7 +231,9 @@ def _mock_narrative(f: dict) -> str:
     if rule == "or_overrun":
         return (f"{f['procedure']} in {f['room']} is predicted to take {f['predicted_minutes']} minutes against "
                 f"{f['booked_minutes']} booked, {f['overrun_minutes']} minutes over. "
-                f"The room's list is predicted to end at {f['room_predicted_end']}.")
+                + (f"Booked to end at {f['booked_end']}, it would end at {f['predicted_end']}, past the "
+                   f"{f['block_end']} block end." if f.get("block_overtime_risk") else
+                   f"The room's list is predicted to end at {f['room_predicted_end']}."))
     if rule == "preop_gap":
         return (f"{f['procedure']} in {f['room']} is booked for {f['booked_start']}, {f['minutes_to_start']} minutes "
                 f"from now, with {f['open_count']} pre-op items still open. The case may start late unless they are "

@@ -251,7 +251,7 @@ def test_a_relative_calls_in_mandarin_for_the_patient(fresh_state, client, login
     y, m, d = p["birthDate"].split("-")
     _, replies, call = converse(client, clerk, "你好，我想帮我妈妈查一下她的预约",
                                 f"我妈妈叫{name}，{y}年{int(m)}月{int(d)}日出生，健康卡尾号{card[-4:]}")
-    assert call["patient_id"] == caller["patient"] and call["caller_relation"] == "mother"
+    assert call["patient_id"] == caller["patient"] and call["caller_relation"] == "child"  # "my mother": her child
     assert call["language"] == "zh-Hans" and "预约" in replies[-1]
 
 

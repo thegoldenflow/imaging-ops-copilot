@@ -2,9 +2,10 @@
 // fasting, labs, blood group); block utilisation, cases at risk of cancellation, predicted end of the day. The
 // room lanes show each case's booking (outline) against its prediction (filled).
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { Scissors, Sparkles } from "lucide-react";
-import { hhmm, PREOP_LABEL, pct, type Board, type OrCase } from "./api";
+import { Clock3, Scissors, Sparkles } from "lucide-react";
+import { adjustBooking, blockOvertime, hhmm, PREOP_LABEL, pct, type Board, type OrCase } from "./api";
 import { EmptyPanel, KpiTile, Panel, SeverityPill, SkeletonRows, StatusPill } from "./kit";
 
 const START_HOUR = 7;
@@ -42,7 +43,7 @@ export function OrColumn({ board }: { board: Board | undefined }) {
         <>
           <Lanes board={board} cases={cases} />
           <ul className="max-h-[30vh] divide-y divide-ct-border overflow-y-auto" data-testid="or-list">
-            {cases.map((c) => <CaseItem key={c.appointment_id} c={c} />)}
+            {cases.map((c) => <CaseItem key={c.appointment_id} c={c} canAdjust={board.role === "operations_manager"} />)}
           </ul>
         </>
       )}
@@ -89,10 +90,17 @@ function Lanes({ board, cases }: { board: Board; cases: OrCase[] }) {
   );
 }
 
-function CaseItem({ c }: { c: OrCase }) {
+function CaseItem({ c, canAdjust }: { c: OrCase; canAdjust: boolean }) {
   const items = Object.keys(PREOP_LABEL);
+  const queryClient = useQueryClient();
+  const pastBlock = blockOvertime(c);
+  const over = (c.overrun_minutes ?? 0) >= 15 && c.status === "booked";
+  const adjust = useMutation({
+    mutationFn: () => adjustBooking(c.appointment_id, `Adjusted to the predicted ${c.predicted_minutes} min`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["ct-board"] }),
+  });
   return (
-    <li className="px-3 py-2" data-testid="or-row">
+    <li className="px-3 py-2" data-testid="or-row" data-mrn={c.mrn ?? ""} data-appointment={c.appointment_id}>
       <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 truncate text-xs text-ct-text">
           <span className="font-medium">{c.room} {hhmm(c.booked_start)}</span>
@@ -118,6 +126,16 @@ function CaseItem({ c }: { c: OrCase }) {
           </span>
         )}
         {c.cancellation_risk && <StatusPill tone="warning" title={c.cancellation_reasons.join("; ")}>cancellation risk</StatusPill>}
+        {pastBlock > 0 && <StatusPill tone="warning" title={`Booked to end by 16:00; predicted to end at ${hhmm(c.predicted_end)}`}>
+          <span data-testid="block-overtime">block overtime +{pastBlock} min</span></StatusPill>}
+        {canAdjust && over && (
+          <button type="button" onClick={() => adjust.mutate()} disabled={adjust.isPending} data-testid="adjust-booking"
+            className="inline-flex items-center gap-1 rounded border border-ct-border px-1.5 py-0.5 text-[11px] font-medium text-ct-accent hover:bg-ct-raised disabled:opacity-60"
+            title="Set the booking to the predicted duration (the OR coordinator's decision; audited)">
+            <Clock3 className="size-3" />Adjust booking to {c.predicted_minutes} min
+          </button>
+        )}
+        {adjust.error && <span className="text-ct-critical" role="alert">{(adjust.error as Error).message}</span>}
       </div>
     </li>
   );

@@ -606,3 +606,29 @@ def test_journey_medrec_step_reconciles_the_orders_written_by_the_sign_off(fresh
     J.medrec_admission(store, encounter, cutoff)
     items = {i["id"] for i in S.reconcile(store, encounter, "admission").items}
     assert "new-51272" not in items  # quetiapine was ordered after the order review's sign-off
+
+
+def test_a_journey_signoff_written_while_the_last_decision_was_saved_is_confirmed_soon_after(fresh_state):
+    """WP9 (Temporal on): the journey's order review can write its sign-off Task while the pharmacist's last decision
+    is being saved, so neither sees the other; the API's background recheck confirms it a moment later, in the name of
+    the pharmacist who decided, as the decision itself would have."""
+    from app.agents.runtime import runtime
+    from app.modules.med_safety import journey as MJ
+
+    store = fresh_state
+    S.intake(store, force=True)
+    pharmacist = user(store, Role.PHARMACIST)
+    encounter = reviews(store).get(NAPROXEN).encounter_id
+    for r in [r for r in reviews(store).find_by("encounter_id", encounter)
+              if r.status == "pending" and r.kind == "medication"]:
+        S.decide_review(store, pharmacist, r.id, "request_change", "Stop it: interaction with warfarin at home")
+    found = MJ.review_orders(store, encounter, None)  # as the activity read them, before the decision was saved
+    with runtime.start("order_review", user=None, encounter_id=encounter) as run:
+        result = MJ.order_review_signoff(run, found, None)
+        run.finish(outcome="completed")
+    task_id = result.wait_for[0].split("/")[1]
+    assert store.fhir.read("Task", task_id)["status"] == "requested"
+    MJ._LAST["at"] = 0.0
+    assert MJ.recheck_signoffs(store) == [task_id]
+    assert store.fhir.read("Task", task_id)["status"] == "completed"
+    assert MJ.decided_before(MJ.review_orders(store, encounter, None)) is not None  # a later journey asks no one

@@ -33,6 +33,12 @@ class OrderSpec:
     authored: datetime
     completed: datetime
     value: float | None = None  # lab result
+    # Set when a person placed the order through decision support (the storyline, WP9): ServiceRequest.priority,
+    # the approved protocol (orderDetail), who ordered it, and the imaging report's conclusion
+    priority: str | None = None
+    detail: str | None = None
+    requester: str | None = None
+    conclusion: str | None = None
 
 
 def _rng(b: Builder, *parts: str) -> random.Random:
@@ -128,7 +134,8 @@ def write_order(b: Builder, order: OrderSpec, as_of: datetime) -> None:
     done = order.completed <= as_of
     b.service_request(order.patient, order.encounter, order_code(order), order.authored, rid=order.id,
                       category=order.kind, status="completed" if done else "active",
-                      occurrence=order.completed if done else None)
+                      occurrence=order.completed if done else None, priority=order.priority or "routine",
+                      requester=order.requester, detail=order.detail)
     if done:
         write_result(b, order)
 
@@ -141,7 +148,8 @@ def write_result(b: Builder, order: OrderSpec) -> None:
                       category="laboratory", interpretation=flag, rid=f"obs-{order.id}")
     elif order.kind == "imaging":
         b.diagnostic_report(order.patient, order.encounter, order_code(order), order.completed, category="RAD",
-                            conclusion=f"{IMAGING_ORDERS[order.code]}: findings documented in the imaging report.",
+                            conclusion=order.conclusion or
+                            f"{IMAGING_ORDERS[order.code]}: findings documented in the imaging report.",
                             based_on=order.id)
 
 
@@ -223,13 +231,18 @@ def write_stay(b: Builder, s: Stay, p: PatientInfo, surgery: Surgery | None, ed:
                 based_on=f"bedreq-{ed.id}" if ed else None, practitioner=s.attending, extensions=exts, rid=s.id)
     b.condition(p.id, s.dx, s.admit, enc=s.id, category="encounter-diagnosis",
                 clinical="resolved" if discharged else "active")
-    # Medications: most home medications continued, plus diagnosis-specific ones
+    # Medications: most home medications continued, plus diagnosis-specific ones (or the planned orders)
     status = "completed" if discharged else "active"
-    for rxcui in p.home_meds:
+    for n, med in enumerate(s.med_plan or [], start=1):
+        b.medication_request(p.id, s.id, med["rxcui"], s.admit + timedelta(hours=med.get("hours", 1)), status=status,
+                             requester=s.attending, dose=med.get("dose"), per_day=med.get("per_day"),
+                             prn=bool(med.get("prn")), reason=med.get("reason"), note=med.get("note"),
+                             rid=f"medrx-{s.id}-{n:02d}")
+    for rxcui in (p.home_meds if s.med_plan is None else []):
         if rng.random() < 0.8:
             b.medication_request(p.id, s.id, rxcui, s.admit + timedelta(hours=rng.uniform(1, 4)),
                                  status=status, requester=s.attending)
-    for rxcui in INPATIENT_MEDS.get(s.dx, []):
+    for rxcui in (INPATIENT_MEDS.get(s.dx, []) if s.med_plan is None else []):
         if rxcui in p.home_meds:
             continue
         b.medication_request(p.id, s.id, rxcui, s.admit + timedelta(hours=rng.uniform(0.5, 3)), status=status,

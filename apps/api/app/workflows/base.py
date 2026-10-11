@@ -242,10 +242,14 @@ class FlowBase:
         self._note(f"{control['action'].capitalize()} of '{self._def(key).label}' by {control.get('by', 'a person')}")
         return control
 
-    def _ready(self, key: str, refs: list[str]) -> bool:
-        return self._control_for(key, ("skip",)) is not None or any(e.get("ref") in refs for e in self.inbox)
+    def _matches(self, event: dict, key: str, refs: list[str], by_step: bool) -> bool:
+        return event.get("ref") in refs or (by_step and event.get("step") == key and event.get("kind") != "admitted")
 
-    def _take(self, key: str, refs: list[str]) -> dict | None:
+    def _ready(self, key: str, refs: list[str], by_step: bool = False) -> bool:
+        return self._control_for(key, ("skip",)) is not None or any(self._matches(e, key, refs, by_step)
+                                                                     for e in self.inbox)
+
+    def _take(self, key: str, refs: list[str], by_step: bool = False) -> dict | None:
         """The outcome of a sign-off, when the inbox or the controls hold one (consumed)."""
         control = self._control_for(key, ("skip",))
         if control is not None:
@@ -253,7 +257,7 @@ class FlowBase:
             self._note(f"Skip of '{self._def(key).label}' by {control.get('by', 'a person')}")
             return {"outcome": "skipped", "by": control.get("by")}
         for event in list(self.inbox):
-            if event.get("ref") not in refs:
+            if not self._matches(event, key, refs, by_step):
                 continue
             self.inbox.remove(event)
             kind = event.get("kind")
@@ -267,9 +271,11 @@ class FlowBase:
                     "by": event.get("role"), "event": event}
         return None
 
-    async def _await_signoff(self, key: str, refs: list[str], *, role: str, focus: str | None = None) -> dict:
+    async def _await_signoff(self, key: str, refs: list[str], *, role: str, focus: str | None = None,
+                             by_step: bool = False) -> dict:
         """Wait for a person: a document signed final, a Task or exception decided (or a skip). Races two absolute
-        deadlines and keeps waiting after escalating."""
+        deadlines and keeps waiting after escalating. `by_step` (WP9): the work item does not exist yet; whoever
+        writes it registers the wait for this step, and its decision is taken whatever its reference."""
         s = self._step(key)
         s["status"], s["waiting_for"] = M.WAITING, {"refs": refs, "role": role}
         s["started_at"] = s["started_at"] or _iso(workflow.now())
@@ -279,7 +285,7 @@ class FlowBase:
         deadlines = [start + timedelta(seconds=t.signoff_timeout_s),
                      start + timedelta(seconds=t.signoff_timeout_s + t.escalation_timeout_s)]
         while True:
-            got = self._take(key, refs)
+            got = self._take(key, refs, by_step)
             if got is not None:
                 return got
             level = s["escalation"]
@@ -288,7 +294,7 @@ class FlowBase:
                 await self._escalate(key, level + 1, role, focus or (refs[0] if refs else None))
                 continue
             try:
-                await workflow.wait_condition(lambda: self._ready(key, refs), timeout=remaining)
+                await workflow.wait_condition(lambda: self._ready(key, refs, by_step), timeout=remaining)
             except asyncio.TimeoutError:
                 await self._escalate(key, level + 1, role, focus or (refs[0] if refs else None))
 

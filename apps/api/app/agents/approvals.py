@@ -44,7 +44,8 @@ APPROVAL = "approval-request"
 REVIEW = "ai-review"
 NEEDS_HUMAN = "needs-human"
 WORKFLOW_SIGNOFF = "workflow-signoff"
-DECIDABLE = (APPROVAL, REVIEW, WORKFLOW_SIGNOFF)
+NEWS2_RESPONSE = "news2-response"  # WP9: the nurse records the response to a NEWS2 flag the journey turned into a Task
+DECIDABLE = (APPROVAL, REVIEW, WORKFLOW_SIGNOFF, NEWS2_RESPONSE)
 OPEN = ("requested", "received", "accepted", "ready", "in-progress")
 ROLE_OF_CODE = {code: role for role, code in access.ROLE_CODE.items()}
 

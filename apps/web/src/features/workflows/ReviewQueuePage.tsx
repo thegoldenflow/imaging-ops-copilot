@@ -4,7 +4,7 @@
 // waiting workflow.
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ClipboardCheck, ExternalLink, PencilLine, ShieldCheck, Sparkles, TowerControl, Workflow, XCircle } from "lucide-react";
+import { Activity, CheckCircle2, ClipboardCheck, ExternalLink, Map, PencilLine, ShieldCheck, Sparkles, TowerControl, Workflow, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { AiBadge, Badge, Button, Card, EmptyState, ErrorState, Loading, PageHeader } from "../../components/ui";
@@ -16,7 +16,11 @@ const KIND = {
   "approval-request": { label: "Approve an AI action", icon: ShieldCheck, tone: "red" as const },
   "ai-review": { label: "Review AI output", icon: Sparkles, tone: "ai" as const },
   "workflow-signoff": { label: "Workflow sign-off", icon: ClipboardCheck, tone: "blue" as const },
+  "news2-response": { label: "NEWS2 response", icon: Activity, tone: "amber" as const },
 };
+
+// 8.1 roadmap stubs (WP9): they run on the storyline's preset data and contain no clinical logic.
+const ROADMAP_STUBS = new Set(["critical_value_routing", "deterioration_alert", "coding_assist"]);
 
 export function ReviewQueuePage() {
   const queue = useQuery({ queryKey: ["review-queue"], queryFn: () => api<{ tasks: QueueTask[] }>("/api/agents/approvals"), refetchInterval: 5000 });
@@ -52,18 +56,19 @@ function QueueRow({ t }: { t: QueueTask }) {
   const Icon = kind.icon;
   const controlTower = t.agent_id === "control_tower";
   return (
-    <li className="p-4" data-task={t.task_id} data-kind={t.kind}>
+    <li className="p-4" data-task={t.task_id} data-kind={t.kind} data-agent={t.agent_id ?? ""}>
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={kind.tone}><Icon className="size-3" />{t.review_id ? "Low AI confidence" : kind.label}</Badge>
         {t.priority && t.priority !== "routine" && <Badge tone="amber">{t.priority}</Badge>}
         <span className="text-xs text-slate-500">Task {t.task_id}{t.encounter_id ? ` · encounter ${t.encounter_id}` : ""}{t.authored_on ? ` · ${dateTime(t.authored_on)}` : ""}</span>
         {t.agent_id && <AiBadge label={t.agent_id} agent={t.agent_id} />}
+        {t.agent_id && ROADMAP_STUBS.has(t.agent_id) && <Badge tone="slate"><Map className="size-3" />Roadmap (8.1): preset data</Badge>}
         {t.workflow_id && (
           <Link to={`/workflows/${encodeURIComponent(t.workflow_id)}`} className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline"><Workflow className="size-3.5" />{t.workflow_id}</Link>
         )}
       </div>
       <p className="mt-1 text-sm text-slate-800">{t.description}</p>
-      {t.recommendation && !controlTower && <p className="mt-1 rounded-lg bg-ai-50 p-2 text-sm text-slate-700">{t.recommendation}</p>}
+      {t.recommendation && !controlTower && <p className="mt-1 whitespace-pre-line rounded-lg bg-ai-50 p-2 text-sm text-slate-700" data-testid="recommendation">{t.recommendation}</p>}
       {controlTower ? (
         <Link to="/control-tower" className="mt-2 inline-flex items-center gap-1 text-sm text-brand-700 hover:underline"><TowerControl className="size-4" />Decide in the Control Tower's action drawer<ExternalLink className="size-3" /></Link>
       ) : correcting && t.review_id ? (

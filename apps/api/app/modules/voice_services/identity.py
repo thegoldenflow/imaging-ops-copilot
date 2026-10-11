@@ -33,6 +33,19 @@ RELATION = re.compile(r"\bmy (mother|mom|mum|father|dad|husband|wife|son|daughte
                       r"grandma|grandpa|sister|brother|aunt|uncle)\b|我(的)?(妈妈|妈|母亲|爸爸|爸|父亲|丈夫|先生|老公|太太|"
                       r"妻子|老婆|儿子|女儿|奶奶|爷爷|外婆|外公|姐姐|妹妹|哥哥|弟弟)", re.IGNORECASE)
 RELATION_EN = {"mom": "mother", "mum": "mother", "dad": "father", "grandma": "grandmother", "grandpa": "grandfather"}
+# "my mother" names the patient; the call records who the caller is to the patient (the caller is her child). A
+# caller who says it ("I'm her daughter", "我是她女儿") is taken at their word (WP9 fix: it was stored the other way
+# round, so a daughter's call read "Call from the patient's mother").
+CALLER_IS = {"mother": "child", "father": "child", "husband": "spouse", "wife": "spouse", "son": "parent",
+             "daughter": "parent", "grandmother": "grandchild", "grandfather": "grandchild", "sister": "sibling",
+             "brother": "sibling", "aunt": "niece or nephew", "uncle": "niece or nephew"}
+SELF_RELATION = re.compile(r"\b(?:i'?m|i am) (?:her|his|their|the patient'?s) (daughter|son|husband|wife|mother|father|"
+                           r"sister|brother|granddaughter|grandson)\b|我是(?:她|他|病人)的?(女儿|儿子|丈夫|先生|老公|太太|妻子|老婆|"
+                           r"妈妈|母亲|爸爸|父亲|姐姐|妹妹|哥哥|弟弟|孙女|孙子|外孙女|外孙)", re.IGNORECASE)
+SELF_ZH = {"女儿": "daughter", "儿子": "son", "丈夫": "husband", "先生": "husband", "老公": "husband", "太太": "wife",
+           "妻子": "wife", "老婆": "wife", "妈妈": "mother", "母亲": "mother", "爸爸": "father", "父亲": "father",
+           "姐姐": "sister", "妹妹": "sister", "哥哥": "brother", "弟弟": "brother", "孙女": "granddaughter",
+           "孙子": "grandson", "外孙女": "granddaughter", "外孙": "grandson"}
 RELATION_ZH = {"妈妈": "mother", "妈": "mother", "母亲": "mother", "爸爸": "father", "爸": "father", "父亲": "father",
                "丈夫": "husband", "先生": "husband", "老公": "husband", "太太": "wife", "妻子": "wife", "老婆": "wife",
                "儿子": "son", "女儿": "daughter", "奶奶": "grandmother", "爷爷": "grandfather", "外婆": "grandmother",
@@ -55,7 +68,7 @@ class Parsed:
     name: str | None = None  # the words that may be the patient's name (matched against the record by the tool)
     birth_date: str | None = None  # YYYY-MM-DD
     card_last4: str | None = None
-    relation: str | None = None
+    relation: str | None = None  # who the caller is to the patient ("daughter", "child", "spouse", ...)
     found: list[str] = field(default_factory=list)  # which pieces this utterance gave
 
 
@@ -83,9 +96,12 @@ def parse(text: str, *, expecting: bool = True) -> Parsed:
             out.card_last4 = fours[0]
     if out.card_last4:
         out.found.append("card_last4")
-    if m := RELATION.search(raw):
+    if m := SELF_RELATION.search(raw):
+        out.relation = m.group(1).lower() if m.group(1) else SELF_ZH[m.group(2)]
+    elif m := RELATION.search(raw):
         word = (m.group(1) or m.group(3) or "").lower()
-        out.relation = RELATION_EN.get(word, word) if m.group(1) else RELATION_ZH.get(m.group(3), m.group(3))
+        named = RELATION_EN.get(word, word) if m.group(1) else RELATION_ZH.get(m.group(3), m.group(3))
+        out.relation = CALLER_IS.get(named, named)
     out.name = _name(raw) if expecting or out.birth_date or out.card_last4 or NAME_CUE.search(raw) else None
     if out.name:
         out.found.append("name")

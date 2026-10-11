@@ -322,6 +322,19 @@ export const rejectException = (id: string, reason: string) =>
   post<ExceptionDetail>(`/api/control-tower/exceptions/${id}/reject`, { reason });
 export const deferException = (id: string, minutes: number) =>
   post<ExceptionDetail>(`/api/control-tower/exceptions/${id}/defer`, { minutes });
+// WP9 (8.2 step 7): the OR coordinator sets a booked case to its predicted duration
+export const adjustBooking = (appointmentId: string, note: string) =>
+  post<{ appointment_id: string; previous_minutes: number; minutes: number; predicted_minutes: number | null }>(
+    `/api/control-tower/or-cases/${appointmentId}/adjust`, { note });
+
+/** A case predicted at least 15 min over that would end after the 16:00 block end it was booked to end by. */
+export function blockOvertime(c: OrCase): number {
+  if (c.status !== "booked" || !c.predicted_end || (c.overrun_minutes ?? 0) < 15) return 0;
+  const end = `${c.booked_start.slice(0, 10)}T16:00`;
+  if (c.booked_end.slice(0, 16) > end || c.predicted_end.slice(0, 16) <= end) return 0;
+  const minutes = (Date.parse(c.predicted_end) - Date.parse(`${end}:00`)) / 60000;
+  return Math.max(0, Math.round(minutes));
+}
 
 // --- the simulator (WP3 API) ---
 export const simRun = (rate: number) => post("/api/hospital/simulator/run", { rate });

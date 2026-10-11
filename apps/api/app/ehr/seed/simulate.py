@@ -93,6 +93,9 @@ class Stay:
     alc_from: datetime | None = None
     disposition: str = "home"
     attending: str | None = None
+    # The admission's medication orders when they are planned (the storyline, WP9), instead of the generator's
+    # draw: [{rxcui, hours (after the admission), dose, per_day, prn, reason, note}]
+    med_plan: list[dict] | None = None
 
 
 @dataclass

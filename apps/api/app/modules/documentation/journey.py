@@ -52,9 +52,20 @@ def _missing_task(run, role: str, kind: str, missing: list[str]) -> StepResult:
                       detail=f"Insufficient information: missing {'; '.join(missing)}")
 
 
+def _signed(run, encounter_id: str, ref: str) -> bool:
+    """The document already signed final (a final document is never drafted again: the draft tool refuses it)."""
+    found = run.tool("getDocuments", {"encounter_id": encounter_id})
+    return found.ok and any(f"DocumentReference/{d.get('id')}" == ref and d.get("docStatus") == "final"
+                            for d in (found.output or {}).get("resources", []))
+
+
 def _step(agent_id: str, kind: str, role: str, encounter_id: str, draft) -> StepResult:
     try:
         with acting_as_system(), runtime.start(agent_id, user=None, encounter_id=encounter_id) as run:
+            ref = doc_ref(kind, encounter_id)
+            if _signed(run, encounter_id, ref):  # signed in Documentation before the journey got here (WP9)
+                run.finish(outcome="completed")
+                return StepResult(refs=[ref], signer=role, detail=f"{ref.split('/')[1]} already signed final")
             result = draft(run)
             if result.status == "insufficient":
                 out = _missing_task(run, role, kind, result.missing)

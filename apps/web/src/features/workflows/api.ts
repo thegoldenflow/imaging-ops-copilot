@@ -86,7 +86,7 @@ export interface WorkflowDetail {
 
 export interface QueueTask {
   task_id: string;
-  kind: "approval-request" | "ai-review" | "workflow-signoff";
+  kind: "approval-request" | "ai-review" | "workflow-signoff" | "news2-response";
   status: string;
   description: string | null;
   authored_on: string | null;

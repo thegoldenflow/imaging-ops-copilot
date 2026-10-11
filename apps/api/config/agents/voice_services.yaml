@@ -20,6 +20,7 @@ allowed_tools:
 - cancelBookedAppointment
 - writeCallRecord
 - createCallTask
+- suggestEhrAction
 - recordPatientReportedObservation
 - updateTask
 data_scope:

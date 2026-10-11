@@ -43,10 +43,19 @@ def recent_calls(store: Store, user: StaffUser, limit: int = 30) -> list[dict]:
 
 
 def requests(store: Store, user: StaffUser) -> list[dict]:
-    """The call centre's requests waiting for a clerk: reschedules and cancellations (approval Tasks)."""
+    """The call centre's requests waiting for a clerk: reschedules and cancellations (approval Tasks), and ED
+    registrations (suggestion cards, WP9: the EHR registers the arrival when the clerk confirms)."""
     fhir = FhirGateway(Actor.of(user), MODULE)
     out = []
     for task in approvals.queue(user, limit=100):
+        if task.get("kind") == approvals.REVIEW and task.get("agent_id") in (callcenter.AGENT, MODULE):
+            found = fhir.read("Task", task["task_id"])
+            action = json.loads(approvals.inputs(found.to_fhir()).get("ehr_action") or "{}") if found else {}
+            if action.get("kind") == "registration":
+                patient = action.get("patient_id")
+                out.append({**task, "kind": "registration", "args": action, "patient_id": patient,
+                            "mrn": _mrn(fhir, patient) if patient else None})
+            continue
         if task.get("tool_id") not in REQUEST_TOOLS or task.get("agent_id") not in (callcenter.AGENT, MODULE):
             continue
         found = fhir.read("Task", task["task_id"])

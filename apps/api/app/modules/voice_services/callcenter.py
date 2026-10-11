@@ -31,6 +31,7 @@ from app.agents.runtime import AgentRun, Context, runtime
 from app.core.context import acting_as_system
 from app.core.models import StaffUser
 from app.core.store import Store, get_store
+from app.ehr import codes as C
 from app.ehr.clock import hospital_now
 from app.ehr.gateway import Actor, FhirGateway
 from app.fhir.dt import fhir_datetime, parse
@@ -160,13 +161,16 @@ def _switch_language(call: HospitalCall, text: str) -> bool:
 def _close(call: HospitalCall) -> None:
     call.ended_at = datetime.now()
     if call.outcome == "in_progress":
-        call.outcome = "requested" if any(a.get("status") == "approval_required" for a in call.actions) else "resolved"
+        call.outcome = "requested" if any(a.get("status") == "approval_required" or
+                                          (a.get("action") == "ed_registration" and a.get("task_id"))
+                                          for a in call.actions) else "resolved"
     call.summary = summarise(call)
 
 
 INTENT_WORDS = {"reschedule": "to reschedule an appointment", "cancel": "to cancel an appointment",
                 "lookup": "when their appointments are", "faq": "general information", "prep": "how to prepare",
                 "clinical": "a clinical question", "transfer": "to speak to a person", "goodbye": None,
+                "arrival": "to register an arrival at the emergency department",
                 "other": None}
 
 
@@ -278,6 +282,13 @@ class Dialog:
         if intents.HUMAN.search(text):
             self._log_intent(intents.Recognised("transfer", 1.0, "rules"))
             return self._transfer("the caller asked for a person")
+        if (arriving := intents.arrival(text)) and not self.st.get("registration"):  # WP9: an ED arrival
+            self._log_intent(intents.Recognised("arrival", 1.0, "rules"))
+            self.st["arrival"] = arriving
+            if not self.call.patient_id:
+                self.st.update(after={"intent": "arrival", "text": text}, pending="identity", id={"names": []})
+                return self._identity(text, first=True)
+            return self._arrival()
         pending = self.st.get("pending")
         if pending == "identity":
             return self._identity(text)
@@ -391,6 +402,37 @@ class Dialog:
             return self._transfer("the identity check failed twice", key="identity_failed")
         return self.say("identity_retry")
 
+    # ----- an ED arrival (WP9) -----
+
+    def _arrival(self) -> str:
+        """The verified patient is on the way to the ED: a registration card for the clerk, pre-filled from the call
+        (suggestEhrAction; the EHR registers the arrival when the clerk confirms it, app/ehr/accepted.py)."""
+        info = self.st.get("arrival") or {"complaint": "injury", "mode": "walk-in"}
+        patient = self.patient or {}
+        mrn = next((i.get("value") for i in patient.get("identifier") or [] if i.get("system") == C.MRN_SYSTEM), "?")
+        name = next((n.get("text") for n in patient.get("name") or [] if n.get("use") == "official"), "the patient")
+        relation = f"the patient's {self.call.caller_relation}" if self.call.caller_relation else "the patient"
+        language = preferred_language(patient)
+        result = self.run.tool("suggestEhrAction", {
+            "patient_id": self.call.patient_id, "reviewer_role": "clerk",
+            "summary": f"ED registration: {name}, arriving by {info['mode']} ({info['complaint']})",
+            "recommendation": f"Register the ED arrival of {name} (MRN {mrn}), verified on call {self.call.id} "
+                              f"(name, birth date, card digits), called in by {relation}: {info['complaint']}, "
+                              f"arriving by {info['mode']}. Preferred language: {language}. Confirming registers the "
+                              f"visit in the EHR (Encounter class EMER, ADT^A01) for the triage nurse.",
+            "action": {"kind": "registration", "patient_id": self.call.patient_id, "complaint": info["complaint"],
+                       "mode": info["mode"], "call": self.call.id},
+            "priority": "urgent"})
+        task = (result.output or {}).get("task_id") if result.ok else None
+        self.st["registration"] = task or "failed"
+        self._act("ed_registration", result, f"ED registration proposed for the registration clerk (Task {task})."
+                  if task else "ED registration could not be proposed; the clerk registers by hand.", task_id=task)
+        self.st["pending"] = "anything_else"
+        if not result.ok:
+            return self.say("transfer")
+        return f"{self.say('arrival_registered', first=patient_name(self.patient, self.lang))} " \
+               f"{self.say('anything_else')}"
+
     # ----- personal intents -----
 
     def _appointments(self) -> list[_Appt]:
@@ -405,6 +447,8 @@ class Dialog:
         self.intent = intent
         if intent == "clinical":
             return self._clinical(text)
+        if intent == "arrival":
+            return self._arrival()
         appts = self._appointments()
         first = patient_name(self.patient, self.lang)
         if not appts:

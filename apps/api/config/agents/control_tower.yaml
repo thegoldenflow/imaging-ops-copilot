@@ -5,7 +5,8 @@
 # The Control Tower (7.1): its module (app/modules/control_tower) reads the boards through FhirGateway under
 # this entry's data scope; its agent (the entrypoint) writes the narrative and recommended actions of an
 # exception the rule engine found (explainException) and, after a bed manager or charge nurse approved them,
-# one Task per action for its owner role (createFlowTask). It never executes an action itself.
+# one Task per action for its owner role (createFlowTask). It never executes an action itself. Its module also
+# records the OR coordinator's own adjustment of a booked case (adjustOrBooking's write right, WP9).
 agent_id: control_tower
 version: 0.2.0
 kind: runtime_agent
@@ -22,6 +23,7 @@ allowed_tools:
 - createTask
 - updateTask
 - appendEncounterLocation
+- adjustOrBooking
 data_scope:
   resources:
   - Location

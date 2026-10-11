@@ -135,6 +135,24 @@ def defer(exception_id: str, body: DeferBody, request: Request,
     return service.exception_view(exc, detail=True)
 
 
+class AdjustBody(BaseModel):
+    minutes: int | None = Field(default=None, ge=15, le=600)
+    note: str = Field(default="", max_length=300)
+
+
+@router.post("/or-cases/{appointment_id}/adjust")
+def adjust_booking(appointment_id: str, body: AdjustBody, request: Request,
+                   user: StaffUser = Depends(require_roles(Role.OPERATIONS_MANAGER))):
+    """The OR coordinator adjusts a booked case to its predicted duration (WP9, 8.2 step 7)."""
+    from app.ehr.gateway import FhirConflict
+
+    try:
+        return _decision_errors(lambda: service.adjust_booking(get_store(), user, appointment_id, body.minutes,
+                                                               body.note, source_ip=client_ip(request)))
+    except (FhirConflict, ValueError) as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+
+
 @router.get("/models")
 def model_report(user: StaffUser = Depends(require_roles(*VIEWERS))):
     """The flow models' metrics (from synthetic data: they show the pipeline works, not real-world performance)."""

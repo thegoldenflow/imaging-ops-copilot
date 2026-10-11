@@ -280,12 +280,15 @@ def test_the_timeline_keeps_the_newest_version_and_shows_retries(fresh_state):
     assert progress.record(_snapshot("journey-stay-00001", {"triageAssist": "done", "orderReview": "running"},
                                      version=2))
     assert not progress.record(_snapshot("journey-stay-00001", {"triageAssist": "running"}, version=1))
-    assert progress.get("journey-stay-00001").steps[1]["status"] == "running"
+    def step(key: str) -> dict:  # by key: the journey's step list grew in WP9 (the ED steps)
+        return next(s for s in progress.get("journey-stay-00001").steps if s["key"] == key)
+
+    assert step("orderReview")["status"] == "running"
     done = [e for e in bus.events(store, types=["workflow.step_completed"], limit=10)]
     assert [e.attrs["step"] for e in done] == ["triageAssist"] and done[0].encounter == "stay-00001"
     progress.mark_attempt("journey-stay-00001", "orderReview", 1, "ConnectionError: gone", max_attempts=4)
-    step = progress.get("journey-stay-00001").steps[1]
-    assert step["status"] == "retrying" and "Attempt 1 of 4 failed" in step["detail"]
+    review = step("orderReview")
+    assert review["status"] == "retrying" and "Attempt 1 of 4 failed" in review["detail"]
     view = progress.view(progress.get("journey-stay-00001"))
     assert view["next_step"] == "medRecAdmission" and view["steps"][0]["label"] == "Triage assist"
 

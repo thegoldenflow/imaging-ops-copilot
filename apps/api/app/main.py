@@ -17,6 +17,7 @@ from app.core.context import RequestContextMiddleware
 from app.core.db.migrate import init_db
 from app.core.store import REWRITE_LOCK, unit_of_work
 from app.core.unit_of_work import UnitOfWorkMiddleware
+from app.ehr import accepted as accepted_suggestions
 from app.ehr import simulator
 from app.ehr.events import bus
 from app.ehr.gateway import BreakGlassRequired, FhirAccessDenied, FhirConflict
@@ -59,6 +60,8 @@ from app.modules.reports.router import router as reports_router
 from app.modules.requisitions import service as requisitions
 from app.modules.requisitions.router import router as requisitions_router
 from app.modules.scheduling.router import router as scheduling_router
+from app.modules.storyline import service as storyline
+from app.modules.storyline.router import router as storyline_router
 from app.modules.voice_services import followup as voice_followup
 from app.modules.voice_services.router import router as voice_router
 from app.workflows import bridge as workflow_bridge
@@ -186,6 +189,8 @@ async def lifespan(_: FastAPI):
     gc.set_threshold(50_000, 50, 100)
     await asyncio.to_thread(init_db)  # migrate; generate the demo data on first start
     workflow_bridge.install()  # domain events -> Temporal (only with TEMPORAL_ADDRESS)
+    accepted_suggestions.install()  # accepted suggestion cards -> the EHR records them (WP9)
+    storyline.install()  # the hospital storyline's cards and EHR script (WP9; a no-op until its reset)
     loops = [_dispatch_loop, _intake_loop, _hospital_loop, _narrator_loop, _aiops_loop]
     if settings.temporal_address:
         loops.append(_workflow_loop)
@@ -238,6 +243,7 @@ app.include_router(med_safety_router)
 app.include_router(documentation_router)
 app.include_router(voice_router)
 app.include_router(aiops_router)
+app.include_router(storyline_router)
 
 
 @app.exception_handler(FhirAccessDenied)

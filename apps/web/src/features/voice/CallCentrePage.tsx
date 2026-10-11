@@ -166,14 +166,18 @@ function Requests() {
   return (
     <Card title={<span className="flex items-center gap-2"><CalendarClock className="size-4" />Requests to confirm</span>}>
       {q.isLoading ? <Loading /> : q.error ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : !q.data?.requests.length ? (
-        <EmptyState title="Nothing to confirm" hint="Reschedules and cancellations the call centre takes wait here for a clerk: the AI only proposes, one click books or cancels." />
+        <EmptyState title="Nothing to confirm" hint="Reschedules, cancellations and ED registrations the call centre takes wait here for a clerk: the AI only proposes, one click books, cancels or registers." />
       ) : (
         <ul className="divide-y divide-slate-100" data-testid="call-requests">
           {q.data.requests.map((r: CallRequest) => (
             <li key={r.task_id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
               <div className="text-sm">
-                <p className="font-medium text-slate-800">{r.kind === "reschedule" ? "Reschedule" : "Cancel"} · MRN {r.mrn ?? "?"}</p>
-                <p className="text-xs text-slate-500">
+                <p className="font-medium text-slate-800">
+                  {r.kind === "registration" ? "ED registration" : r.kind === "reschedule" ? "Reschedule" : "Cancel"} · MRN {r.mrn ?? "?"}
+                  {r.kind === "registration" && <AiBadge label="pre-filled from the call" agent="call_center" />}
+                </p>
+                <p className="text-xs text-slate-500" data-testid={r.kind === "registration" ? "registration-request" : undefined}>
+                  {r.kind === "registration" ? `${r.args?.complaint ?? ""}, arriving by ${r.args?.mode ?? "?"} · call ${r.args?.call ?? ""} · confirming registers the visit in the EHR` : ""}
                   {r.appointment ? `${r.appointment.service_name ?? r.appointment.service_display}, ${when(r.appointment.start)}` : ""}
                   {r.proposed ? ` → ${when(r.proposed.start)}` : ""}
                 </p>

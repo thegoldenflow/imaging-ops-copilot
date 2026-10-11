@@ -508,7 +508,10 @@ def intake(store: Store, *, force: bool = False) -> dict[str, int]:
 
 def intake_step(store: Store) -> None:
     """Background step of the API's hospital loop (after the event drain)."""
+    from app.modules.med_safety import journey
+
     intake(store)
+    journey.recheck_signoffs(store)  # a journey sign-off written while the last decision was being saved
 
 
 def ai_step(store: Store, limit: int = 2) -> None:

@@ -851,7 +851,149 @@ Findings (not fixed here):
   **Closed 2026-10-10** (branch `claude/voice-fallback-languages`, cut from `claude/voice-fallback-rules`): the fallback answers in the caller's language, English by default. The language is found per turn (`intents.language`): Chinese characters make it Chinese, else the turn's French and English words are counted (the keyword rules, now split by language in `WORDS`, plus greetings, pronouns, articles and month names; words both languages use, such as OK or parking, count for neither). A turn that gives no sign (a name, a date, "OK") keeps the call's language, kept in `session.state["lang"]`; when the model answered the earlier turns, the fallback looks back at what the caller said to it. Once the caller is verified, the patient's `preferred_language` is used if the phone line speaks it and the caller has not spoken a language yet: what the caller says wins (`state["lang_from"]`: caller or record). Every reply is in a phrase table written by hand in the three languages, `app/modules/frontdesk/phrases.py` (the pattern of WP8's `voice_services/phrases.py`): the identity follow-ups, the menu, the confirmations, the transfers and the goodbye, with spoken times ("mardi 13 octobre à 13 h", "10月14日（星期三）09:00"), opening hours from the site's days and hours ("du lundi au samedi, de 8 h à 20 h", "星期一至星期六，8:00至20:00"), the seeded parking note with its translations (any other note is read in English) and French elision before a site name ("à l'Eastview Imaging Centre"). The English sentences are unchanged, exam and site names stay as they are (as in the SMS templates), and the greeting stays English (both agents say it before the caller speaks). Preparation instructions are the prep module's approved text in the caller's language (`prep.message_text`, System 9); without an approved translation the caller hears the approved English after a sentence in their language saying why. The tools are unchanged: the fallback reads times and hours from the store (the appointment and slot ids, the site's record) instead of the tools' English strings, so neither the model agent's path, its tools' contracts nor the mock model changed. The judge now fails a fallback call whose reply is not in the case's language (its own word lists, not the fallback's; the approved English preparation text counts for neither); the model's pass is not checked for language because the mock model answers in English. Two judge fixes on the way: the site case's address check now uses digit boundaries (a Chinese reply, 地址是482, has no word boundary before the number, so fd-14 failed although the address was given), and replies before verification are also checked for the appointment's date in French and Chinese. Run `run-2026-10-10T150508` (mock, own databases `ioc_voice_lang` / `ioc_test_voice_lang`): both agents 20/20, every gate met, scripted fallback 20/20 with the language check (answering in English, the 9 French and Chinese calls fail it), mean server time per caller turn 91 ms (p95 327 ms). Prompt texts unchanged, so no restamp. Tests: `tests/test_frontdesk_eval.py` (the medical transfer in each language answered in it, a French confirmation without an appointment answered in French, the language of 13 caller turns, the language kept across turns and the record's language as a hint, the judge failing French and Chinese calls answered in English, Chinese times and approved preparation text and the English text with a note when the translation is not approved, French hours, dates and elision, a French or Chinese date before verification counted as a disclosure); backend suite (`uv run pytest -q`, 702 tests): 701 passed, the 5-second backfill check of `test_flagships.py` took 9.3 s while other sessions held the CPU and passes alone (`test_flagships.py` 13 passed); `test_frontdesk_eval.py` and `test_core.py` on the final code: 61 passed. Playwright `storyline.spec.ts` (English phone lines): 3 passed (own database, API on 9447, Vite on 5213). No web change. Limits: the language is found by keyword like the requests, so a French turn without any listed word keeps the call's language; exam names stay English; Simplified Chinese only (the imaging patients' language code is `zh`); the phone page's browser speech (synthesis and recognition) is still `en-CA`, so a French or Chinese reply is shown correctly but read out with an English voice.
   **Closed 2026-10-10** (branch `claude/phone-page-speech-lang`, cut from `claude/voice-fallback-languages`): the phone page (`apps/web/src/features/frontdesk/PhoneAgent.tsx`) reads each reply with a browser voice in its language (`en-CA`, `fr-CA`, `zh-CN`) and listens in the language of the last reply. The language is the fallback's `session.state.lang` for its replies; for the model agent's replies (no such state), Chinese characters mean Chinese, else English. "Call details" shows it (Language (agent voice)). `CallSession.state` is now typed in `src/lib/types.ts`; no API change. New spec `e2e/frontdesk-languages.spec.ts` (records what the page asks the browser to say, since headless Chromium has no voices): a French site question answered and spoken in French, the goodbye too, then a Chinese call; the greeting stays `en-CA`. `npx tsc -b` passes; `frontdesk-languages.spec.ts` passed, `storyline.spec.ts` 3 passed (own database; its demo reset needed `--timeout=180000` while the machine's CPU was at 100%: the first run's reset timed out at 60 s). Limit: the model agent's French replies are still read with the English voice (no language from the model).
 
-### WP9 · Hospital storyline (8.2)
+### WP9 · Hospital storyline (8.2) — done
+
+Read-only audit first (spec 8.1, 8.2, 6.5, 8.3, 8.4; every hospital work package's section and hand-over; the imaging storyline cards and `e2e/storyline.spec.ts`). What exists for each of the twelve steps, and what is missing:
+
+| Step | Module today | Gap the storyline has to close |
+| --- | --- | --- |
+| 1 call, registration | WP8 call centre: Chinese, identity (name + birth date + card digits), intents reschedule / cancel / lookup / FAQ / prep / clinical / transfer | No intent registers an ED arrival; nothing creates an Encounter (EMER) except the day simulator; a relative's relation is stored the wrong way round ("my mother" → caller_relation `mother`, summary "Call from the patient's mother") |
+| 2 triage | Control Tower: admission probability with three reasons, only once a CTAS is recorded; CTAS only as the EHR records it | No CTAS suggestion; the prediction is the model's (0.82 needs planted features); nothing written back |
+| 3 imaging | Phase 2 requisition pipeline (extraction, triage P1–P4, protocol suggestion; radiologist confirms) | Imaging patients (`PT-…`) and hospital patients (`pat-…`) are separate records (MPI is an 8.1 card); hospital roles have no imaging screens; the protocol library has no hip protocol (a hip request gets a CT head or chest X-ray protocol); the mock triage gives P3 to a hip fracture |
+| 4 INR critical value | none (8.1 stub) | everything: preset threshold, routing Task, acknowledgement |
+| 5 Ortho full | Control Tower unit-occupancy rule and action drawer | Ortho and Surgery are full with two discharge-ready Surgery patients on Friday's data only (Mon–Thu: Surgery 9–15 free beds, 0–2 ready); no action targets the overflow unit's discharge-ready patients; nothing places the patient after the approval |
+| 6 MedRec | WP6 order review (warfarin + NSAID: major) and admission MedRec (omission) | the planted case (`case_82`) is another patient |
+| 7 OR 110 vs 90 | Control Tower surgical-duration model, `or_overrun` rule, journey proposeSchedule | +20 min is under both thresholds (30); the OR coordinator cannot change a booked Appointment |
+| 8 NEWS2 7 | none (8.1 stub); the journey's ward step turns a `news2` Flag into a nurse Task | everything: the preset score, the Flag, the nurse's response |
+| 9–10 documents | WP7 discharge summary (validator), bilingual instructions (warfarin "steady greens", wound red flags) | the planted cases are other patients; the summary needs the signed discharge MedRec first |
+| 11 follow-up | WP8 follow-up call, red-flag rule `wound_drainage`, nurse queue | the planted case is another patient; the stay must be discharged and the instructions signed |
+| 12 coding | journey `codingStub` writes nothing (8.1 card) | the preset suggestion and the coder's acceptance |
+| journey | InpatientJourneyWorkflow starts at the inpatient admission | steps 2–4 happen in the ED before the stay exists |
+
+Tasks:
+
+- [x] Storyline preset `app/ehr/seed/journey.py`: the spec's `demo/seed_journey.py` (8.2, "planted through the generator's mechanisms"), applied by the storyline's reset only (`POST /api/storyline/reset`: the demo reset, then `journey.plant`). The header's Reset demo and every earlier test see the default data.
+  - The patient `pat-j0001`: 72, female, Mandarin; warfarin for atrial fibrillation, amlodipine, metoprolol, atorvastatin; consents; her daughter as contact. Her imaging-centre record is `PT-J0001`, linked by a preset MPI entry.
+  - Orthopedics and Surgery are filled through the generator's builders, and Surgery is balanced to exactly two discharge-ready patients by the Control Tower's own model. Patients near the line get a pending result; morning discharges and transfers off both units are held until noon.
+  - Her expected ED visit `ed-j0001`; the plan horizon extended to cover the stay and the 48-hour follow-up.
+  - Deterministic, with explicit ids, its own random stream and its own id scope (`<prefix>-jpNNNN`).
+- [x] Simulator script `app/ehr/storyline.py`, in the plan:
+  - her ED course after triage: INR 3.8 at +45 min, the decision to admit at +95;
+  - the stay with its admission orders (`Stay.med_plan`: naproxen new, warfarin held, amlodipine left out), allowed units Orthopedics then Surgery (`bed_units`);
+  - the OR case, booked 14:30 for 90 min, which in fact takes 115;
+  - spot vital signs with a NEWS2 of 7 at 02:00 (new plan event kind `vitals`), discharge prescriptions (new kind `prescriptions`), the discharge at 11:00 on post-operative day 3;
+  - the Surgery team's early discharges after the bed manager's approval, and her admission to the first freed bed once it is cleaned.
+
+  Events planned for a fixed time (`fixed`) are not moved by a stay's deferral. Simulator: `apply_now` (one event now, with the person as operator).
+- [x] People's EHR actions on accepted suggestion cards (`app/ehr/accepted.py`, consumer `ehr.accepted-suggestions`, CDS Hooks style). The recommend tool `suggestEhrAction` writes an `ai-review` Task carrying the action. On acceptance the simulated EHR records it with the person as operator: the ED registration (ADT^A01; her expected visit, or a walk-in), the triage (CTAS, vital signs, a fall-risk Flag; ADT^A08), the imaging orders (ServiceRequests, ORM^O01).
+- [x] Step 1: the call centre recognises an ED arrival (a rule in `intents.arrival`, after the identity check), and its registration card goes to the clerk's Requests. Fixed on the way: the caller's relation was stored the wrong way round; "my mother" now records the caller as `child`, "我是她女儿" as `daughter`.
+- [x] Step 2: triage assist `app/modules/control_tower/triage.py`: a CTAS suggestion with its reasons, and the Control Tower's admission model with its three reasons (0.82 for her vital signs). The card is written by the registry module `ed_decision_support`; the ED nurse accepts it in the review queue.
+- [x] Step 3: the ED physician's requests go through the imaging centre's own pipeline for her imaging record: extraction, triage P2, protocols. Two hospital protocols were added, `XR-HIP-2V` and `CT-HIP-FX`. The physician accepts one card, the orders are placed, and the imaging-side triage and protocols are confirmed (audited).
+- [x] Step 4 (8.1 stub, roadmap): INR 3.8 against the preset threshold 3.5. Registry module `critical_value_routing`; a card for the ED physician, acknowledged.
+- [x] Step 5: unit-occupancy fact `overflow_discharge_ready` and the menu action `overflow_discharge_rounds` (physician). On approval the simulator script plays the Surgery team, and she is admitted to the first clean Surgery bed (Encounter.location).
+- [x] Step 6: WP6 finds warfarin + naproxen (major) and the omitted amlodipine on her admission orders. The pharmacist requests a change and handles each row; the surgeon, her attending, co-signs.
+- [x] Step 7: block overtime (≥ 15 min over and past the 16:00 block end) in the `or_overrun` rule (`rules.block_overtime`) and in proposeSchedule. The OR coordinator adjusts the booked Appointment: `FhirGateway.adjust_or_booking` (operations manager only, audited), API `POST /api/control-tower/or-cases/{id}/adjust`, privileged tool `adjustOrBooking`, and the web's "Adjust booking to N min".
+- [x] Step 8 (8.1 stub, roadmap): the preset NEWS2 7 raises a `news2` Flag through `deterioration_alert` (createFlag) and a nurse card (`news2-response`; the journey's own Task when it runs); the ward nurse records the response.
+- [x] Steps 9–11: WP7 and WP8 on her stay.
+  - The admitting physician's note names lisinopril, so the mock draft cites it and the validator blocks it until the surgeon removes it.
+  - The discharge MedRec is done off-screen by the script, labelled as such and audited under the pharmacist's and surgeon's names.
+  - The instructions are in Simplified Chinese with warfarin's steady greens.
+  - The follow-up call in Mandarin escalates heavy wound drainage, and the nurse calls back.
+- [x] Step 12 (8.1 stub, roadmap): ICD-10-CA S72.0 (W19, I48, Z92.1) and CCI 1.VA.53, preset. Registry module `coding_assist`; the clerk, as health-records coder, accepts.
+- [x] InpatientJourneyWorkflow from the ED, version 4 (`workflow.patched("journey-ed-phase")`, `JourneyInput.ed_visit`). It starts at the registration for her planned stay (`journey-stay-j0001`).
+  - triageAssist, imagingOrders and criticalValue are sign-offs on the cards (waits registered by step).
+  - bedAssignment waits for the bridge's `admitted` signal while she boards.
+  - Then the steps of WP4c–WP8; the coding suggestion is a sign-off.
+  - A journey started at the admission records no marker and runs as before. The captured histories all replay unchanged; `journey_ed.json` is added.
+- [x] Registry: modules `ed_decision_support`, `critical_value_routing`, `deterioration_alert`, `coding_assist`; tools `suggestEhrAction` (recommend) and `adjustOrBooking` (privileged); `call_center`, `voice_services` and `control_tower` get the new tools. The registry has 35 agents and 53 tools.
+- [x] Storyline API `/api/storyline`: the status of each step with its AI proposal, signature, EHR records and audit events, plus the clock, Temporal and the journey. `POST /reset`, `POST /advance` (a background fast-forward to the step's beat).
+- [x] Web `/storyline` (`features/storyline/`):
+  - the twelve steps, each with its click path, the sentence to say, the expected screen, the permission note and a one-click switch to the person who plays it;
+  - the trail "AI proposes → a person signs → audit";
+  - the patient, the clock with the fast-forward's progress, Temporal's state with a link to the journey, and "You are" (the current role);
+  - nav entry, Home card, and Roadmap badges on the stubs' cards.
+  - Web fixes on the way: Call centre registration requests, the OR row's block-overtime pill and adjust button, the review queue's news2-response kind.
+- [x] `demo/hospital_journey.md` (under 10 minutes; setup with reset, Temporal on and off, roles)
+- [x] Tests, Playwright and storyline report (results below)
+- [x] Docs: this section, data-model.md (storyline section), audit-baseline.md (naming map)
+
+Results (2026-10-10):
+
+Mock model (`LLM_PROVIDER=mock`). Own databases: `ioc_test_wp9` (pytest) and `ioc_wp9` (API, Playwright, reports). The API ran on 9445 and Vite on 5219. Temporal runs used namespace and task queue `hospital-wp9` with a standalone worker and `WORKFLOW_FOLLOWUP_DELAY_S=20`. The machine was shared with other sessions; for long stretches the CPU was at 100%, so the timings vary by a factor of 3–5.
+
+- **Backend, full suite** (2026-10-10, Saturday's generated data): 711 passed and 2 failed. Both failures were WP9's own:
+  - the registry rule for documentation-tier entries, which now allows a suggestion-card module;
+  - a workflow timeline test that read a step by index, which the ED steps had shifted.
+
+  Both were fixed and re-run green.
+- **Backend, re-runs on 2026-10-11 (Sunday)** after the race fixes below:
+  - `test_storyline.py` (13, including the whole offline walk, 12 of 12 steps), the replay tests (10 histories plus 2 checks, `journey_ed.json` new), `test_agent_registry`, `test_access`, `test_voice_services`, `test_fhir_gateway`: 104 passed.
+  - `test_documentation.py`: 12 passed.
+  - `test_workflows.py` and `test_med_safety.py`, including the new tests and the Temporal time-skipping test of the journey from the ED: 27 passed and 5 failed. The same 5 fail on the base commit a454d12 the same day, so they are pre-existing and depend on the date (follow-up below):
+    - `test_capacity_workflow_executes_the_approval_and_checks_the_occupancy_an_hour_later` and `test_rejected_and_cleared_exceptions_record_their_outcome_too`: "should have exceptions at 07:00: 2 >= 3";
+    - `test_admission_reconciliation_signed_and_cosigned`, `test_workbench_flow_over_http`, `test_journey_medrec_step_retried_replays_the_draft_and_skips_a_record_already_signed`: the MedRec AI step was "refused".
+- **In-process walk:** 12 of 12 steps. It took 4.3 minutes on a quiet machine and 15–25 minutes under load (see the note on savepoints).
+- **`npx tsc -b`:** passes.
+- **Playwright `e2e/hospital-storyline.spec.ts`:**
+  - Offline: passed, 30.6 minutes with the CPU at 100% (the run before the last journey fixes, which do not run offline).
+  - With Temporal: passed, 15.0 minutes, on the final code, and her journey `journey-stay-j0001` completed, 14 of 14 steps.
+  - The spec switches to each step's person with the page's one-click switch. It does the step in the module's own screens and checks Done, the proposal, the signature, the audit events, and that "You are" matches the signed-in person. It also checks the roadmap badges on steps 4, 8 and 12 and two role contrasts: the clerk's queue lacks the triage card, and the surgeon is refused the OR adjustment.
+- **Full Playwright suite (offline):** 44 tests, 41 minutes: 35 passed (`hospital-storyline.spec.ts` again, on the final code), 2 skipped (the online workflow tests: Temporal off), 7 failed, none of them WP9's:
+  - 5 in `business-compliance.spec.ts` (inventory, referral analytics, referrer portal, PHIPA monitoring, inspection hub) and med-safety's RBAC test. Run on their own, they pass on the WP9 code as on the base commit a454d12, so in the full run they lost to the load.
+  - med-safety's "pharmacist: queue, rule and AI flags…", which fails on its own on the base commit too, the same Sunday as the backend MedRec tests (follow-up).
+- **Storyline report:**
+  - `evals/storyline/report_offline.md`: 12 of 12 steps, walk 389 s, reset 44 s.
+  - `report_temporal.md`: 12 of 12 steps, walk 399 s, journey completed 14 of 14.
+  - The demo script budgets 595 s of talking and clicking.
+- **Evals:**
+  - Control Tower rule engine: 20 of 20 scenarios. Narrator (mock), on the test database: 30 exceptions, schema, grounding and guards 100% (the block-overtime wording passes the guards).
+  - Voice services: all three gates met (call centre intent accuracy 1.0, follow-up, bilingual).
+  - Reports whose only changes were times and dates are not committed.
+
+Notes and deviations:
+
+- Stack: unchanged. No new table and no migration (the latest is still `0010_voice_services`). The storyline's state is the module blob `storyline`.
+- Names (spec → here):
+  - `demo/seed_journey.py` is `apps/api/app/ehr/seed/journey.py`. The preset writes FHIR through the generator's builders, and the modules may not write the EHR directly (the gateway rule), so it lives with the generator. It is called by `app/modules/storyline/service.py` `reset`.
+  - The simulator script is `apps/api/app/ehr/storyline.py`, together with the storyline service's event consumer.
+  - The walk the tests, the report and the e2e mirror is `app/modules/storyline/walk.py`.
+  - Recorded in audit-baseline.md.
+- Story mode only: the preset is planted by the storyline's reset, never by the header's Reset demo or the generator. The default demo data, its calibration and every earlier test are unchanged.
+  - The preset balances Orthopedics and Surgery for any weekday. It fills free beds with stays of the units' usual diagnoses and plants or removes discharge-ready patients until exactly two Surgery patients are at or above the Control Tower's 0.7 (the model itself decides, at 07:00 and two hours later). Patients between 0.62 and 0.7 get a pending result, and morning discharges and transfers off both units are held until noon.
+  - Tested on Friday's data (the demo database) and Monday's (a detached generator run).
+- The rest of the hospital stands still after the generated 36 hours: only the storyline's events, the ward rounds and housekeeping are planned there. The plan's horizon is moved to 13:00 on day 5 so the stay (discharge 11:00 on post-operative day 3) and the 48-hour call fit, and the fast-forwards across days 2–5 are quick.
+- Story numbers:
+  - Triage gives CTAS 2 with admission probability 0.82 (SpO₂ 91%, heart rate 112) from the Control Tower's own model.
+  - The OR case is predicted at **115 min against 90 booked**. The spec says 110; 115 is the closest the surgical-duration model gives for a plausible case (Dr. Osei, ASA 2, urgent, a total hip), and it runs past the 16:00 block end, which the new block-overtime condition catches (+20 alone was under the 30-minute overrun threshold).
+  - The NEWS2 of 7 is preset in the flowsheet (8.1 stub), not computed.
+- People's EHR actions (registration, triage, imaging orders) come from accepted suggestion cards, CDS Hooks style. The AI never records them; the EHR records them with the person who accepted as the operator (EVN-5).
+  - The call centre's ED-arrival rule is in the rule layer (`intents.arrival`), so no prompt changed and the prompt gate is untouched.
+  - The imaging orders go through the imaging centre's own pipeline for her imaging-centre record. The MPI link between `pat-j0001` and `PT-J0001` is preset (8.1 roadmap card).
+- Scripted by the simulator, labelled as such:
+  - the Surgery team's early discharges after the bed manager's approval;
+  - her admission to the first cleaned bed;
+  - the discharge medication reconciliation (WP7's summary needs it signed; done off-screen with a reason that says so, audited under the pharmacist's and surgeon's names);
+  - the admitting physician's note naming lisinopril (the untraceable item the validator blocks).
+- New writes:
+  - `FhirGateway.adjust_or_booking`: the operations manager only, a booked OR case only, audited;
+  - plan event kinds `vitals` and `prescriptions`;
+  - `fixed` plan events;
+  - `simulator.apply_now`.
+- WP8 fix: the call centre stored "my mother" as caller relation `mother` (the summary read "Call from the patient's mother"). The relation is now who the caller is to the patient: `child`, `daughter` and so on; "I'm her daughter" and "我是她女儿" are taken at their word. `tests/test_voice_services.py` was updated to `child`.
+- WP6 in the journey, a race found in the online run: the storyline's pharmacist decides the naproxen order while her journey still waits for her bed, so when the journey's order review ran later, the decisions were already made and the new sign-off Task waited for nobody. The order review step now records the decisions instead (`med_safety.journey.decided_before`): every flagged medication order of the stay is decided, so there is nothing to ask. A stay with nothing flagged still gets the confirm Task. The same for the journey's OR proposal (`journey.proposeSchedule`): when the OR coordinator has already adjusted the booking to the predicted duration in the Control Tower, it records that instead of opening a Task (and an adjustment made while the Task is open approves it, `control_tower.service.adjust_booking`). The MedRec step already recognised a record signed before the journey got there. The WP7 steps did only when the draft could be replayed; a summary edited and signed in Documentation (the storyline's lisinopril removal) made the journey's re-draft fail ('invalid arguments': the draft tool refuses a final document) and fall back to a by-hand Task that waited for a signature already given. They now look for the signed document first (`documentation.journey._signed`). One more race between the API and the worker: the journey's order-review sign-off Task can be written while the pharmacist's last decision is being saved, so neither sees the other; for two minutes after such a decision the API's background loop confirms it again (`med_safety.journey.recheck_signoffs`, in the decider's name, as `confirm_signoff` would have).
+- Web fix: the session was dropped when `/api/auth/me` failed for any reason, including a fetch aborted by a quick navigation (the e2e's role switches). Now only a 401 drops it (`src/lib/auth.tsx`; `api()` already cleared the token on a 401).
+- The storyline status reads her records through FhirGateway, and every read of a patient's record is audited. The status therefore keeps its facts while nothing could have changed: the key is the reset, the change counter, the clock, the last domain event and the last audited decision, as the Control Tower keeps its snapshot. While a fast-forward runs it reuses facts up to 8 s old. Without this, each poll of the page (every 1–3 s) wrote about fifteen read events.
+- The in-process walk (backend test, `--in-process` report) runs in one rolled-back transaction, and every audit event is a savepoint in it. On this machine, under other sessions' load, statements took 20–40 ms instead of 2, so the walk took 15–25 minutes instead of 4–6. The live API commits per request and is not affected.
+- Temporal: her journey is version 4 of InpatientJourneyWorkflow, `journey-stay-j0001`, started at the registration.
+  - The bed step waits for the bridge's `admitted` signal.
+  - The 48-hour follow-up waits for `WORKFLOW_FOLLOWUP_DELAY_S` of wall clock; set it to seconds for the demo.
+  - Without Temporal the storyline service drives the same cards and records step by step (offline mode), and the page says which mode it is in.
+- 8.1 roadmap stubs on preset data, easy for WP10 to point to: registry modules `critical_value_routing`, `deterioration_alert`, `coding_assist` (`config/agents/`, deployment demo, eval not applicable) with the preset data in `app/modules/storyline/script.py` and the cards in `stubs.py`. The Roadmap badge appears on their cards in the review queue and on the storyline page; the journey steps `criticalValue`, `wardMonitoring` (NEWS2) and `codingStub` are labelled "8.1 roadmap".
+
+Follow-ups (not WP9):
+
+- Five tests depend on the day the test data is generated for. On Sunday 2026-10-11 they fail on the base commit too: the two capacity-workflow tests expect at least three exceptions at 07:00, and three MedRec tests expect the AI step to run where it is now refused. They passed on Saturday's data. The Playwright test "pharmacist: queue, rule and AI flags…" in `med-safety.spec.ts` fails the same day on the base commit too.
+- The in-process storyline walk spends most of its time on PostgreSQL round trips under load: each audit event is its own savepoint in the test's transaction.
 
 ### WP10 · Roadmap cards and documentation (8.1, 8.3)
 

@@ -186,6 +186,7 @@ BLOBS = {
     "hospital_clock",  # the hospital's simulated clock (app/ehr)
     "workflow_faults",  # failures injected into workflow steps for the demo (app/workflows/faults.py)
     "voice_demo",  # the planted voice-services demo cases (app/ehr/seed/voice.py: ids only)
+    "storyline",  # the hospital storyline's state (app/modules/storyline: ids, preset facts, step markers)
 }
 
 # Derived per process from stored data; never written to the database.

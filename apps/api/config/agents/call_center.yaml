@@ -19,6 +19,7 @@ allowed_tools:
 - cancelBookedAppointment
 - writeCallRecord
 - createCallTask
+- suggestEhrAction
 data_scope:
   resources:
   - Patient

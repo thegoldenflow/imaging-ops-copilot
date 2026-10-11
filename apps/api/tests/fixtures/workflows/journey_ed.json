@@ -1,0 +1,2404 @@
+{
+  "events": [
+    {
+      "eventId": "1",
+      "eventTime": "2026-10-11T00:55:55.238Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_STARTED",
+      "workflowExecutionStartedEventAttributes": {
+        "workflowType": {
+          "name": "InpatientJourneyWorkflow"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJlZF92aXNpdCI6ImVkLWowMDAxIiwiZW5jb3VudGVyX2lkIjoic3RheS1qMDAwMSIsInBhdGllbnRfaWQiOiJwYXQtajAwMDEiLCJzdGFydGVkX2J5IjoidXNlcjpVLUNMRVItMDEiLCJ0aW1lcnMiOnsiZXNjYWxhdGlvbl90aW1lb3V0X3MiOjg2NDAwLCJmb2xsb3d1cF9kZWxheV9zIjoxNzI4MDAsInNpZ25vZmZfdGltZW91dF9zIjo4NjQwMCwidmVyaWZ5X2FmdGVyX3MiOjM2MDB9fQ=="
+            }
+          ]
+        },
+        "workflowExecutionTimeout": "315360000s",
+        "workflowRunTimeout": "315360000s",
+        "workflowTaskTimeout": "10s",
+        "originalExecutionRunId": "e6d28c8e-0c8c-4cea-a9b3-48bcde25ca85",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "firstExecutionRunId": "e6d28c8e-0c8c-4cea-a9b3-48bcde25ca85",
+        "attempt": 1,
+        "firstWorkflowTaskBackoff": "0s",
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "2",
+      "eventTime": "2026-10-11T00:55:55.238Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "3",
+      "eventTime": "2026-10-11T00:55:55.238Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "2",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "509"
+      }
+    },
+    {
+      "eventId": "4",
+      "eventTime": "2026-10-11T00:55:55.350Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "2",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {
+          "coreUsedFlags": [
+            2,
+            1,
+            3
+          ],
+          "sdkName": "temporal-python",
+          "sdkVersion": "1.33.0"
+        },
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "5",
+      "eventTime": "2026-10-11T00:55:55.350Z",
+      "eventType": "EVENT_TYPE_MARKER_RECORDED",
+      "markerRecordedEventAttributes": {
+        "markerName": "core_patch",
+        "details": {
+          "patch-data": {
+            "payloads": [
+              {
+                "metadata": {
+                  "encoding": "anNvbi9wbGFpbg=="
+                },
+                "data": "eyJpZCI6ImpvdXJuZXktZWQtcGhhc2UiLCJkZXByZWNhdGVkIjpmYWxzZX0="
+              }
+            ]
+          }
+        },
+        "workflowTaskCompletedEventId": "3"
+      }
+    },
+    {
+      "eventId": "6",
+      "eventTime": "2026-10-11T00:55:55.350Z",
+      "eventType": "EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES",
+      "upsertWorkflowSearchAttributesEventAttributes": {
+        "workflowTaskCompletedEventId": "3",
+        "searchAttributes": {
+          "indexedFields": {
+            "TemporalChangeVersion": {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg==",
+                "type": "S2V5d29yZExpc3Q="
+              },
+              "data": "WyJqb3VybmV5LWVkLXBoYXNlIl0="
+            }
+          }
+        }
+      }
+    },
+    {
+      "eventId": "7",
+      "eventTime": "2026-10-11T00:55:55.350Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "1",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOiJ0cmlhZ2VBc3Npc3QiLCJpZCI6ImpvdXJuZXktc3RheS1qMDAwMSIsIm1ldGEiOnsiZWRfdmlzaXQiOiJlZC1qMDAwMSIsImVuY291bnRlcl9pZCI6InN0YXktajAwMDEiLCJwYXRpZW50X2lkIjoicGF0LWowMDAxIiwic3RhcnRlZF9ieSI6InVzZXI6VS1DTEVSLTAxIiwic3RhcnRlZF9pbiI6IkVEIn0sIm5vdGVzIjpbXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTUrMDA6MDAiLCJzdGF0dXMiOiJydW5uaW5nIiwic3RlcHMiOlt7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJ0cmlhZ2VBc3Npc3QiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiVHJpYWdlIGFzc2lzdCIsIm93bmVyIjoibnVyc2UiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTUrMDA6MDAiLCJzdGF0dXMiOiJydW5uaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImltYWdpbmdPcmRlcnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiSW1hZ2luZyBvcmRlcnMgKHVyZ2VuY3kgYW5kIHByb3RvY29sKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiY3JpdGljYWxWYWx1ZSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJDcml0aWNhbCB2YWx1ZSAoSU5SKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJiZWRBc3NpZ25tZW50Iiwia2luZCI6ImF1dG8iLCJsYWJlbCI6IkJlZCBhc3NpZ25tZW50Iiwib3duZXIiOiJvcGVyYXRpb25zX21hbmFnZXIiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJvcmRlclJldmlldyIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJPcmRlciByZXZpZXciLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJtZWRSZWNBZG1pc3Npb24iLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiQWRtaXNzaW9uIG1lZGljYXRpb24gcmVjb25jaWxpYXRpb24iLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJwcmVkaWN0RHVyYXRpb24iLCJraW5kIjoiYXV0byIsImxhYmVsIjoiU3VyZ2ljYWwgZHVyYXRpb24gcHJlZGljdGlvbiIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoicHJvcG9zZVNjaGVkdWxlIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6Ik9SIGJvb2tpbmcgY2hlY2siLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6IndhcmRNb25pdG9yaW5nIiwia2luZCI6IndhaXQiLCJsYWJlbCI6IldhcmQgbW9uaXRvcmluZyAoTkVXUzIpIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IjguMSByb2FkbWFwIChORVdTMiBzdHViKSIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImRyYWZ0RGlzY2hhcmdlU3VtbWFyeSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJEaXNjaGFyZ2Ugc3VtbWFyeSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZHJhZnRQYXRpZW50SW5zdHJ1Y3Rpb25zIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IlBhdGllbnQgaW5zdHJ1Y3Rpb25zIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImZvbGxvd3VwRGVsYXkiLCJraW5kIjoidGltZXIiLCJsYWJlbCI6IjQ4IGhvdXJzIGFmdGVyIGRpc2NoYXJnZSIsIm93bmVyIjoic3lzdGVtIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoic2NoZWR1bGVGb2xsb3d1cENhbGwiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiRm9sbG93LXVwIGNhbGwgc2NoZWR1bGVkIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImNvZGluZ1N0dWIiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiQ29kaW5nIHN1Z2dlc3Rpb24iLCJvd25lciI6ImNsZXJrIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfV0sInRlbXBvcmFsX3J1bl9pZCI6ImU2ZDI4YzhlLTBjOGMtNGNlYS1hOWIzLTQ4YmNkZTI1Y2E4NSIsInVwZGF0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwidmVyc2lvbiI6MSwid29ya2Zsb3dfdHlwZSI6IklucGF0aWVudEpvdXJuZXlXb3JrZmxvdyJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "3",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "8",
+      "eventTime": "2026-10-11T00:55:55.350Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "7",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "9",
+      "eventTime": "2026-10-11T00:55:55.472Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "7",
+        "startedEventId": "8",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "10",
+      "eventTime": "2026-10-11T00:55:55.472Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "11",
+      "eventTime": "2026-10-11T00:55:55.472Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "10",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "5140"
+      }
+    },
+    {
+      "eventId": "12",
+      "eventTime": "2026-10-11T00:55:55.519Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "10",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "13",
+      "eventTime": "2026-10-11T00:55:55.519Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "2",
+        "activityType": {
+          "name": "journey.edTriage"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJlZF92aXNpdCI6ImVkLWowMDAxIiwiZW5jb3VudGVyX2lkIjoic3RheS1qMDAwMSIsInBhdGllbnRfaWQiOiJwYXQtajAwMDEiLCJ3b3JrZmxvd19pZCI6ImpvdXJuZXktc3RheS1qMDAwMSJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "120s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "11",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 4.0,
+          "maximumInterval": "16s",
+          "maximumAttempts": 4
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "14",
+      "eventTime": "2026-10-11T00:55:55.519Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "13",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "15",
+      "eventTime": "2026-10-11T00:55:55.619Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJfYXR0ZW1wdCI6MSwiZGV0YWlsIjoiVHJpYWdlIHN1Z2dlc3Rpb24gY2FyZCBmb3IgdGhlIG51cnNlIiwicmVmcyI6WyJUYXNrL3Rhc2stMDAwMDEiXSwic2lnbmVyIjoibnVyc2UiLCJ3YWl0X2ZvciI6WyJUYXNrL3Rhc2stMDAwMDEiXX0="
+            }
+          ]
+        },
+        "scheduledEventId": "13",
+        "startedEventId": "14",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "16",
+      "eventTime": "2026-10-11T00:55:55.619Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "17",
+      "eventTime": "2026-10-11T00:55:55.619Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "16",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "5856"
+      }
+    },
+    {
+      "eventId": "18",
+      "eventTime": "2026-10-11T00:55:55.666Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "16",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "19",
+      "eventTime": "2026-10-11T00:55:55.666Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "3",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOiJ0cmlhZ2VBc3Npc3QiLCJpZCI6ImpvdXJuZXktc3RheS1qMDAwMSIsIm1ldGEiOnsiZWRfdmlzaXQiOiJlZC1qMDAwMSIsImVuY291bnRlcl9pZCI6InN0YXktajAwMDEiLCJwYXRpZW50X2lkIjoicGF0LWowMDAxIiwic3RhcnRlZF9ieSI6InVzZXI6VS1DTEVSLTAxIiwic3RhcnRlZF9pbiI6IkVEIn0sIm5vdGVzIjpbXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTUrMDA6MDAiLCJzdGF0dXMiOiJydW5uaW5nIiwic3RlcHMiOlt7ImF0dGVtcHRzIjoxLCJkZXRhaWwiOiJUcmlhZ2Ugc3VnZ2VzdGlvbiBjYXJkIGZvciB0aGUgbnVyc2UiLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoidHJpYWdlQXNzaXN0Iiwia2luZCI6ImF1dG8iLCJsYWJlbCI6IlRyaWFnZSBhc3Npc3QiLCJvd25lciI6Im51cnNlIiwicmVmcyI6WyJUYXNrL3Rhc2stMDAwMDEiXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTUrMDA6MDAiLCJzdGF0dXMiOiJ3YWl0aW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOnsicmVmcyI6WyJUYXNrL3Rhc2stMDAwMDEiXSwicm9sZSI6Im51cnNlIn19LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImltYWdpbmdPcmRlcnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiSW1hZ2luZyBvcmRlcnMgKHVyZ2VuY3kgYW5kIHByb3RvY29sKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiY3JpdGljYWxWYWx1ZSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJDcml0aWNhbCB2YWx1ZSAoSU5SKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJiZWRBc3NpZ25tZW50Iiwia2luZCI6ImF1dG8iLCJsYWJlbCI6IkJlZCBhc3NpZ25tZW50Iiwib3duZXIiOiJvcGVyYXRpb25zX21hbmFnZXIiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJvcmRlclJldmlldyIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJPcmRlciByZXZpZXciLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJtZWRSZWNBZG1pc3Npb24iLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiQWRtaXNzaW9uIG1lZGljYXRpb24gcmVjb25jaWxpYXRpb24iLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJwcmVkaWN0RHVyYXRpb24iLCJraW5kIjoiYXV0byIsImxhYmVsIjoiU3VyZ2ljYWwgZHVyYXRpb24gcHJlZGljdGlvbiIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoicHJvcG9zZVNjaGVkdWxlIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6Ik9SIGJvb2tpbmcgY2hlY2siLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6IndhcmRNb25pdG9yaW5nIiwia2luZCI6IndhaXQiLCJsYWJlbCI6IldhcmQgbW9uaXRvcmluZyAoTkVXUzIpIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IjguMSByb2FkbWFwIChORVdTMiBzdHViKSIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImRyYWZ0RGlzY2hhcmdlU3VtbWFyeSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJEaXNjaGFyZ2Ugc3VtbWFyeSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZHJhZnRQYXRpZW50SW5zdHJ1Y3Rpb25zIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IlBhdGllbnQgaW5zdHJ1Y3Rpb25zIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImZvbGxvd3VwRGVsYXkiLCJraW5kIjoidGltZXIiLCJsYWJlbCI6IjQ4IGhvdXJzIGFmdGVyIGRpc2NoYXJnZSIsIm93bmVyIjoic3lzdGVtIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoic2NoZWR1bGVGb2xsb3d1cENhbGwiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiRm9sbG93LXVwIGNhbGwgc2NoZWR1bGVkIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImNvZGluZ1N0dWIiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiQ29kaW5nIHN1Z2dlc3Rpb24iLCJvd25lciI6ImNsZXJrIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfV0sInRlbXBvcmFsX3J1bl9pZCI6ImU2ZDI4YzhlLTBjOGMtNGNlYS1hOWIzLTQ4YmNkZTI1Y2E4NSIsInVwZGF0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwidmVyc2lvbiI6Miwid29ya2Zsb3dfdHlwZSI6IklucGF0aWVudEpvdXJuZXlXb3JrZmxvdyJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "17",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "20",
+      "eventTime": "2026-10-11T00:55:55.666Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "19",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "21",
+      "eventTime": "2026-10-11T00:55:55.814Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "19",
+        "startedEventId": "20",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "22",
+      "eventTime": "2026-10-11T00:55:55.814Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "23",
+      "eventTime": "2026-10-11T00:55:55.814Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "22",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "10306"
+      }
+    },
+    {
+      "eventId": "24",
+      "eventTime": "2026-10-11T00:55:55.859Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "22",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "25",
+      "eventTime": "2026-10-11T00:55:55.859Z",
+      "eventType": "EVENT_TYPE_TIMER_STARTED",
+      "timerStartedEventAttributes": {
+        "timerId": "1",
+        "startToFireTimeout": "86400s",
+        "workflowTaskCompletedEventId": "23"
+      }
+    },
+    {
+      "eventId": "26",
+      "eventTime": "2026-10-11T00:55:58.750Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED",
+      "workflowExecutionSignaledEventAttributes": {
+        "signalName": "event",
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJhdCI6IjIwMjYtMTAtMDlUMDc6MDA6MDAiLCJkZWNpc2lvbiI6ImFjY2VwdCIsImV2ZW50X2lkIjoiNzRhMWFmMTYtYmIxYi01Y2VmLTgxZTQtZDliZWU4OWU4MGMxIiwia2luZCI6ImRlY2lkZWQiLCJyZWYiOiJUYXNrL3Rhc2stMDAwMDEiLCJyb2xlIjoibnVyc2UiLCJzdGVwIjoidHJpYWdlQXNzaXN0In0="
+            }
+          ]
+        },
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "27",
+      "eventTime": "2026-10-11T00:55:58.750Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "28",
+      "eventTime": "2026-10-11T00:55:58.750Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "27",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "10783"
+      }
+    },
+    {
+      "eventId": "29",
+      "eventTime": "2026-10-11T00:55:58.806Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "27",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "30",
+      "eventTime": "2026-10-11T00:55:58.806Z",
+      "eventType": "EVENT_TYPE_TIMER_CANCELED",
+      "timerCanceledEventAttributes": {
+        "timerId": "1",
+        "startedEventId": "25",
+        "workflowTaskCompletedEventId": "28"
+      }
+    },
+    {
+      "eventId": "31",
+      "eventTime": "2026-10-11T00:55:58.806Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "4",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOm51bGwsImlkIjoiam91cm5leS1zdGF5LWowMDAxIiwibWV0YSI6eyJlZF92aXNpdCI6ImVkLWowMDAxIiwiZW5jb3VudGVyX2lkIjoic3RheS1qMDAwMSIsInBhdGllbnRfaWQiOiJwYXQtajAwMDEiLCJzdGFydGVkX2J5IjoidXNlcjpVLUNMRVItMDEiLCJzdGFydGVkX2luIjoiRUQifSwibm90ZXMiOltdLCJzdGFydGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1NSswMDowMCIsInN0YXR1cyI6InJ1bm5pbmciLCJzdGVwcyI6W3siYXR0ZW1wdHMiOjEsImRldGFpbCI6IkNvbmZpcm1lZCBieSB0aGUgbnVyc2UiLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTgrMDA6MDAiLCJrZXkiOiJ0cmlhZ2VBc3Npc3QiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiVHJpYWdlIGFzc2lzdCIsIm93bmVyIjoibnVyc2UiLCJyZWZzIjpbIlRhc2svdGFzay0wMDAwMSJdLCJzdGFydGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1NSswMDowMCIsInN0YXR1cyI6ImRvbmUiLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiaW1hZ2luZ09yZGVycyIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJJbWFnaW5nIG9yZGVycyAodXJnZW5jeSBhbmQgcHJvdG9jb2wpIiwib3duZXIiOiJwaHlzaWNpYW4iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJjcml0aWNhbFZhbHVlIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkNyaXRpY2FsIHZhbHVlIChJTlIpIiwib3duZXIiOiJwaHlzaWNpYW4iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImJlZEFzc2lnbm1lbnQiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiQmVkIGFzc2lnbm1lbnQiLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6Im9yZGVyUmV2aWV3Iiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6Ik9yZGVyIHJldmlldyIsIm93bmVyIjoicGhhcm1hY2lzdCIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6Im1lZFJlY0FkbWlzc2lvbiIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJBZG1pc3Npb24gbWVkaWNhdGlvbiByZWNvbmNpbGlhdGlvbiIsIm93bmVyIjoicGhhcm1hY2lzdCIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6InByZWRpY3REdXJhdGlvbiIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJTdXJnaWNhbCBkdXJhdGlvbiBwcmVkaWN0aW9uIiwib3duZXIiOiJvcGVyYXRpb25zX21hbmFnZXIiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJwcm9wb3NlU2NoZWR1bGUiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiT1IgYm9va2luZyBjaGVjayIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoid2FyZE1vbml0b3JpbmciLCJraW5kIjoid2FpdCIsImxhYmVsIjoiV2FyZCBtb25pdG9yaW5nIChORVdTMikiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAgKE5FV1MyIHN0dWIpIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZHJhZnREaXNjaGFyZ2VTdW1tYXJ5Iiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkRpc2NoYXJnZSBzdW1tYXJ5Iiwib3duZXIiOiJwaHlzaWNpYW4iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJkcmFmdFBhdGllbnRJbnN0cnVjdGlvbnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiUGF0aWVudCBpbnN0cnVjdGlvbnMiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZm9sbG93dXBEZWxheSIsImtpbmQiOiJ0aW1lciIsImxhYmVsIjoiNDggaG91cnMgYWZ0ZXIgZGlzY2hhcmdlIiwib3duZXIiOiJzeXN0ZW0iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJzY2hlZHVsZUZvbGxvd3VwQ2FsbCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJGb2xsb3ctdXAgY2FsbCBzY2hlZHVsZWQiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiY29kaW5nU3R1YiIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJDb2Rpbmcgc3VnZ2VzdGlvbiIsIm93bmVyIjoiY2xlcmsiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9XSwidGVtcG9yYWxfcnVuX2lkIjoiZTZkMjhjOGUtMGM4Yy00Y2VhLWE5YjMtNDhiY2RlMjVjYTg1IiwidXBkYXRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTgrMDA6MDAiLCJ2ZXJzaW9uIjozLCJ3b3JrZmxvd190eXBlIjoiSW5wYXRpZW50Sm91cm5leVdvcmtmbG93In0="
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "28",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "32",
+      "eventTime": "2026-10-11T00:55:58.806Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "31",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "33",
+      "eventTime": "2026-10-11T00:55:58.890Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "31",
+        "startedEventId": "32",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "34",
+      "eventTime": "2026-10-11T00:55:58.890Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "35",
+      "eventTime": "2026-10-11T00:55:58.890Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "34",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "15218"
+      }
+    },
+    {
+      "eventId": "36",
+      "eventTime": "2026-10-11T00:55:58.988Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "34",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "37",
+      "eventTime": "2026-10-11T00:55:58.988Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "5",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOiJpbWFnaW5nT3JkZXJzIiwiaWQiOiJqb3VybmV5LXN0YXktajAwMDEiLCJtZXRhIjp7ImVkX3Zpc2l0IjoiZWQtajAwMDEiLCJlbmNvdW50ZXJfaWQiOiJzdGF5LWowMDAxIiwicGF0aWVudF9pZCI6InBhdC1qMDAwMSIsInN0YXJ0ZWRfYnkiOiJ1c2VyOlUtQ0xFUi0wMSIsInN0YXJ0ZWRfaW4iOiJFRCJ9LCJub3RlcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoicnVubmluZyIsInN0ZXBzIjpbeyJhdHRlbXB0cyI6MSwiZGV0YWlsIjoiQ29uZmlybWVkIGJ5IHRoZSBudXJzZSIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1OCswMDowMCIsImtleSI6InRyaWFnZUFzc2lzdCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJUcmlhZ2UgYXNzaXN0Iiwib3duZXIiOiJudXJzZSIsInJlZnMiOlsiVGFzay90YXNrLTAwMDAxIl0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJpbWFnaW5nT3JkZXJzIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkltYWdpbmcgb3JkZXJzICh1cmdlbmN5IGFuZCBwcm90b2NvbCkiLCJvd25lciI6InBoeXNpY2lhbiIsInJlZnMiOltdLCJzdGFydGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1OCswMDowMCIsInN0YXR1cyI6InJ1bm5pbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiY3JpdGljYWxWYWx1ZSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJDcml0aWNhbCB2YWx1ZSAoSU5SKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJiZWRBc3NpZ25tZW50Iiwia2luZCI6ImF1dG8iLCJsYWJlbCI6IkJlZCBhc3NpZ25tZW50Iiwib3duZXIiOiJvcGVyYXRpb25zX21hbmFnZXIiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJvcmRlclJldmlldyIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJPcmRlciByZXZpZXciLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJtZWRSZWNBZG1pc3Npb24iLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiQWRtaXNzaW9uIG1lZGljYXRpb24gcmVjb25jaWxpYXRpb24iLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJwcmVkaWN0RHVyYXRpb24iLCJraW5kIjoiYXV0byIsImxhYmVsIjoiU3VyZ2ljYWwgZHVyYXRpb24gcHJlZGljdGlvbiIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoicHJvcG9zZVNjaGVkdWxlIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6Ik9SIGJvb2tpbmcgY2hlY2siLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6IndhcmRNb25pdG9yaW5nIiwia2luZCI6IndhaXQiLCJsYWJlbCI6IldhcmQgbW9uaXRvcmluZyAoTkVXUzIpIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IjguMSByb2FkbWFwIChORVdTMiBzdHViKSIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImRyYWZ0RGlzY2hhcmdlU3VtbWFyeSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJEaXNjaGFyZ2Ugc3VtbWFyeSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZHJhZnRQYXRpZW50SW5zdHJ1Y3Rpb25zIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IlBhdGllbnQgaW5zdHJ1Y3Rpb25zIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImZvbGxvd3VwRGVsYXkiLCJraW5kIjoidGltZXIiLCJsYWJlbCI6IjQ4IGhvdXJzIGFmdGVyIGRpc2NoYXJnZSIsIm93bmVyIjoic3lzdGVtIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoic2NoZWR1bGVGb2xsb3d1cENhbGwiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiRm9sbG93LXVwIGNhbGwgc2NoZWR1bGVkIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImNvZGluZ1N0dWIiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiQ29kaW5nIHN1Z2dlc3Rpb24iLCJvd25lciI6ImNsZXJrIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfV0sInRlbXBvcmFsX3J1bl9pZCI6ImU2ZDI4YzhlLTBjOGMtNGNlYS1hOWIzLTQ4YmNkZTI1Y2E4NSIsInVwZGF0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU4KzAwOjAwIiwidmVyc2lvbiI6NCwid29ya2Zsb3dfdHlwZSI6IklucGF0aWVudEpvdXJuZXlXb3JrZmxvdyJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "35",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "38",
+      "eventTime": "2026-10-11T00:55:58.988Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "37",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "39",
+      "eventTime": "2026-10-11T00:55:59.420Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "37",
+        "startedEventId": "38",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "40",
+      "eventTime": "2026-10-11T00:55:59.420Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "41",
+      "eventTime": "2026-10-11T00:55:59.421Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "40",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "19659"
+      }
+    },
+    {
+      "eventId": "42",
+      "eventTime": "2026-10-11T00:55:59.719Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "40",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "43",
+      "eventTime": "2026-10-11T00:55:59.719Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "6",
+        "activityType": {
+          "name": "journey.imagingOrders"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJlZF92aXNpdCI6ImVkLWowMDAxIiwiZW5jb3VudGVyX2lkIjoic3RheS1qMDAwMSIsInBhdGllbnRfaWQiOiJwYXQtajAwMDEiLCJ3b3JrZmxvd19pZCI6ImpvdXJuZXktc3RheS1qMDAwMSJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "120s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "41",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 4.0,
+          "maximumInterval": "16s",
+          "maximumAttempts": 4
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "44",
+      "eventTime": "2026-10-11T00:55:59.719Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "43",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "45",
+      "eventTime": "2026-10-11T00:56:00.095Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJfYXR0ZW1wdCI6MSwiZGV0YWlsIjoiSW1hZ2luZyBvcmRlcnMgY2FyZCBmb3IgdGhlIHBoeXNpY2lhbiIsInJlZnMiOlsiVGFzay90YXNrLTAwMDAyIl0sInNpZ25lciI6InBoeXNpY2lhbiIsIndhaXRfZm9yIjpbIlRhc2svdGFzay0wMDAwMiJdfQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "43",
+        "startedEventId": "44",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "46",
+      "eventTime": "2026-10-11T00:56:00.095Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "47",
+      "eventTime": "2026-10-11T00:56:00.096Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "46",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "20384"
+      }
+    },
+    {
+      "eventId": "48",
+      "eventTime": "2026-10-11T00:56:00.315Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "46",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "49",
+      "eventTime": "2026-10-11T00:56:00.315Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "7",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOiJpbWFnaW5nT3JkZXJzIiwiaWQiOiJqb3VybmV5LXN0YXktajAwMDEiLCJtZXRhIjp7ImVkX3Zpc2l0IjoiZWQtajAwMDEiLCJlbmNvdW50ZXJfaWQiOiJzdGF5LWowMDAxIiwicGF0aWVudF9pZCI6InBhdC1qMDAwMSIsInN0YXJ0ZWRfYnkiOiJ1c2VyOlUtQ0xFUi0wMSIsInN0YXJ0ZWRfaW4iOiJFRCJ9LCJub3RlcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoicnVubmluZyIsInN0ZXBzIjpbeyJhdHRlbXB0cyI6MSwiZGV0YWlsIjoiQ29uZmlybWVkIGJ5IHRoZSBudXJzZSIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1OCswMDowMCIsImtleSI6InRyaWFnZUFzc2lzdCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJUcmlhZ2UgYXNzaXN0Iiwib3duZXIiOiJudXJzZSIsInJlZnMiOlsiVGFzay90YXNrLTAwMDAxIl0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjoxLCJkZXRhaWwiOiJJbWFnaW5nIG9yZGVycyBjYXJkIGZvciB0aGUgcGh5c2ljaWFuIiwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImltYWdpbmdPcmRlcnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiSW1hZ2luZyBvcmRlcnMgKHVyZ2VuY3kgYW5kIHByb3RvY29sKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6WyJUYXNrL3Rhc2stMDAwMDIiXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTgrMDA6MDAiLCJzdGF0dXMiOiJ3YWl0aW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOnsicmVmcyI6WyJUYXNrL3Rhc2stMDAwMDIiXSwicm9sZSI6InBoeXNpY2lhbiJ9fSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJjcml0aWNhbFZhbHVlIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkNyaXRpY2FsIHZhbHVlIChJTlIpIiwib3duZXIiOiJwaHlzaWNpYW4iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImJlZEFzc2lnbm1lbnQiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiQmVkIGFzc2lnbm1lbnQiLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6Im9yZGVyUmV2aWV3Iiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6Ik9yZGVyIHJldmlldyIsIm93bmVyIjoicGhhcm1hY2lzdCIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6Im1lZFJlY0FkbWlzc2lvbiIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJBZG1pc3Npb24gbWVkaWNhdGlvbiByZWNvbmNpbGlhdGlvbiIsIm93bmVyIjoicGhhcm1hY2lzdCIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6InByZWRpY3REdXJhdGlvbiIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJTdXJnaWNhbCBkdXJhdGlvbiBwcmVkaWN0aW9uIiwib3duZXIiOiJvcGVyYXRpb25zX21hbmFnZXIiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJwcm9wb3NlU2NoZWR1bGUiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiT1IgYm9va2luZyBjaGVjayIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoid2FyZE1vbml0b3JpbmciLCJraW5kIjoid2FpdCIsImxhYmVsIjoiV2FyZCBtb25pdG9yaW5nIChORVdTMikiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAgKE5FV1MyIHN0dWIpIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZHJhZnREaXNjaGFyZ2VTdW1tYXJ5Iiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkRpc2NoYXJnZSBzdW1tYXJ5Iiwib3duZXIiOiJwaHlzaWNpYW4iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJkcmFmdFBhdGllbnRJbnN0cnVjdGlvbnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiUGF0aWVudCBpbnN0cnVjdGlvbnMiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZm9sbG93dXBEZWxheSIsImtpbmQiOiJ0aW1lciIsImxhYmVsIjoiNDggaG91cnMgYWZ0ZXIgZGlzY2hhcmdlIiwib3duZXIiOiJzeXN0ZW0iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJzY2hlZHVsZUZvbGxvd3VwQ2FsbCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJGb2xsb3ctdXAgY2FsbCBzY2hlZHVsZWQiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiY29kaW5nU3R1YiIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJDb2Rpbmcgc3VnZ2VzdGlvbiIsIm93bmVyIjoiY2xlcmsiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9XSwidGVtcG9yYWxfcnVuX2lkIjoiZTZkMjhjOGUtMGM4Yy00Y2VhLWE5YjMtNDhiY2RlMjVjYTg1IiwidXBkYXRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTY6MDArMDA6MDAiLCJ2ZXJzaW9uIjo1LCJ3b3JrZmxvd190eXBlIjoiSW5wYXRpZW50Sm91cm5leVdvcmtmbG93In0="
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "47",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "50",
+      "eventTime": "2026-10-11T00:56:00.316Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "49",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "51",
+      "eventTime": "2026-10-11T00:56:00.354Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "49",
+        "startedEventId": "50",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "52",
+      "eventTime": "2026-10-11T00:56:00.354Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "53",
+      "eventTime": "2026-10-11T00:56:00.354Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "52",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "24920"
+      }
+    },
+    {
+      "eventId": "54",
+      "eventTime": "2026-10-11T00:56:00.461Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "52",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "55",
+      "eventTime": "2026-10-11T00:56:00.461Z",
+      "eventType": "EVENT_TYPE_TIMER_STARTED",
+      "timerStartedEventAttributes": {
+        "timerId": "2",
+        "startToFireTimeout": "86400s",
+        "workflowTaskCompletedEventId": "53"
+      }
+    },
+    {
+      "eventId": "56",
+      "eventTime": "2026-10-11T00:56:02.334Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED",
+      "workflowExecutionSignaledEventAttributes": {
+        "signalName": "event",
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJhdCI6IjIwMjYtMTAtMDlUMDc6MDA6MDAiLCJkZWNpc2lvbiI6ImFjY2VwdCIsImV2ZW50X2lkIjoiNjJkMTRkYjktZWI2MS01NTAwLTlkZmYtNzM2OGJmYTMzMDUyIiwia2luZCI6ImRlY2lkZWQiLCJyZWYiOiJUYXNrL3Rhc2stMDAwMDIiLCJyb2xlIjoicGh5c2ljaWFuIiwic3RlcCI6ImltYWdpbmdPcmRlcnMifQ=="
+            }
+          ]
+        },
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "57",
+      "eventTime": "2026-10-11T00:56:02.334Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "58",
+      "eventTime": "2026-10-11T00:56:02.334Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "57",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "25403"
+      }
+    },
+    {
+      "eventId": "59",
+      "eventTime": "2026-10-11T00:56:02.420Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "57",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "60",
+      "eventTime": "2026-10-11T00:56:02.420Z",
+      "eventType": "EVENT_TYPE_TIMER_CANCELED",
+      "timerCanceledEventAttributes": {
+        "timerId": "2",
+        "startedEventId": "55",
+        "workflowTaskCompletedEventId": "58"
+      }
+    },
+    {
+      "eventId": "61",
+      "eventTime": "2026-10-11T00:56:02.420Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "8",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOm51bGwsImlkIjoiam91cm5leS1zdGF5LWowMDAxIiwibWV0YSI6eyJlZF92aXNpdCI6ImVkLWowMDAxIiwiZW5jb3VudGVyX2lkIjoic3RheS1qMDAwMSIsInBhdGllbnRfaWQiOiJwYXQtajAwMDEiLCJzdGFydGVkX2J5IjoidXNlcjpVLUNMRVItMDEiLCJzdGFydGVkX2luIjoiRUQifSwibm90ZXMiOltdLCJzdGFydGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1NSswMDowMCIsInN0YXR1cyI6InJ1bm5pbmciLCJzdGVwcyI6W3siYXR0ZW1wdHMiOjEsImRldGFpbCI6IkNvbmZpcm1lZCBieSB0aGUgbnVyc2UiLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTgrMDA6MDAiLCJrZXkiOiJ0cmlhZ2VBc3Npc3QiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiVHJpYWdlIGFzc2lzdCIsIm93bmVyIjoibnVyc2UiLCJyZWZzIjpbIlRhc2svdGFzay0wMDAwMSJdLCJzdGFydGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1NSswMDowMCIsInN0YXR1cyI6ImRvbmUiLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MSwiZGV0YWlsIjoiQ29uZmlybWVkIGJ5IHRoZSBwaHlzaWNpYW4iLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTY6MDIrMDA6MDAiLCJrZXkiOiJpbWFnaW5nT3JkZXJzIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkltYWdpbmcgb3JkZXJzICh1cmdlbmN5IGFuZCBwcm90b2NvbCkiLCJvd25lciI6InBoeXNpY2lhbiIsInJlZnMiOlsiVGFzay90YXNrLTAwMDAyIl0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU4KzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJjcml0aWNhbFZhbHVlIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkNyaXRpY2FsIHZhbHVlIChJTlIpIiwib3duZXIiOiJwaHlzaWNpYW4iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImJlZEFzc2lnbm1lbnQiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiQmVkIGFzc2lnbm1lbnQiLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6Im9yZGVyUmV2aWV3Iiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6Ik9yZGVyIHJldmlldyIsIm93bmVyIjoicGhhcm1hY2lzdCIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6Im1lZFJlY0FkbWlzc2lvbiIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJBZG1pc3Npb24gbWVkaWNhdGlvbiByZWNvbmNpbGlhdGlvbiIsIm93bmVyIjoicGhhcm1hY2lzdCIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6InByZWRpY3REdXJhdGlvbiIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJTdXJnaWNhbCBkdXJhdGlvbiBwcmVkaWN0aW9uIiwib3duZXIiOiJvcGVyYXRpb25zX21hbmFnZXIiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJwcm9wb3NlU2NoZWR1bGUiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiT1IgYm9va2luZyBjaGVjayIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoid2FyZE1vbml0b3JpbmciLCJraW5kIjoid2FpdCIsImxhYmVsIjoiV2FyZCBtb25pdG9yaW5nIChORVdTMikiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAgKE5FV1MyIHN0dWIpIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZHJhZnREaXNjaGFyZ2VTdW1tYXJ5Iiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkRpc2NoYXJnZSBzdW1tYXJ5Iiwib3duZXIiOiJwaHlzaWNpYW4iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJkcmFmdFBhdGllbnRJbnN0cnVjdGlvbnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiUGF0aWVudCBpbnN0cnVjdGlvbnMiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZm9sbG93dXBEZWxheSIsImtpbmQiOiJ0aW1lciIsImxhYmVsIjoiNDggaG91cnMgYWZ0ZXIgZGlzY2hhcmdlIiwib3duZXIiOiJzeXN0ZW0iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJzY2hlZHVsZUZvbGxvd3VwQ2FsbCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJGb2xsb3ctdXAgY2FsbCBzY2hlZHVsZWQiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiY29kaW5nU3R1YiIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJDb2Rpbmcgc3VnZ2VzdGlvbiIsIm93bmVyIjoiY2xlcmsiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9XSwidGVtcG9yYWxfcnVuX2lkIjoiZTZkMjhjOGUtMGM4Yy00Y2VhLWE5YjMtNDhiY2RlMjVjYTg1IiwidXBkYXRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTY6MDIrMDA6MDAiLCJ2ZXJzaW9uIjo2LCJ3b3JrZmxvd190eXBlIjoiSW5wYXRpZW50Sm91cm5leVdvcmtmbG93In0="
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "58",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "62",
+      "eventTime": "2026-10-11T00:56:02.420Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "61",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "63",
+      "eventTime": "2026-10-11T00:56:02.464Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "61",
+        "startedEventId": "62",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "64",
+      "eventTime": "2026-10-11T00:56:02.464Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "65",
+      "eventTime": "2026-10-11T00:56:02.464Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "64",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "29923"
+      }
+    },
+    {
+      "eventId": "66",
+      "eventTime": "2026-10-11T00:56:02.583Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "64",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "67",
+      "eventTime": "2026-10-11T00:56:02.583Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "9",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOiJjcml0aWNhbFZhbHVlIiwiaWQiOiJqb3VybmV5LXN0YXktajAwMDEiLCJtZXRhIjp7ImVkX3Zpc2l0IjoiZWQtajAwMDEiLCJlbmNvdW50ZXJfaWQiOiJzdGF5LWowMDAxIiwicGF0aWVudF9pZCI6InBhdC1qMDAwMSIsInN0YXJ0ZWRfYnkiOiJ1c2VyOlUtQ0xFUi0wMSIsInN0YXJ0ZWRfaW4iOiJFRCJ9LCJub3RlcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoicnVubmluZyIsInN0ZXBzIjpbeyJhdHRlbXB0cyI6MSwiZGV0YWlsIjoiQ29uZmlybWVkIGJ5IHRoZSBudXJzZSIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1OCswMDowMCIsImtleSI6InRyaWFnZUFzc2lzdCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJUcmlhZ2UgYXNzaXN0Iiwib3duZXIiOiJudXJzZSIsInJlZnMiOlsiVGFzay90YXNrLTAwMDAxIl0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjoxLCJkZXRhaWwiOiJDb25maXJtZWQgYnkgdGhlIHBoeXNpY2lhbiIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NjowMiswMDowMCIsImtleSI6ImltYWdpbmdPcmRlcnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiSW1hZ2luZyBvcmRlcnMgKHVyZ2VuY3kgYW5kIHByb3RvY29sKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6WyJUYXNrL3Rhc2stMDAwMDIiXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTgrMDA6MDAiLCJzdGF0dXMiOiJkb25lIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImNyaXRpY2FsVmFsdWUiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiQ3JpdGljYWwgdmFsdWUgKElOUikiLCJvd25lciI6InBoeXNpY2lhbiIsInJlZnMiOltdLCJzdGFydGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NjowMiswMDowMCIsInN0YXR1cyI6InJ1bm5pbmciLCJzdHViIjoiOC4xIHJvYWRtYXAiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJiZWRBc3NpZ25tZW50Iiwia2luZCI6ImF1dG8iLCJsYWJlbCI6IkJlZCBhc3NpZ25tZW50Iiwib3duZXIiOiJvcGVyYXRpb25zX21hbmFnZXIiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJvcmRlclJldmlldyIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJPcmRlciByZXZpZXciLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJtZWRSZWNBZG1pc3Npb24iLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiQWRtaXNzaW9uIG1lZGljYXRpb24gcmVjb25jaWxpYXRpb24iLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJwcmVkaWN0RHVyYXRpb24iLCJraW5kIjoiYXV0byIsImxhYmVsIjoiU3VyZ2ljYWwgZHVyYXRpb24gcHJlZGljdGlvbiIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoicHJvcG9zZVNjaGVkdWxlIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6Ik9SIGJvb2tpbmcgY2hlY2siLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6IndhcmRNb25pdG9yaW5nIiwia2luZCI6IndhaXQiLCJsYWJlbCI6IldhcmQgbW9uaXRvcmluZyAoTkVXUzIpIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IjguMSByb2FkbWFwIChORVdTMiBzdHViKSIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImRyYWZ0RGlzY2hhcmdlU3VtbWFyeSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJEaXNjaGFyZ2Ugc3VtbWFyeSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZHJhZnRQYXRpZW50SW5zdHJ1Y3Rpb25zIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IlBhdGllbnQgaW5zdHJ1Y3Rpb25zIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImZvbGxvd3VwRGVsYXkiLCJraW5kIjoidGltZXIiLCJsYWJlbCI6IjQ4IGhvdXJzIGFmdGVyIGRpc2NoYXJnZSIsIm93bmVyIjoic3lzdGVtIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoic2NoZWR1bGVGb2xsb3d1cENhbGwiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiRm9sbG93LXVwIGNhbGwgc2NoZWR1bGVkIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImNvZGluZ1N0dWIiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiQ29kaW5nIHN1Z2dlc3Rpb24iLCJvd25lciI6ImNsZXJrIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfV0sInRlbXBvcmFsX3J1bl9pZCI6ImU2ZDI4YzhlLTBjOGMtNGNlYS1hOWIzLTQ4YmNkZTI1Y2E4NSIsInVwZGF0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjAyKzAwOjAwIiwidmVyc2lvbiI6Nywid29ya2Zsb3dfdHlwZSI6IklucGF0aWVudEpvdXJuZXlXb3JrZmxvdyJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "65",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "68",
+      "eventTime": "2026-10-11T00:56:02.583Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "67",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "69",
+      "eventTime": "2026-10-11T00:56:03.025Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "67",
+        "startedEventId": "68",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "70",
+      "eventTime": "2026-10-11T00:56:03.025Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "71",
+      "eventTime": "2026-10-11T00:56:03.025Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "70",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "34447"
+      }
+    },
+    {
+      "eventId": "72",
+      "eventTime": "2026-10-11T00:56:03.133Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "70",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "73",
+      "eventTime": "2026-10-11T00:56:03.133Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "10",
+        "activityType": {
+          "name": "journey.criticalValue"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJlZF92aXNpdCI6ImVkLWowMDAxIiwiZW5jb3VudGVyX2lkIjoic3RheS1qMDAwMSIsInBhdGllbnRfaWQiOiJwYXQtajAwMDEiLCJ3b3JrZmxvd19pZCI6ImpvdXJuZXktc3RheS1qMDAwMSJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "120s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "71",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 4.0,
+          "maximumInterval": "16s",
+          "maximumAttempts": 4
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "74",
+      "eventTime": "2026-10-11T00:56:03.133Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "73",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "75",
+      "eventTime": "2026-10-11T00:56:03.314Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJfYXR0ZW1wdCI6MSwiZGV0YWlsIjoiV2FpdGluZyBmb3IgdGhlIElOUiByZXN1bHQ6IHRoZSBjcml0aWNhbC12YWx1ZSByb3V0ZXIgKHJvYWRtYXAgc3R1Yikgc2VuZHMgaXQgdG8gdGhlIEVEIHBoeXNpY2lhbiIsInNpZ25lciI6InBoeXNpY2lhbiIsIndhaXRfc3RlcCI6dHJ1ZX0="
+            }
+          ]
+        },
+        "scheduledEventId": "73",
+        "startedEventId": "74",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "76",
+      "eventTime": "2026-10-11T00:56:03.314Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "77",
+      "eventTime": "2026-10-11T00:56:03.314Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "76",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "35190"
+      }
+    },
+    {
+      "eventId": "78",
+      "eventTime": "2026-10-11T00:56:03.398Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "76",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "79",
+      "eventTime": "2026-10-11T00:56:03.398Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "11",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOiJjcml0aWNhbFZhbHVlIiwiaWQiOiJqb3VybmV5LXN0YXktajAwMDEiLCJtZXRhIjp7ImVkX3Zpc2l0IjoiZWQtajAwMDEiLCJlbmNvdW50ZXJfaWQiOiJzdGF5LWowMDAxIiwicGF0aWVudF9pZCI6InBhdC1qMDAwMSIsInN0YXJ0ZWRfYnkiOiJ1c2VyOlUtQ0xFUi0wMSIsInN0YXJ0ZWRfaW4iOiJFRCJ9LCJub3RlcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoicnVubmluZyIsInN0ZXBzIjpbeyJhdHRlbXB0cyI6MSwiZGV0YWlsIjoiQ29uZmlybWVkIGJ5IHRoZSBudXJzZSIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1OCswMDowMCIsImtleSI6InRyaWFnZUFzc2lzdCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJUcmlhZ2UgYXNzaXN0Iiwib3duZXIiOiJudXJzZSIsInJlZnMiOlsiVGFzay90YXNrLTAwMDAxIl0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjoxLCJkZXRhaWwiOiJDb25maXJtZWQgYnkgdGhlIHBoeXNpY2lhbiIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NjowMiswMDowMCIsImtleSI6ImltYWdpbmdPcmRlcnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiSW1hZ2luZyBvcmRlcnMgKHVyZ2VuY3kgYW5kIHByb3RvY29sKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6WyJUYXNrL3Rhc2stMDAwMDIiXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTgrMDA6MDAiLCJzdGF0dXMiOiJkb25lIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjEsImRldGFpbCI6IldhaXRpbmcgZm9yIHRoZSBJTlIgcmVzdWx0OiB0aGUgY3JpdGljYWwtdmFsdWUgcm91dGVyIChyb2FkbWFwIHN0dWIpIHNlbmRzIGl0IHRvIHRoZSBFRCBwaHlzaWNpYW4iLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiY3JpdGljYWxWYWx1ZSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJDcml0aWNhbCB2YWx1ZSAoSU5SKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjAyKzAwOjAwIiwic3RhdHVzIjoid2FpdGluZyIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOnsicmVmcyI6W10sInJvbGUiOiJwaHlzaWNpYW4ifX0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiYmVkQXNzaWdubWVudCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJCZWQgYXNzaWdubWVudCIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoib3JkZXJSZXZpZXciLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiT3JkZXIgcmV2aWV3Iiwib3duZXIiOiJwaGFybWFjaXN0IiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoibWVkUmVjQWRtaXNzaW9uIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkFkbWlzc2lvbiBtZWRpY2F0aW9uIHJlY29uY2lsaWF0aW9uIiwib3duZXIiOiJwaGFybWFjaXN0IiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoicHJlZGljdER1cmF0aW9uIiwia2luZCI6ImF1dG8iLCJsYWJlbCI6IlN1cmdpY2FsIGR1cmF0aW9uIHByZWRpY3Rpb24iLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6InByb3Bvc2VTY2hlZHVsZSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJPUiBib29raW5nIGNoZWNrIiwib3duZXIiOiJvcGVyYXRpb25zX21hbmFnZXIiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJ3YXJkTW9uaXRvcmluZyIsImtpbmQiOiJ3YWl0IiwibGFiZWwiOiJXYXJkIG1vbml0b3JpbmcgKE5FV1MyKSIsIm93bmVyIjoibnVyc2UiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiI4LjEgcm9hZG1hcCAoTkVXUzIgc3R1YikiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJkcmFmdERpc2NoYXJnZVN1bW1hcnkiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiRGlzY2hhcmdlIHN1bW1hcnkiLCJvd25lciI6InBoeXNpY2lhbiIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImRyYWZ0UGF0aWVudEluc3RydWN0aW9ucyIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJQYXRpZW50IGluc3RydWN0aW9ucyIsIm93bmVyIjoibnVyc2UiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJmb2xsb3d1cERlbGF5Iiwia2luZCI6InRpbWVyIiwibGFiZWwiOiI0OCBob3VycyBhZnRlciBkaXNjaGFyZ2UiLCJvd25lciI6InN5c3RlbSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6InNjaGVkdWxlRm9sbG93dXBDYWxsIiwia2luZCI6ImF1dG8iLCJsYWJlbCI6IkZvbGxvdy11cCBjYWxsIHNjaGVkdWxlZCIsIm93bmVyIjoibnVyc2UiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJjb2RpbmdTdHViIiwia2luZCI6ImF1dG8iLCJsYWJlbCI6IkNvZGluZyBzdWdnZXN0aW9uIiwib3duZXIiOiJjbGVyayIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IjguMSByb2FkbWFwIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH1dLCJ0ZW1wb3JhbF9ydW5faWQiOiJlNmQyOGM4ZS0wYzhjLTRjZWEtYTliMy00OGJjZGUyNWNhODUiLCJ1cGRhdGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NjowMyswMDowMCIsInZlcnNpb24iOjgsIndvcmtmbG93X3R5cGUiOiJJbnBhdGllbnRKb3VybmV5V29ya2Zsb3cifQ=="
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "77",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "80",
+      "eventTime": "2026-10-11T00:56:03.399Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "79",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "81",
+      "eventTime": "2026-10-11T00:56:03.434Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "79",
+        "startedEventId": "80",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "82",
+      "eventTime": "2026-10-11T00:56:03.434Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "83",
+      "eventTime": "2026-10-11T00:56:03.434Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "82",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "39838"
+      }
+    },
+    {
+      "eventId": "84",
+      "eventTime": "2026-10-11T00:56:03.542Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "82",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "85",
+      "eventTime": "2026-10-11T00:56:03.542Z",
+      "eventType": "EVENT_TYPE_TIMER_STARTED",
+      "timerStartedEventAttributes": {
+        "timerId": "3",
+        "startToFireTimeout": "86400s",
+        "workflowTaskCompletedEventId": "83"
+      }
+    },
+    {
+      "eventId": "86",
+      "eventTime": "2026-10-11T00:56:06.538Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED",
+      "workflowExecutionSignaledEventAttributes": {
+        "signalName": "event",
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJhdCI6IjIwMjYtMTAtMDlUMDc6NDY6MDAiLCJkZWNpc2lvbiI6ImFjY2VwdCIsImV2ZW50X2lkIjoiM2ZiYTY0MWQtYmI5Ny01ZDU0LWFlMzAtOWIwYWM0MTE1YWI4Iiwia2luZCI6ImRlY2lkZWQiLCJyZWYiOiJUYXNrL3Rhc2stMDAwMDMiLCJyb2xlIjoicGh5c2ljaWFuIiwic3RlcCI6ImNyaXRpY2FsVmFsdWUifQ=="
+            }
+          ]
+        },
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "87",
+      "eventTime": "2026-10-11T00:56:06.538Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "88",
+      "eventTime": "2026-10-11T00:56:06.538Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "87",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "40321"
+      }
+    },
+    {
+      "eventId": "89",
+      "eventTime": "2026-10-11T00:56:06.647Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "87",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "90",
+      "eventTime": "2026-10-11T00:56:06.647Z",
+      "eventType": "EVENT_TYPE_TIMER_CANCELED",
+      "timerCanceledEventAttributes": {
+        "timerId": "3",
+        "startedEventId": "85",
+        "workflowTaskCompletedEventId": "88"
+      }
+    },
+    {
+      "eventId": "91",
+      "eventTime": "2026-10-11T00:56:06.647Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "12",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOm51bGwsImlkIjoiam91cm5leS1zdGF5LWowMDAxIiwibWV0YSI6eyJlZF92aXNpdCI6ImVkLWowMDAxIiwiZW5jb3VudGVyX2lkIjoic3RheS1qMDAwMSIsInBhdGllbnRfaWQiOiJwYXQtajAwMDEiLCJzdGFydGVkX2J5IjoidXNlcjpVLUNMRVItMDEiLCJzdGFydGVkX2luIjoiRUQifSwibm90ZXMiOltdLCJzdGFydGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1NSswMDowMCIsInN0YXR1cyI6InJ1bm5pbmciLCJzdGVwcyI6W3siYXR0ZW1wdHMiOjEsImRldGFpbCI6IkNvbmZpcm1lZCBieSB0aGUgbnVyc2UiLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTgrMDA6MDAiLCJrZXkiOiJ0cmlhZ2VBc3Npc3QiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiVHJpYWdlIGFzc2lzdCIsIm93bmVyIjoibnVyc2UiLCJyZWZzIjpbIlRhc2svdGFzay0wMDAwMSJdLCJzdGFydGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1NSswMDowMCIsInN0YXR1cyI6ImRvbmUiLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MSwiZGV0YWlsIjoiQ29uZmlybWVkIGJ5IHRoZSBwaHlzaWNpYW4iLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTY6MDIrMDA6MDAiLCJrZXkiOiJpbWFnaW5nT3JkZXJzIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkltYWdpbmcgb3JkZXJzICh1cmdlbmN5IGFuZCBwcm90b2NvbCkiLCJvd25lciI6InBoeXNpY2lhbiIsInJlZnMiOlsiVGFzay90YXNrLTAwMDAyIl0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU4KzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjoxLCJkZXRhaWwiOiJDb25maXJtZWQgYnkgdGhlIHBoeXNpY2lhbiIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NjowNiswMDowMCIsImtleSI6ImNyaXRpY2FsVmFsdWUiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiQ3JpdGljYWwgdmFsdWUgKElOUikiLCJvd25lciI6InBoeXNpY2lhbiIsInJlZnMiOltdLCJzdGFydGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NjowMiswMDowMCIsInN0YXR1cyI6ImRvbmUiLCJzdHViIjoiOC4xIHJvYWRtYXAiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJiZWRBc3NpZ25tZW50Iiwia2luZCI6ImF1dG8iLCJsYWJlbCI6IkJlZCBhc3NpZ25tZW50Iiwib3duZXIiOiJvcGVyYXRpb25zX21hbmFnZXIiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJvcmRlclJldmlldyIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJPcmRlciByZXZpZXciLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJtZWRSZWNBZG1pc3Npb24iLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiQWRtaXNzaW9uIG1lZGljYXRpb24gcmVjb25jaWxpYXRpb24iLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJwcmVkaWN0RHVyYXRpb24iLCJraW5kIjoiYXV0byIsImxhYmVsIjoiU3VyZ2ljYWwgZHVyYXRpb24gcHJlZGljdGlvbiIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoicHJvcG9zZVNjaGVkdWxlIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6Ik9SIGJvb2tpbmcgY2hlY2siLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6IndhcmRNb25pdG9yaW5nIiwia2luZCI6IndhaXQiLCJsYWJlbCI6IldhcmQgbW9uaXRvcmluZyAoTkVXUzIpIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IjguMSByb2FkbWFwIChORVdTMiBzdHViKSIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImRyYWZ0RGlzY2hhcmdlU3VtbWFyeSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJEaXNjaGFyZ2Ugc3VtbWFyeSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZHJhZnRQYXRpZW50SW5zdHJ1Y3Rpb25zIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IlBhdGllbnQgaW5zdHJ1Y3Rpb25zIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImZvbGxvd3VwRGVsYXkiLCJraW5kIjoidGltZXIiLCJsYWJlbCI6IjQ4IGhvdXJzIGFmdGVyIGRpc2NoYXJnZSIsIm93bmVyIjoic3lzdGVtIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoic2NoZWR1bGVGb2xsb3d1cENhbGwiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiRm9sbG93LXVwIGNhbGwgc2NoZWR1bGVkIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImNvZGluZ1N0dWIiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiQ29kaW5nIHN1Z2dlc3Rpb24iLCJvd25lciI6ImNsZXJrIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfV0sInRlbXBvcmFsX3J1bl9pZCI6ImU2ZDI4YzhlLTBjOGMtNGNlYS1hOWIzLTQ4YmNkZTI1Y2E4NSIsInVwZGF0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjA2KzAwOjAwIiwidmVyc2lvbiI6OSwid29ya2Zsb3dfdHlwZSI6IklucGF0aWVudEpvdXJuZXlXb3JrZmxvdyJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "88",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "92",
+      "eventTime": "2026-10-11T00:56:06.647Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "91",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "93",
+      "eventTime": "2026-10-11T00:56:06.718Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "91",
+        "startedEventId": "92",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "94",
+      "eventTime": "2026-10-11T00:56:06.718Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "95",
+      "eventTime": "2026-10-11T00:56:06.718Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "94",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "44909"
+      }
+    },
+    {
+      "eventId": "96",
+      "eventTime": "2026-10-11T00:56:06.953Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "94",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "97",
+      "eventTime": "2026-10-11T00:56:06.953Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "13",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOiJiZWRBc3NpZ25tZW50IiwiaWQiOiJqb3VybmV5LXN0YXktajAwMDEiLCJtZXRhIjp7ImVkX3Zpc2l0IjoiZWQtajAwMDEiLCJlbmNvdW50ZXJfaWQiOiJzdGF5LWowMDAxIiwicGF0aWVudF9pZCI6InBhdC1qMDAwMSIsInN0YXJ0ZWRfYnkiOiJ1c2VyOlUtQ0xFUi0wMSIsInN0YXJ0ZWRfaW4iOiJFRCJ9LCJub3RlcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoicnVubmluZyIsInN0ZXBzIjpbeyJhdHRlbXB0cyI6MSwiZGV0YWlsIjoiQ29uZmlybWVkIGJ5IHRoZSBudXJzZSIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1OCswMDowMCIsImtleSI6InRyaWFnZUFzc2lzdCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJUcmlhZ2UgYXNzaXN0Iiwib3duZXIiOiJudXJzZSIsInJlZnMiOlsiVGFzay90YXNrLTAwMDAxIl0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjoxLCJkZXRhaWwiOiJDb25maXJtZWQgYnkgdGhlIHBoeXNpY2lhbiIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NjowMiswMDowMCIsImtleSI6ImltYWdpbmdPcmRlcnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiSW1hZ2luZyBvcmRlcnMgKHVyZ2VuY3kgYW5kIHByb3RvY29sKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6WyJUYXNrL3Rhc2stMDAwMDIiXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTgrMDA6MDAiLCJzdGF0dXMiOiJkb25lIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjEsImRldGFpbCI6IkNvbmZpcm1lZCBieSB0aGUgcGh5c2ljaWFuIiwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjA2KzAwOjAwIiwia2V5IjoiY3JpdGljYWxWYWx1ZSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJDcml0aWNhbCB2YWx1ZSAoSU5SKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjAyKzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6IkJvYXJkaW5nIGluIHRoZSBFRCB1bnRpbCBhIGJlZCBpcyBmcmVlICh0aGUgYmVkIG1hbmFnZXIgZGVjaWRlcyBpbiB0aGUgQ29udHJvbCBUb3dlcikiLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiYmVkQXNzaWdubWVudCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJCZWQgYXNzaWdubWVudCIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjA2KzAwOjAwIiwic3RhdHVzIjoid2FpdGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJvcmRlclJldmlldyIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJPcmRlciByZXZpZXciLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJtZWRSZWNBZG1pc3Npb24iLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiQWRtaXNzaW9uIG1lZGljYXRpb24gcmVjb25jaWxpYXRpb24iLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJwcmVkaWN0RHVyYXRpb24iLCJraW5kIjoiYXV0byIsImxhYmVsIjoiU3VyZ2ljYWwgZHVyYXRpb24gcHJlZGljdGlvbiIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoicHJvcG9zZVNjaGVkdWxlIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6Ik9SIGJvb2tpbmcgY2hlY2siLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6IndhcmRNb25pdG9yaW5nIiwia2luZCI6IndhaXQiLCJsYWJlbCI6IldhcmQgbW9uaXRvcmluZyAoTkVXUzIpIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IjguMSByb2FkbWFwIChORVdTMiBzdHViKSIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImRyYWZ0RGlzY2hhcmdlU3VtbWFyeSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJEaXNjaGFyZ2Ugc3VtbWFyeSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZHJhZnRQYXRpZW50SW5zdHJ1Y3Rpb25zIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IlBhdGllbnQgaW5zdHJ1Y3Rpb25zIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImZvbGxvd3VwRGVsYXkiLCJraW5kIjoidGltZXIiLCJsYWJlbCI6IjQ4IGhvdXJzIGFmdGVyIGRpc2NoYXJnZSIsIm93bmVyIjoic3lzdGVtIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoic2NoZWR1bGVGb2xsb3d1cENhbGwiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiRm9sbG93LXVwIGNhbGwgc2NoZWR1bGVkIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImNvZGluZ1N0dWIiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiQ29kaW5nIHN1Z2dlc3Rpb24iLCJvd25lciI6ImNsZXJrIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfV0sInRlbXBvcmFsX3J1bl9pZCI6ImU2ZDI4YzhlLTBjOGMtNGNlYS1hOWIzLTQ4YmNkZTI1Y2E4NSIsInVwZGF0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjA2KzAwOjAwIiwidmVyc2lvbiI6MTAsIndvcmtmbG93X3R5cGUiOiJJbnBhdGllbnRKb3VybmV5V29ya2Zsb3cifQ=="
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "95",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "98",
+      "eventTime": "2026-10-11T00:56:06.953Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "97",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "99",
+      "eventTime": "2026-10-11T00:56:07.072Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "97",
+        "startedEventId": "98",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "100",
+      "eventTime": "2026-10-11T00:56:07.072Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "101",
+      "eventTime": "2026-10-11T00:56:07.073Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "100",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "49585"
+      }
+    },
+    {
+      "eventId": "102",
+      "eventTime": "2026-10-11T00:56:07.209Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "100",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "103",
+      "eventTime": "2026-10-11T00:56:17.250Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED",
+      "workflowExecutionSignaledEventAttributes": {
+        "signalName": "event",
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJhdCI6IjIwMjYtMTAtMDlUMTA6MDE6MDAiLCJldmVudF9pZCI6IjRmOWQ0MTcwLWUwNzEtNWM2Zi05NGRkLTVmNTRkZmFlODVjMSIsImtpbmQiOiJhZG1pdHRlZCIsInJlZiI6IkVuY291bnRlci9zdGF5LWowMDAxIiwic3RlcCI6ImJlZEFzc2lnbm1lbnQifQ=="
+            }
+          ]
+        },
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "104",
+      "eventTime": "2026-10-11T00:56:17.250Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "105",
+      "eventTime": "2026-10-11T00:56:17.251Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "104",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "49999"
+      }
+    },
+    {
+      "eventId": "106",
+      "eventTime": "2026-10-11T00:56:18.017Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "104",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "107",
+      "eventTime": "2026-10-11T00:56:18.017Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "14",
+        "activityType": {
+          "name": "journey.context"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJlbmNvdW50ZXJfaWQiOiJzdGF5LWowMDAxIiwid29ya2Zsb3dfaWQiOiJqb3VybmV5LXN0YXktajAwMDEifQ=="
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "120s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "105",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 4.0,
+          "maximumInterval": "16s",
+          "maximumAttempts": 4
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "108",
+      "eventTime": "2026-10-11T00:56:18.017Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "107",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "109",
+      "eventTime": "2026-10-11T00:56:19.344Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJfYXR0ZW1wdCI6MSwiYWRtaXR0ZWRfYXQiOiIyMDI2LTEwLTA5VDEwOjIwOjAwLTA0OjAwIiwiYXNfb2YiOiIyMDI2LTEwLTA5VDEwOjA3OjAwLTA0OjAwIiwiYmVkX2lkIjoiU1VSRy0xMC1CIiwiZWRfdmlzaXQiOiJlZC1qMDAwMSIsInBhdGllbnRfaWQiOiJwYXQtajAwMDEiLCJ1bml0X2lkIjoiU1VSRyJ9"
+            }
+          ]
+        },
+        "scheduledEventId": "107",
+        "startedEventId": "108",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "110",
+      "eventTime": "2026-10-11T00:56:19.344Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "111",
+      "eventTime": "2026-10-11T00:56:19.344Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "110",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "50703"
+      }
+    },
+    {
+      "eventId": "112",
+      "eventTime": "2026-10-11T00:56:19.661Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "110",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "113",
+      "eventTime": "2026-10-11T00:56:19.661Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "15",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOiJiZWRBc3NpZ25tZW50IiwiaWQiOiJqb3VybmV5LXN0YXktajAwMDEiLCJtZXRhIjp7ImFkbWl0dGVkX2F0IjoiMjAyNi0xMC0wOVQxMDoyMDowMC0wNDowMCIsImJlZF9pZCI6IlNVUkctMTAtQiIsImVkX3Zpc2l0IjoiZWQtajAwMDEiLCJlbmNvdW50ZXJfaWQiOiJzdGF5LWowMDAxIiwicGF0aWVudF9pZCI6InBhdC1qMDAwMSIsInN0YXJ0ZWRfYnkiOiJ1c2VyOlUtQ0xFUi0wMSIsInN0YXJ0ZWRfaW4iOiJFRCIsInVuaXRfaWQiOiJTVVJHIn0sIm5vdGVzIjpbXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTUrMDA6MDAiLCJzdGF0dXMiOiJydW5uaW5nIiwic3RlcHMiOlt7ImF0dGVtcHRzIjoxLCJkZXRhaWwiOiJDb25maXJtZWQgYnkgdGhlIG51cnNlIiwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU4KzAwOjAwIiwia2V5IjoidHJpYWdlQXNzaXN0Iiwia2luZCI6ImF1dG8iLCJsYWJlbCI6IlRyaWFnZSBhc3Npc3QiLCJvd25lciI6Im51cnNlIiwicmVmcyI6WyJUYXNrL3Rhc2stMDAwMDEiXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTUrMDA6MDAiLCJzdGF0dXMiOiJkb25lIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjEsImRldGFpbCI6IkNvbmZpcm1lZCBieSB0aGUgcGh5c2ljaWFuIiwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjAyKzAwOjAwIiwia2V5IjoiaW1hZ2luZ09yZGVycyIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJJbWFnaW5nIG9yZGVycyAodXJnZW5jeSBhbmQgcHJvdG9jb2wpIiwib3duZXIiOiJwaHlzaWNpYW4iLCJyZWZzIjpbIlRhc2svdGFzay0wMDAwMiJdLCJzdGFydGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1OCswMDowMCIsInN0YXR1cyI6ImRvbmUiLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MSwiZGV0YWlsIjoiQ29uZmlybWVkIGJ5IHRoZSBwaHlzaWNpYW4iLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTY6MDYrMDA6MDAiLCJrZXkiOiJjcml0aWNhbFZhbHVlIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkNyaXRpY2FsIHZhbHVlIChJTlIpIiwib3duZXIiOiJwaHlzaWNpYW4iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTY6MDIrMDA6MDAiLCJzdGF0dXMiOiJkb25lIiwic3R1YiI6IjguMSByb2FkbWFwIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MSwiZGV0YWlsIjoiQm9hcmRpbmcgaW4gdGhlIEVEIHVudGlsIGEgYmVkIGlzIGZyZWUgKHRoZSBiZWQgbWFuYWdlciBkZWNpZGVzIGluIHRoZSBDb250cm9sIFRvd2VyKSIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJiZWRBc3NpZ25tZW50Iiwia2luZCI6ImF1dG8iLCJsYWJlbCI6IkJlZCBhc3NpZ25tZW50Iiwib3duZXIiOiJvcGVyYXRpb25zX21hbmFnZXIiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTY6MDYrMDA6MDAiLCJzdGF0dXMiOiJydW5uaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6Im9yZGVyUmV2aWV3Iiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6Ik9yZGVyIHJldmlldyIsIm93bmVyIjoicGhhcm1hY2lzdCIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6Im1lZFJlY0FkbWlzc2lvbiIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJBZG1pc3Npb24gbWVkaWNhdGlvbiByZWNvbmNpbGlhdGlvbiIsIm93bmVyIjoicGhhcm1hY2lzdCIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6InByZWRpY3REdXJhdGlvbiIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJTdXJnaWNhbCBkdXJhdGlvbiBwcmVkaWN0aW9uIiwib3duZXIiOiJvcGVyYXRpb25zX21hbmFnZXIiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJwcm9wb3NlU2NoZWR1bGUiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiT1IgYm9va2luZyBjaGVjayIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoid2FyZE1vbml0b3JpbmciLCJraW5kIjoid2FpdCIsImxhYmVsIjoiV2FyZCBtb25pdG9yaW5nIChORVdTMikiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAgKE5FV1MyIHN0dWIpIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZHJhZnREaXNjaGFyZ2VTdW1tYXJ5Iiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkRpc2NoYXJnZSBzdW1tYXJ5Iiwib3duZXIiOiJwaHlzaWNpYW4iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJkcmFmdFBhdGllbnRJbnN0cnVjdGlvbnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiUGF0aWVudCBpbnN0cnVjdGlvbnMiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZm9sbG93dXBEZWxheSIsImtpbmQiOiJ0aW1lciIsImxhYmVsIjoiNDggaG91cnMgYWZ0ZXIgZGlzY2hhcmdlIiwib3duZXIiOiJzeXN0ZW0iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJzY2hlZHVsZUZvbGxvd3VwQ2FsbCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJGb2xsb3ctdXAgY2FsbCBzY2hlZHVsZWQiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiY29kaW5nU3R1YiIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJDb2Rpbmcgc3VnZ2VzdGlvbiIsIm93bmVyIjoiY2xlcmsiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9XSwidGVtcG9yYWxfcnVuX2lkIjoiZTZkMjhjOGUtMGM4Yy00Y2VhLWE5YjMtNDhiY2RlMjVjYTg1IiwidXBkYXRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTY6MTkrMDA6MDAiLCJ2ZXJzaW9uIjoxMSwid29ya2Zsb3dfdHlwZSI6IklucGF0aWVudEpvdXJuZXlXb3JrZmxvdyJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "111",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "114",
+      "eventTime": "2026-10-11T00:56:19.661Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "113",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "115",
+      "eventTime": "2026-10-11T00:56:19.945Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "113",
+        "startedEventId": "114",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "116",
+      "eventTime": "2026-10-11T00:56:19.945Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "117",
+      "eventTime": "2026-10-11T00:56:19.945Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "116",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "55461"
+      }
+    },
+    {
+      "eventId": "118",
+      "eventTime": "2026-10-11T00:56:20.201Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "116",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "119",
+      "eventTime": "2026-10-11T00:56:20.201Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "16",
+        "activityType": {
+          "name": "journey.bedAssignment"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJhZG1pdHRlZF9hdCI6IjIwMjYtMTAtMDlUMTA6MjA6MDAtMDQ6MDAiLCJhc19vZiI6IjIwMjYtMTAtMDlUMTA6MDc6MDAtMDQ6MDAiLCJlZF92aXNpdCI6ImVkLWowMDAxIiwiZW5jb3VudGVyX2lkIjoic3RheS1qMDAwMSIsInBhdGllbnRfaWQiOiJwYXQtajAwMDEiLCJ3b3JrZmxvd19pZCI6ImpvdXJuZXktc3RheS1qMDAwMSJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "120s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "117",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 4.0,
+          "maximumInterval": "16s",
+          "maximumAttempts": 4
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "120",
+      "eventTime": "2026-10-11T00:56:20.201Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "119",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "121",
+      "eventTime": "2026-10-11T00:56:20.512Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJfYXR0ZW1wdCI6MSwiZGV0YWlsIjoiQmVkIFNVUkctMTAtQiBvbiBTdXJnZXJ5IHNpbmNlIEZyaSAxMDowMSAoYXNzaWduZWQgYnkgdGhlIEVIUiBhdCBhZG1pc3Npb24pIiwicmVmcyI6WyJMb2NhdGlvbi9TVVJHLTEwLUIiXX0="
+            }
+          ]
+        },
+        "scheduledEventId": "119",
+        "startedEventId": "120",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "122",
+      "eventTime": "2026-10-11T00:56:20.512Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "123",
+      "eventTime": "2026-10-11T00:56:20.512Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "122",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "56254"
+      }
+    },
+    {
+      "eventId": "124",
+      "eventTime": "2026-10-11T00:56:20.983Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "122",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "125",
+      "eventTime": "2026-10-11T00:56:20.983Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "17",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOm51bGwsImlkIjoiam91cm5leS1zdGF5LWowMDAxIiwibWV0YSI6eyJhZG1pdHRlZF9hdCI6IjIwMjYtMTAtMDlUMTA6MjA6MDAtMDQ6MDAiLCJiZWRfaWQiOiJTVVJHLTEwLUIiLCJlZF92aXNpdCI6ImVkLWowMDAxIiwiZW5jb3VudGVyX2lkIjoic3RheS1qMDAwMSIsInBhdGllbnRfaWQiOiJwYXQtajAwMDEiLCJzdGFydGVkX2J5IjoidXNlcjpVLUNMRVItMDEiLCJzdGFydGVkX2luIjoiRUQiLCJ1bml0X2lkIjoiU1VSRyJ9LCJub3RlcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoicnVubmluZyIsInN0ZXBzIjpbeyJhdHRlbXB0cyI6MSwiZGV0YWlsIjoiQ29uZmlybWVkIGJ5IHRoZSBudXJzZSIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1OCswMDowMCIsImtleSI6InRyaWFnZUFzc2lzdCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJUcmlhZ2UgYXNzaXN0Iiwib3duZXIiOiJudXJzZSIsInJlZnMiOlsiVGFzay90YXNrLTAwMDAxIl0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjoxLCJkZXRhaWwiOiJDb25maXJtZWQgYnkgdGhlIHBoeXNpY2lhbiIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NjowMiswMDowMCIsImtleSI6ImltYWdpbmdPcmRlcnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiSW1hZ2luZyBvcmRlcnMgKHVyZ2VuY3kgYW5kIHByb3RvY29sKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6WyJUYXNrL3Rhc2stMDAwMDIiXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTgrMDA6MDAiLCJzdGF0dXMiOiJkb25lIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjEsImRldGFpbCI6IkNvbmZpcm1lZCBieSB0aGUgcGh5c2ljaWFuIiwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjA2KzAwOjAwIiwia2V5IjoiY3JpdGljYWxWYWx1ZSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJDcml0aWNhbCB2YWx1ZSAoSU5SKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjAyKzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjEsImRldGFpbCI6IkJlZCBTVVJHLTEwLUIgb24gU3VyZ2VyeSBzaW5jZSBGcmkgMTA6MDEgKGFzc2lnbmVkIGJ5IHRoZSBFSFIgYXQgYWRtaXNzaW9uKSIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NjoyMCswMDowMCIsImtleSI6ImJlZEFzc2lnbm1lbnQiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiQmVkIGFzc2lnbm1lbnQiLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOlsiTG9jYXRpb24vU1VSRy0xMC1CIl0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjA2KzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJvcmRlclJldmlldyIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJPcmRlciByZXZpZXciLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJtZWRSZWNBZG1pc3Npb24iLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiQWRtaXNzaW9uIG1lZGljYXRpb24gcmVjb25jaWxpYXRpb24iLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJwcmVkaWN0RHVyYXRpb24iLCJraW5kIjoiYXV0byIsImxhYmVsIjoiU3VyZ2ljYWwgZHVyYXRpb24gcHJlZGljdGlvbiIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoicHJvcG9zZVNjaGVkdWxlIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6Ik9SIGJvb2tpbmcgY2hlY2siLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6IndhcmRNb25pdG9yaW5nIiwia2luZCI6IndhaXQiLCJsYWJlbCI6IldhcmQgbW9uaXRvcmluZyAoTkVXUzIpIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IjguMSByb2FkbWFwIChORVdTMiBzdHViKSIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImRyYWZ0RGlzY2hhcmdlU3VtbWFyeSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJEaXNjaGFyZ2Ugc3VtbWFyeSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZHJhZnRQYXRpZW50SW5zdHJ1Y3Rpb25zIiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IlBhdGllbnQgaW5zdHJ1Y3Rpb25zIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImZvbGxvd3VwRGVsYXkiLCJraW5kIjoidGltZXIiLCJsYWJlbCI6IjQ4IGhvdXJzIGFmdGVyIGRpc2NoYXJnZSIsIm93bmVyIjoic3lzdGVtIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoic2NoZWR1bGVGb2xsb3d1cENhbGwiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiRm9sbG93LXVwIGNhbGwgc2NoZWR1bGVkIiwib3duZXIiOiJudXJzZSIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6ImNvZGluZ1N0dWIiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiQ29kaW5nIHN1Z2dlc3Rpb24iLCJvd25lciI6ImNsZXJrIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfV0sInRlbXBvcmFsX3J1bl9pZCI6ImU2ZDI4YzhlLTBjOGMtNGNlYS1hOWIzLTQ4YmNkZTI1Y2E4NSIsInVwZGF0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjIwKzAwOjAwIiwidmVyc2lvbiI6MTIsIndvcmtmbG93X3R5cGUiOiJJbnBhdGllbnRKb3VybmV5V29ya2Zsb3cifQ=="
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "123",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "126",
+      "eventTime": "2026-10-11T00:56:20.983Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "125",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "127",
+      "eventTime": "2026-10-11T00:56:21.345Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "125",
+        "startedEventId": "126",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "128",
+      "eventTime": "2026-10-11T00:56:21.345Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "129",
+      "eventTime": "2026-10-11T00:56:21.345Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "128",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "61032"
+      }
+    },
+    {
+      "eventId": "130",
+      "eventTime": "2026-10-11T00:56:22.112Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "128",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "131",
+      "eventTime": "2026-10-11T00:56:22.112Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "18",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOiJvcmRlclJldmlldyIsImlkIjoiam91cm5leS1zdGF5LWowMDAxIiwibWV0YSI6eyJhZG1pdHRlZF9hdCI6IjIwMjYtMTAtMDlUMTA6MjA6MDAtMDQ6MDAiLCJiZWRfaWQiOiJTVVJHLTEwLUIiLCJlZF92aXNpdCI6ImVkLWowMDAxIiwiZW5jb3VudGVyX2lkIjoic3RheS1qMDAwMSIsInBhdGllbnRfaWQiOiJwYXQtajAwMDEiLCJzdGFydGVkX2J5IjoidXNlcjpVLUNMRVItMDEiLCJzdGFydGVkX2luIjoiRUQiLCJ1bml0X2lkIjoiU1VSRyJ9LCJub3RlcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoicnVubmluZyIsInN0ZXBzIjpbeyJhdHRlbXB0cyI6MSwiZGV0YWlsIjoiQ29uZmlybWVkIGJ5IHRoZSBudXJzZSIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1OCswMDowMCIsImtleSI6InRyaWFnZUFzc2lzdCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJUcmlhZ2UgYXNzaXN0Iiwib3duZXIiOiJudXJzZSIsInJlZnMiOlsiVGFzay90YXNrLTAwMDAxIl0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjoxLCJkZXRhaWwiOiJDb25maXJtZWQgYnkgdGhlIHBoeXNpY2lhbiIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NjowMiswMDowMCIsImtleSI6ImltYWdpbmdPcmRlcnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiSW1hZ2luZyBvcmRlcnMgKHVyZ2VuY3kgYW5kIHByb3RvY29sKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6WyJUYXNrL3Rhc2stMDAwMDIiXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTgrMDA6MDAiLCJzdGF0dXMiOiJkb25lIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjEsImRldGFpbCI6IkNvbmZpcm1lZCBieSB0aGUgcGh5c2ljaWFuIiwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjA2KzAwOjAwIiwia2V5IjoiY3JpdGljYWxWYWx1ZSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJDcml0aWNhbCB2YWx1ZSAoSU5SKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjAyKzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjEsImRldGFpbCI6IkJlZCBTVVJHLTEwLUIgb24gU3VyZ2VyeSBzaW5jZSBGcmkgMTA6MDEgKGFzc2lnbmVkIGJ5IHRoZSBFSFIgYXQgYWRtaXNzaW9uKSIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NjoyMCswMDowMCIsImtleSI6ImJlZEFzc2lnbm1lbnQiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiQmVkIGFzc2lnbm1lbnQiLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOlsiTG9jYXRpb24vU1VSRy0xMC1CIl0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjA2KzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJvcmRlclJldmlldyIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJPcmRlciByZXZpZXciLCJvd25lciI6InBoYXJtYWNpc3QiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTY6MjErMDA6MDAiLCJzdGF0dXMiOiJydW5uaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6Im1lZFJlY0FkbWlzc2lvbiIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJBZG1pc3Npb24gbWVkaWNhdGlvbiByZWNvbmNpbGlhdGlvbiIsIm93bmVyIjoicGhhcm1hY2lzdCIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6InByZWRpY3REdXJhdGlvbiIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJTdXJnaWNhbCBkdXJhdGlvbiBwcmVkaWN0aW9uIiwib3duZXIiOiJvcGVyYXRpb25zX21hbmFnZXIiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJwcm9wb3NlU2NoZWR1bGUiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiT1IgYm9va2luZyBjaGVjayIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoid2FyZE1vbml0b3JpbmciLCJraW5kIjoid2FpdCIsImxhYmVsIjoiV2FyZCBtb25pdG9yaW5nIChORVdTMikiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAgKE5FV1MyIHN0dWIpIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZHJhZnREaXNjaGFyZ2VTdW1tYXJ5Iiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkRpc2NoYXJnZSBzdW1tYXJ5Iiwib3duZXIiOiJwaHlzaWNpYW4iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJkcmFmdFBhdGllbnRJbnN0cnVjdGlvbnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiUGF0aWVudCBpbnN0cnVjdGlvbnMiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZm9sbG93dXBEZWxheSIsImtpbmQiOiJ0aW1lciIsImxhYmVsIjoiNDggaG91cnMgYWZ0ZXIgZGlzY2hhcmdlIiwib3duZXIiOiJzeXN0ZW0iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJzY2hlZHVsZUZvbGxvd3VwQ2FsbCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJGb2xsb3ctdXAgY2FsbCBzY2hlZHVsZWQiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiY29kaW5nU3R1YiIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJDb2Rpbmcgc3VnZ2VzdGlvbiIsIm93bmVyIjoiY2xlcmsiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9XSwidGVtcG9yYWxfcnVuX2lkIjoiZTZkMjhjOGUtMGM4Yy00Y2VhLWE5YjMtNDhiY2RlMjVjYTg1IiwidXBkYXRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTY6MjErMDA6MDAiLCJ2ZXJzaW9uIjoxMywid29ya2Zsb3dfdHlwZSI6IklucGF0aWVudEpvdXJuZXlXb3JrZmxvdyJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "129",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "132",
+      "eventTime": "2026-10-11T00:56:22.112Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "131",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "133",
+      "eventTime": "2026-10-11T00:56:22.644Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "131",
+        "startedEventId": "132",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "134",
+      "eventTime": "2026-10-11T00:56:22.644Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "135",
+      "eventTime": "2026-10-11T00:56:22.644Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "134",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "65850"
+      }
+    },
+    {
+      "eventId": "136",
+      "eventTime": "2026-10-11T00:56:23.111Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "134",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "137",
+      "eventTime": "2026-10-11T00:56:23.111Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "19",
+        "activityType": {
+          "name": "journey.orderReview"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJhZG1pdHRlZF9hdCI6IjIwMjYtMTAtMDlUMTA6MjA6MDAtMDQ6MDAiLCJhc19vZiI6IjIwMjYtMTAtMDlUMTA6MDc6MDAtMDQ6MDAiLCJlZF92aXNpdCI6ImVkLWowMDAxIiwiZW5jb3VudGVyX2lkIjoic3RheS1qMDAwMSIsInBhdGllbnRfaWQiOiJwYXQtajAwMDEiLCJ3b3JrZmxvd19pZCI6ImpvdXJuZXktc3RheS1qMDAwMSJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "120s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "135",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 4.0,
+          "maximumInterval": "16s",
+          "maximumAttempts": 4
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "138",
+      "eventTime": "2026-10-11T00:56:23.111Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "137",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "139",
+      "eventTime": "2026-10-11T00:56:26.217Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJfYXR0ZW1wdCI6MSwiZGV0YWlsIjoiMCBvcmRlcnMgcmV2aWV3ZWQgYnkgdGhlIHJ1bGVzLCAwIGZsYWdnZWQ7IHRoZSBwaGFybWFjaXN0IHNpZ25zIG9mZiBpbiBNZWRpY2F0aW9uIHNhZmV0eSIsInJlZnMiOlsiVGFzay90YXNrLTAwMDA0Il0sInNpZ25lciI6InBoYXJtYWNpc3QiLCJ3YWl0X2ZvciI6WyJUYXNrL3Rhc2stMDAwMDQiXX0="
+            }
+          ]
+        },
+        "scheduledEventId": "137",
+        "startedEventId": "138",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "140",
+      "eventTime": "2026-10-11T00:56:26.217Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "141",
+      "eventTime": "2026-10-11T00:56:26.217Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "140",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "66714"
+      }
+    },
+    {
+      "eventId": "142",
+      "eventTime": "2026-10-11T00:56:26.653Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "140",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "binaryChecksum": "f92d49a6fadb49499b4a3adaff6f81d6",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "143",
+      "eventTime": "2026-10-11T00:56:26.653Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "20",
+        "activityType": {
+          "name": "workflows.recordProgress"
+        },
+        "taskQueue": {
+          "name": "hospital-workflows-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJjdXJyZW50X3N0ZXAiOiJvcmRlclJldmlldyIsImlkIjoiam91cm5leS1zdGF5LWowMDAxIiwibWV0YSI6eyJhZG1pdHRlZF9hdCI6IjIwMjYtMTAtMDlUMTA6MjA6MDAtMDQ6MDAiLCJiZWRfaWQiOiJTVVJHLTEwLUIiLCJlZF92aXNpdCI6ImVkLWowMDAxIiwiZW5jb3VudGVyX2lkIjoic3RheS1qMDAwMSIsInBhdGllbnRfaWQiOiJwYXQtajAwMDEiLCJzdGFydGVkX2J5IjoidXNlcjpVLUNMRVItMDEiLCJzdGFydGVkX2luIjoiRUQiLCJ1bml0X2lkIjoiU1VSRyJ9LCJub3RlcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoicnVubmluZyIsInN0ZXBzIjpbeyJhdHRlbXB0cyI6MSwiZGV0YWlsIjoiQ29uZmlybWVkIGJ5IHRoZSBudXJzZSIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NTo1OCswMDowMCIsImtleSI6InRyaWFnZUFzc2lzdCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJUcmlhZ2UgYXNzaXN0Iiwib3duZXIiOiJudXJzZSIsInJlZnMiOlsiVGFzay90YXNrLTAwMDAxIl0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU1OjU1KzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjoxLCJkZXRhaWwiOiJDb25maXJtZWQgYnkgdGhlIHBoeXNpY2lhbiIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NjowMiswMDowMCIsImtleSI6ImltYWdpbmdPcmRlcnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiSW1hZ2luZyBvcmRlcnMgKHVyZ2VuY3kgYW5kIHByb3RvY29sKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6WyJUYXNrL3Rhc2stMDAwMDIiXSwic3RhcnRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTU6NTgrMDA6MDAiLCJzdGF0dXMiOiJkb25lIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjEsImRldGFpbCI6IkNvbmZpcm1lZCBieSB0aGUgcGh5c2ljaWFuIiwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjA2KzAwOjAwIiwia2V5IjoiY3JpdGljYWxWYWx1ZSIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJDcml0aWNhbCB2YWx1ZSAoSU5SKSIsIm93bmVyIjoicGh5c2ljaWFuIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjAyKzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjEsImRldGFpbCI6IkJlZCBTVVJHLTEwLUIgb24gU3VyZ2VyeSBzaW5jZSBGcmkgMTA6MDEgKGFzc2lnbmVkIGJ5IHRoZSBFSFIgYXQgYWRtaXNzaW9uKSIsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjoiMjAyNi0xMC0xMVQwMDo1NjoyMCswMDowMCIsImtleSI6ImJlZEFzc2lnbm1lbnQiLCJraW5kIjoiYXV0byIsImxhYmVsIjoiQmVkIGFzc2lnbm1lbnQiLCJvd25lciI6Im9wZXJhdGlvbnNfbWFuYWdlciIsInJlZnMiOlsiTG9jYXRpb24vU1VSRy0xMC1CIl0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjA2KzAwOjAwIiwic3RhdHVzIjoiZG9uZSIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjoxLCJkZXRhaWwiOiIwIG9yZGVycyByZXZpZXdlZCBieSB0aGUgcnVsZXMsIDAgZmxhZ2dlZDsgdGhlIHBoYXJtYWNpc3Qgc2lnbnMgb2ZmIGluIE1lZGljYXRpb24gc2FmZXR5IiwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6Im9yZGVyUmV2aWV3Iiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6Ik9yZGVyIHJldmlldyIsIm93bmVyIjoicGhhcm1hY2lzdCIsInJlZnMiOlsiVGFzay90YXNrLTAwMDA0Il0sInN0YXJ0ZWRfYXQiOiIyMDI2LTEwLTExVDAwOjU2OjIxKzAwOjAwIiwic3RhdHVzIjoid2FpdGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjp7InJlZnMiOlsiVGFzay90YXNrLTAwMDA0Il0sInJvbGUiOiJwaGFybWFjaXN0In19LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6Im1lZFJlY0FkbWlzc2lvbiIsImtpbmQiOiJzaWdub2ZmIiwibGFiZWwiOiJBZG1pc3Npb24gbWVkaWNhdGlvbiByZWNvbmNpbGlhdGlvbiIsIm93bmVyIjoicGhhcm1hY2lzdCIsInJlZnMiOltdLCJzdGFydGVkX2F0IjpudWxsLCJzdGF0dXMiOiJwZW5kaW5nIiwic3R1YiI6IiIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9LHsiYXR0ZW1wdHMiOjAsImRldGFpbCI6bnVsbCwiZXNjYWxhdGlvbiI6MCwiZmluaXNoZWRfYXQiOm51bGwsImtleSI6InByZWRpY3REdXJhdGlvbiIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJTdXJnaWNhbCBkdXJhdGlvbiBwcmVkaWN0aW9uIiwib3duZXIiOiJvcGVyYXRpb25zX21hbmFnZXIiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJwcm9wb3NlU2NoZWR1bGUiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiT1IgYm9va2luZyBjaGVjayIsIm93bmVyIjoib3BlcmF0aW9uc19tYW5hZ2VyIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5Ijoid2FyZE1vbml0b3JpbmciLCJraW5kIjoid2FpdCIsImxhYmVsIjoiV2FyZCBtb25pdG9yaW5nIChORVdTMikiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiOC4xIHJvYWRtYXAgKE5FV1MyIHN0dWIpIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZHJhZnREaXNjaGFyZ2VTdW1tYXJ5Iiwia2luZCI6InNpZ25vZmYiLCJsYWJlbCI6IkRpc2NoYXJnZSBzdW1tYXJ5Iiwib3duZXIiOiJwaHlzaWNpYW4iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJkcmFmdFBhdGllbnRJbnN0cnVjdGlvbnMiLCJraW5kIjoic2lnbm9mZiIsImxhYmVsIjoiUGF0aWVudCBpbnN0cnVjdGlvbnMiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiZm9sbG93dXBEZWxheSIsImtpbmQiOiJ0aW1lciIsImxhYmVsIjoiNDggaG91cnMgYWZ0ZXIgZGlzY2hhcmdlIiwib3duZXIiOiJzeXN0ZW0iLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiIiLCJ0YXNrcyI6W10sIndhaXRpbmdfZm9yIjpudWxsfSx7ImF0dGVtcHRzIjowLCJkZXRhaWwiOm51bGwsImVzY2FsYXRpb24iOjAsImZpbmlzaGVkX2F0IjpudWxsLCJrZXkiOiJzY2hlZHVsZUZvbGxvd3VwQ2FsbCIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJGb2xsb3ctdXAgY2FsbCBzY2hlZHVsZWQiLCJvd25lciI6Im51cnNlIiwicmVmcyI6W10sInN0YXJ0ZWRfYXQiOm51bGwsInN0YXR1cyI6InBlbmRpbmciLCJzdHViIjoiIiwidGFza3MiOltdLCJ3YWl0aW5nX2ZvciI6bnVsbH0seyJhdHRlbXB0cyI6MCwiZGV0YWlsIjpudWxsLCJlc2NhbGF0aW9uIjowLCJmaW5pc2hlZF9hdCI6bnVsbCwia2V5IjoiY29kaW5nU3R1YiIsImtpbmQiOiJhdXRvIiwibGFiZWwiOiJDb2Rpbmcgc3VnZ2VzdGlvbiIsIm93bmVyIjoiY2xlcmsiLCJyZWZzIjpbXSwic3RhcnRlZF9hdCI6bnVsbCwic3RhdHVzIjoicGVuZGluZyIsInN0dWIiOiI4LjEgcm9hZG1hcCIsInRhc2tzIjpbXSwid2FpdGluZ19mb3IiOm51bGx9XSwidGVtcG9yYWxfcnVuX2lkIjoiZTZkMjhjOGUtMGM4Yy00Y2VhLWE5YjMtNDhiY2RlMjVjYTg1IiwidXBkYXRlZF9hdCI6IjIwMjYtMTAtMTFUMDA6NTY6MjYrMDA6MDAiLCJ2ZXJzaW9uIjoxNCwid29ya2Zsb3dfdHlwZSI6IklucGF0aWVudEpvdXJuZXlXb3JrZmxvdyJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "30s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "141",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "10s"
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "144",
+      "eventTime": "2026-10-11T00:56:26.653Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "143",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "145",
+      "eventTime": "2026-10-11T00:56:27.003Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        },
+        "scheduledEventId": "143",
+        "startedEventId": "144",
+        "identity": "22024@LAPTOP-97RSS2RI"
+      }
+    },
+    {
+      "eventId": "146",
+      "eventTime": "2026-10-11T00:56:27.003Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "hospital-workflows-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "147",
+      "eventTime": "2026-10-11T00:56:27.003Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "146",
+        "identity": "22024@LAPTOP-97RSS2RI",
+        "historySizeBytes": "71679"
+      }
+    }
+  ]
+}

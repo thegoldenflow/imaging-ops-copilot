@@ -45,6 +45,7 @@ import { BreakGlassReviewPage } from "./features/hospital/BreakGlassReviewPage";
 import { PatientChartPage } from "./features/hospital/PatientChartPage";
 import { PatientsPage } from "./features/hospital/PatientsPage";
 import { HomePage } from "./features/home/HomePage";
+import { StorylinePage } from "./features/storyline/StorylinePage";
 import { PreRegPage } from "./features/patient/PreRegPage";
 import { ReferrerPage } from "./features/referrer/ReferrerPage";
 import { ReadingRoomPage } from "./features/reports/ReadingRoomPage";
@@ -86,6 +87,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/feedback/:token" element={<FeedbackSurveyPage />} />
             <Route element={<RequireAuth><Layout /></RequireAuth>}>
               <Route index element={<HomePage />} />
+              <Route path="/storyline" element={<Guard path="/storyline"><StorylinePage /></Guard>} />
               <Route path="/scheduling" element={<Guard path="/scheduling"><SchedulingPage /></Guard>} />
               <Route path="/front-desk" element={<Guard path="/front-desk"><FrontDeskPage /></Guard>} />
               <Route path="/reading" element={<Guard path="/reading"><ReadingRoomPage /></Guard>} />

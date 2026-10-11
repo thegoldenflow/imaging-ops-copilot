@@ -5,6 +5,7 @@ Domain events in, workflow starts and signals out:
 | Domain event              | Condition                         | Command                                                |
 | ------------------------- | --------------------------------- | ------------------------------------------------------ |
 | patient.admitted          | inpatient stay (class IMP)        | start InpatientJourneyWorkflow `journey-<encounter>`   |
+|                           | a journey from the ED waits (WP9) | and signal it: admitted                                |
 | patient.discharged        | inpatient stay                    | signal the journey: discharged                         |
 | flag.raised               | code news2                        | signal the journey: news2                              |
 | document.signed           | a workflow waits for the document | signal that workflow: signed (final or a co-signature) |
@@ -97,8 +98,13 @@ def commands_for(event: DomainEvent) -> list[dict]:
     """The starts and signals one domain event means (see the table above)."""
     a, t = event.attrs, event.type
     if t == "patient.admitted" and a.get("encounter_class") == "IMP" and event.encounter:
-        return [_start(event, M.JOURNEY, M.journey_id(event.encounter),
-                       {"encounter_id": event.encounter, "patient_id": event.patient})]
+        out = [_start(event, M.JOURNEY, M.journey_id(event.encounter),
+                      {"encounter_id": event.encounter, "patient_id": event.patient})]
+        wait = waiting_for(f"Encounter/{event.encounter}")  # a journey that started in the ED waits for this
+        if wait is not None:
+            out.append(_signal(event, wait["workflow_id"], {"kind": "admitted", "ref": f"Encounter/{event.encounter}",
+                                                            "step": wait["step"]}))
+        return out
     if t == "patient.discharged" and a.get("encounter_class") == "IMP" and event.encounter:
         return [_signal(event, M.journey_id(event.encounter),
                         {"kind": "discharged", "ref": f"Encounter/{event.encounter}"})]
@@ -146,13 +152,18 @@ def control(workflow_id: str, step: str, action: str, by: str, role: str, event_
                          "at": datetime.now().isoformat(timespec="seconds")}})
 
 
-def start_journey(encounter_id: str, patient_id: str | None, by: str, event_id: str, timer_values: dict | None = None) -> str:
-    """Start a journey for an inpatient admitted before the bridge was on (from the workflow view)."""
+def start_journey(encounter_id: str, patient_id: str | None, by: str, event_id: str, timer_values: dict | None = None,
+                  *, ed_visit: str | None = None) -> str:
+    """Start a journey for an inpatient admitted before the bridge was on (from the workflow view), or, with
+    `ed_visit`, a journey that starts in the ED for a planned stay (WP9: the storyline registers its patient's
+    arrival; the journey waits for the admission, which the bridge signals as `admitted`)."""
     workflow_id = M.journey_id(encounter_id)
+    payload = {"encounter_id": encounter_id, "patient_id": patient_id,
+               "timers": {**timers(), **(timer_values or {})}, "started_by": by}
+    if ed_visit:
+        payload["ed_visit"] = ed_visit
     enqueue({"id": f"{event_id}:start:{workflow_id}", "kind": "start", "workflow_id": workflow_id,
-             "workflow_type": M.JOURNEY, "signal": None,
-             "payload": {"encounter_id": encounter_id, "patient_id": patient_id,
-                         "timers": {**timers(), **(timer_values or {})}, "started_by": by}})
+             "workflow_type": M.JOURNEY, "signal": None, "payload": payload})
     return workflow_id
 
 

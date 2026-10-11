@@ -85,6 +85,26 @@ class Recognised:
     emergency: bool = False
 
 
+# A caller announcing an arrival at the ED (WP9, spec 8.2 step 1): a registration matter, handled by rule like the
+# emergency and transfer rules (the model's intents are unchanged); the clerk confirms the registration.
+ARRIVAL = _rx(r"\b(ambulance|paramedics?|on (her|his|their|my) way to (the |your )?(emergency|er|ed|hospital)|"
+              r"(bringing|taking|brought) (her|him|them|me) (in|to (the |your )?(emergency|er|ed|hospital)))\b|救护车|"
+              r"救護車|(送|来|到|去|進|进)(你们|你們)?(的)?(医院|醫院)?(急诊|急診)|在(急诊|急診)")
+ARRIVAL_COMPLAINTS = [("fall", _rx(r"\b(fell|fall|fallen|slipped|tripped)\b|摔|跌")),
+                      ("chest pain", _rx(r"\bchest pain\b|胸痛|胸口痛")),
+                      ("shortness of breath", _rx(r"\b(short of breath|can'?t breathe|breathless)\b|喘不过气|呼吸困难"))]
+
+
+def arrival(text: str) -> dict | None:
+    """What a caller says about an ED arrival: the complaint and how the patient comes (None: no arrival)."""
+    t = text or ""
+    if not ARRIVAL.search(t):
+        return None
+    complaint = next((name for name, rx in ARRIVAL_COMPLAINTS if rx.search(t)), "injury")
+    mode = "ambulance" if re.search(r"ambulance|paramedic|救护车|救護車", t, re.I) else "walk-in"
+    return {"complaint": complaint, "mode": mode}
+
+
 def emergency(text: str) -> bool:
     return bool(EMERGENCY.search(text or "")) or any(h.emergency for h in redflags.scan(text or ""))
 

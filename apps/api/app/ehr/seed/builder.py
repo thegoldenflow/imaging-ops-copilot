@@ -235,7 +235,7 @@ class Builder:
                         category: str, status: str = "active", intent: str = "order", priority: str = "routine",
                         occurrence: datetime | None = None, requester: str | None = None,
                         location: str | None = None, reason: str | None = None, note: str | None = None,
-                        rid: str | None = None) -> dict:
+                        detail: str | None = None, rid: str | None = None) -> dict:
         resource: dict = {
             "resourceType": "ServiceRequest", "id": rid or self.next_id("sr"), "status": status, "intent": intent,
             "priority": priority, "category": [C.concept(C.LOCAL, category, category)], "code": code,
@@ -253,6 +253,8 @@ class Builder:
             resource["reasonCode"] = [C.snomed(reason)]
         if note:
             resource["note"] = [{"text": note}]
+        if detail:
+            resource["orderDetail"] = [{"text": detail}]
         return self.add(resource)
 
     def diagnostic_report(self, pid: str, enc: str | None, code: dict, when: datetime, *, conclusion: str,

@@ -146,6 +146,10 @@ def test_a_medicine_from_a_note_is_blocked_until_removed(fresh_state):
     assert not red(edited) and edited["can_sign"] and edited["sign_block"] is None
     assert edited["edits"] and edited["raw_validation"]["issues"]  # the raw hallucination stays on record
     assert service.sign(store, physician, view["id"])["doc_status"] == "final"
+    # WP9: the journey gets to its step after the edited summary was signed: it does not draft again (the draft
+    # tool refuses a final document), it records the signature
+    done = journey.discharge_summary_step(store, stay)
+    assert not done.refused and done.wait_for == [] and "already signed final" in done.detail
 
 
 def test_nurse_cannot_sign_a_summary_and_other_units_are_refused(fresh_state, client, login):

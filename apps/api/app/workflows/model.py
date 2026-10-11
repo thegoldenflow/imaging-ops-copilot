@@ -70,6 +70,7 @@ class JourneyInput:
     patient_id: str | None = None
     timers: Timers = field(default_factory=Timers)
     started_by: str = ""  # the domain event id, or "user:<id>" for a start from the workflow view
+    ed_visit: str | None = None  # WP9: the journey starts in the ED (the planned stay does not exist yet)
 
 
 @dataclass
@@ -99,12 +100,15 @@ class StepDef:
 
 JOURNEY_STEPS = (
     StepDef("triageAssist", "Triage assist", "nurse", "auto"),
+    # WP9: the two ED steps of a journey that starts in the ED (8.2 steps 3 and 4); not applicable otherwise
+    StepDef("imagingOrders", "Imaging orders (urgency and protocol)", "physician", "signoff"),
+    StepDef("criticalValue", "Critical value (INR)", "physician", "signoff", "8.1 roadmap"),
+    StepDef("bedAssignment", "Bed assignment", "operations_manager", "auto"),
     StepDef("orderReview", "Order review", "pharmacist", "signoff"),
     StepDef("medRecAdmission", "Admission medication reconciliation", "pharmacist", "signoff"),
-    StepDef("bedAssignment", "Bed assignment", "operations_manager", "auto"),
     StepDef("predictDuration", "Surgical duration prediction", "operations_manager", "auto"),
     StepDef("proposeSchedule", "OR booking check", "operations_manager", "signoff"),
-    StepDef("wardMonitoring", "Ward monitoring (NEWS2)", "nurse", "wait", "WP9"),
+    StepDef("wardMonitoring", "Ward monitoring (NEWS2)", "nurse", "wait", "8.1 roadmap (NEWS2 stub)"),
     StepDef("draftDischargeSummary", "Discharge summary", "physician", "signoff"),
     StepDef("draftPatientInstructions", "Patient instructions", "nurse", "signoff"),
     StepDef("followupDelay", "48 hours after discharge", "system", "timer"),
