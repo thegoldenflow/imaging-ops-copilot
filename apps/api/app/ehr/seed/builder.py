@@ -344,3 +344,12 @@ class Builder:
             "patient": ref("Patient", pid), "dateTime": fhir_datetime(when),
             "provision": {"type": "permit" if permit else "deny", "purpose": [C.coding(C.CONSENT_CATEGORY, category)]},
         })
+
+    def consents(self, pid: str) -> dict[str, str]:
+        """The patient's latest consent decision per category ("permit" / "deny"); a missing category is absent."""
+        latest: dict[str, dict] = {}
+        for c in self.store.fhir.search("Consent", patient=pid):
+            cat = ((c.get("category") or [{}])[0].get("coding") or [{}])[0].get("code")
+            if cat and (cat not in latest or (c.get("dateTime") or "") > (latest[cat].get("dateTime") or "")):
+                latest[cat] = c
+        return {k: (v.get("provision") or {}).get("type", "deny") for k, v in latest.items()}

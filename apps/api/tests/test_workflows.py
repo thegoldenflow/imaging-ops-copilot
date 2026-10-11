@@ -455,7 +455,9 @@ def _open_exceptions(h, store) -> list:
         service.reset_state()
         service.refresh(store, force=True)
         found = [e for e in X.stream(store) if e.status == "open"]
-    assert len(found) >= 3, "the seeded hospital should have exceptions at 07:00"
+    # the tests use two; Monday's 07:00 has the fewest of the five hospital days (two OR overruns), and a Sunday
+    # generates Monday's day
+    assert len(found) >= 2, "the seeded hospital should have exceptions at 07:00"
     for exc in found:
         h.wait_step(M.capacity_id(exc.id), "decision", ("waiting",), timeout=90)
     return found
@@ -481,6 +483,7 @@ def test_capacity_workflow_executes_the_approval_and_checks_the_occupancy_an_hou
             assert exc.narration_status == "done" and h.step(wf, "explainAndRecommend")["status"] == "done"
             faults.inject("execute", 1)
             actions = [a["action_id"] for a in exc.narration["recommended_actions"]]
+            assert actions  # the approval has something to execute
             decided = service.approve(store, _user(OPS), exc.id, actions, "approved in the test")
             assert decided.decision["executed_by"] == "workflow" and decided.decision["workflow_id"] == wf
             assert all(a["status"] == "queued" and a["task_id"] is None for a in decided.decision["actions"])

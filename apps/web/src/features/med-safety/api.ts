@@ -218,7 +218,13 @@ export function useQueue(show: QueueShow) {
 }
 
 export function useReview(id: string | null) {
-  return useQuery({ queryKey: ["ms-review", id], queryFn: () => api<ReviewDetail>(`/api/med-safety/reviews/${id}`), enabled: Boolean(id) });
+  return useQuery({
+    queryKey: ["ms-review", id],
+    queryFn: () => api<ReviewDetail>(`/api/med-safety/reviews/${id}`),
+    enabled: Boolean(id),
+    // the background loop may be writing the commentary (and "Ask the AI now" then leaves it to the loop): follow it
+    refetchInterval: (query) => (query.state.data?.commentary_status === "pending" ? 2000 : false),
+  });
 }
 
 export function useSession(id: string | null) {

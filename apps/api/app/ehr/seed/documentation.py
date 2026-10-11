@@ -67,12 +67,7 @@ def _unit_at(stay: Stay, at: datetime) -> str:
 
 
 def _consents(b: Builder, patient_id: str) -> dict[str, str]:
-    latest: dict[str, dict] = {}
-    for c in b.store.fhir.search("Consent", patient=patient_id):
-        cat = ((c.get("category") or [{}])[0].get("coding") or [{}])[0].get("code")
-        if cat and (cat not in latest or (c.get("dateTime") or "") > (latest[cat].get("dateTime") or "")):
-            latest[cat] = c
-    return {k: (v.get("provision") or {}).get("type", "deny") for k, v in latest.items()}
+    return b.consents(patient_id)
 
 
 def _meds(b: Builder, stay_id: str) -> list[dict]:

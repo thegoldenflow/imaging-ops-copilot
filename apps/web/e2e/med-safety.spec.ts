@@ -89,12 +89,15 @@ test("pharmacist: queue, rule and AI flags, every item handled, sign; physician 
   await page.getByTestId("queue-search").fill(interaction.mrn);
   await page.getByTestId(`queue-item-${interaction.id}`).click();
   const review = page.getByTestId("review-panel");
-  await expect(review.getByTestId("finding").first()).toContainText("Interaction (major): naproxen + warfarin");
-  await expect(review.getByTestId("source-rule").first()).toContainText("Rule: Drug interaction");
+  // not necessarily the first finding: a hip-fracture patient may also be on enoxaparin (another major interaction)
+  const warfarin = review.getByTestId("finding").filter({ hasText: "Interaction (major): naproxen + warfarin" });
+  await expect(warfarin).toBeVisible();
+  await expect(warfarin.getByTestId("source-rule")).toContainText("Rule: Drug interaction");
   if (await review.getByRole("button", { name: "Ask the AI now" }).isVisible()) {
     await review.getByRole("button", { name: "Ask the AI now" }).click();
   }
-  await expect(review.getByTestId("ai-concern").first()).toBeVisible();
+  // the background loop may hold this commentary while it writes it with others: the panel follows it
+  await expect(review.getByTestId("ai-concern").first()).toBeVisible({ timeout: 30_000 });
   await expect(review.getByTestId("source-ai").first()).toContainText("confidence");
   await review.getByTestId("ai-concern").first().getByTestId("view-evidence").click();
   await expect(page.getByTestId("evidence-entry").first()).toBeVisible();

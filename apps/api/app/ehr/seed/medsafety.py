@@ -8,15 +8,17 @@
    At least one Medicine A stay gets them (the demo physician co-signs its
    reconciliation).
 2. Planted cases with fixed ids (`*-ms-*`):
-   - the 8.2 storyline's case on a recent hip-fracture stay: warfarin at home and
-     continued, a new naproxen order (major interaction), an INR of 3.8, and a home
-     antihypertensive that was not ordered on admission (omission);
+   - the 8.2 storyline's case on a recent hip-fracture stay (else another fracture
+     on Orthopedics) of a patient who consented to AI processing: warfarin at home
+     and continued, a new naproxen order (major interaction), an INR of 3.8, and a
+     home antihypertensive that was not ordered on admission (omission);
    - a blocking allergy (penicillin allergy, piperacillin ordered) on Medicine A;
    - renal dosing (eGFR 24, ketorolac ordered) on Medicine B;
    - dose bounds (tramadol 100 mg four times a day for a patient over 75);
    - a duplicate test (a lab test ordered again while its result is a day old) on Medicine A;
    - an admission reconciliation on Medicine A with a dose change, duplicate
-     therapy and a new medication without an indication (quetiapine).
+     therapy and a new medication without an indication (quetiapine), for a
+     patient who consented to AI processing (the AI judges the indication).
 
 Everything here is written after every other section, with its own random
 streams and explicit ids, so no earlier id or value changes. The day simulator
@@ -35,6 +37,7 @@ from app.ehr.seed.simulate import Stay, Timeline
 from app.fhir.dt import parse
 
 HIP_FRACTURE = "5913000"
+FRACTURES = (HIP_FRACTURE, "125605004")  # neck of femur, any bone
 ANTIHYPERTENSIVES = ("17767", "29046", "5487")  # amlodipine, lisinopril, hydrochlorothiazide
 # Inpatient-only medications at discharge: (probability it continues, the oral medication it becomes or None).
 DISCHARGE_FATE: dict[str, tuple[float, str | None]] = {
@@ -117,20 +120,27 @@ def discharge_prescriptions(b: Builder, stay: Stay, p: PatientInfo, now: datetim
 
 
 def _pick_82(stays: list[Stay], patients: dict[str, PatientInfo], now: datetime) -> Stay | None:
-    """A hip-fracture stay admitted as recently as possible, preferring the storyline's patient (a woman about 72
-    whose language is Chinese)."""
+    """A hip-fracture stay admitted as recently as possible, else another fracture on Orthopedics (the naproxen is
+    for fracture pain), preferring the storyline's patient (a woman about 72 whose language is Chinese)."""
+    def best(found: list[Stay]) -> Stay:
+        return min(found, key=lambda s: (patients[s.patient].sex != "female", patients[s.patient].lang == "en",
+                                         abs(patients[s.patient].age - 72), -s.admit.timestamp()))
+
+    fractures = ([s for s in stays if s.dx == HIP_FRACTURE],
+                 [s for s in stays if s.dx in FRACTURES and _unit(s, now) == "ORTH"])
     for hours in (24, 48, 72, 168, None):
-        for pool in ([s for s in stays if s.dx == HIP_FRACTURE], [s for s in stays if _unit(s, now) == "ORTH"]):
+        for pool in fractures:
             found = [s for s in pool if hours is None or s.admit >= now - timedelta(hours=hours)]
             if found:
-                return min(found, key=lambda s: (patients[s.patient].sex != "female", patients[s.patient].lang == "en",
-                                                 abs(patients[s.patient].age - 72), -s.admit.timestamp()))
-    return stays[-1] if stays else None
+                return best(found)
+    orthopedics = [s for s in stays if _unit(s, now) == "ORTH"]  # no fracture in hospital
+    return best(orthopedics) if orthopedics else (stays[-1] if stays else None)
 
 
 def _pick(stays: list[Stay], used: set[str], *, unit: str | None = None, recent: bool = False,
-          key=None, now: datetime) -> Stay | None:
-    pool = [s for s in stays if s.patient not in used and (unit is None or _unit(s, now) == unit)]
+          key=None, eligible=None, now: datetime) -> Stay | None:
+    pool = [s for s in stays if s.patient not in used and (unit is None or _unit(s, now) == unit)
+            and (eligible is None or eligible(s))]
     if recent:
         within = [s for s in pool if s.admit >= now - timedelta(hours=24)]
         pool = within or pool
@@ -240,13 +250,17 @@ def generate(b: Builder, tl: Timeline, patients: dict[str, PatientInfo], now: da
     meda_newest = {s.patient for s in sorted((s for s in stays if _unit(s, now) == "MEDA"), key=lambda s: s.id)[-2:]}
     used: set[str] = set(meda_newest) | {s.patient for s in stays if s.id in leaving_ids}
     staying = [s for s in stays if s.id not in leaving_ids]
-    s82 = _pick_82([s for s in staying if s.patient not in used], patients, now)
+
+    def ai_consent(s: Stay) -> bool:  # the 8.2 commentary and the reconciliation's indication check are the AI's
+        return b.consents(s.patient).get("ai_processing") == "permit"
+
+    s82 = _pick_82([s for s in staying if s.patient not in used and ai_consent(s)], patients, now)
     if s82:
         out["case_82"] = plant_82(b, s82, patients[s82.patient], now)
         used.add(s82.patient)
     plants = [
         ("allergy", plant_allergy, dict(unit="MEDA", recent=True)),
-        ("medrec", plant_admission_medrec, dict(unit="MEDA", recent=True, key=lambda s: (
+        ("medrec", plant_admission_medrec, dict(unit="MEDA", recent=True, eligible=ai_consent, key=lambda s: (
             any(c in patients[s.patient].conditions for c in NO_ANTIPSYCHOTIC_INDICATION), -s.admit.timestamp()))),
         ("duplicate_test", plant_duplicate_test, dict(unit="MEDA")),
         ("renal", plant_renal, dict(unit="MEDB")),

@@ -95,6 +95,33 @@ def test_generator_plants_the_cases_and_discharge_prescriptions(fresh_state):
     assert "MEDA" in units  # the demo physician co-signs one
 
 
+def test_the_planted_ai_cases_fit_their_story_whatever_the_day_of_seeding():
+    # The hospital is generated as of 07:00 on the day of seeding (Saturday seeds Friday, Sunday seeds Monday), and
+    # which stays get the planted cases depends on that day. The 8.2 case and the admission reconciliation need the
+    # patient's ai_processing consent, which the newest Medicine A admission lacks on Monday (deny) and Thursday
+    # (missing); the 8.2 naproxen is for fracture pain, and on Thursday the newest Orthopedics admission is a spinal
+    # fusion. One seeding per hospital day stands for the others: a Sunday (Monday's day) and a Thursday.
+    from datetime import datetime
+
+    from app.core.config import settings
+    from app.core.store import Store, use_store
+    from app.ehr.seed import generate
+    from app.ehr.seed.medsafety import FRACTURES
+
+    for wall in (datetime(2026, 10, 11, 12), datetime(2026, 10, 15, 12)):
+        s = Store()
+        with use_store(s):
+            info = generate(s, settings.seed, wall)
+            fhir = FhirGateway(Actor.system("test"), "consent_management", LocalBackend(s))
+            for name in ("case_82", "medrec"):
+                case = info["medsafety"][name]
+                assert consent.consent_status(fhir, case["patient"])["ai_processing"] == "permit", (wall, name)
+            stay = s.fhir.read("Encounter", info["medsafety"]["case_82"]["stay"])
+            assert stay["reasonCode"][0]["coding"][0]["code"] in FRACTURES, wall
+            assert ref_id(s.fhir.read("MedicationRequest", "medrx-ms-82-naproxen")["encounter"]) == stay["id"]
+            assert ref_id(s.fhir.read("MedicationRequest", QUETIAPINE)["encounter"]) == info["medsafety"]["medrec"]["stay"]
+
+
 def test_discharge_keeps_the_discharge_prescriptions_active(fresh_state):
     store = fresh_state
     plans = store.fhir.search("MedicationRequest", category="plan")
