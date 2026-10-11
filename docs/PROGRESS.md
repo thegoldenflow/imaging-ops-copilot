@@ -1058,7 +1058,7 @@ Newcomer check (2026-10-11, literally from README.md: a fresh clone of this bran
 
 Gaps found and fixed in README.md: (1) cloned under the session's scratchpad (a 150-character path), `uv run` failed with "DLL load failed while importing _collections_cy: The filename or extension is too long" (Windows' 260-character limit inside `.venv\Lib\site-packages`); a junction did not help (uv resolves it), so the clone moved to `D:\ioc-nc` (removed afterwards), and the README now says to clone into a short path, with a troubleshooting row; (2) the first page after the API starts takes 10–30 s; (3) the storyline and demo resets take 1–3 minutes, not "about a minute"; (4) starting the API takes about a minute even on a seeded database. Still manual by design: choosing a free port on Windows, creating a database for a non-default name, and (on this shared machine only) a Temporal namespace of one's own. A newcomer on a clean machine also downloads the Python and npm packages (the caches were warm here), a few minutes more.
 
-Found during the check, not fixed (not WP10): the standalone worker's first activities can race while building a table's row codec (`app/core/db/repo.py` `_codec` → `schema.mapping`, no lock): two threads create the same SQLAlchemy `Table` ("Table 'sites' is already defined for this MetaData instance"), and the pooled connection of the failed activity then reports "another command is already in progress". Temporal retries the activities and the worker recovers (status online, 1 worker), but the log fills with tracebacks right after a worker start and during a demo reset. A lock around the codec's first build would fix it.
+Found during the check, not fixed (not WP10): the standalone worker's first activities can race while building a table's row codec (`app/core/db/repo.py` `_codec` → `schema.mapping`, no lock): two threads create the same SQLAlchemy `Table` ("Table 'sites' is already defined for this MetaData instance"), and the pooled connection of the failed activity then reports "another command is already in progress". Temporal retries the activities and the worker recovers (status online, 1 worker), but the log fills with tracebacks right after a worker start and during a demo reset. A lock around the codec's first build would fix it. Fixed afterwards, with a second cause: see "WP10 follow-up · worker thread race in the database layer" below.
 
 Notes and deviations:
 
@@ -1080,6 +1080,26 @@ Limits:
 - The safety page reads every run file holding a platform suite once the runs change (cached afterwards); with hundreds of runs the first request slows down.
 - The eval summary and the safety doc are refreshed by their scripts, not automatically: the summary after a run (`scripts/eval_summary.py`), the doc after a registry change (the backend suite fails until `scripts/safety_doc.py` has run).
 - The newcomer check ran on this machine with warm package caches and an already running Postgres container; a cold machine adds the downloads.
+
+### WP10 follow-up · worker thread race in the database layer — done
+
+Found by WP10's newcomer check (2026-10-11, the standalone worker's log). The worker runs its activities in 8 threads (2 inside the API), each with its own unit of work. The log showed two problems, both in the database layer:
+
+1. **First build of a table mapping.** `schema.mapping` (a `functools.cache`) and `repo._CODECS` built each collection's SQLAlchemy `Table` on first use without a lock. When the worker started, its activity threads opened their first Store at the same moment, and one of them failed with "Table 'sites' is already defined for this MetaData instance".
+2. **"another command is already in progress".** This error had a different cause. A Store that fails to build holds no connection yet: its transaction starts with the first query. The errors came from `workflows.recordProgress` attempts that waited longer than their 30-second start-to-close timeout for the demo-reset lock (`pg_advisory_xact_lock_shared`), which a reset holds exclusively while it runs. Temporal cancels a timed-out synchronous activity by raising `CancelledError` inside its thread, and on Windows psycopg waits for results in a Python loop, so the exception stopped psycopg in the middle of the query. The unit of work then sent ROLLBACK into that busy connection, which failed. The pool logged "Exception during reset or similar" and threw the connection away, and the activity reported the rollback error in place of the cancellation.
+
+- [x] `app/core/db/schema.py`: `mapping` builds each table once under a lock. The model import stays outside the lock, because importing a module can itself need a mapping. `app/core/db/repo.py`: `_codec` keeps whichever codec is stored first (`dict.setdefault`). `app/core/store.py`: `get_engine` creates the engine under a lock (before, two threads could create two pools).
+- [x] `app/core/store.py` `EngineSource`: a connection with a query still running (psycopg `transaction_status` ACTIVE) is not rolled back. Its query is cancelled on the server (`cancel_safe`), so it stops waiting for the lock, and the connection is invalidated rather than returned to the pool. The original exception comes out. `autonomous()` (audit events) now uses the same begin, commit and rollback.
+- [x] Tests in `tests/test_db_threads.py` (3):
+  - Eight threads build a fresh codec for the same table at once (a slow model import lines them up) and get one codec and one `Table`. Before the fix, 7 of the 8 failed with "already defined".
+  - An exception raised into a thread that waits for an advisory lock, the way Temporal raises one, comes out unchanged. The pool logs nothing, its checked-out count goes back down, the server stops waiting and the next unit of work runs. Before the fix, the exception came out as `OperationalError: another command is already in progress` with the pool's "Exception during reset" traceback, as in the worker log. The test makes psycopg use its Python wait loop (the Windows default) on every platform; whether its C loop on Linux lets the exception in mid-query was not checked.
+  - A Store that fails to build holds no connection. This test passes before and after the fix; it records the finding above.
+
+Tests 2026-10-11 (Sunday's generated data, mock model, own test database `ioc_test_codec_race`): the backend suite passed 773 of 773 in 25 min 22 s, including the three new tests and `tests/test_db.py`. The five date-dependent Sunday failures listed under WP10 also pass, after 95c8eef. Not run: Playwright (no screen changed) and a live restart of the worker against Temporal.
+
+Not changed (follow-ups):
+
+- `reset_store` takes the demo-reset lock before it generates the data, so the lock is held for the whole reset, which takes 1–3 minutes. Activities that wait for the lock longer than their timeouts are cancelled and retried until the reset ends (now without the rollback and pool tracebacks). Generating the detached store before taking the lock would leave only the TRUNCATE and the inserts under it.
 
 ## Environment notes
 

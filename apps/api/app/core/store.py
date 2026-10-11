@@ -15,11 +15,13 @@ from __future__ import annotations
 
 import contextlib
 import re
+import threading
 from collections.abc import Callable, Iterator
 from contextvars import ContextVar
 from datetime import datetime
 from typing import Any
 
+from psycopg import pq
 from sqlalchemy import Connection, Engine, create_engine, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -47,15 +49,39 @@ from app.ehr.fhirstore import FhirStore, fhir_resources
 # ---------- Connections ----------
 
 _engine: Engine | None = None
+_engine_lock = threading.Lock()  # the worker's activity threads ask for it at the same moment
 
 
 def get_engine() -> Engine:
     global _engine
     if _engine is None:
-        from app.core.config import settings
+        with _engine_lock:
+            if _engine is None:
+                from app.core.config import settings
 
-        _engine = create_engine(settings.database_url, pool_pre_ping=True, pool_size=10, max_overflow=10)
+                _engine = create_engine(settings.database_url, pool_pre_ping=True, pool_size=10, max_overflow=10)
     return _engine
+
+
+def _busy(conn: Connection) -> bool:
+    """A query is still running on this connection: an exception raised inside the thread interrupted psycopg while
+    it waited for the result (Temporal cancels a timed-out activity that way). Such a connection refuses every
+    command, ROLLBACK included, until that result has been read."""
+    if conn.closed or conn.invalidated:
+        return False
+    dbapi = conn.connection.dbapi_connection
+    return dbapi is not None and dbapi.info.transaction_status == pq.TransactionStatus.ACTIVE
+
+
+def _release(conn: Connection) -> None:
+    """Give a connection back to the pool. A busy one is dropped instead, after its query is cancelled on the server:
+    it may be waiting for a lock (the demo-reset lock, typically), and closing the socket alone would leave it
+    waiting there until it got the lock."""
+    if _busy(conn):
+        with contextlib.suppress(Exception):
+            conn.connection.dbapi_connection.cancel_safe(timeout=5)
+        conn.invalidate()
+    conn.close()
 
 
 class _Tx:
@@ -77,20 +103,26 @@ class EngineSource:
             try:
                 trans.commit()
             finally:
-                conn.close()
+                _release(conn)
 
         def rollback() -> None:
             try:
-                trans.rollback()
+                if not _busy(conn):
+                    trans.rollback()
             finally:
-                conn.close()
+                _release(conn)
 
         return _Tx(conn, commit, rollback)
 
     @contextlib.contextmanager
     def autonomous(self) -> Iterator[Connection]:
-        with self.engine.begin() as conn:
-            yield conn
+        tx = self.begin()
+        try:
+            yield tx.conn
+        except BaseException:
+            tx.rollback()
+            raise
+        tx.commit()
 
 
 class ConnectionSource:

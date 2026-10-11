@@ -17,6 +17,7 @@ them at import time would be circular.
 """
 
 import importlib
+import threading
 import types
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -310,10 +311,24 @@ def _import(ref: str) -> Any:
     return getattr(importlib.import_module(module), name)
 
 
-@cache
+_MAPPINGS: dict[str, Mapping] = {}
+_MAPPING_LOCK = threading.Lock()
+
+
 def mapping(name: str) -> Mapping:
+    """The resolved mapping of a collection, built on first use. Threads share it: the workflow worker's activity
+    threads open their first Store at the same moment, and a table can be added to the metadata only once."""
+    if (m := _MAPPINGS.get(name)) is not None:
+        return m
     spec = STORE_ENTITIES.get(name) or MODULE_ENTITIES[name]
-    model = _import(spec.model_ref)
+    model = _import(spec.model_ref)  # outside the lock: importing a module may itself need a mapping
+    with _MAPPING_LOCK:
+        if (m := _MAPPINGS.get(name)) is None:
+            m = _MAPPINGS[name] = _build(spec, model)
+    return m
+
+
+def _build(spec: EntitySpec, model: type[BaseModel]) -> Mapping:
     fields = list(model.model_fields)
     reserved = {"row_key", "seq"} | {col for col, _ in spec.blind}
     if clash := reserved & set(fields):

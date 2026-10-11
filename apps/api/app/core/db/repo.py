@@ -196,9 +196,11 @@ _CODECS: dict[str, _RowCodec] = {}
 
 
 def _codec(name: str) -> _RowCodec:
-    if name not in _CODECS:
-        _CODECS[name] = _RowCodec(name)
-    return _CODECS[name]
+    codec = _CODECS.get(name)
+    if codec is None:
+        # Activity threads may build one at the same time (schema.mapping is safe for that); the first stored wins.
+        codec = _CODECS.setdefault(name, _RowCodec(name))
+    return codec
 
 
 class EntityTable(Generic[T]):
