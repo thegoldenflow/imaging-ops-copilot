@@ -1,0 +1,59 @@
+# Agent registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# kind: runtime_agent (hosted by the agent runtime) | embedded_agent (AI step inside its module) |
+# module (no model; registered for its EHR writes). Model ids come from the environment (model_policy.tier).
+#
+# Medication reconciliation (7.2): its module (app/modules/med_safety) compares the medication lists (omission,
+# dose or frequency change, duplicate therapy); its agent (the entrypoint) judges whether each new medication has an
+# indication on the diagnosis list (with a confidence), explains each discrepancy in a sentence and writes the draft
+# record (draftMedRec). The pharmacist handles every item and signs; a physician co-signs (cosign). After the
+# pharmacist asked for a change, the agent writes the prescriber's Task (createTask).
+agent_id: medication_reconciliation
+version: 0.2.0
+kind: runtime_agent
+owner: Pharmacy and medication safety team
+purpose: Medication reconciliation differences, co-signed by pharmacist and physician (7.2).
+risk_tier: clinical_ds
+allowed_tools:
+- getMedicationContext
+- getEncounterBundle
+- getMedications
+- getHomeMeds
+- draftMedRec
+- draftDocument
+- submitForReview
+- createTask
+- updateTask
+- signDocumentFinal
+data_scope:
+  resources:
+  - Patient
+  - Encounter
+  - MedicationRequest
+  - MedicationStatement
+  - AllergyIntolerance
+  - Condition
+  - Observation
+  - DocumentReference
+  scope: own_unit
+model_policy:
+  tier: reasoning
+  max_tokens: 8000
+  temperature_max: null
+prompt_version: medication_reconciliation@1
+required_signoff_role:
+- pharmacist
+- physician
+cosign: true
+consent_required:
+- ai_processing
+eval_status:
+  status: pending
+  run_id: evals/medrec/report.json
+  note: 'Mock baseline only (20 synthetic reconciliations, classification accuracy of the discrepancy list, and the
+    "new without indication" judgements of the 60 order-review cases; see the reports). The mock is optimistic; the
+    status stays pending until the configured model has been run on the sets (scripts/med_safety_eval.py --live).'
+deployment_status: demo
+entrypoint: app.modules.med_safety.medrec_agent
+confidence_threshold: 0.7
+# Release gate (6.6): the share of eval cases that must succeed: every row of the reconciliation typed as labelled.
+eval_threshold: 0.9

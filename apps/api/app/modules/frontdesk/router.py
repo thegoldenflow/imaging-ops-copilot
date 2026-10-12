@@ -12,8 +12,7 @@ from app.core.templates import LANGUAGES, format_when
 from app.integrations.mocks import validate_health_card, verify_private_insurance
 from app.modules.frontdesk import service
 from app.modules.prep import service as prep
-from app.modules.frontdesk.agent import agent_reply, new_session
-from app.modules.frontdesk.tools import Turn
+from app.modules.frontdesk.agent import new_session
 
 router = APIRouter(tags=["frontdesk"])
 
@@ -46,24 +45,12 @@ def call_turn(call_id: str, body: TurnRequest, user: StaffUser = Depends(FRONT))
     text = body.text.strip()[:500]
     if not text:
         raise HTTPException(422, "Empty utterance")
-    session.transcript.append(Turn(role="caller", text=text))
-    reply, mode = agent_reply(store, session, text)
-    session.transcript.append(Turn(role="agent", text=reply))
-    ended = session.outcome == "transferred" or session.state.get("ended", False)
+    reply, mode, ended = service.take_turn(store, session, text)
     if ended:
-        _end(store, session)
+        service.end_call(store, session)
     store.touch()
     return {"reply": reply, "mode": mode, "latency_ms": session.latencies_ms[-1], "ended": ended,
             "session": session.model_dump(mode="json")}
-
-
-def _end(store, session) -> None:
-    if session.ended_at:
-        return
-    session.ended_at = datetime.now()
-    if session.outcome == "in_progress":
-        session.outcome = "abandoned"
-    service.summarize_call(store, session)
 
 
 @router.post("/api/frontdesk/calls/{call_id}/end")
@@ -72,7 +59,7 @@ def end_call(call_id: str, user: StaffUser = Depends(FRONT)):
     session = service.calls(store).get(call_id)
     if session is None:
         raise HTTPException(404, "Call not found")
-    _end(store, session)
+    service.end_call(store, session)
     store.touch()
     return session.model_dump(mode="json")
 

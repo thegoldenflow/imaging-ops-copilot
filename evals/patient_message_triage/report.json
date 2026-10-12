@@ -1,0 +1,188 @@
+{
+  "agent_id": "patient_message_triage",
+  "agent_version": "0.1.0",
+  "prompt_version": "patient_message_triage@1",
+  "mode": "mock",
+  "run_at": "2026-10-09T18:42:27",
+  "cases": 12,
+  "passed": 11,
+  "accuracy": 0.9167,
+  "gate": 0.8,
+  "status": "passed",
+  "by_source": {
+    "authored": {
+      "cases": 12,
+      "passed": 11
+    }
+  },
+  "results": [
+    {
+      "id": "authored-chest-pain",
+      "source": "authored",
+      "status": "ok",
+      "got": {
+        "category": "clinical",
+        "urgency": "urgent"
+      },
+      "expected": {
+        "category": "clinical",
+        "urgency": "urgent"
+      },
+      "passed": true
+    },
+    {
+      "id": "authored-reschedule",
+      "source": "authored",
+      "status": "ok",
+      "got": {
+        "category": "scheduling",
+        "urgency": "routine"
+      },
+      "expected": {
+        "category": "scheduling",
+        "urgency": "routine"
+      },
+      "passed": true
+    },
+    {
+      "id": "authored-work-form",
+      "source": "authored",
+      "status": "ok",
+      "got": {
+        "category": "administrative",
+        "urgency": "routine"
+      },
+      "expected": {
+        "category": "administrative",
+        "urgency": "routine"
+      },
+      "passed": true
+    },
+    {
+      "id": "authored-wound",
+      "source": "authored",
+      "status": "ok",
+      "got": {
+        "category": "clinical",
+        "urgency": "urgent"
+      },
+      "expected": {
+        "category": "clinical",
+        "urgency": "urgent"
+      },
+      "passed": true
+    },
+    {
+      "id": "authored-visiting",
+      "source": "authored",
+      "status": "ok",
+      "got": {
+        "category": "scheduling",
+        "urgency": "routine"
+      },
+      "expected": {
+        "category": "scheduling",
+        "urgency": "routine"
+      },
+      "passed": true
+    },
+    {
+      "id": "authored-fall",
+      "source": "authored",
+      "status": "ok",
+      "got": {
+        "category": "clinical",
+        "urgency": "urgent"
+      },
+      "expected": {
+        "category": "clinical",
+        "urgency": "urgent"
+      },
+      "passed": true
+    },
+    {
+      "id": "authored-parking",
+      "source": "authored",
+      "status": "ok",
+      "got": {
+        "category": "administrative",
+        "urgency": "routine"
+      },
+      "expected": {
+        "category": "other",
+        "urgency": "routine"
+      },
+      "passed": false
+    },
+    {
+      "id": "authored-fever-zh",
+      "source": "authored",
+      "status": "ok",
+      "got": {
+        "category": "clinical",
+        "urgency": "urgent"
+      },
+      "expected": {
+        "category": "clinical",
+        "urgency": "urgent"
+      },
+      "passed": true
+    },
+    {
+      "id": "authored-thanks",
+      "source": "authored",
+      "status": "ok",
+      "got": {
+        "category": "other",
+        "urgency": "routine"
+      },
+      "expected": {
+        "category": "other",
+        "urgency": "routine"
+      },
+      "passed": true
+    },
+    {
+      "id": "authored-bill",
+      "source": "authored",
+      "status": "ok",
+      "got": {
+        "category": "administrative",
+        "urgency": "routine"
+      },
+      "expected": {
+        "category": "administrative",
+        "urgency": "routine"
+      },
+      "passed": true
+    },
+    {
+      "id": "authored-pills",
+      "source": "authored",
+      "status": "ok",
+      "got": {
+        "category": "clinical",
+        "urgency": "soon"
+      },
+      "expected": {
+        "category": "clinical",
+        "urgency": "soon"
+      },
+      "passed": true
+    },
+    {
+      "id": "authored-followup-zh",
+      "source": "authored",
+      "status": "ok",
+      "got": {
+        "category": "scheduling",
+        "urgency": "routine"
+      },
+      "expected": {
+        "category": "scheduling",
+        "urgency": "routine"
+      },
+      "passed": true
+    }
+  ]
+}

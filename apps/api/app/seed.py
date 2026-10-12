@@ -122,11 +122,14 @@ def build_store(seed: int | None = None) -> Store:
     return build(seed)
 
 
-def populate(s: Store, seed: int | None = None) -> None:
+def populate(s: Store, seed: int | None = None, *, hospital: bool = True, now: datetime | None = None) -> None:
+    """`hospital=False` leaves out the hospital EHR (its own random stream, generated last), for evals that need
+    the imaging data only (the referral summary eval builds three data sets). `now`: the time the data is generated
+    for (default: the current hour); the data set depends on its day and hour."""
     from app.core.config import settings
 
     rng = random.Random(settings.seed if seed is None else seed)
-    now = datetime.now().replace(minute=0, second=0, microsecond=0)
+    now = (now or datetime.now()).replace(minute=0, second=0, microsecond=0)
     today = now.date()
     s.modules["seed_time"] = now
 
@@ -258,6 +261,30 @@ def populate(s: Store, seed: int | None = None) -> None:
     _add_requisitions(s, rng, now)
     _add_radiology_ops(s, rng, now)
     _add_business_compliance(s, rng, now)
+    if hospital:
+        _add_hospital(s, settings.seed if seed is None else seed, now)
+    _add_noshow_risk(s, now)
+
+
+def _add_noshow_risk(s: Store, now: datetime) -> None:
+    """The no-show model's risk scores on upcoming appointments, and the extra reminders for the high-risk ones,
+    are part of the data set. Otherwise the first scheduling request after a reset does this work: it reads every
+    appointment, trains the model, and queues a few hundred reminders with a database round trip each (11 s to a
+    minute on a busy machine, while the scheduling page shows "Loading…")."""
+    from app.modules.scheduling.service import queue_extra_reminders
+
+    queue_extra_reminders(s, now)  # trains the model (the store's own cache) and scores the upcoming appointments
+    s.modules["extra_reminders_done"] = True
+
+
+def _add_hospital(s: Store, seed: int, now: datetime) -> None:
+    """Phases 6-8: the synthetic hospital EHR (FHIR resources and the day simulator's plan).
+    It uses its own random streams, so the imaging data above does not change."""
+    from app.ehr.seed import generate
+    from app.ehr.seed.platform import seed_platform
+
+    generate(s, seed, now)
+    seed_platform(s)  # hospital staff logins (6.3 roles) and draft documents for the signing service
 
 
 def _add_staff(s: Store) -> None:

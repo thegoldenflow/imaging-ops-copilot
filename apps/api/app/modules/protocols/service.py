@@ -11,7 +11,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.core.store import Store
-from app.llm.prompts import Prompt
+from app.agents.prompts import registered
 from app.llm.providers import mock_fixture
 from app.modules.protocols.library import BY_ID, Protocol
 
@@ -44,16 +44,7 @@ class ProtocolRecord(BaseModel):
         return self.approved_id or self.primary_id
 
 
-PROTOCOL_PROMPT = Prompt(
-    name="protocol_suggest",
-    version="protocol_suggest@1",
-    system=(
-        "You suggest an imaging protocol for an outpatient requisition. Choose only from the candidate protocols "
-        "given, by id. Return the best match as primary and the next two as alternatives, explain the choice in "
-        "one or two sentences, and say whether the primary needs IV contrast. A radiologist approves every choice."
-    ),
-    template="Requested exam: {exam}\nClinical information: {clinical}\n\nCANDIDATES:\n{candidates}",
-)
+PROTOCOL_PROMPT = registered("protocol_suggest")
 
 
 @mock_fixture("protocol_suggest")

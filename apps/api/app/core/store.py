@@ -15,12 +15,15 @@ from __future__ import annotations
 
 import contextlib
 import re
+import threading
 from collections.abc import Callable, Iterator
 from contextvars import ContextVar
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Connection, Engine, create_engine, select, text
+import psycopg
+from psycopg import pq, sql
+from sqlalchemy import Connection, Dialect, Engine, Table, create_engine, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.core.audit import AuditLog
@@ -42,19 +45,44 @@ from app.core.models import (
     StaffUser,
     WaitlistEntry,
 )
+from app.ehr.fhirstore import FhirStore, fhir_resources
 
 # ---------- Connections ----------
 
 _engine: Engine | None = None
+_engine_lock = threading.Lock()  # the worker's activity threads ask for it at the same moment
 
 
 def get_engine() -> Engine:
     global _engine
     if _engine is None:
-        from app.core.config import settings
+        with _engine_lock:
+            if _engine is None:
+                from app.core.config import settings
 
-        _engine = create_engine(settings.database_url, pool_pre_ping=True, pool_size=10, max_overflow=10)
+                _engine = create_engine(settings.database_url, pool_pre_ping=True, pool_size=10, max_overflow=10)
     return _engine
+
+
+def _busy(conn: Connection) -> bool:
+    """A query is still running on this connection: an exception raised inside the thread interrupted psycopg while
+    it waited for the result (Temporal cancels a timed-out activity that way). Such a connection refuses every
+    command, ROLLBACK included, until that result has been read."""
+    if conn.closed or conn.invalidated:
+        return False
+    dbapi = conn.connection.dbapi_connection
+    return dbapi is not None and dbapi.info.transaction_status == pq.TransactionStatus.ACTIVE
+
+
+def _release(conn: Connection) -> None:
+    """Give a connection back to the pool. A busy one is dropped instead, after its query is cancelled on the server:
+    it may be waiting for a lock (the demo-reset lock, typically), and closing the socket alone would leave it
+    waiting there until it got the lock."""
+    if _busy(conn):
+        with contextlib.suppress(Exception):
+            conn.connection.dbapi_connection.cancel_safe(timeout=5)
+        conn.invalidate()
+    conn.close()
 
 
 class _Tx:
@@ -76,20 +104,26 @@ class EngineSource:
             try:
                 trans.commit()
             finally:
-                conn.close()
+                _release(conn)
 
         def rollback() -> None:
             try:
-                trans.rollback()
+                if not _busy(conn):
+                    trans.rollback()
             finally:
-                conn.close()
+                _release(conn)
 
         return _Tx(conn, commit, rollback)
 
     @contextlib.contextmanager
     def autonomous(self) -> Iterator[Connection]:
-        with self.engine.begin() as conn:
-            yield conn
+        tx = self.begin()
+        try:
+            yield tx.conn
+        except BaseException:
+            tx.rollback()
+            raise
+        tx.commit()
 
 
 class ConnectionSource:
@@ -140,6 +174,7 @@ class Store:
             setattr(self, name, (ListTable if spec.kind == "list" else EntityTable)(self, name))
         self.images = ImageTable(self)
         self.modules = ModuleSpace(self)
+        self.fhir = FhirStore(self)  # hospital EHR resources (app/ehr)
         self.audit = AuditLog(self)
 
     def __repr__(self) -> str:
@@ -159,7 +194,7 @@ class Store:
         return self._source.autonomous()
 
     def _collections(self) -> list:
-        return [*(getattr(self, name) for name in schema.STORE_ENTITIES), self.images, self.modules]
+        return [*(getattr(self, name) for name in schema.STORE_ENTITIES), self.images, self.modules, self.fhir]
 
     def flush(self) -> int:
         return sum(c.flush() for c in self._collections())
@@ -320,27 +355,46 @@ def unit_of_work() -> Iterator[Store]:
 # ---------- Seeding and reset ----------
 
 
-def persist(src: Store, into: Store) -> None:
-    """Replace everything in the database with the contents of a detached store."""
+def encode_rows(src: Store) -> list[tuple[Table, list[dict]]]:
+    """Every row of a detached store as persist() writes it (PHI encrypted, JSON encoded), table by table. CPU work
+    only, so reset_store() does it before it takes the lock."""
+    if not src.detached:
+        raise ValueError("encode_rows() reads a detached store")
+    rows = [(schema.mapping(name).table, getattr(src, name).encoded_rows()) for name in schema.STORE_ENTITIES]
+    rows += [(schema.mapping(table.name).table, table.encoded_rows()) for table in src.modules.tables()]
+    return rows + [(schema.module_state, src.modules.encoded_rows()), (schema.images, src.images.encoded_rows()),
+                   (schema.audit_events, src.audit.encoded_rows()), (fhir_resources, src.fhir.encoded_rows())]
+
+
+def _copy_rows(cursor: psycopg.Cursor, dialect: Dialect, table: Table, rows: list[dict]) -> None:
+    """COPY rows into a table, with the values an INSERT of the same rows would send: each column's bind processor
+    runs first (JSONB's wraps the value, so None becomes JSON null, as with INSERT). The columns are the first
+    row's keys; columns left out get their defaults (identity `seq`, `updated_at`)."""
+    columns = [table.c[key] for key in rows[0]]
+    procs = [(c.key, c.type.dialect_impl(dialect).bind_processor(dialect)) for c in columns]
+    stmt = sql.SQL("COPY {} ({}) FROM STDIN").format(
+        sql.Identifier(table.name), sql.SQL(", ").join(sql.Identifier(c.name) for c in columns))
+    with cursor.copy(stmt) as copy:
+        for row in rows:
+            copy.write_row([row[key] if proc is None else proc(row[key]) for key, proc in procs])
+
+
+def persist(src: Store, into: Store, rows: list[tuple[Table, list[dict]]] | None = None) -> None:
+    """Replace everything in the database with the contents of a detached store (`rows`: its encode_rows(), when the
+    caller has them already). The rows are written with COPY, in the same transaction: a reset runs this under its
+    lock, and COPY takes about half as long as INSERT (docs/engineering-notes.md, note 8)."""
     if not src.detached or into.detached:
         raise ValueError("persist() copies a detached store into a database store")
+    rows = encode_rows(src) if rows is None else rows
     conn = into.conn()
     into.expunge()
     tables = ", ".join(f'"{t}"' for t in schema.data_tables())
     conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY"))
     into.rewritten = True
-
-    def insert_rows(table, rows: list[dict]) -> None:
-        for i in range(0, len(rows), 2000):
-            conn.execute(table.insert(), rows[i:i + 2000])
-
-    for name in schema.STORE_ENTITIES:
-        insert_rows(schema.mapping(name).table, getattr(src, name).encoded_rows())
-    for table in src.modules.tables():
-        insert_rows(schema.mapping(table.name).table, table.encoded_rows())
-    insert_rows(schema.module_state, src.modules.encoded_rows())
-    insert_rows(schema.images, src.images.encoded_rows())
-    insert_rows(schema.audit_events, src.audit.encoded_rows())
+    with conn.connection.dbapi_connection.cursor() as cursor:
+        for table, encoded in rows:
+            if encoded:
+                _copy_rows(cursor, conn.dialect, table, encoded)
     for prefix, n in src._counters.items():
         name = _ensure_sequence(prefix)
         conn.execute(text("SELECT setval(:seq, :n)"), {"seq": name, "n": n})
@@ -349,20 +403,34 @@ def persist(src: Store, into: Store) -> None:
     into.touch()
 
 
-def build_store(seed: int | None = None) -> Store:
-    """The demo data set, generated in memory (detached)."""
+def build_store(seed: int | None = None, *, hospital: bool = True, now: datetime | None = None) -> Store:
+    """The demo data set, generated in memory (detached); `hospital=False`: the imaging data only; `now`: the time
+    it is generated for (default: now)."""
     from app.seed import populate
 
     store = Store()
     with use_store(store):
-        populate(store, seed)
+        populate(store, seed, hospital=hospital, now=now)
     return store
 
 
+# Held (exclusively) while the demo data is rewritten; background steps take it shared and skip while a reset runs,
+# so the TRUNCATE of every table never deadlocks with a step writing into them.
+REWRITE_LOCK = 0x5EED_DA7A
+
+
 def reset_store(seed: int | None = None) -> Store:
-    """Regenerate the demo data and write it over the current database contents."""
+    """Regenerate the demo data and write it over the current database contents.
+
+    The data set is generated and encoded first, in memory (no database access), and only then is the lock taken:
+    workflow activities and background steps keep running meanwhile and wait only while the tables are rewritten.
+    The lock is transaction-scoped, so what the caller writes after the reset, and its commit, are covered too."""
     store = get_store()
-    persist(build_store(seed), store)
+    data = build_store(seed)
+    rows = encode_rows(data)
+    if not store.detached:
+        store.conn().execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": REWRITE_LOCK})
+    persist(data, store, rows)
     clear_process_cache()
     return store
 

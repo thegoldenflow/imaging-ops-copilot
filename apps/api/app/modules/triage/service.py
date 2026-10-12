@@ -13,7 +13,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.core.store import Store
-from app.llm.prompts import Prompt
+from app.agents.prompts import registered
 from app.llm.providers import mock_fixture
 
 
@@ -48,18 +48,7 @@ class TriageRecord(BaseModel):
     triaged_at: datetime
 
 
-TRIAGE_PROMPT = Prompt(
-    name="requisition_triage",
-    version="requisition_triage@1",
-    system=(
-        "You triage outpatient imaging requisitions for scheduling priority. "
-        "P1: must be imaged within 48 hours (e.g. suspected DVT, cauda equina symptoms). "
-        "P2: within 1 week (suspected cancer, new seizure, postmenopausal bleeding, significant red flags). "
-        "P3: within 1 month (symptomatic, no red flags). P4: routine or follow-up (chronic, stable, surveillance). "
-        "List red flags as short phrases quoted from the request. A radiologist reviews every decision."
-    ),
-    template="Extracted requisition fields (JSON):\n{fields}",
-)
+TRIAGE_PROMPT = registered("requisition_triage")
 
 P1_WORDS = r"\bdvt\b|deep vein thrombosis|cauda equina|saddle (numbness|anesthesia|anaesthesia)|urinary retention"
 P4_FOLLOWUP = r"follow-up|surveillance|known (small )?(\w+ )?nodule"

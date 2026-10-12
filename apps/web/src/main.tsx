@@ -4,7 +4,8 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { canSee, Layout, NAV } from "./components/Layout";
 import { EmptyState, Loading } from "./components/ui";
-import { AiUsagePage } from "./features/admin/AiUsagePage";
+import { AgentsPage } from "./features/admin/AgentsPage";
+import { AiOpsPage } from "./features/ai-ops/AiOpsPage";
 import { AuditPage } from "./features/admin/AuditPage";
 import { BacklogPage } from "./features/backlog/BacklogPage";
 import { CriticalPage } from "./features/critical/CriticalPage";
@@ -22,7 +23,15 @@ import { PortalPage } from "./features/portal/PortalPage";
 import { PortalPatientPage } from "./features/portal/PortalPatientPage";
 import { PeerReviewPage } from "./features/peer-review/PeerReviewPage";
 import { ContrastPage } from "./features/contrast/ContrastPage";
-import { EvalsPage } from "./features/evals/EvalsPage";
+import { ControlTowerPage } from "./features/control-tower/ControlTowerPage";
+import { ReviewQueuePage } from "./features/workflows/ReviewQueuePage";
+import { WorkflowPage } from "./features/workflows/WorkflowPage";
+import { WorkflowsPage } from "./features/workflows/WorkflowsPage";
+import { MedSafetyPage } from "./features/med-safety/MedSafetyPage";
+import { DocumentationPage } from "./features/documentation/DocumentationPage";
+import { CallCentrePage } from "./features/voice/CallCentrePage";
+import { FollowUpPage } from "./features/voice/FollowUpPage";
+import { PatientPortalPage, PrintPage } from "./features/documentation/PatientPages";
 import { ClinicalKnowledgePage } from "./features/clinical-kg/ClinicalKnowledge";
 import { MriSafetyPage } from "./features/mri-safety/MriSafetyPage";
 import { MriQuestionnairePage } from "./features/patient/MriQuestionnairePage";
@@ -32,7 +41,13 @@ import { RequisitionDetailPage } from "./features/requisitions/RequisitionDetail
 import { RequisitionsPage } from "./features/requisitions/RequisitionsPage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { FrontDeskPage } from "./features/frontdesk/FrontDeskPage";
+import { BreakGlassReviewPage } from "./features/hospital/BreakGlassReviewPage";
+import { PatientChartPage } from "./features/hospital/PatientChartPage";
+import { PatientsPage } from "./features/hospital/PatientsPage";
 import { HomePage } from "./features/home/HomePage";
+import { StorylinePage } from "./features/storyline/StorylinePage";
+import { RoadmapPage } from "./features/roadmap/RoadmapPage";
+import { SafetyPage } from "./features/roadmap/SafetyPage";
 import { PreRegPage } from "./features/patient/PreRegPage";
 import { ReferrerPage } from "./features/referrer/ReferrerPage";
 import { ReadingRoomPage } from "./features/reports/ReadingRoomPage";
@@ -74,6 +89,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/feedback/:token" element={<FeedbackSurveyPage />} />
             <Route element={<RequireAuth><Layout /></RequireAuth>}>
               <Route index element={<HomePage />} />
+              <Route path="/storyline" element={<Guard path="/storyline"><StorylinePage /></Guard>} />
               <Route path="/scheduling" element={<Guard path="/scheduling"><SchedulingPage /></Guard>} />
               <Route path="/front-desk" element={<Guard path="/front-desk"><FrontDeskPage /></Guard>} />
               <Route path="/reading" element={<Guard path="/reading"><ReadingRoomPage /></Guard>} />
@@ -100,9 +116,26 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/phipa" element={<Guard path="/phipa"><PhipaPage /></Guard>} />
               <Route path="/inspection" element={<Guard path="/inspection"><InspectionPage /></Guard>} />
               <Route path="/inspection/documents/:docId" element={<Guard path="/inspection"><DocumentPage /></Guard>} />
-              <Route path="/evals" element={<Guard path="/evals"><EvalsPage /></Guard>} />
-              <Route path="/ai-usage" element={<Guard path="/ai-usage"><AiUsagePage /></Guard>} />
+              <Route path="/evals" element={<Guard path="/ai-ops"><AiOpsPage defaultTab="imaging" /></Guard>} />
+              <Route path="/agents" element={<Guard path="/agents"><AgentsPage /></Guard>} />
+              <Route path="/ai-usage" element={<Guard path="/ai-ops"><AiOpsPage defaultTab="calls" /></Guard>} />
+              <Route path="/ai-ops" element={<Guard path="/ai-ops"><AiOpsPage /></Guard>} />
               <Route path="/audit" element={<Guard path="/audit"><AuditPage /></Guard>} />
+              <Route path="/break-glass-review" element={<Guard path="/break-glass-review"><BreakGlassReviewPage /></Guard>} />
+              <Route path="/control-tower" element={<Guard path="/control-tower"><ControlTowerPage /></Guard>} />
+              <Route path="/workflows" element={<Guard path="/workflows"><WorkflowsPage /></Guard>} />
+              <Route path="/workflows/:workflowId" element={<Guard path="/workflows"><WorkflowPage /></Guard>} />
+              <Route path="/reviews" element={<Guard path="/reviews"><ReviewQueuePage /></Guard>} />
+              <Route path="/med-safety" element={<Guard path="/med-safety"><MedSafetyPage /></Guard>} />
+              <Route path="/documentation" element={<Guard path="/documentation"><DocumentationPage /></Guard>} />
+              <Route path="/call-centre" element={<Guard path="/call-centre"><CallCentrePage /></Guard>} />
+              <Route path="/follow-up" element={<Guard path="/follow-up"><FollowUpPage /></Guard>} />
+              <Route path="/documentation/print/:docId" element={<Guard path="/documentation"><PrintPage /></Guard>} />
+              <Route path="/documentation/portal/:docId" element={<Guard path="/documentation"><PatientPortalPage /></Guard>} />
+              <Route path="/hospital/patients" element={<Guard path="/hospital/patients"><PatientsPage /></Guard>} />
+              <Route path="/roadmap" element={<Guard path="/roadmap"><RoadmapPage /></Guard>} />
+              <Route path="/safety" element={<Guard path="/safety"><SafetyPage /></Guard>} />
+              <Route path="/hospital/patients/:mrn" element={<Guard path="/hospital/patients"><PatientChartPage /></Guard>} />
               <Route path="*" element={<EmptyState title="Page not found" />} />
             </Route>
           </Routes>

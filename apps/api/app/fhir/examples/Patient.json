@@ -1,0 +1,81 @@
+{
+  "resourceType": "Patient",
+  "id": "pat-0003",
+  "active": true,
+  "identifier": [
+    {
+      "use": "usual",
+      "type": {
+        "text": "Medical record number"
+      },
+      "system": "urn:demo-hospital:mrn",
+      "value": "40000003"
+    },
+    {
+      "use": "official",
+      "type": {
+        "text": "Ontario health card (synthetic)"
+      },
+      "system": "urn:demo-hospital:hcn",
+      "value": "5960899638",
+      "extension": [
+        {
+          "url": "urn:demo-hospital:ext:synthetic",
+          "valueBoolean": true
+        },
+        {
+          "url": "urn:demo-hospital:ext:hcn-version",
+          "valueString": "AB"
+        }
+      ]
+    }
+  ],
+  "name": [
+    {
+      "use": "official",
+      "family": "Brennan",
+      "given": [
+        "Paul"
+      ],
+      "text": "Paul Brennan"
+    }
+  ],
+  "gender": "male",
+  "birthDate": "1944-05-14",
+  "address": [
+    {
+      "use": "home",
+      "line": [
+        "865 Example St"
+      ],
+      "city": "Brampton",
+      "state": "ON",
+      "postalCode": "L7B 2X9",
+      "country": "CA"
+    }
+  ],
+  "communication": [
+    {
+      "language": {
+        "coding": [
+          {
+            "system": "urn:ietf:bcp:47",
+            "code": "en",
+            "display": "English"
+          }
+        ]
+      },
+      "preferred": true
+    }
+  ],
+  "managingOrganization": {
+    "reference": "Organization/org-demo-hospital"
+  },
+  "telecom": [
+    {
+      "system": "phone",
+      "value": "+1-647-555-0148",
+      "use": "home"
+    }
+  ]
+}

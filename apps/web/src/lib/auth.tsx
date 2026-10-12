@@ -21,7 +21,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!getToken()) return;
     api<StaffUser>("/api/auth/me")
       .then(setUser)
-      .catch(() => setToken(null))
+      // A 401 has already dropped the token (api); a request aborted by a navigation keeps it for the next page
+      .catch(() => undefined)
       .finally(() => setLoading(false));
   }, []);
 

@@ -1,0 +1,63 @@
+# Tool registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# side_effect_level read / recommend / action / privileged; schemas are JSON Schema (the subset in
+# app/agents/jsonschema.py); fhir_writes is what the tool may write (agents' write rights derive from it).
+tool_id: findCaller
+description: 'Identity check of a caller (7.4): the patient whose name, birth date and last four digits of the
+  (synthetic) health card all match. Returns the patient only on an exact single match; the check is code, never
+  the model.'
+side_effect_level: read
+handler: app.modules.voice_services.tools:find_caller
+domain: fhir
+reads:
+- Patient
+input_schema:
+  type: object
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 120
+    birth_date:
+      type: string
+      pattern: ^\d{4}-\d{2}-\d{2}$
+    card_last4:
+      type: string
+      pattern: ^\d{4}$
+  required:
+  - name
+  - birth_date
+  - card_last4
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    verified:
+      type: boolean
+    patient_id:
+      type:
+      - string
+      - 'null'
+    given_name:
+      type:
+      - string
+      - 'null'
+    language:
+      type:
+      - string
+      - 'null'
+  required:
+  - verified
+  additionalProperties: false
+permission_policy:
+  roles:
+  - physician
+  - nurse
+  - clerk
+  - system
+idempotency:
+  required: false
+timeout_ms: 8000
+retry:
+  max_attempts: 2
+  backoff_ms: 50
+audit_level: detailed

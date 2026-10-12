@@ -91,7 +91,7 @@ function TriageCard({ d, isRad }: { d: RequisitionDetail; isRad: boolean }) {
   const override = useMutation({ mutationFn: () => post<RequisitionDetail>(`/api/requisitions/${d.summary.id}/triage/override`, { priority, reason }), onSuccess: set });
   const t = d.triage!;
   return (
-    <Card title={<span className="flex items-center gap-2">Triage <AiBadge label={t.ai_status === "seeded" ? "Baseline" : "AI suggestion"} /></span>}
+    <Card title={<span className="flex items-center gap-2">Triage <AiBadge label={t.ai_status === "seeded" ? "Baseline" : "AI suggestion"} agent={t.ai_status === "seeded" ? undefined : "requisition_triage"} /></span>}
       actions={<DaysLeft days={d.summary.days_left} />}>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-slate-500">AI:</span>{t.ai_priority ? <UrgencyBadge urgency={t.ai_priority} /> : <Badge tone="amber">unavailable</Badge>}
@@ -134,7 +134,7 @@ function ProtocolCard({ d, isRad }: { d: RequisitionDetail; isRad: boolean }) {
   });
   const options = [p.primary, ...p.alternatives];
   return (
-    <Card title={<span className="flex items-center gap-2">Protocol <AiBadge label={p.ai_status === "seeded" ? "Baseline" : "AI suggestion"} /></span>}
+    <Card title={<span className="flex items-center gap-2">Protocol <AiBadge label={p.ai_status === "seeded" ? "Baseline" : "AI suggestion"} agent={p.ai_status === "seeded" ? undefined : "protocol_suggest"} /></span>}
       actions={p.approved ? <Badge tone="green"><ShieldCheck className="size-3" /> Approved by {p.approved_by}</Badge> : null}>
       <ul className="space-y-2">
         {options.map((o, i) => (
@@ -183,7 +183,7 @@ function MriCard({ d }: { d: RequisitionDetail }) {
           {m.flags.length > 0 ? <ul className="list-disc pl-4 text-rose-700">{m.flags.map((f) => <li key={f}>{f}</li>)}</ul> : <p className="text-slate-600">{m.submitted_at ? "No safety flags in the answers." : "Waiting for the patient's answers."}</p>}
           {m.devices.length > 0 && (
             <ul className="space-y-1">{m.devices.map((dv, i) => (
-              <li key={i} className="rounded-lg bg-slate-50 p-2 text-xs"><AiBadge label="AI read" /> “{dv.patient_words}” → <b>{dv.device_name}</b> · {dv.mr_status}</li>
+              <li key={i} className="rounded-lg bg-slate-50 p-2 text-xs"><AiBadge label="AI read" agent="mri_implant_extract" /> “{dv.patient_words}” → <b>{dv.device_name}</b> · {dv.mr_status}</li>
             ))}</ul>
           )}
           {m.reviewed_by && <p className="text-xs text-slate-500">{m.review_decision === "cleared" ? "Cleared" : "Not cleared"} by {m.reviewed_by}: “{m.review_note}”</p>}
@@ -258,7 +258,7 @@ export function RequisitionDetailPage() {
               <HighlightedText detail={d} />
             </Card>
             {d.extraction && (
-              <Card title={<span className="flex items-center gap-2">Extracted fields <AiBadge label={d.extraction.ai_status === "seeded" ? "Baseline" : "AI-extracted"} /></span>}
+              <Card title={<span className="flex items-center gap-2">Extracted fields <AiBadge label={d.extraction.ai_status === "seeded" ? "Baseline" : "AI-extracted"} agent={d.extraction.ai_status === "seeded" ? undefined : "requisition_extract"} /></span>}
                 actions={<span className="text-xs text-slate-400">{d.extraction.prompt_version}</span>}>
                 <table className="w-full"><tbody className="divide-y divide-slate-100">
                   {Object.entries(d.extraction.fields).map(([k, v]) => (

@@ -1,0 +1,79 @@
+{
+ "run_id": "run-2026-10-10T063931",
+ "started_at": "2026-10-10T06:39:31",
+ "finished_at": "2026-10-10T06:39:31",
+ "mode": "mock",
+ "baseline": true,
+ "trigger": "cli",
+ "requested": [
+  "call_center",
+  "followup_calls"
+ ],
+ "variant": null,
+ "git": {
+  "commit": "03be4e4",
+  "dirty": false
+ },
+ "agents": {
+  "followup_calls": {
+   "suite": null,
+   "agent_version": "0.2.0",
+   "prompt_version": "followup_calls@1",
+   "prompt_sha256": "b6f34da76170109f",
+   "status": "no_eval_set",
+   "met": null,
+   "note": "no eval set (no adapter, no evals/<agent>/cases.jsonl, no module report)",
+   "eval_status": "pending"
+  },
+  "call_center": {
+   "suite": "report.call_center",
+   "suite_kind": "report",
+   "suite_title": "call_center (module report call_center/report.json)",
+   "source": "evals/call_center/report.json",
+   "agent_version": "0.2.0",
+   "kind": "runtime_agent",
+   "risk_tier": "ops",
+   "prompt_version": "call_center@1",
+   "prompt_sha256": "4943e61cc5adac86",
+   "model": "claude-haiku-4-5",
+   "model_key": "claude-voice",
+   "mode": "mock",
+   "variant": null,
+   "threshold": 0.8,
+   "pipeline_eval": false,
+   "metrics": {
+    "schema_validity": null,
+    "grounding_rate": null,
+    "task_success": null,
+    "human_override_rate": null,
+    "latency_p50_ms": null,
+    "latency_p95_ms": null,
+    "cost_per_case_usd": null,
+    "cost_estimated": true,
+    "cases": 0,
+    "cases_passed": 0,
+    "model_calls": 0,
+    "tokens_in": 0,
+    "tokens_out": 0,
+    "human_decisions": 0
+   },
+   "extra": {},
+   "gates": {
+    "module_verdict": {
+     "value": true,
+     "threshold": true,
+     "passed": true
+    }
+   },
+   "notes": "Read from the module's report report.json (its own script ran it).",
+   "module_run_at": "2026-10-10T04:37:02",
+   "case_results": [],
+   "status": "met",
+   "met": true,
+   "seconds": 0.0,
+   "eval_status": "pending"
+  }
+ },
+ "platform": {},
+ "note": "Mock model: a baseline that shows the pipeline (context, schema, guards, evidence), not a model's quality; mock costs are list-price estimates."
+}

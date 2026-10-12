@@ -2,6 +2,8 @@
 
 Read `docs/SPEC.md` in full before starting any work. It is the source of truth for scope, phases, the shared data model and acceptance criteria. Track progress in `docs/PROGRESS.md`.
 
+The hospital-platform extension (phases 6–8, work packages WP0–WP10) is specified in `docs/SPEC-hospital.md`. For that work also read `docs/audit-baseline.md` (reusable components, owner decisions, naming map) and `docs/data-model.md` first.
+
 ## Repository layout
 
 - `apps/api/` — FastAPI backend: `app/core` (config, auth, audit, store, templates), `app/llm` (gateway, providers, de-identification, prompts), `app/modules/<system>`, `app/integrations` (mocks), `app/seed.py`

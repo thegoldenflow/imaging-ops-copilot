@@ -1,12 +1,19 @@
 import clsx from "clsx";
 import {
   Activity,
+  BedDouble,
+  Bot,
+  KeyRound,
+  Layers,
+  Map as MapIcon,
   CalendarClock,
   ClipboardCheck,
   ClipboardList,
   Droplet,
+  FileSignature,
+  Headset,
+  PhoneOutgoing,
   FileText,
-  FlaskConical,
   History,
   Home,
   Inbox,
@@ -14,6 +21,7 @@ import {
   LogOut,
   Magnet,
   Package,
+  Pill,
   BookOpenCheck,
   ShieldAlert,
   MessageSquareHeart,
@@ -25,10 +33,14 @@ import {
   Radiation,
   PhoneCall,
   RotateCcw,
+  Route as RouteIcon,
   ScanLine,
   ShieldCheck,
   Siren,
   Sparkles,
+  TowerControl,
+  ListChecks,
+  Workflow,
 } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -36,7 +48,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { isLiveLlm, llmVendor } from "../lib/llm";
-import { ROLE_LABEL, type Meta, type Role } from "../lib/types";
+import { BreakGlassBanner } from "../features/hospital/BreakGlass";
+import { EscalationCount } from "../features/voice/FollowUpPage";
+import { HOSPITAL_CLINICAL, ROLE_LABEL, type Meta, type Role } from "../lib/types";
 import { Badge, Button } from "./ui";
 
 interface NavItem {
@@ -44,13 +58,22 @@ interface NavItem {
   label: string;
   icon: typeof Home;
   roles: Role[] | "all";
-  section: "" | "Operations" | "Intake pipeline" | "Radiology ops" | "Business & compliance" | "Oversight";
+  section: "" | "Hospital" | "Operations" | "Intake pipeline" | "Radiology ops" | "Business & compliance" | "Oversight" | "Architecture";
 }
 
 const STAFF: Role[] = ["front_desk", "technologist", "radiologist", "operations_manager", "medical_director", "admin"];
 
 export const NAV: NavItem[] = [
   { to: "/", label: "Home", icon: Home, roles: "all", section: "" },
+  { to: "/storyline", label: "Hospital storyline", icon: RouteIcon, roles: "all", section: "" },
+  { to: "/control-tower", label: "Control Tower", icon: TowerControl, roles: ["operations_manager", "nurse", "physician"], section: "Hospital" },
+  { to: "/hospital/patients", label: "Patients", icon: BedDouble, roles: HOSPITAL_CLINICAL, section: "Hospital" },
+  { to: "/reviews", label: "Review queue", icon: ListChecks, roles: HOSPITAL_CLINICAL, section: "Hospital" },
+  { to: "/workflows", label: "Workflows", icon: Workflow, roles: [...HOSPITAL_CLINICAL, "admin"], section: "Hospital" },
+  { to: "/med-safety", label: "Medication safety", icon: Pill, roles: ["pharmacist", "physician"], section: "Hospital" },
+  { to: "/documentation", label: "Documentation", icon: FileSignature, roles: ["physician", "nurse"], section: "Hospital" },
+  { to: "/call-centre", label: "Call centre", icon: Headset, roles: ["clerk", "operations_manager"], section: "Hospital" },
+  { to: "/follow-up", label: "Follow-up calls", icon: PhoneOutgoing, roles: ["nurse", "physician"], section: "Hospital" },
   { to: "/scheduling", label: "Scheduling", icon: CalendarClock, roles: ["front_desk", "technologist", "operations_manager", "medical_director", "admin"], section: "Operations" },
   { to: "/front-desk", label: "Front desk", icon: PhoneCall, roles: ["front_desk", "operations_manager", "admin"], section: "Operations" },
   { to: "/reading", label: "Reading room", icon: ScanLine, roles: ["radiologist", "medical_director", "admin"], section: "Operations" },
@@ -73,9 +96,12 @@ export const NAV: NavItem[] = [
   { to: "/feedback", label: "Patient feedback", icon: MessageSquareHeart, roles: ["front_desk", "operations_manager", "medical_director", "admin"], section: "Business & compliance" },
   { to: "/phipa", label: "Access monitoring", icon: ShieldAlert, roles: ["medical_director", "admin"], section: "Business & compliance" },
   { to: "/inspection", label: "Inspection hub", icon: BookOpenCheck, roles: STAFF, section: "Business & compliance" },
-  { to: "/ai-usage", label: "AI usage", icon: Activity, roles: ["operations_manager", "medical_director", "admin"], section: "Oversight" },
-  { to: "/evals", label: "AI evaluations", icon: FlaskConical, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Oversight" },
+  { to: "/agents", label: "AI agents", icon: Bot, roles: ["admin"], section: "Oversight" },
+  { to: "/ai-ops", label: "AI Ops", icon: Activity, roles: ["radiologist", "operations_manager", "medical_director", "admin"], section: "Oversight" },
   { to: "/audit", label: "Audit log", icon: ShieldCheck, roles: ["medical_director", "admin"], section: "Oversight" },
+  { to: "/break-glass-review", label: "Break-glass review", icon: KeyRound, roles: ["admin"], section: "Oversight" },
+  { to: "/safety", label: "Safety tiers", icon: Layers, roles: "all", section: "Architecture" },
+  { to: "/roadmap", label: "Roadmap", icon: MapIcon, roles: "all", section: "Architecture" },
 ];
 
 export function canSee(item: NavItem, role: Role) {
@@ -133,6 +159,7 @@ export function Layout() {
             >
               <item.icon className="size-4" />
               {item.label}
+              {item.to === "/follow-up" && <EscalationCount enabled={user.role === "nurse" || user.role === "physician"} />}
             </NavLink>
             </div>
           ))}
@@ -162,7 +189,11 @@ export function Layout() {
           <div className="flex items-center gap-2">
             <div className="text-right leading-tight">
               <p className="text-sm font-medium text-slate-900" data-testid="current-user">{user.name}</p>
-              <p className="text-xs text-slate-500">{ROLE_LABEL[user.role]}{user.site_ids.length ? ` · ${user.site_ids.join(", ")}` : ""}</p>
+              <p className="text-xs text-slate-500">
+                {ROLE_LABEL[user.role]}
+                {user.site_ids.length ? ` · ${user.site_ids.join(", ")}` : ""}
+                {user.unit_ids?.length ? ` · ${user.unit_ids.join(", ")}` : ""}
+              </p>
             </div>
             <Button size="sm" variant="ghost" onClick={reset} loading={resetting} title="Reset demo data">
               <RotateCcw className="size-4" />
@@ -174,6 +205,7 @@ export function Layout() {
             </Button>
           </div>
         </header>
+        <BreakGlassBanner />
         <main className="flex-1 px-4 py-5 md:px-6">
           <Outlet />
         </main>

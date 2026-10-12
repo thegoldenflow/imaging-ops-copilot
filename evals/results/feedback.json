@@ -1,6 +1,6 @@
 {
  "task": "feedback",
- "run_at": "2026-10-07T00:23:49",
+ "run_at": "2026-10-10T04:27:55",
  "mode": "mock",
  "model": "rule-based baseline",
  "n": 60,
@@ -231,6 +231,6 @@
    }
   }
  ],
- "seconds": 1.1,
+ "seconds": 1.5,
  "notes": "60 comments, 15 per language (EN, FR, ZH, PA), with star rating. Sentiment accuracy, exact theme-set match and micro-F1 over themes."
 }

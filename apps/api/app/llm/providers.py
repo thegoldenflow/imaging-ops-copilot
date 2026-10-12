@@ -78,6 +78,19 @@ def mock_fixture(task: str):
     return register
 
 
+# Mock tool-use fixtures: task name -> function(messages, tools) -> (content blocks, stop reason). A tool-using
+# agent with one runs its loop on the mock (its eval); without one the mock has no tool-use agent.
+MOCK_TOOL_FIXTURES: dict[str, Callable[[list, list], tuple[list, str]]] = {}
+
+
+def mock_tool_fixture(task: str):
+    def register(fn):
+        MOCK_TOOL_FIXTURES[task] = fn
+        return fn
+
+    return register
+
+
 class MockProvider:
     mode = "mock"
 
@@ -85,7 +98,8 @@ class MockProvider:
         self.latency_s = latency_s
         self.attempts: dict[str, int] = {}
 
-    def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0) -> ProviderResult:
+    def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0,
+                      max_tokens=8000) -> ProviderResult:
         time.sleep(self.latency_s)
         fixture = MOCK_FIXTURES.get(task)
         if fixture is None:
@@ -96,8 +110,17 @@ class MockProvider:
             input_tokens=len(text) // 4 + 1500 * len(images or []), output_tokens=len(json.dumps(data)) // 4,
         )
 
-    def tool_turn(self, **_) -> ProviderResult:
-        raise ProviderUnavailable("The mock provider has no tool-use agent; use the scripted agent")
+    def tool_turn(self, *, task=None, model="", messages=(), tools=(), **_) -> ProviderResult:
+        fixture = MOCK_TOOL_FIXTURES.get(task)
+        if fixture is None:
+            raise ProviderUnavailable("The mock provider has no tool-use agent; use the scripted agent")
+        time.sleep(self.latency_s)
+        content, stop_reason = fixture(list(messages), list(tools))
+        return ProviderResult(
+            data=None, model=f"mock:{model}", content=content, stop_reason=stop_reason,
+            input_tokens=len(json.dumps(list(messages), default=str)) // 4,
+            output_tokens=len(json.dumps(content, default=str)) // 4,
+        )
 
 
 class AnthropicProvider:
@@ -121,7 +144,8 @@ class AnthropicProvider:
         except anthropic.APIConnectionError as e:  # includes timeouts
             raise ProviderUnavailable(f"Connection error: {e}") from e
 
-    def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0) -> ProviderResult:
+    def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0,
+                      max_tokens=8000) -> ProviderResult:
         content: list[dict] = [
             {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}}
             for b64, media_type in (images or [])
@@ -129,7 +153,7 @@ class AnthropicProvider:
         content.append({"type": "text", "text": text})
         resp = self._create(
             model=model,
-            max_tokens=8000,
+            max_tokens=max_tokens,
             system=system,
             messages=[{"role": "user", "content": content}],
             output_config={"format": {"type": "json_schema", "schema": schema}},
@@ -146,8 +170,8 @@ class AnthropicProvider:
             input_tokens=resp.usage.input_tokens, output_tokens=resp.usage.output_tokens,
         )
 
-    def tool_turn(self, *, model, system, messages, tools) -> ProviderResult:
-        resp = self._create(model=model, max_tokens=1024, system=system, messages=messages, tools=tools)
+    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024, task=None) -> ProviderResult:
+        resp = self._create(model=model, max_tokens=max_tokens, system=system, messages=messages, tools=tools)
         if resp.stop_reason == "refusal":
             raise ProviderRefusal("Model declined the request")
         return ProviderResult(
@@ -301,7 +325,8 @@ class GeminiProvider:
         # Thinking tokens are billed as output.
         return u.prompt_token_count or 0, (u.candidates_token_count or 0) + (u.thoughts_token_count or 0)
 
-    def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0) -> ProviderResult:
+    def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0,
+                      max_tokens=8000) -> ProviderResult:
         contents: list = [
             genai_types.Part.from_bytes(data=base64.b64decode(b64), mime_type=media_type)
             for b64, media_type in (images or [])
@@ -309,7 +334,7 @@ class GeminiProvider:
         contents.append(text)
         resp = self._generate(model=model, contents=contents, config=genai_types.GenerateContentConfig(
             system_instruction=system,
-            max_output_tokens=8000,
+            max_output_tokens=max_tokens,
             response_mime_type="application/json",
             response_json_schema=schema,
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
@@ -324,10 +349,10 @@ class GeminiProvider:
         return ProviderResult(data=data, model=resp.model_version or model,
                               input_tokens=tokens_in, output_tokens=tokens_out)
 
-    def tool_turn(self, *, model, system, messages, tools) -> ProviderResult:
+    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024, task=None) -> ProviderResult:
         resp = self._generate(model=model, contents=gemini_contents(messages), config=genai_types.GenerateContentConfig(
             system_instruction=system,
-            max_output_tokens=1024,
+            max_output_tokens=max_tokens,
             tools=gemini_tools(tools),
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
         ))

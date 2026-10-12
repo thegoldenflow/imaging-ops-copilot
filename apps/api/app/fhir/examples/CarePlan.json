@@ -1,0 +1,36 @@
+{
+  "resourceType": "CarePlan",
+  "id": "careplan-example",
+  "status": "active",
+  "intent": "plan",
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "urn:demo-hospital:code",
+          "code": "discharge-plan"
+        }
+      ],
+      "text": "Discharge plan"
+    }
+  ],
+  "title": "Discharge and follow-up plan",
+  "subject": {
+    "reference": "Patient/pat-0388"
+  },
+  "encounter": {
+    "reference": "Encounter/stay-00912"
+  },
+  "period": {
+    "start": "2026-10-08T10:00:00-04:00"
+  },
+  "activity": [
+    {
+      "detail": {
+        "kind": "Appointment",
+        "status": "scheduled",
+        "description": "Follow-up call 48 hours after discharge"
+      }
+    }
+  ]
+}

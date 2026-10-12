@@ -118,7 +118,8 @@ test("storyline: report, phone cancellation, backfill, pre-registration, audit",
   await page.getByRole("link", { name: "Audit log" }).click();
   await expect(page.getByText(/Chain intact/)).toBeVisible();
   await shot(page, "10-audit");
-  await page.getByRole("link", { name: "AI usage" }).click();
+  await page.getByRole("link", { name: "AI Ops" }).click();
+  await page.getByRole("tab", { name: "Model calls" }).click();
   await expect(page.getByRole("cell", { name: "cxr_draft", exact: true }).first()).toBeVisible();
 });
 

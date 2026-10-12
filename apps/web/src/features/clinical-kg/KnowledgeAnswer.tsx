@@ -64,7 +64,7 @@ export function KnowledgeAnswer({ entry, compact = false }: { entry: KgEntry; co
   return (
     <div className="space-y-3" data-testid="kg-answer">
       <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-        {aiAnswered && <AiBadge label={entry.mode === "mock" ? "Template answer" : `AI answer · ${llmVendor(entry.mode) ?? entry.mode}`} />}
+        {aiAnswered && <AiBadge label={entry.mode === "mock" ? "Template answer" : `AI answer · ${llmVendor(entry.mode) ?? entry.mode}`} agent="clinical_kg_answer" />}
         {entry.entities.filter((e) => e.name).map((e) => (
           <Badge key={e.text} tone="blue">{e.text}{e.name !== e.text && ` → ${e.name}`}{e.match === "fuzzy" && " (approx.)"}</Badge>
         ))}

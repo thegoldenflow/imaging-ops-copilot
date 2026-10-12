@@ -15,6 +15,15 @@ class Role(StrEnum):
     MEDICAL_DIRECTOR = "medical_director"
     ADMIN = "admin"
     REFERRER = "referrer"
+    # Hospital platform (docs/SPEC-hospital.md 6.3); the spec's ops_manager is OPERATIONS_MANAGER.
+    PHYSICIAN = "physician"
+    NURSE = "nurse"
+    PHARMACIST = "pharmacist"
+    CLERK = "clerk"
+
+
+IMAGING_ROLES = frozenset({Role.FRONT_DESK, Role.TECHNOLOGIST, Role.RADIOLOGIST, Role.OPERATIONS_MANAGER,
+                           Role.MEDICAL_DIRECTOR, Role.ADMIN, Role.REFERRER})
 
 
 class Modality(StrEnum):
@@ -190,6 +199,9 @@ class StaffUser(BaseModel):  # FHIR PractitionerRole
     referrer_id: str | None = None
     reading_modalities: list[Modality] = Field(default_factory=list)  # radiologist credentials
     demo_login: bool = True  # shown on the demo login page (one user per role)
+    # Hospital staff: the units whose patients they see (empty = no unit scope) and their FHIR Practitioner.
+    unit_ids: list[str] = Field(default_factory=list)
+    practitioner_id: str | None = None
 
 
 class MessageOutbox(BaseModel):  # FHIR Communication
@@ -210,17 +222,23 @@ class MessageOutbox(BaseModel):  # FHIR Communication
 class AuditEvent(BaseModel):  # FHIR AuditEvent
     seq: int
     ts: datetime
-    user_id: str
+    user_id: str  # actor id (spec 6.3 actor_id)
     user_name: str
-    role: str
-    action: str  # read, create, update, delete, login, export
+    role: str  # actor role (spec 6.3 actor_role)
+    action: str  # read, create, update, delete, login, export, sign, ...
     resource_type: str
     resource_id: str | None
-    outcome: str  # allowed, denied
+    outcome: str  # allowed, denied; ai_call: ok, retried_ok, needs_human, unavailable; reviews: justified, ...
     source_ip: str | None
     reason: str
     prev_hash: str
     hash: str
+    # WP4 (6.3). Left out of the hash digest when null, so events written before them still verify.
+    event_type: str | None = None  # read, write, ai_call, sign, break_glass, export, consent_change, simulator_event, login
+    patient_mrn_hash: str | None = None  # keyed blind index of the patient's MRN
+    encounter_id: str | None = None
+    module: str | None = None  # the purpose module (FhirGateway) or the LLM task
+    prompt_version: str | None = None  # ai_call only
 
 
 class LlmCall(BaseModel):

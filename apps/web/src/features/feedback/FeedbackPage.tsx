@@ -44,7 +44,7 @@ function ResponseRow({ r, themes }: { r: FeedbackResponse; themes: Record<string
           {r.themes.map((t) => <Badge key={t} tone="blue">{themes[t]}</Badge>)}
           {r.ai_status === null && <Badge tone="ai">AI labelling…</Badge>}
           {r.ai_status === "unavailable" && <Badge tone="amber">AI unavailable, label by hand</Badge>}
-          {r.confirmed_by ? <Badge tone="green">Confirmed by {r.confirmed_by}</Badge> : r.ai_status && ["ok", "seeded"].includes(r.ai_status) && <AiBadge label={r.ai_status === "seeded" ? "Baseline label" : "AI label"} />}
+          {r.confirmed_by ? <Badge tone="green">Confirmed by {r.confirmed_by}</Badge> : r.ai_status && ["ok", "seeded"].includes(r.ai_status) && <AiBadge label={r.ai_status === "seeded" ? "Baseline label" : "AI label"} agent={r.ai_status === "seeded" ? undefined : "feedback_classify"} />}
         </div>
       </div>
       {r.comment && <p className="mt-1 text-slate-700">“{r.comment}”</p>}

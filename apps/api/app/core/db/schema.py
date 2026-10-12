@@ -17,6 +17,7 @@ them at import time would be circular.
 """
 
 import importlib
+import threading
 import types
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -115,6 +116,45 @@ MODULE_ENTITIES = {
         EntitySpec("backfill_cases", f"{M}.scheduling.service:BackfillCase"),
         EntitySpec("offers", f"{M}.scheduling.service:Offer"),
         EntitySpec("triage", f"{M}.triage.service:TriageRecord"),
+        # Messages to external systems that could not be delivered (app/integrations/contract.py)
+        EntitySpec("dead_letters", "app.integrations.contract:DeadLetter", encrypted=("payload",),
+                   indexes=(("adapter", "status"),)),
+        # Hospital platform (6.3): break-glass grants and the free-text de-identification misses
+        EntitySpec("break_glass_grants", "app.ehr.breakglass:BreakGlassGrant", encrypted=("mrn", "reason", "review_note"),
+                   indexes=(("user_id",), ("review_status",))),
+        EntitySpec("deid_misses", "app.llm.freetext_deid:DeidMiss", kind="list", encrypted=("text", "context")),
+        # Agent runtime (6.4): one trace per run (references and hashes only) and the Tool Gateway's
+        # idempotency records (the first result of an action, replayed for 24 hours; encrypted)
+        EntitySpec("agent_traces", "app.agents.trace:AgentTrace", indexes=(("agent_id",), ("started_at",))),
+        EntitySpec("tool_idempotency", "app.agents.trace:IdempotencyRecord", encrypted=("result",),
+                   indexes=(("expires_at",),)),
+        # Control Tower (7.1): the exception stream (the narrative may quote beds and MRN tokens: encrypted)
+        EntitySpec("flow_exceptions", "app.modules.control_tower.exceptions:FlowException", encrypted=("narration",),
+                   indexes=(("status",), ("key",))),
+        # Durable workflows (6.5): the timeline of each workflow for the workflow view (step details encrypted),
+        # and the low-confidence agent outputs a person reviews (de-identified model input and output, encrypted)
+        EntitySpec("workflow_runs", "app.workflows.progress:WorkflowRun", encrypted=("steps", "notes"),
+                   indexes=(("workflow_type", "status"), ("encounter_id",), ("exception_id",))),
+        EntitySpec("agent_reviews", "app.agents.reviews:AgentReview", encrypted=("input", "output", "correction"),
+                   indexes=(("run_id",), ("status",))),
+        # Medication safety (7.2): the review queue. Order reviews keyed by the order reference, reconciliations by
+        # encounter and kind; the AI commentary, the reconciliation items (with the pharmacist's reasons) and the
+        # decisions are free text: encrypted
+        EntitySpec("order_reviews", "app.modules.med_safety.models:OrderReview",
+                   encrypted=("commentary", "decision"), indexes=(("id",), ("status",), ("patient_id",))),
+        EntitySpec("medrec_sessions", "app.modules.med_safety.models:MedRecSession",
+                   encrypted=("items", "ai_detail", "discharge_table"), indexes=(("id",), ("status",),
+                                                                             ("encounter_id",))),
+        # Patient voice services (7.4): call-centre calls and follow-up calls. Transcripts, dialog state, answers,
+        # the patient's words and the summaries are free text about the patient: encrypted. No audio is stored.
+        EntitySpec("voice_calls", "app.modules.voice_services.models:HospitalCall",
+                   encrypted=("transcript", "state", "intents", "actions", "summary", "caller_relation",
+                              "transfer_reason"),
+                   indexes=(("patient_id",), ("started_at",))),
+        EntitySpec("followup_calls", "app.modules.voice_services.models:FollowupCall",
+                   encrypted=("script", "transcript", "answers", "rule_hits", "classifier", "summary", "reason",
+                              "nurse_actions"),
+                   indexes=(("encounter_id",), ("status",), ("unit_id",))),
     ]
 }
 
@@ -143,6 +183,11 @@ BLOBS = {
     "extra_reminders_done",
     "daily_reset",  # date of the last automatic demo reset
     "seed_time",  # the "now" the demo data was generated for (it ages from there)
+    "hospital_plan",  # the day simulator's upcoming events (app/ehr)
+    "hospital_clock",  # the hospital's simulated clock (app/ehr)
+    "workflow_faults",  # failures injected into workflow steps for the demo (app/workflows/faults.py)
+    "voice_demo",  # the planted voice-services demo cases (app/ehr/seed/voice.py: ids only)
+    "storyline",  # the hospital storyline's state (app/modules/storyline: ids, preset facts, step markers)
 }
 
 # Derived per process from stored data; never written to the database.
@@ -180,7 +225,16 @@ audit_events = Table(
     Column("reason", Text, nullable=False),
     Column("prev_hash", Text, nullable=False),
     Column("hash", Text, nullable=False),
+    # Hospital platform (6.3, migration 0005); null on events written before.
+    Column("event_type", Text),
+    Column("patient_mrn_hash", Text),
+    Column("encounter_id", Text),
+    Column("module", Text),
+    Column("prompt_version", Text),
 )
+Index("ix_audit_events_event_type", audit_events.c.event_type)
+Index("ix_audit_events_patient_mrn_hash", audit_events.c.patient_mrn_hash)
+Index("ix_audit_events_user_id", audit_events.c.user_id)
 
 auth_sessions = Table(
     "auth_sessions", metadata,
@@ -196,7 +250,10 @@ app_meta = Table(
 )
 
 # Tables a demo reset empties. Sessions survive: staff ids are stable across resets.
-FIXED_DATA_TABLES = ("module_state", "images", "audit_events")
+# fhir_resources is defined in app/ehr/fhirstore.py (the hospital EHR's FHIR store), the event
+# log and its consumer cursors in app/ehr/events.py (a reset restarts the sequence, so they go together).
+FIXED_DATA_TABLES = ("module_state", "images", "audit_events", "fhir_resources", "domain_events", "event_consumers",
+                     "event_deliveries", "workflow_commands", "workflow_waits")
 
 
 # ---------- Pydantic model -> table ----------
@@ -254,10 +311,24 @@ def _import(ref: str) -> Any:
     return getattr(importlib.import_module(module), name)
 
 
-@cache
+_MAPPINGS: dict[str, Mapping] = {}
+_MAPPING_LOCK = threading.Lock()
+
+
 def mapping(name: str) -> Mapping:
+    """The resolved mapping of a collection, built on first use. Threads share it: the workflow worker's activity
+    threads open their first Store at the same moment, and a table can be added to the metadata only once."""
+    if (m := _MAPPINGS.get(name)) is not None:
+        return m
     spec = STORE_ENTITIES.get(name) or MODULE_ENTITIES[name]
-    model = _import(spec.model_ref)
+    model = _import(spec.model_ref)  # outside the lock: importing a module may itself need a mapping
+    with _MAPPING_LOCK:
+        if (m := _MAPPINGS.get(name)) is None:
+            m = _MAPPINGS[name] = _build(spec, model)
+    return m
+
+
+def _build(spec: EntitySpec, model: type[BaseModel]) -> Mapping:
     fields = list(model.model_fields)
     reserved = {"row_key", "seq"} | {col for col, _ in spec.blind}
     if clash := reserved & set(fields):
@@ -303,6 +374,10 @@ def all_entity_names() -> list[str]:
 
 def get_metadata() -> MetaData:
     """Metadata with every table defined (imports all model classes)."""
+    import app.ehr.events  # noqa: F401  (defines the event log tables)
+    import app.ehr.fhirstore  # noqa: F401  (defines fhir_resources)
+    import app.workflows.tables  # noqa: F401  (the workflow bridge's outbox and waits)
+
     for name in all_entity_names():
         mapping(name)
     for name in CONFIGS:

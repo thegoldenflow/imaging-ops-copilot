@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 
 from pydantic import BaseModel, Field
 
-from app.core.models import ACTIVE_STATUSES, Appointment
+from app.core.models import ACTIVE_STATUSES, Appointment, AppointmentStatus
 from app.core.store import Store
 from app.core.templates import prep_text
 from app.modules.scheduling import service as scheduling
@@ -14,6 +14,11 @@ from app.modules.scheduling import service as scheduling
 MONTHS = {m: i + 1 for i, m in enumerate(
     ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
      "november", "december"])}
+# French, with and without accents (speech to text may drop them).
+MONTHS |= {m: i + 1 for i, names in enumerate(
+    ["janvier", "février fevrier", "mars", "avril", "mai", "juin", "juillet", "août aout", "septembre", "octobre",
+     "novembre", "décembre decembre"]) for m in names.split()}
+CN_DIGITS = {c: i for i, c in enumerate("〇一二三四五六七八九")} | {"零": 0}
 
 
 class Turn(BaseModel):
@@ -37,23 +42,43 @@ class CallSession(BaseModel):
     latencies_ms: list[int] = []
 
 
+def _cn_number(s: str) -> int:
+    """12, or Chinese numerals: 一九八四 is 1984 (digit by digit), 十一 is 11, 二十 is 20."""
+    if s.isdigit():
+        return int(s)
+    if "十" not in s:
+        return int("".join(str(CN_DIGITS[c]) for c in s))
+    tens, _, ones = s.partition("十")
+    return CN_DIGITS.get(tens, 1) * 10 + CN_DIGITS.get(ones, 0)
+
+
 def parse_dob(text: str) -> date | None:
+    """A birth date as said: ISO or numeric (month first unless the first number cannot be a month; a two-digit
+    year is the latest one not in the future), Chinese (Arabic or Chinese numerals), or an English or French month
+    name before or after the day. Every form the phone agent's de-identification turns into a placeholder
+    (app/llm/deid.py SPOKEN_DATE_RES) reads here once the tool input is re-identified."""
     t = text.lower().replace(",", " ")
-    t = re.sub(r"(\d)(st|nd|rd|th)\b", r"\1", t)
-    if m := re.search(r"\b(19\d{2}|20\d{2})-(\d{1,2})-(\d{1,2})\b", t):
-        y, mo, d = map(int, m.groups())
-    elif m := re.search(r"\b(\d{1,2})/(\d{1,2})/(19\d{2}|20\d{2})\b", t):
-        mo, d, y = map(int, m.groups())
-    elif m := re.search(r"\b([a-z]+)\s+(\d{1,2})\s+(19\d{2}|20\d{2})\b", t):
+    t = re.sub(r"(\d)(st|nd|rd|th|er)\b", r"\1", t)
+    t = re.sub(r"(\d)\s+of\s+", r"\1 ", t)
+    if m := re.search(r"\b(19\d{2}|20\d{2})([-/.])(\d{1,2})\2(\d{1,2})\b", t):
+        y, mo, d = int(m[1]), int(m[3]), int(m[4])
+    elif m := re.search(r"\b(\d{1,2})([/.-])(\d{1,2})\2(19\d{2}|20\d{2}|\d{2})\b", t):
+        mo, d, y = int(m[1]), int(m[3]), int(m[4])
+        if mo > 12:  # 13/04/1968 is day first
+            mo, d = d, mo
+        if y < 100:
+            y += 2000 if y <= date.today().year % 100 else 1900
+    elif m := re.search(r"(19\d{2}|20\d{2}|[〇零一二三四五六七八九]{4})\s*年\s*(\d{1,2}|[一二三四五六七八九十]{1,3})\s*月"
+                        r"\s*(\d{1,2}|[一二三四五六七八九十]{1,3})", t):
+        y, mo, d = map(_cn_number, m.groups())
+    elif m := re.search(r"\b([^\W\d_]+)\s+(\d{1,2})\s+(19\d{2}|20\d{2})\b", t):
         if m.group(1) not in MONTHS:
             return None
         mo, d, y = MONTHS[m.group(1)], int(m.group(2)), int(m.group(3))
-    elif m := re.search(r"\b(\d{1,2})\s+([a-z]+)\s+(19\d{2}|20\d{2})\b", t):
+    elif m := re.search(r"\b(\d{1,2})\s+([^\W\d_]+)\s+(19\d{2}|20\d{2})\b", t):
         if m.group(2) not in MONTHS:
             return None
         d, mo, y = int(m.group(1)), MONTHS[m.group(2)], int(m.group(3))
-    elif m := re.search(r"(19\d{2}|20\d{2})年(\d{1,2})月(\d{1,2})", text):
-        y, mo, d = map(int, m.groups())
     else:
         return None
     try:
@@ -67,8 +92,25 @@ def find_named_patients(store: Store, text: str) -> list[str]:
     return [p.id for p in store.patients.values() if p.full_name.lower() in lowered]
 
 
+GENERIC_SITE_WORDS = {"imaging", "centre", "center", "clinic"}
+
+
+def find_named_site(store: Store, text: str) -> str:
+    """The site the caller names ("your Northgate clinic", "Northgate诊所"), or "" when none is named."""
+    lowered = text.lower()
+    return next((s.name for s in store.sites.values()
+                 if any(w in lowered for w in s.name.lower().split() if w not in GENERIC_SITE_WORDS)), "")
+
+
 class ToolError(Exception):
     pass
+
+
+def _resolved(session: CallSession) -> None:
+    """The caller's request is done: the call log says resolved, whichever agent (model or scripted) asked for the
+    tool. A call put through to a person stays transferred."""
+    if session.outcome == "in_progress":
+        session.outcome = "resolved"
 
 
 def _require_verified(session: CallSession) -> str:
@@ -161,6 +203,7 @@ def reschedule(store: Store, session: CallSession, appointment_id: str, slot_id:
                           exam_code=appt.exam_code, start=start, urgency=appt.urgency)
     session.actions.append({"tool": "reschedule", "old": appt.id, "new": new.id,
                             "backfill_case": case.id if case else None})
+    _resolved(session)
     return {"rescheduled": True, "new_appointment": _appt_summary(store, new)}
 
 
@@ -168,12 +211,28 @@ def cancel(store: Store, session: CallSession, appointment_id: str, reason: str 
     appt = _own_appointment(store, session, appointment_id)
     case = scheduling.cancel(store, appt, reason)
     session.actions.append({"tool": "cancel", "appointment": appt.id, "backfill_case": case.id if case else None})
+    _resolved(session)
     return {"cancelled": True, "appointment": _appt_summary(store, appt)}
+
+
+def confirm_appointment(store: Store, session: CallSession, appointment_id: str) -> dict:
+    """The caller will attend: confirmed as by an SMS reply, unless a guard (an MRI screening awaiting review)
+    blocks it."""
+    appt = _own_appointment(store, session, appointment_id)
+    if scheduling.confirm_blockers(store, appt):
+        return {"confirmed": False, "reason": "A safety screening still needs staff review; staff will call the "
+                                              "patient."}
+    appt.status = AppointmentStatus.CONFIRMED
+    appt.reminder_confirmed = True
+    session.actions.append({"tool": "confirm", "appointment": appt.id})
+    _resolved(session)
+    return {"confirmed": True, "appointment": _appt_summary(store, appt)}
 
 
 def get_prep_instructions(store: Store, session: CallSession, appointment_id: str) -> dict:
     appt = _own_appointment(store, session, appointment_id)
     patient = store.patients[appt.patient_id]
+    _resolved(session)
     return {"instructions": prep_text(appt.exam_code, "en"),
             "note": f"Written instructions were also sent in the patient's preferred language ({patient.preferred_language})."}
 
@@ -186,6 +245,7 @@ def get_site_info(store: Store, session: CallSession, site: str = "") -> dict:
             match = next(s for s in store.sites.values() if s.name == upcoming[0]["site"])
     match = match or store.sites["LKS"]
     days = "Monday to Saturday" if 5 in match.open_days else "Monday to Friday"
+    _resolved(session)
     return {"site": match.name, "address": match.address, "phone": match.phone,
             "hours": f"{days}, {match.open_hour}:00 to {match.close_hour}:00", "parking": match.parking}
 
@@ -202,6 +262,7 @@ TOOLS = {
     "find_open_slots": find_open_slots,
     "reschedule": reschedule,
     "cancel": cancel,
+    "confirm_appointment": confirm_appointment,
     "get_prep_instructions": get_prep_instructions,
     "get_site_info": get_site_info,
     "transfer_to_human": transfer_to_human,
@@ -223,6 +284,8 @@ TOOL_DEFINITIONS = [
      "input_schema": _schema({"appointment_id": {"type": "string"}, "slot_id": {"type": "string"}}, ["appointment_id", "slot_id"])},
     {"name": "cancel", "description": "Cancel an appointment. Confirm with the caller first.",
      "input_schema": _schema({"appointment_id": {"type": "string"}, "reason": {"type": "string"}}, ["appointment_id", "reason"])},
+    {"name": "confirm_appointment", "description": "Confirm that the caller will attend an appointment, when they ask to confirm it.",
+     "input_schema": _schema({"appointment_id": {"type": "string"}}, ["appointment_id"])},
     {"name": "get_prep_instructions", "description": "Preparation instructions for an appointment.",
      "input_schema": _schema({"appointment_id": {"type": "string"}}, ["appointment_id"])},
     {"name": "get_site_info", "description": "Address, hours, phone and parking for a site.",
@@ -230,6 +293,28 @@ TOOL_DEFINITIONS = [
     {"name": "transfer_to_human", "description": "Transfer the caller to staff. Use for medical questions or anything you cannot handle.",
      "input_schema": _schema({"reason": {"type": "string"}}, ["reason"])},
 ]
+
+
+# The tools in the tool registry (config/tools/<tool_id>.yaml, domain imaging_frontdesk): tool id -> name here.
+REGISTERED = {"verifyCallerIdentity": "verify_identity", "lookupAppointments": "lookup_appointment",
+              "findOpenSlots": "find_open_slots", "rescheduleAppointment": "reschedule",
+              "cancelAppointment": "cancel", "confirmAppointment": "confirm_appointment",
+              "getPrepInstructions": "get_prep_instructions",
+              "getSiteInfo": "get_site_info", "transferToHuman": "transfer_to_human"}
+TOOL_IDS = {name: tool_id for tool_id, name in REGISTERED.items()}
+
+
+def registered_tool(ctx, **args) -> dict:
+    """Handler of the phone tools behind the Tool Gateway (6.4). The call session comes with the run;
+    a tool's own refusal (caller not verified, slot taken) goes back to the model as an error."""
+    from app.agents.gateway import ToolPreconditionFailed
+    from app.core.store import get_store
+
+    session = ctx.attachments["session"]
+    output = run_tool(ctx.attachments.get("store") or get_store(), session, REGISTERED[ctx.tool.tool_id], args)
+    if "error" in output:
+        raise ToolPreconditionFailed(output["error"])
+    return output
 
 
 def run_tool(store: Store, session: CallSession, name: str, args: dict) -> dict:

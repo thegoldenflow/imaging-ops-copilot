@@ -11,24 +11,35 @@ const STATUS_TONE: Record<string, "green" | "blue" | "slate" | "red" | "amber"> 
   confirmed: "green", booked: "blue", completed: "slate", cancelled: "red", no_show: "amber",
 };
 
-function today() {
-  const d = new Date();
+function isoDay(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function today() {
+  return isoDay(new Date());
+}
+
+// The list opens on the next day the site is open: on a Saturday that is Monday, not a Sunday with every site closed.
+function nextOpenDay(site: Site | undefined) {
+  const d = new Date();
+  for (let i = 0; i < 7; i++) {
+    d.setDate(d.getDate() + 1);
+    if (!site || site.open_days.includes((d.getDay() + 6) % 7)) break; // getDay() counts from Sunday
+  }
+  return isoDay(d);
 }
 
 export function AppointmentsTab({ sites, onBackfill }: { sites: Site[]; onBackfill: (c: BackfillCase) => void }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [day, setDay] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  });
   const [site, setSite] = useState(user?.site_ids[0] ?? "LKS");
+  const [picked, setDay] = useState<string | null>(null);
+  const day = picked ?? nextOpenDay(sites.find((s) => s.id === site));
   const [highRisk, setHighRisk] = useState(false);
   const query = useQuery({
     queryKey: ["appointments", day, site, highRisk],
     queryFn: () => api<{ appointments: Appointment[]; total: number }>(`/api/scheduling/appointments?day=${day}&site_id=${site}&high_risk_only=${highRisk}`),
+    enabled: sites.length > 0, // the default day needs the site's opening days
     refetchInterval: 5000,
   });
   const cancel = useMutation({
@@ -63,7 +74,7 @@ export function AppointmentsTab({ sites, onBackfill }: { sites: Site[]; onBackfi
         </>
       }
     >
-      {query.isLoading && <Loading />}
+      {(query.isLoading || !sites.length) && <Loading />}
       {query.error && <ErrorState error={query.error} onRetry={() => query.refetch()} />}
       {cancel.error && <p className="px-4 pt-3 text-sm text-rose-600" role="alert">{(cancel.error as Error).message}</p>}
       {complete.error && <p className="px-4 pt-3 text-sm text-rose-600" role="alert">{(complete.error as Error).message}</p>}

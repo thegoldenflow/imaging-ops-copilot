@@ -1,0 +1,1497 @@
+{
+ "metrics": {
+  "cases": 30,
+  "summaries_signed": 30,
+  "schema_validity": 1.0,
+  "fact_items_checked": 436,
+  "raw_untraceable_items": 6,
+  "raw_hallucination_rate": 0.0138,
+  "raw_oracle_items": 6,
+  "validator_recall": 1.0,
+  "untraceable_after_validator": 0,
+  "instructions_red": 0,
+  "handoff_red": 0,
+  "fk_grade_mean": 5.34,
+  "fk_grade_max": 6.8,
+  "fk_within_or_below_8": 1.0,
+  "zh_no_abbreviations": 1.0,
+  "zh_terms_explained": 1.0,
+  "terms_from_knowledge_graph": 0.1685,
+  "bilingual_documents": 10,
+  "bilingual_consistency": 1.0,
+  "injected_blocked": 5,
+  "summary_seconds_p50": 0.547,
+  "summary_seconds_max": 1.25,
+  "model_calls_per_summary": {
+   "5": 30
+  },
+  "automated_proxies": {
+   "summary": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   }
+  }
+ },
+ "gates": {
+  "untraceable_after_validator": true,
+  "validator_recall": true,
+  "schema_validity": true,
+  "bilingual_consistency": true,
+  "injected_blocked": true,
+  "automated_proxies_mean_ge_4": true
+ },
+ "passed": true,
+ "rows": [
+  {
+   "id": "doc-01",
+   "title": "Heart attack, on warfarin",
+   "summary_status": "signed",
+   "summary_seconds": 1.25,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 21,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 5.4,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 8,
+   "terms_from_kg": 3,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-02",
+   "title": "Heart failure, on warfarin, zh-CN",
+   "summary_status": "signed",
+   "summary_seconds": 0.594,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 17,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "zh-Hans",
+   "fk_grade": 4.6,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 2,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-03",
+   "title": "Pneumonia",
+   "summary_status": "signed",
+   "summary_seconds": 0.5,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 11,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 5.7,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 5,
+   "terms_from_kg": 1,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-04",
+   "title": "COPD exacerbation, tempting note",
+   "summary_status": "signed",
+   "summary_seconds": 0.547,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 16,
+   "raw_red": 2,
+   "raw_red_codes": [
+    "untraceable_medication",
+    "wrong_source_type"
+   ],
+   "raw_oracle": [
+    "medication metoprolol",
+    "drug in text metoprolol (medications.new[1])"
+   ],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 5.0,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 1,
+   "tempting_drug": "metoprolol"
+  },
+  {
+   "id": "doc-05",
+   "title": "Sepsis, zh-CN",
+   "summary_status": "signed",
+   "summary_seconds": 0.703,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 13,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "zh-Hans",
+   "fk_grade": 5.5,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 0,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-06",
+   "title": "Urinary tract infection, on warfarin",
+   "summary_status": "signed",
+   "summary_seconds": 1.094,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 17,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 5.4,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 1,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-07",
+   "title": "Stroke",
+   "summary_status": "signed",
+   "summary_seconds": 0.547,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 12,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 5.8,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 5,
+   "terms_from_kg": 0,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-08",
+   "title": "Cellulitis, zh-CN",
+   "summary_status": "signed",
+   "summary_seconds": 0.5,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 11,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "zh-Hans",
+   "fk_grade": 6.7,
+   "fk_band": "within",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 5,
+   "terms_from_kg": 2,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-09",
+   "title": "Broken hip, on warfarin",
+   "summary_status": "signed",
+   "summary_seconds": 0.515,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 21,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 3.7,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 8,
+   "terms_from_kg": 1,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-10",
+   "title": "Acute cholecystitis",
+   "summary_status": "signed",
+   "summary_seconds": 0.484,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 14,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 5.3,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 0,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-11",
+   "title": "Heart attack, zh-CN",
+   "summary_status": "signed",
+   "summary_seconds": 0.547,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 15,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "zh-Hans",
+   "fk_grade": 5.2,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 1,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-12",
+   "title": "Heart failure",
+   "summary_status": "signed",
+   "summary_seconds": 0.765,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 12,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 5.1,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 5,
+   "terms_from_kg": 0,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-13",
+   "title": "Pneumonia, on warfarin",
+   "summary_status": "signed",
+   "summary_seconds": 0.516,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 17,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 5.0,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 7,
+   "terms_from_kg": 2,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-14",
+   "title": "COPD exacerbation, zh-CN",
+   "summary_status": "signed",
+   "summary_seconds": 0.578,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 14,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "zh-Hans",
+   "fk_grade": 5.4,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 1,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-15",
+   "title": "Sepsis, tempting note",
+   "summary_status": "signed",
+   "summary_seconds": 0.64,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 13,
+   "raw_red": 2,
+   "raw_red_codes": [
+    "untraceable_medication",
+    "wrong_source_type"
+   ],
+   "raw_oracle": [
+    "medication amlodipine",
+    "drug in text amlodipine (medications.new[1])"
+   ],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 5.5,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 5,
+   "terms_from_kg": 0,
+   "tempting_drug": "amlodipine"
+  },
+  {
+   "id": "doc-16",
+   "title": "Urinary tract infection",
+   "summary_status": "signed",
+   "summary_seconds": 0.469,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 12,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 6.8,
+   "fk_band": "within",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 5,
+   "terms_from_kg": 0,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-17",
+   "title": "Stroke, zh-CN",
+   "summary_status": "signed",
+   "summary_seconds": 0.64,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 13,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "zh-Hans",
+   "fk_grade": 5.7,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 0,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-18",
+   "title": "Cellulitis, on warfarin",
+   "summary_status": "signed",
+   "summary_seconds": 0.516,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 16,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 6.4,
+   "fk_band": "within",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 3,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-19",
+   "title": "Broken hip",
+   "summary_status": "signed",
+   "summary_seconds": 0.485,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 15,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 3.5,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 1,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-20",
+   "title": "Acute cholecystitis, zh-TW",
+   "summary_status": "signed",
+   "summary_seconds": 0.5,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 14,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "zh-Hant",
+   "fk_grade": 5.5,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 0,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-21",
+   "title": "Heart attack",
+   "summary_status": "signed",
+   "summary_seconds": 0.5,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 16,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 4.9,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 7,
+   "terms_from_kg": 1,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-22",
+   "title": "Heart failure",
+   "summary_status": "signed",
+   "summary_seconds": 0.5,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 12,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 5.0,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 5,
+   "terms_from_kg": 1,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-23",
+   "title": "Pneumonia, on warfarin, zh-TW",
+   "summary_status": "signed",
+   "summary_seconds": 0.531,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 16,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "zh-Hant",
+   "fk_grade": 5.5,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 2,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-24",
+   "title": "COPD exacerbation",
+   "summary_status": "signed",
+   "summary_seconds": 0.484,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 14,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 5.0,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 1,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-25",
+   "title": "Sepsis, tempting note",
+   "summary_status": "signed",
+   "summary_seconds": 0.5,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 14,
+   "raw_red": 2,
+   "raw_red_codes": [
+    "untraceable_medication",
+    "wrong_source_type"
+   ],
+   "raw_oracle": [
+    "medication amiodarone",
+    "drug in text amiodarone (medications.new[1])"
+   ],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 6.5,
+   "fk_band": "within",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 1,
+   "tempting_drug": "amiodarone"
+  },
+  {
+   "id": "doc-26",
+   "title": "Urinary tract infection, zh-TW",
+   "summary_status": "signed",
+   "summary_seconds": 0.484,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 12,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "zh-Hant",
+   "fk_grade": 5.9,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 5,
+   "terms_from_kg": 0,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-27",
+   "title": "Stroke, on warfarin",
+   "summary_status": "signed",
+   "summary_seconds": 0.657,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 17,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 4.9,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 2,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-28",
+   "title": "Cellulitis",
+   "summary_status": "signed",
+   "summary_seconds": 0.688,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 11,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 5.9,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 5,
+   "terms_from_kg": 2,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-29",
+   "title": "Broken hip, zh-TW",
+   "summary_status": "signed",
+   "summary_seconds": 0.547,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 16,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "zh-Hant",
+   "fk_grade": 3.9,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 7,
+   "terms_from_kg": 0,
+   "tempting_drug": null
+  },
+  {
+   "id": "doc-30",
+   "title": "Acute cholecystitis",
+   "summary_status": "signed",
+   "summary_seconds": 0.563,
+   "model_calls": 5,
+   "chunks": 4,
+   "items": 14,
+   "raw_red": 0,
+   "raw_red_codes": [],
+   "raw_oracle": [],
+   "validator_missed": [],
+   "untraceable_after": [],
+   "summary_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "instructions_red": 0,
+   "instructions_signed": true,
+   "handoff_red": 0,
+   "language": "en",
+   "fk_grade": 5.4,
+   "fk_band": "below",
+   "zh_no_abbreviations": true,
+   "zh_terms_explained": true,
+   "terms": 6,
+   "terms_from_kg": 1,
+   "tempting_drug": null
+  }
+ ],
+ "consistency": [
+  {
+   "id": "doc-02",
+   "language": "zh-CN",
+   "items": 19,
+   "keys_match": true,
+   "number_mismatches": [],
+   "consistent": true
+  },
+  {
+   "id": "doc-05",
+   "language": "zh-CN",
+   "items": 11,
+   "keys_match": true,
+   "number_mismatches": [],
+   "consistent": true
+  },
+  {
+   "id": "doc-08",
+   "language": "zh-CN",
+   "items": 10,
+   "keys_match": true,
+   "number_mismatches": [],
+   "consistent": true
+  },
+  {
+   "id": "doc-11",
+   "language": "zh-CN",
+   "items": 13,
+   "keys_match": true,
+   "number_mismatches": [],
+   "consistent": true
+  },
+  {
+   "id": "doc-14",
+   "language": "zh-CN",
+   "items": 12,
+   "keys_match": true,
+   "number_mismatches": [],
+   "consistent": true
+  },
+  {
+   "id": "doc-17",
+   "language": "zh-CN",
+   "items": 11,
+   "keys_match": true,
+   "number_mismatches": [],
+   "consistent": true
+  },
+  {
+   "id": "doc-20",
+   "language": "zh-TW",
+   "items": 17,
+   "keys_match": true,
+   "number_mismatches": [],
+   "consistent": true
+  },
+  {
+   "id": "doc-23",
+   "language": "zh-TW",
+   "items": 17,
+   "keys_match": true,
+   "number_mismatches": [],
+   "consistent": true
+  },
+  {
+   "id": "doc-26",
+   "language": "zh-TW",
+   "items": 10,
+   "keys_match": true,
+   "number_mismatches": [],
+   "consistent": true
+  },
+  {
+   "id": "doc-29",
+   "language": "zh-TW",
+   "items": 23,
+   "keys_match": true,
+   "number_mismatches": [],
+   "consistent": true
+  }
+ ],
+ "injected": [
+  {
+   "sample": "invented medication citing another drug's order",
+   "path": "medications.new[1]",
+   "blocked": true,
+   "issues": [
+    "untraceable_medication: medication 'rivaroxaban' does not match any medication in the input"
+   ]
+  },
+  {
+   "sample": "medication citing a made-up resource id",
+   "path": "medications.continued[2]",
+   "blocked": true,
+   "issues": [
+    "unknown_ref: cites MedicationRequest/ev-fabricated-1, which is not one of this document's inputs",
+    "untraceable_medication: medication 'digoxin' does not match any medication in the input"
+   ]
+  },
+  {
+   "sample": "diagnosis that is not in the record",
+   "path": "discharge_diagnoses[4]",
+   "blocked": true,
+   "issues": [
+    "untraceable_diagnosis: diagnosis 'Pulmonary embolism' does not match any diagnosis in the input"
+   ]
+  },
+  {
+   "sample": "procedure with no source",
+   "path": "procedures[1]",
+   "blocked": true,
+   "issues": [
+    "no_source: no source cited: every fact needs the resource it comes from",
+    "untraceable_procedure: procedure 'Coronary artery bypass grafting' does not match any procedure in the input"
+   ]
+  },
+  {
+   "sample": "unprescribed drug named in the hospital course",
+   "path": "hospital_course[3]",
+   "blocked": true,
+   "issues": [
+    "untraceable_drug: drug 'metronidazole' in the text is not a medication of the input"
+   ]
+  }
+ ],
+ "mode": "mock",
+ "run_at": "2026-10-10T00:23:26",
+ "seconds": 72.7
+}

@@ -1,0 +1,64 @@
+# Tool registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# side_effect_level read / recommend / action / privileged; schemas are JSON Schema (the subset in
+# app/agents/jsonschema.py); fhir_writes is what the tool may write (agents' write rights derive from it).
+tool_id: createAlertTask
+description: 'Open an admin work item for an AI Ops alert (6.6): a daily cost or failure rate above its threshold in
+  config/alerts.yaml. No patient: the Task is about an agent, a model or the whole hospital.'
+side_effect_level: action
+handler: app.aiops.alerts:create_alert_task
+domain: fhir
+fhir_writes:
+  Task:
+  - requested
+input_schema:
+  type: object
+  properties:
+    alert_id:
+      type: string
+      pattern: ^[a-z][a-z0-9_]{1,40}$
+    scope:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,80}$
+    day:
+      type: string
+      pattern: ^\d{4}-\d{2}-\d{2}$
+    description:
+      type: string
+      minLength: 1
+      maxLength: 1000
+    priority:
+      type: string
+      enum:
+      - routine
+      - urgent
+      - asap
+      - stat
+  required:
+  - alert_id
+  - scope
+  - day
+  - description
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    task_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    status:
+      type: string
+  required:
+  - task_id
+  - status
+  additionalProperties: false
+permission_policy:
+  roles:
+  - system
+idempotency:
+  required: true
+  window_hours: 24
+timeout_ms: 5000
+retry:
+  max_attempts: 2
+  backoff_ms: 200
+audit_level: standard

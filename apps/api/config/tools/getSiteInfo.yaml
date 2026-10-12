@@ -1,0 +1,32 @@
+# Tool registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# side_effect_level read / recommend / action / privileged; schemas are JSON Schema (the subset in
+# app/agents/jsonschema.py); fhir_writes is what the tool may write (agents' write rights derive from it).
+tool_id: getSiteInfo
+description: Address, hours, phone and parking of a site.
+side_effect_level: read
+handler: app.modules.frontdesk.tools:registered_tool
+domain: imaging_frontdesk
+input_schema:
+  type: object
+  properties:
+    site:
+      type: string
+      maxLength: 100
+  required:
+  - site
+  additionalProperties: false
+output_schema:
+  type: object
+permission_policy:
+  roles:
+  - front_desk
+  - operations_manager
+  - admin
+  - system
+idempotency:
+  required: false
+timeout_ms: 3000
+retry:
+  max_attempts: 2
+  backoff_ms: 50
+audit_level: standard

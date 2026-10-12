@@ -22,7 +22,7 @@ from pydantic import BaseModel, model_validator
 from app.core.models import Appointment
 from app.core.store import Store
 from app.llm.gateway import get_gateway
-from app.llm.prompts import Prompt
+from app.agents.prompts import registered
 from app.llm.providers import mock_fixture
 
 WEEKS = 12
@@ -217,18 +217,7 @@ class SummaryOutput(BaseModel):
         return self
 
 
-SUMMARY_PROMPT = Prompt(
-    name="referral_weekly_summary",
-    version="referral_weekly_summary@1",
-    system=(
-        "You write a short weekly referral summary for the operations team of an outpatient imaging group. "
-        "You are given named facts computed by database queries. Never write a number, percentage or date yourself: "
-        "insert facts only as placeholders in curly braces, e.g. {last_week_total}. Use only the keys provided. "
-        "Do not infer causes; you may suggest follow-up such as visiting referrers whose volume dropped. "
-        "Return a headline and 2 to 6 plain sentences."
-    ),
-    template="Facts (key: label = value):\n{facts}",
-)
+SUMMARY_PROMPT = registered("referral_weekly_summary")
 
 
 def _facts_text(fs: dict[str, Fact]) -> str:

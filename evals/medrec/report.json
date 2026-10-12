@@ -1,0 +1,249 @@
+{
+  "metrics": {
+    "cases": 20,
+    "rows": 57,
+    "correct": 57,
+    "accuracy": 1.0
+  },
+  "confusion": [
+    {
+      "expected": "dose_change",
+      "predicted": "dose_change",
+      "count": 6
+    },
+    {
+      "expected": "duplicate_therapy",
+      "predicted": "duplicate_therapy",
+      "count": 5
+    },
+    {
+      "expected": "match",
+      "predicted": "match",
+      "count": 12
+    },
+    {
+      "expected": "new",
+      "predicted": "new",
+      "count": 15
+    },
+    {
+      "expected": "new_without_indication",
+      "predicted": "new_without_indication",
+      "count": 5
+    },
+    {
+      "expected": "omission",
+      "predicted": "omission",
+      "count": 14
+    }
+  ],
+  "gates": {
+    "accuracy": 0.9
+  },
+  "passed": true,
+  "results": [
+    {
+      "id": "mr-001",
+      "title": "Hip fracture on warfarin: an antihypertensive missed, a dose change, naproxen and enoxaparin",
+      "kind": "admission",
+      "rows": 6,
+      "correct": 6,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-001-stay-admission"
+    },
+    {
+      "id": "mr-002",
+      "title": "Omeprazole at home, pantoprazole in hospital",
+      "kind": "admission",
+      "rows": 3,
+      "correct": 3,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-002-stay-admission"
+    },
+    {
+      "id": "mr-003",
+      "title": "Metformin doubled, insulin started",
+      "kind": "admission",
+      "rows": 2,
+      "correct": 2,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-003-stay-admission"
+    },
+    {
+      "id": "mr-004",
+      "title": "Simvastatin added to atorvastatin",
+      "kind": "admission",
+      "rows": 3,
+      "correct": 3,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-004-stay-admission"
+    },
+    {
+      "id": "mr-005",
+      "title": "Sertraline left off, tramadol for back pain",
+      "kind": "admission",
+      "rows": 2,
+      "correct": 2,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-005-stay-admission"
+    },
+    {
+      "id": "mr-006",
+      "title": "Levothyroxine twice a day, allopurinol missed, colchicine for gout",
+      "kind": "admission",
+      "rows": 3,
+      "correct": 3,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-006-stay-admission"
+    },
+    {
+      "id": "mr-007",
+      "title": "Quetiapine continued in Alzheimer's disease",
+      "kind": "admission",
+      "rows": 1,
+      "correct": 1,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-007-stay-admission"
+    },
+    {
+      "id": "mr-008",
+      "title": "Lorazepam started with no diagnosis for it",
+      "kind": "admission",
+      "rows": 1,
+      "correct": 1,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-008-stay-admission"
+    },
+    {
+      "id": "mr-009",
+      "title": "Heart failure: furosemide doubled, spironolactone held, potassium started",
+      "kind": "admission",
+      "rows": 3,
+      "correct": 3,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-009-stay-admission"
+    },
+    {
+      "id": "mr-010",
+      "title": "COPD exacerbation: tiotropium held, prednisone started",
+      "kind": "admission",
+      "rows": 3,
+      "correct": 3,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-010-stay-admission"
+    },
+    {
+      "id": "mr-011",
+      "title": "Pneumonia: home naproxen stopped, IV antibiotic to amoxicillin",
+      "kind": "discharge",
+      "rows": 5,
+      "correct": 5,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-011-stay-discharge"
+    },
+    {
+      "id": "mr-012",
+      "title": "Heart failure: furosemide increased at discharge",
+      "kind": "discharge",
+      "rows": 2,
+      "correct": 2,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-012-stay-discharge"
+    },
+    {
+      "id": "mr-013",
+      "title": "Hip fracture on warfarin: enoxaparin continued with warfarin",
+      "kind": "discharge",
+      "rows": 3,
+      "correct": 3,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-013-stay-discharge"
+    },
+    {
+      "id": "mr-014",
+      "title": "Omeprazole at home, pantoprazole and omeprazole at discharge",
+      "kind": "discharge",
+      "rows": 3,
+      "correct": 3,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-014-stay-discharge"
+    },
+    {
+      "id": "mr-015",
+      "title": "Diabetes: insulin added to metformin at discharge",
+      "kind": "discharge",
+      "rows": 2,
+      "correct": 2,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-015-stay-discharge"
+    },
+    {
+      "id": "mr-016",
+      "title": "After a myocardial infarction: statin switched, dual antiplatelets",
+      "kind": "discharge",
+      "rows": 5,
+      "correct": 5,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-016-stay-discharge"
+    },
+    {
+      "id": "mr-017",
+      "title": "Lisinopril doubled at discharge",
+      "kind": "discharge",
+      "rows": 1,
+      "correct": 1,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-017-stay-discharge"
+    },
+    {
+      "id": "mr-018",
+      "title": "Lorazepam started in hospital and prescribed at discharge",
+      "kind": "discharge",
+      "rows": 2,
+      "correct": 2,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-018-stay-discharge"
+    },
+    {
+      "id": "mr-019",
+      "title": "Fracture: as-needed morphine and ondansetron stop, tramadol at discharge",
+      "kind": "discharge",
+      "rows": 4,
+      "correct": 4,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-019-stay-discharge"
+    },
+    {
+      "id": "mr-020",
+      "title": "Sepsis: two IV antibiotics stop, amoxicillin at discharge",
+      "kind": "discharge",
+      "rows": 3,
+      "correct": 3,
+      "wrong": {},
+      "ai_status": "done",
+      "document": "medrec-ev-mr-020-stay-discharge"
+    }
+  ],
+  "seconds": 11.3,
+  "mode": "mock",
+  "run_at": "2026-10-09T19:50:53"
+}

@@ -196,9 +196,11 @@ _CODECS: dict[str, _RowCodec] = {}
 
 
 def _codec(name: str) -> _RowCodec:
-    if name not in _CODECS:
-        _CODECS[name] = _RowCodec(name)
-    return _CODECS[name]
+    codec = _CODECS.get(name)
+    if codec is None:
+        # Activity threads may build one at the same time (schema.mapping is safe for that); the first stored wins.
+        codec = _CODECS.setdefault(name, _RowCodec(name))
+    return codec
 
 
 class EntityTable(Generic[T]):
@@ -289,6 +291,15 @@ class EntityTable(Generic[T]):
             self._absent.add(key)
             return default
         return self._adopt([row])[0]
+
+    def forget(self, key: str) -> None:
+        """Drop this unit of work's copy of one row, so the next read sees what other transactions committed since
+        (e.g. after taking a lock that serialises work on it). Pending changes are written first."""
+        self.flush()
+        self._map.pop(key, None)
+        self._snap.pop(key, None)
+        self._absent.discard(key)
+        self._complete = self._store.detached
 
     def __getitem__(self, key: str) -> T:
         obj = self.get(key, _MISSING)
@@ -391,6 +402,18 @@ class EntityTable(Generic[T]):
         else:
             condition = m.table.c[field] == value
         return [o for o in self._adopt(self._select(condition).all()) if match(o)]
+
+    def since(self, column: str, start: Any) -> list[T]:
+        """Rows whose (indexed) column is at or after `start`, without loading the whole table (AI Ops windows)."""
+        def keep(obj: T) -> bool:
+            value = getattr(obj, column)
+            return value is not None and value >= start
+
+        if self._complete or self._store.detached:
+            return [o for o in self._map.values() if keep(o)]
+        self.flush()
+        table = self._codec.m.table
+        return [o for o in self._adopt(self._select(table.c[column] >= start).all()) if keep(o)]
 
     def claim_due(self, column: str, now: datetime, statuses: tuple[str, ...] | None = None) -> list[T]:
         """Rows due at `now` (column <= now, optional status filter), locked for this unit of work.
@@ -661,7 +684,13 @@ class ModuleSpace:
     def __init__(self, store: Store) -> None:
         self._store = store
         self._tables: dict[str, EntityTable | ListTable] = {}
+        self._own_caches: dict[str, Any] = {}  # detached only
         self.expunge()
+
+    def _caches(self) -> dict[str, Any]:
+        """The process's caches, derived from the database. A detached store (the generator, the evals) keeps its own:
+        a reset generates its data set while other units of work in the process use theirs."""
+        return self._own_caches if self._store.detached else _PROCESS_CACHE
 
     def expunge(self) -> None:
         for table in self._tables.values():
@@ -709,7 +738,7 @@ class ModuleSpace:
         if kind == "table":
             return self.table(name)
         if kind == "cache":
-            return _PROCESS_CACHE.get(name, default)
+            return self._caches().get(name, default)
         value = self._load(name)
         return default if value is _MISSING else value
 
@@ -727,7 +756,7 @@ class ModuleSpace:
         if kind == "table":
             raise TypeError(f"{name} is a table; write its entries instead of replacing it")
         if kind == "cache":
-            _PROCESS_CACHE[name] = value
+            self._caches()[name] = value
             return
         if kind == "config" and not isinstance(value, schema.config_model(name)):
             raise TypeError(f"{name} must be a {schema.config_model(name).__name__}")
@@ -740,7 +769,7 @@ class ModuleSpace:
             self.table(name).clear()
             return default
         if kind == "cache":
-            return _PROCESS_CACHE.pop(name, default)
+            return self._caches().pop(name, default)
         value = self._load(name)
         self._values.pop(name, None)
         self._deleted.add(name)
@@ -768,9 +797,10 @@ class ModuleSpace:
                         table.update(content)
             return table
         if kind == "cache":
-            if name not in _PROCESS_CACHE:
-                _PROCESS_CACHE[name] = factory()
-            return _PROCESS_CACHE[name]
+            caches = self._caches()
+            if name not in caches:
+                caches[name] = factory()
+            return caches[name]
         value = self._load(name)
         if value is _MISSING:
             value = factory()

@@ -1,0 +1,35 @@
+{
+  "resourceType": "Communication",
+  "id": "comm-example",
+  "status": "completed",
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "urn:demo-hospital:code",
+          "code": "followup-call"
+        }
+      ]
+    }
+  ],
+  "subject": {
+    "reference": "Patient/pat-0388"
+  },
+  "encounter": {
+    "reference": "Encounter/stay-00912"
+  },
+  "sent": "2026-10-10T10:00:00-04:00",
+  "recipient": [
+    {
+      "reference": "Patient/pat-0388"
+    }
+  ],
+  "sender": {
+    "reference": "Device/agent-followup_call"
+  },
+  "payload": [
+    {
+      "contentString": "Follow-up call completed; no red flags reported."
+    }
+  ]
+}

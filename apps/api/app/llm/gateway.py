@@ -3,7 +3,17 @@
 Responsibilities: de-identify input, enforce a Pydantic output schema (one
 retry, then "needs human review"), degrade on timeouts and API failures, and
 log each call (task, model, prompt version, tokens, latency, cost, outcome)
-without storing PHI.
+without storing PHI. Each call is also an `ai_call` audit event (spec 6.3) with
+the task as module and the prompt version.
+
+Agent registry (spec 6.4): the task is the agent id. A task without a registry
+entry is refused (`UnregisteredAgent`); the entry's model_policy picks the model
+tier and max_tokens; its prompt_version must be the prompt sent; in
+APP_MODE=prod an agent that has not passed its evaluation (or is not prod_ready)
+is refused, which the modules handle like an unavailable model. The outcome says
+whether the agent is evaluated, so the UI can flag output that is not. Inside an
+agent run the call joins the run's trace; otherwise (the imaging modules' calls)
+it gets a one-call trace of its own.
 """
 
 import hashlib
@@ -13,7 +23,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
+from app.agents import models as agent_models
+from app.agents import registry as agent_registry
+from app.agents import trace as agent_trace
 from app.core.config import settings
+from app.core.context import request_context
 from app.core.models import LlmCall, Patient
 from app.core.store import get_store
 from app.llm.deid import Pseudonymizer
@@ -43,6 +57,13 @@ PRICES = {
 Tier = Literal["reasoning", "fast", "voice"]
 
 
+class _TierPolicy:
+    """A model_policy with just a tier (for `model_for`)."""
+
+    def __init__(self, tier: str) -> None:
+        self.model_policy = type("P", (), {"tier": tier, "model": None})()
+
+
 class LlmOutcome(BaseModel):
     status: Literal["ok", "needs_human", "unavailable"]
     data: dict | None = None
@@ -51,6 +72,10 @@ class LlmOutcome(BaseModel):
     prompt_version: str
     mode: str
     error: str | None = None
+    agent_version: str | None = None
+    eval_status: str | None = None
+    evaluated: bool = True  # False: show the output with a "not evaluated" flag (6.4)
+    run_id: str | None = None  # the trace this call belongs to
 
 
 def make_provider():
@@ -74,10 +99,58 @@ class LlmGateway:
         return self.provider.mode
 
     def model_for(self, tier: Tier) -> str:
+        """The id of the registered model of this provider and tier (config/models.yaml; the id itself comes from
+        the environment)."""
+        entry = agent_models.resolve(_TierPolicy(tier), self.mode)
+        if entry is not None:
+            return entry.id_from(settings)
         if self.mode == "gemini":
             return {"reasoning": settings.gemini_model_reasoning, "fast": settings.gemini_model_fast,
                     "voice": settings.gemini_model_voice}[tier]
         return {"reasoning": settings.model_reasoning, "fast": settings.model_fast, "voice": settings.model_voice}[tier]
+
+    def model_for_agent(self, spec) -> str | None:
+        """The model an agent's model_policy names in the model registry for this provider (None: none registered)."""
+        entry = agent_models.resolve(spec, self.mode)
+        return entry.id_from(settings) if entry is not None else None
+
+    def _agent(self, task: str, prompt: Prompt):
+        """The task's registry entry, its model and, when the call may not go ahead, why (UnregisteredAgent if
+        none)."""
+        spec = agent_registry.require_agent(task)
+        refusal = agent_registry.gate(spec)
+        if refusal is None and spec.prompt_version and spec.prompt_version != prompt.version:
+            refusal = f"prompt {prompt.version} is not the registered prompt {spec.prompt_version} of {spec.label}"
+        model = self.model_for_agent(spec)
+        if model is None:
+            model = self.model_for(spec.model_policy.tier)
+            refusal = refusal or (f"{spec.label}: no {agent_models.provider_of(self.mode)} model in config/models.yaml "
+                                  f"for its model_policy")
+        return spec, model, refusal
+
+    @staticmethod
+    def _trace(spec, call: LlmCall, input_refs: list[str]) -> str | None:
+        """Join the agent run in progress, or write a one-call trace (embedded agents)."""
+        record = agent_trace.LlmCallRecord(
+            call_id=call.id, agent_id=spec.agent_id, model=call.model, prompt_version=call.prompt_version,
+            status=call.outcome, tokens_in=call.input_tokens, tokens_out=call.output_tokens, cost_usd=call.cost_usd,
+            latency_ms=call.latency_ms)
+        active = agent_trace.active()
+        if active is not None:
+            active.add_llm_call(record)
+            agent_trace.save(active)
+            return active.run_id
+        store = get_store()
+        outcome = {"ok": "completed", "retried_ok": "completed"}.get(call.outcome, call.outcome)
+        trace = agent_trace.AgentTrace(
+            run_id=store.next_id("RUN"), agent_id=spec.agent_id, agent_version=spec.version, kind="call",
+            mode=call.mode, eval_status=spec.eval_status.status, evaluated=spec.evaluated,
+            actor_id=(ctx.user.id if (ctx := request_context()) and ctx.user else "system"),
+            actor_role=(str(ctx.user.role) if ctx and ctx.user else "system"), input_refs=input_refs,
+            output_refs=[f"LlmCall/{call.id}"], outcome=outcome, started_at=call.ts, finished_at=datetime.now())
+        trace.add_llm_call(record)
+        agent_trace.save(trace)
+        return trace.run_id
 
     def _log(self, *, task, model, prompt, text, started, outcome, result: ProviderResult | None = None,
              error=None, input_tokens=0, output_tokens=0) -> LlmCall:
@@ -94,7 +167,20 @@ class LlmGateway:
             input_hash=hashlib.sha256(text.encode()).hexdigest()[:16], error=(error or None) and error[:300],
         )
         store.llm_calls.append(call)
+        self._audit(store, call)
         return call
+
+    @staticmethod
+    def _audit(store, call: LlmCall) -> None:
+        """An `ai_call` audit event (6.3) for the person whose request made the call, or the system."""
+        ctx = request_context()
+        user = ctx.user if ctx else None
+        store.audit.record(
+            user_id=user.id if user else "system", user_name=user.name if user else "system",
+            role=str(user.role) if user else "system", action="ai_call", event_type="ai_call",
+            resource_type="LlmCall", resource_id=call.id, outcome=call.outcome,
+            source_ip=ctx.source_ip if ctx else None, reason=f"{call.mode}:{call.model}", module=call.task,
+            prompt_version=call.prompt_version)
 
     def structured(
         self,
@@ -106,10 +192,33 @@ class LlmGateway:
         tier: Tier = "reasoning",
         images: list[tuple[str, str]] | None = None,  # (base64, media type)
         patients: list[Patient] | None = None,
+        pseudonymizer: Pseudonymizer | None = None,
+        input_refs: list[str] | None = None,
     ) -> LlmOutcome:
-        model = self.model_for(tier)
-        pseudo = Pseudonymizer(patients)
-        text = pseudo.redact(prompt.render(**variables))
+        """`pseudonymizer`: the variables were de-identified by the caller with it (FHIR resources through
+        app/llm/fhir_deid.py, notes through app/llm/freetext_deid.py). The gateway then repeats only the
+        replacement of the identifiers it knows, not its own patterns (which would also tokenise the clinical
+        dates of a resource), and re-identifies the output with the same map.
+
+        `tier` is superseded by the agent registry's model_policy (the registry is the source of truth)."""
+        spec, model, refusal = self._agent(task, prompt)
+        refs = list(input_refs or []) + [f"Patient/{p.id}" for p in patients or []]
+        flags = {"agent_version": spec.version, "eval_status": spec.eval_status.status, "evaluated": spec.evaluated}
+
+        def done(call: LlmCall, **kw) -> LlmOutcome:
+            return LlmOutcome(call_id=call.id, model=model, prompt_version=prompt.version, mode=self.mode,
+                              run_id=self._trace(spec, call, refs), **flags, **kw)
+
+        if refusal is not None:
+            call = self._log(task=task, model=model, prompt=prompt, text="", started=time.monotonic(),
+                             outcome="refused", error=refusal)
+            return done(call, status="unavailable", error=refusal)
+        if pseudonymizer is not None:
+            pseudo = pseudonymizer
+            text = pseudo.redact_known(prompt.render(**variables))
+        else:
+            pseudo = Pseudonymizer(patients)
+            text = pseudo.redact(prompt.render(**variables))
         schema = strict_schema(schema_cls)
         started = time.monotonic()
         tokens_in = tokens_out = 0
@@ -122,18 +231,16 @@ class LlmGateway:
             try:
                 result = self.provider.complete_json(
                     task=task, model=model, system=prompt.system, text=request_text, schema=schema,
-                    images=images, attempt=attempt,
+                    images=images, attempt=attempt, max_tokens=spec.model_policy.max_tokens,
                 )
             except ProviderUnavailable as e:
                 call = self._log(task=task, model=model, prompt=prompt, text=text, started=started,
                                  outcome="unavailable", error=str(e), input_tokens=tokens_in, output_tokens=tokens_out)
-                return LlmOutcome(status="unavailable", call_id=call.id, model=model,
-                                  prompt_version=prompt.version, mode=self.mode, error="AI is temporarily unavailable")
+                return done(call, status="unavailable", error="AI is temporarily unavailable")
             except ProviderRefusal as e:
                 call = self._log(task=task, model=model, prompt=prompt, text=text, started=started,
                                  outcome="needs_human", error=str(e), input_tokens=tokens_in, output_tokens=tokens_out)
-                return LlmOutcome(status="needs_human", call_id=call.id, model=model,
-                                  prompt_version=prompt.version, mode=self.mode, error=str(e))
+                return done(call, status="needs_human", error=str(e))
             except InvalidOutput as e:
                 error = f"Invalid JSON: {e}"
                 continue
@@ -147,28 +254,36 @@ class LlmGateway:
             call = self._log(task=task, model=model, prompt=prompt, text=text, started=started,
                              outcome="ok" if attempt == 0 else "retried_ok",
                              input_tokens=tokens_in, output_tokens=tokens_out)
-            return LlmOutcome(status="ok", data=pseudo.restore(parsed.model_dump(mode="json")), call_id=call.id,
-                              model=model, prompt_version=prompt.version, mode=self.mode)
+            return done(call, status="ok", data=pseudo.restore(parsed.model_dump(mode="json")))
 
         call = self._log(task=task, model=model, prompt=prompt, text=text, started=started, outcome="needs_human",
                          error=error, input_tokens=tokens_in, output_tokens=tokens_out)
-        return LlmOutcome(status="needs_human", call_id=call.id, model=model, prompt_version=prompt.version,
-                          mode=self.mode, error="AI output failed validation twice; needs human review")
+        return done(call, status="needs_human", error="AI output failed validation twice; needs human review")
 
     def tool_turn(self, *, task: str, prompt: Prompt, messages: list, tools: list, redacted_text: str,
                   tier: Tier = "voice") -> ProviderResult:
         """One model turn of a tool-using agent. Callers redact text before building
-        `messages`; this logs the call and re-raises ProviderUnavailable/Refusal."""
-        model = self.model_for(tier)
+        `messages`; this logs the call and re-raises ProviderUnavailable/Refusal (a call the
+        agent registry refuses raises ProviderUnavailable, so the caller falls back the same way).
+        The tool calls the model asks for go through the Tool Gateway (app/agents/gateway.py)."""
+        spec, model, refusal = self._agent(task, prompt)
         started = time.monotonic()
+        if refusal is not None:
+            call = self._log(task=task, model=model, prompt=prompt, text="", started=started, outcome="refused",
+                             error=refusal)
+            self._trace(spec, call, [])
+            raise ProviderUnavailable(refusal)
         try:
-            result = self.provider.tool_turn(model=model, system=prompt.system, messages=messages, tools=tools)
+            result = self.provider.tool_turn(task=task, model=model, system=prompt.system, messages=messages,
+                                             tools=tools, max_tokens=spec.model_policy.max_tokens)
         except (ProviderUnavailable, ProviderRefusal) as e:
-            self._log(task=task, model=model, prompt=prompt, text=redacted_text, started=started,
-                      outcome="unavailable", error=str(e))
+            call = self._log(task=task, model=model, prompt=prompt, text=redacted_text, started=started,
+                             outcome="unavailable", error=str(e))
+            self._trace(spec, call, [])
             raise
-        self._log(task=task, model=model, prompt=prompt, text=redacted_text, started=started, outcome="ok",
-                  result=result)
+        call = self._log(task=task, model=model, prompt=prompt, text=redacted_text, started=started, outcome="ok",
+                         result=result)
+        self._trace(spec, call, [])
         return result
 
 

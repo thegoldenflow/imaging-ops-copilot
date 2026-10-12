@@ -1,0 +1,45 @@
+{
+  "resourceType": "AllergyIntolerance",
+  "id": "alg-000001",
+  "clinicalStatus": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",
+        "code": "active"
+      }
+    ]
+  },
+  "category": [
+    "medication"
+  ],
+  "criticality": "low",
+  "code": {
+    "coding": [
+      {
+        "system": "http://snomed.info/sct",
+        "code": "387406002",
+        "display": "Sulfonamide"
+      }
+    ],
+    "text": "Sulfonamide"
+  },
+  "patient": {
+    "reference": "Patient/pat-0006"
+  },
+  "recordedDate": "2016-11-09",
+  "reaction": [
+    {
+      "description": "Itching",
+      "severity": "mild"
+    }
+  ],
+  "extension": [
+    {
+      "url": "urn:demo-hospital:ext:drug-class",
+      "valueCode": "sulfonamide"
+    }
+  ],
+  "encounter": {
+    "reference": "Encounter/enc-000006"
+  }
+}

@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from app.core.auth import CLINICAL_STAFF, audit_phi, require_roles
 from app.core.models import StaffUser
 from app.core.store import get_store
-from app.integrations.mocks import MOCK_CONFIG
+from app.integrations.mocks import MOCK_CONFIG, adapter
 from app.modules.priors import service
 
 router = APIRouter(prefix="/api/priors", tags=["priors"])
@@ -50,4 +50,5 @@ class Simulation(BaseModel):
 def simulate(body: Simulation, user: StaffUser = Depends(VIEWERS)):
     """Demo control: make the mock outside archives fail some or all requests."""
     MOCK_CONFIG["outside_archive"].failure_rate = body.failure_rate
+    adapter("outside_archive").breaker.reset()  # a changed setting gets a fresh circuit
     return MOCK_CONFIG["outside_archive"].model_dump()

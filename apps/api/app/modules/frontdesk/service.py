@@ -8,11 +8,13 @@ from pydantic import BaseModel
 from app.core.models import ACTIVE_STATUSES, Appointment, AppointmentStatus
 from app.core.store import Store, get_store
 from app.core.templates import format_when, render
-from app.integrations.mocks import CoverageResult, queue_message
+from app.integrations.mocks import CoverageResult, adapter, queue_message
+from app.llm.deid import Pseudonymizer
 from app.llm.gateway import get_gateway
 from app.llm.prompts import CALL_SUMMARY
 from app.llm.providers import mock_fixture
-from app.modules.frontdesk.tools import CallSession
+from app.modules.frontdesk.agent import agent_reply
+from app.modules.frontdesk.tools import CallSession, Turn
 from app.modules.scheduling import service as scheduling
 
 PUBLIC_BASE = "/prereg"
@@ -99,6 +101,7 @@ class ReplyResult(BaseModel):
 
 def handle_reply(store: Store, message_id: str, text: str) -> ReplyResult:
     msg = store.outbox[message_id]
+    adapter(msg.channel).receive("reply", correlation_id=msg.id)  # inbound, under the outbound message's id
     answer = text.strip().upper()
     if msg.kind == "waitlist_offer":
         offer = next((o for o in scheduling.offers(store).values() if o.message_id == msg.id), None)
@@ -145,15 +148,41 @@ def _mock_summary(text: str, images: list, attempt: int) -> dict:
     return {"summary": summary, "follow_up_needed": follow_up}
 
 
-def summarize_call(store: Store, session: CallSession) -> None:
+def summarize_call(store: Store, session: CallSession) -> dict | None:
+    """Writes the call log's summary; returns the AI output (None when the summary is unavailable)."""
     transcript = "\n".join(f"{t.role}: {t.text}" for t in session.transcript if t.role != "tool")
     actions = ", ".join(a["tool"] for a in session.actions) or "none"
     patients = [store.patients[session.verified_patient_id]] if session.verified_patient_id else []
+    # De-identified like the agent's turns: any patient's name (a caller who was not verified may have said one)
+    # and a birth date in any form said.
+    pseudo = Pseudonymizer(list(store.patients.values()))
     outcome = get_gateway().structured(
-        task="call_summary", prompt=CALL_SUMMARY, variables={"transcript": transcript, "actions": actions},
-        schema_cls=CallSummary, tier="fast", patients=patients,
+        task="call_summary", prompt=CALL_SUMMARY,
+        variables={"transcript": pseudo.redact(transcript, spoken_dates=True), "actions": actions},
+        schema_cls=CallSummary, tier="fast", patients=patients, pseudonymizer=pseudo,
     )
     if outcome.status == "ok":
         session.summary = outcome.data["summary"]
-    else:
-        session.summary = f"Summary unavailable ({outcome.status}). Actions: {actions}."
+        return outcome.data
+    session.summary = f"Summary unavailable ({outcome.status}). Actions: {actions}."
+    return None
+
+
+# ---------- Call turns (the API and the phone eval) ----------
+
+def take_turn(store: Store, session: CallSession, text: str) -> tuple[str, str, bool]:
+    """One caller utterance: (the agent's reply, the agent mode used, whether the call is over)."""
+    session.transcript.append(Turn(role="caller", text=text))
+    reply, mode = agent_reply(store, session, text)
+    session.transcript.append(Turn(role="agent", text=reply))
+    return reply, mode, session.outcome == "transferred" or session.state.get("ended", False)
+
+
+def end_call(store: Store, session: CallSession) -> dict | None:
+    """Close the call and summarise it (the summary's AI output, or None)."""
+    if session.ended_at:
+        return None
+    session.ended_at = datetime.now()
+    if session.outcome == "in_progress":
+        session.outcome = "abandoned"
+    return summarize_call(store, session)

@@ -32,6 +32,9 @@ services:
         required: false # optional for `up -d postgres`; the API needs PHI_ENCRYPTION_KEY and PHI_BLIND_INDEX_KEY from it
     environment:
       DATABASE_URL: postgresql+psycopg://ioc:ioc@postgres:5432/ioc
+      # temporal:7233 when the `workflows` profile runs (TEMPORAL_ADDRESS=temporal:7233 docker compose --profile
+      # workflows up -d); empty: the workflow view says "offline" and every module works without it.
+      TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,5 +51,93 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Optional: HAPI FHIR R4 as the hospital EHR (docs/SPEC-hospital.md 6.2). Not needed for the demo,
+  # which keeps FHIR resources in PostgreSQL; start it with `docker compose --profile ehr up -d hapi`,
+  # load the hospital with `uv run python scripts/load_fhir.py` and check it with `scripts/smoke_fhir.sh`.
+  # FHIR_BACKEND=hapi makes the API read and write through it.
+  hapi-db:
+    image: postgres:16-alpine
+    profiles: ["ehr"]
+    environment:
+      POSTGRES_USER: hapi
+      POSTGRES_PASSWORD: hapi
+      POSTGRES_DB: hapi
+    volumes:
+      - hapidata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hapi -d hapi"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  hapi:
+    image: hapiproject/hapi:v7.4.0
+    profiles: ["ehr"]
+    ports:
+      - "127.0.0.1:${HAPI_PORT:-8080}:8080"
+    environment:
+      spring.datasource.url: jdbc:postgresql://hapi-db:5432/hapi
+      spring.datasource.username: hapi
+      spring.datasource.password: hapi
+      spring.datasource.driverClassName: org.postgresql.Driver
+      spring.jpa.properties.hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
+      hapi.fhir.fhir_version: R4
+      hapi.fhir.allow_external_references: "true"
+      hapi.fhir.allow_placeholder_references: "true"
+      hapi.fhir.enforce_referential_integrity_on_write: "false"
+      hapi.fhir.subscription.resthook_enabled: "false"
+      hapi.fhir.subscription.websocket_enabled: "false"
+      hapi.fhir.subscription.email_enabled: "false"
+    depends_on:
+      hapi-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional: durable workflows (docs/SPEC-hospital.md 6.5). Temporal's single-container dev server (SQLite file,
+  # namespace hospital-demo, web UI on 8233) and the workflow worker. Local development: `docker compose --profile
+  # workflows up -d temporal`, TEMPORAL_ADDRESS=127.0.0.1:7233 in apps/api/.env and the worker in a terminal
+  # (`uv run python -m app.workflows.worker`). Without TEMPORAL_ADDRESS the workflow view says "offline".
+  temporal:
+    image: temporalio/temporal:1.8.3
+    profiles: ["workflows"]
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--namespace", "hospital-demo",
+              "--db-filename", "/home/temporal/temporal.db", "--ui-port", "8233", "--log-level", "warn"]
+    ports:
+      - "127.0.0.1:${TEMPORAL_PORT:-7233}:7233"
+      - "127.0.0.1:${TEMPORAL_UI_PORT:-8233}:8233"
+    volumes:
+      - temporaldata:/home/temporal
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "namespace", "describe", "--namespace", "hospital-demo",
+             "--address", "127.0.0.1:7233"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    profiles: ["workflows"]
+    command: ["python", "-m", "app.workflows.worker"]
+    env_file:
+      - path: apps/api/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://ioc:ioc@postgres:5432/ioc
+      TEMPORAL_ADDRESS: temporal:7233
+    healthcheck:
+      disable: true # the API image's check calls the HTTP API, which the worker does not serve
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata:
+  hapidata:
+  temporaldata:

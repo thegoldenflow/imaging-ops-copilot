@@ -1,0 +1,54 @@
+{
+  "resourceType": "Provenance",
+  "id": "prov-example",
+  "target": [
+    {
+      "reference": "DocumentReference/doc-example"
+    }
+  ],
+  "recorded": "2026-10-08T10:00:05-04:00",
+  "agent": [
+    {
+      "type": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/provenance-participant-type",
+            "code": "assembler"
+          }
+        ]
+      },
+      "who": {
+        "reference": "Device/agent-discharge_summary",
+        "display": "discharge_summary 1.0.0"
+      }
+    }
+  ],
+  "entity": [
+    {
+      "role": "source",
+      "what": {
+        "reference": "Encounter/stay-00912"
+      }
+    },
+    {
+      "role": "source",
+      "what": {
+        "reference": "Condition/cond-000001"
+      }
+    }
+  ],
+  "extension": [
+    {
+      "url": "urn:demo-hospital:ext:prompt-version",
+      "valueString": "discharge_summary@1"
+    },
+    {
+      "url": "urn:demo-hospital:ext:model",
+      "valueString": "claude-sonnet-5-5"
+    },
+    {
+      "url": "urn:demo-hospital:ext:run-id",
+      "valueString": "run-example"
+    }
+  ]
+}

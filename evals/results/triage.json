@@ -1,6 +1,6 @@
 {
  "task": "triage",
- "run_at": "2026-10-06T22:35:05",
+ "run_at": "2026-10-10T04:30:27",
  "mode": "mock",
  "model": "rule-based baseline",
  "n": 50,
@@ -43,6 +43,6 @@
    "rationale": "Symptomatic without red flags."
   }
  ],
- "seconds": 0.2,
+ "seconds": 2.7,
  "notes": "Agreement with the labelled priority (P1-P4). Under-triage is the safety-relevant error."
 }

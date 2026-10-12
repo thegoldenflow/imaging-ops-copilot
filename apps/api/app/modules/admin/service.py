@@ -26,4 +26,7 @@ def maybe_daily_reset(store: Store, now: datetime | None = None) -> bool:
     store.modules["daily_reset"] = now.date().isoformat()
     store.audit.record(user_id="system", user_name="Scheduler", role="system", action="reset",
                        resource_type="demo_data", resource_id=None, reason="daily demo reset")
+    from app.workflows import bridge
+
+    bridge.on_reset()  # the running workflows refer to data that is gone (6.5)
     return True

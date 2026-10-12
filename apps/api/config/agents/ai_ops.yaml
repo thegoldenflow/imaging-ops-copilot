@@ -1,0 +1,26 @@
+# Agent registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# kind: runtime_agent (hosted by the agent runtime) | embedded_agent (AI step inside its module) |
+# module (no model; registered for its EHR writes). Model ids come from the environment (model_policy.tier).
+#
+# AI Ops (6.6): the alerts in config/alerts.yaml open an admin Task when an agent's daily cost or failure rate
+# passes its threshold, and close it when an admin resolves it. No model; it reads only its own Tasks.
+agent_id: ai_ops
+version: 1.0.0
+kind: module
+owner: Hospital platform team
+purpose: 'AI Ops alerts (6.6): an admin Task when a daily cost or failure rate passes its threshold in
+  config/alerts.yaml; resolved by an admin on the AI Ops page.'
+risk_tier: ops
+allowed_tools:
+- createAlertTask
+- updateTask
+data_scope:
+  resources:
+  - Task
+  scope: hospital
+prompt_version: null
+required_signoff_role: []
+consent_required: []
+eval_status:
+  status: not_applicable
+deployment_status: demo

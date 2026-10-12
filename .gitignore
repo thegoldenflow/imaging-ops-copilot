@@ -27,3 +27,6 @@ test-results/
 
 # Derived list for translators (python -m app.modules.clinical_kg.terms export)
 apps/api/app/modules/clinical_kg/data/terms_to_translate.jsonl
+
+# Control Tower: training data rebuilt from FHIR by scripts/build_flow_dataset.py (the models and reports are kept)
+apps/api/models/flow/data/

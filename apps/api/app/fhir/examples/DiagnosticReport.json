@@ -1,0 +1,39 @@
+{
+  "resourceType": "DiagnosticReport",
+  "id": "dr-000001",
+  "status": "final",
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/v2-0074",
+          "code": "RAD"
+        }
+      ]
+    }
+  ],
+  "code": {
+    "coding": [
+      {
+        "system": "urn:demo-hospital:code",
+        "code": "XR_CHEST",
+        "display": "X-ray Chest"
+      }
+    ],
+    "text": "X-ray Chest"
+  },
+  "subject": {
+    "reference": "Patient/pat-0013"
+  },
+  "effectiveDateTime": "2026-08-10T10:40:11-04:00",
+  "issued": "2026-08-10T10:40:11-04:00",
+  "conclusion": "X-ray Chest: findings documented in the imaging report.",
+  "encounter": {
+    "reference": "Encounter/stay-00002"
+  },
+  "basedOn": [
+    {
+      "reference": "ServiceRequest/ord-stay-00002-07"
+    }
+  ]
+}

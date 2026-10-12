@@ -1,0 +1,41 @@
+{
+  "resourceType": "DocumentReference",
+  "id": "doc-example",
+  "status": "current",
+  "docStatus": "preliminary",
+  "type": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "18842-5",
+        "display": "Discharge summary"
+      }
+    ]
+  },
+  "subject": {
+    "reference": "Patient/pat-0388"
+  },
+  "date": "2026-10-08T10:00:00-04:00",
+  "author": [
+    {
+      "reference": "Device/agent-discharge_summary",
+      "display": "discharge_summary 1.0.0 (AI draft)"
+    }
+  ],
+  "content": [
+    {
+      "attachment": {
+        "contentType": "application/json",
+        "language": "en",
+        "title": "Discharge summary (draft)"
+      }
+    }
+  ],
+  "context": {
+    "encounter": [
+      {
+        "reference": "Encounter/stay-00912"
+      }
+    ]
+  }
+}

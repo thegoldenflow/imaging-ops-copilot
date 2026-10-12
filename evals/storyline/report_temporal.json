@@ -1,0 +1,183 @@
+{
+  "kind": "temporal",
+  "mode": "running API http://127.0.0.1:9445",
+  "run_at": "2026-10-11T01:36:53",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "git": "a454d12-dirty",
+  "llm": "the API's",
+  "temporal": true,
+  "reset_seconds": 61.8,
+  "walk_seconds": 399.2,
+  "budget_seconds": 595,
+  "steps_ok": 12,
+  "passed": true,
+  "journey": {
+    "id": "journey-stay-j0001",
+    "workflow_type": "InpatientJourneyWorkflow",
+    "status": "completed",
+    "current_step": null,
+    "current_label": null,
+    "current_status": null,
+    "encounter_id": "stay-j0001",
+    "unit_id": "SURG",
+    "exception_id": null,
+    "run_id": null,
+    "started_at": "2026-10-11T01:30:45",
+    "updated_at": "2026-10-11T01:36:51",
+    "done": 14,
+    "total": 14,
+    "attention": false
+  },
+  "hospital_time_end": "2026-10-17T11:06:00",
+  "steps": [
+    {
+      "n": 1,
+      "key": "call",
+      "title": "A daughter calls in Mandarin; the clerk confirms the ED registration",
+      "user": "U-CLER-01",
+      "seconds": 24.84,
+      "ok": true,
+      "result": "call VC-00083 (daughter), registration Task task-04835",
+      "refs": [
+        "Encounter/ed-j0001"
+      ]
+    },
+    {
+      "n": 2,
+      "key": "triage",
+      "title": "Triage: CTAS 2 suggested, admission probability 0.82 with three reasons",
+      "user": "U-NURS-01",
+      "seconds": 24.45,
+      "ok": true,
+      "result": "CTAS 2 suggested; Admission probability 0.82: CTAS 2, SpO₂ 91%, heart rate 112",
+      "refs": [
+        "Observation/ctas-ed-j0001",
+        "Flag/flag-ed-j0001-fall-risk"
+      ]
+    },
+    {
+      "n": 3,
+      "key": "imaging",
+      "title": "Hip X-rays and CT: urgency and protocol suggested, the ED physician orders",
+      "user": "U-DOC-01",
+      "seconds": 10.81,
+      "ok": true,
+      "result": "Imaging orders: X-ray and CT of the left hip (urgency P2)",
+      "refs": [
+        "ServiceRequest/ord-ed-j0001-xr-hip",
+        "ServiceRequest/ord-ed-j0001-ct-hip"
+      ]
+    },
+    {
+      "n": 4,
+      "key": "inr",
+      "title": "INR 3.8: a critical value routed to the ED physician",
+      "user": "U-DOC-01",
+      "seconds": 12.73,
+      "ok": true,
+      "result": "Critical value: INR 3.8 before surgery (roadmap stub)",
+      "refs": [
+        "Observation/obs-ord-ed-j0001-inr"
+      ]
+    },
+    {
+      "n": 5,
+      "key": "bed",
+      "title": "Orthopedics is full; Surgery has 2 discharge-ready patients; the bed manager approves",
+      "user": "U-OPS",
+      "seconds": 26.28,
+      "ok": true,
+      "result": "Orthopedics at 100% occupancy (EXC-00667) approved: overflow_discharge_rounds, confirm_discharges",
+      "refs": [
+        "Encounter/stay-j0001",
+        "Location/SURG-04-B"
+      ]
+    },
+    {
+      "n": 6,
+      "key": "medrec",
+      "title": "Admission MedRec: warfarin + naproxen (major), amlodipine left out",
+      "user": "U-PHAR-01",
+      "seconds": 9.86,
+      "ok": true,
+      "result": "2 omission(s) incl. amlodipine; MedRec MR-03368 final",
+      "refs": [
+        "DocumentReference/medrec-stay-j0001-admission"
+      ]
+    },
+    {
+      "n": 7,
+      "key": "or",
+      "title": "OR: predicted 115 min against 90 booked, past the block; the coordinator adjusts",
+      "user": "U-OPS",
+      "seconds": 6.78,
+      "ok": true,
+      "result": "booked 90 -> 115 min (predicted 115)",
+      "refs": [
+        "Appointment/appt-surg-j0001-book-1"
+      ]
+    },
+    {
+      "n": 8,
+      "key": "news2",
+      "title": "First night after surgery: NEWS2 7 raises a flag",
+      "user": "U-NURS-13",
+      "seconds": 56.36,
+      "ok": true,
+      "result": "NEWS2 alert on this patient: assess now and record the response (score and observations in the flag).",
+      "refs": [
+        "Flag/flag-00016"
+      ]
+    },
+    {
+      "n": 9,
+      "key": "summary",
+      "title": "Discharge summary: the validator blocks an untraceable medicine",
+      "user": "U-SURG-02",
+      "seconds": 141.09,
+      "ok": true,
+      "result": "blocked ['condition/cond-j0001-htn-note', 'lisinopril']; removed and signed",
+      "refs": [
+        "DocumentReference/dsum-stay-j0001"
+      ]
+    },
+    {
+      "n": 10,
+      "key": "instructions",
+      "title": "Bilingual instructions: warfarin diet and wound red flags",
+      "user": "U-NURS-13",
+      "seconds": 4.89,
+      "ok": true,
+      "result": "pinstr-stay-j0001 (zh-Hans) signed",
+      "refs": [
+        "DocumentReference/pinstr-stay-j0001"
+      ]
+    },
+    {
+      "n": 11,
+      "key": "followup",
+      "title": "48 hours later: a Chinese follow-up call escalates heavy wound drainage",
+      "user": "U-NURS-13",
+      "seconds": 76.48,
+      "ok": true,
+      "result": "FU-stay-j0001: escalated (urgent), call-back recorded",
+      "refs": [
+        "Communication/communicatio-00101",
+        "Task/task-05074"
+      ]
+    },
+    {
+      "n": 12,
+      "key": "coding",
+      "title": "Coding suggestion: main diagnosis and procedure codes",
+      "user": "U-CLER-01",
+      "seconds": 3.42,
+      "ok": true,
+      "result": "Coding suggestion: S72.0 and 1.VA.53 (roadmap stub)",
+      "refs": [
+        "Task/task-05016"
+      ]
+    }
+  ],
+  "error": null
+}

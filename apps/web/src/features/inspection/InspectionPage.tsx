@@ -91,7 +91,7 @@ function Answer({ e }: { e: QaEntry }) {
       <p className="text-sm font-medium text-slate-900">{e.question}</p>
       {e.found ? (
         <>
-          <div className="flex items-start gap-2"><AiBadge label="AI answer from your documents" /></div>
+          <div className="flex items-start gap-2"><AiBadge label="AI answer from your documents" agent="policy_qa" /></div>
           <p className="text-sm text-slate-800">{e.answer}</p>
           <ol className="space-y-1.5">
             {e.citations.map((c, i) => (

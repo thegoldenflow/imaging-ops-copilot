@@ -9,7 +9,7 @@ import re
 
 from pydantic import BaseModel, Field
 
-from app.llm.prompts import Prompt
+from app.agents.prompts import registered
 from app.llm.providers import mock_fixture
 
 LOW_CONFIDENCE = 0.7
@@ -43,19 +43,7 @@ FIELD_LABELS = {
     "stated_urgency": "Urgency stated by referrer",
 }
 
-EXTRACT_PROMPT = Prompt(
-    name="requisition_extract",
-    version="requisition_extract@1",
-    system=(
-        "You extract structured fields from diagnostic imaging requisitions for an imaging centre. "
-        "Copy each source_quote verbatim from the requisition so it can be highlighted. "
-        "Use an empty list when a field is absent; never infer facts that are not written. "
-        "Set confidence below 0.7 when the wording is ambiguous. "
-        "stated_urgency.value must be one of: urgent, routine, unspecified. "
-        "Identifiers may appear as placeholders like [PERSON_1]; leave them as written."
-    ),
-    template="Requisition:\n<<<\n{text}\n>>>",
-)
+EXTRACT_PROMPT = registered("requisition_extract")
 
 LABELLED = {
     "requested_exam": r"^Exam requested:\s*(.+)$",

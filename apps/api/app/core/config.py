@@ -50,6 +50,34 @@ class Settings:
     background_workers: bool
     # Hour of day (0-23) at which the demo data is regenerated once a day; unset: never.
     demo_daily_reset_hour: int | None
+    # Hospital EHR behind FhirGateway: "local" (FHIR store in PostgreSQL) or "hapi" (a FHIR server).
+    fhir_backend: str
+    fhir_base_url: str
+    # "none" (local HAPI) or "smart_backend" (SMART Backend Services, defined but not implemented).
+    fhir_auth_mode: str
+    fhir_client_id: str | None
+    fhir_token_url: str | None
+    # "demo" or "prod" (spec 6.4): in prod an agent runs only when its eval_status is passed and its
+    # deployment_status prod_ready; in demo an agent that has not passed runs with a "not evaluated" flag.
+    app_mode: str
+    # Durable workflows (spec 6.5). Unset address: Temporal is off, the workflow view says "offline" and every
+    # module works without it.
+    temporal_address: str | None
+    temporal_namespace: str
+    temporal_task_queue: str
+    # Run the workflow worker inside the API process (development, Playwright); otherwise `python -m app.workflows.worker`.
+    temporal_worker_in_api: bool
+    # Timer durations in seconds, passed in each workflow's start input (so a change never alters a running
+    # workflow's history). Temporal's timers run on the wall clock, not the simulated hospital clock.
+    workflow_signoff_timeout_s: int
+    workflow_escalation_timeout_s: int
+    workflow_followup_delay_s: int
+    workflow_verify_after_s: int
+    # Post-discharge follow-up calls (7.4) without a journey workflow: due this many hospital hours after the
+    # discharge, still placed until `window` hours after it; the nurse calls back within `callback` minutes.
+    followup_call_delay_h: int = 48
+    followup_call_window_h: int = 72
+    followup_callback_minutes: int = 30
 
 
 def load_settings() -> Settings:
@@ -61,6 +89,15 @@ def load_settings() -> Settings:
     provider = (os.getenv("LLM_PROVIDER") or os.getenv("LLM_MODE") or ("anthropic" if key else "mock")).strip().lower()
     if provider not in ("anthropic", "gemini", "mock"):
         raise ValueError(f"LLM_PROVIDER must be anthropic, gemini or mock, not {provider!r}")
+    fhir_backend = os.getenv("FHIR_BACKEND", "local").strip().lower()
+    if fhir_backend not in ("local", "hapi"):
+        raise ValueError(f"FHIR_BACKEND must be local or hapi, not {fhir_backend!r}")
+    fhir_auth_mode = os.getenv("FHIR_AUTH_MODE", "none").strip().lower()
+    if fhir_auth_mode not in ("none", "smart_backend"):
+        raise ValueError(f"FHIR_AUTH_MODE must be none or smart_backend, not {fhir_auth_mode!r}")
+    app_mode = os.getenv("APP_MODE", "demo").strip().lower()
+    if app_mode not in ("demo", "prod"):
+        raise ValueError(f"APP_MODE must be demo or prod, not {app_mode!r}")
     return Settings(
         anthropic_api_key=key,
         google_agent_platform_api_key=os.getenv("GOOGLE_AGENT_PLATFORM_API_KEY") or None,
@@ -78,6 +115,23 @@ def load_settings() -> Settings:
         database_url=os.getenv("DATABASE_URL", "postgresql+psycopg://ioc:ioc@127.0.0.1:5433/ioc"),
         background_workers=os.getenv("BACKGROUND_WORKERS", "1") != "0",
         demo_daily_reset_hour=int(h) if (h := os.getenv("DEMO_DAILY_RESET_HOUR", "").strip()) else None,
+        fhir_backend=fhir_backend,
+        fhir_base_url=os.getenv("FHIR_BASE_URL", "http://localhost:8080/fhir").rstrip("/"),
+        fhir_auth_mode=fhir_auth_mode,
+        fhir_client_id=os.getenv("FHIR_CLIENT_ID") or None,
+        fhir_token_url=os.getenv("FHIR_TOKEN_URL") or None,
+        app_mode=app_mode,
+        temporal_address=os.getenv("TEMPORAL_ADDRESS", "").strip() or None,
+        temporal_namespace=os.getenv("TEMPORAL_NAMESPACE", "hospital-demo").strip(),
+        temporal_task_queue=os.getenv("TEMPORAL_TASK_QUEUE", "hospital-workflows").strip(),
+        temporal_worker_in_api=os.getenv("TEMPORAL_WORKER_IN_API", "0") == "1",
+        workflow_signoff_timeout_s=int(os.getenv("WORKFLOW_SIGNOFF_TIMEOUT_S", str(24 * 3600))),
+        workflow_escalation_timeout_s=int(os.getenv("WORKFLOW_ESCALATION_TIMEOUT_S", str(24 * 3600))),
+        workflow_followup_delay_s=int(os.getenv("WORKFLOW_FOLLOWUP_DELAY_S", str(48 * 3600))),
+        workflow_verify_after_s=int(os.getenv("WORKFLOW_VERIFY_AFTER_S", str(3600))),
+        followup_call_delay_h=int(os.getenv("FOLLOWUP_CALL_DELAY_H", "48")),
+        followup_call_window_h=int(os.getenv("FOLLOWUP_CALL_WINDOW_H", "72")),
+        followup_callback_minutes=int(os.getenv("FOLLOWUP_CALLBACK_MINUTES", "30")),
     )
 
 

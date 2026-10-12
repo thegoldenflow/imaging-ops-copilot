@@ -15,8 +15,10 @@
 - **数据在 PostgreSQL 里**（数据卷 `imaging-ops_pgdata`）：重启容器、发版、服务器重启后数据和登录会话都保留，进行中的危急结果升级、旧片调取、提醒发送会接着做。API 启动时自动跑数据库迁移；库是空的就生成演示数据。
 - **PHI 字段级加密**：患者姓名、出生日期、电话、邮箱、地址、健康卡号，以及申请单原文、外发消息、通话记录等自由文本，用 `PHI_ENCRYPTION_KEY` 加密后入库；按出生日期 / 健康卡号查人用 `PHI_BLIND_INDEX_KEY` 算的盲索引。两把密钥只在 `.env` 里，**不在数据库备份里**，要单独保管（见下文“备份”）。
 - 审计日志表在数据库层禁止 UPDATE / DELETE（触发器），加上哈希链。
-- API 跑 1 个 worker：后台步骤已经用行锁 / advisory lock 防重，但爽约模型、检索索引是每个进程一份的缓存，演示量没必要多开。
-- 资源：API 常驻约 250MB，Postgres 约 100MB（估计），nginx 约 10MB。1GB 内存的机器够用；旧服务（Neo4j + Postgres + bge）停掉后能腾出约 1.7GB。
+- API 跑 1 个 worker：后台步骤已经用行锁 / advisory lock 防重，但爽约模型、检索索引、行缓存是每个进程一份的缓存，演示量没必要多开。
+- 全院扩展（Phase 6–8）的合成 EHR（约 6.5 万个 FHIR 资源）也在同一个 PostgreSQL 库里（表 `fhir_resources`），不需要额外服务。HAPI FHIR（compose 里的 `ehr` profile）只用于本机对照，服务器上不要开（单独就要约 1.7GB 内存）。
+- 可选的持久化工作流：Temporal dev server 和 worker（`workflows` profile，见下文“可选：持久化工作流”）。不开时工作流页面显示 "offline"，其余功能照常。
+- 资源（2026-10-11 本机实测，生成演示数据并打开过各页面之后）：API 常驻约 650MB（全院数据、行缓存、知识图谱、流量模型都在进程里），Postgres 单库约 150–250MB，nginx 约 10MB；开工作流再加 Temporal 约 200MB 和 worker（与 API 同一个镜像，按 API 的量估）。不开工作流至少 1.5GB 内存，开工作流至少 2.5GB；再小的机器加 swap。一次“Reset demo”或每日重置会在几十秒内把 API 的内存和 CPU 顶高。
 
 ## A. 本机：构建并推送
 
@@ -81,7 +83,17 @@ PHI_BLIND_INDEX_KEY=<base64>
 ANTHROPIC_API_KEY=<key>
 # LLM_PROVIDER=gemini
 # GOOGLE_AGENT_PLATFORM_API_KEY=<key>
+
+# 发布门（规格 6.4 / 6.6）：demo（默认）下未通过评测的 agent 照常运行，输出带 "Not evaluated" 标记；
+# prod 下这些 agent 被拒绝，模块退回规则层或人工。目前提交的评测全是 mock 基线，prod 等于关掉 AI 步骤。
+# APP_MODE=demo
+
+# 可选：持久化工作流（需要 --profile workflows，见下文）
+# TEMPORAL_ADDRESS=temporal:7233
+# WORKFLOW_FOLLOWUP_DELAY_S=20
 ```
+
+其余变量（模型 id、FHIR、随访时长等）见 `apps/api/.env.example` 和仓库根目录 README 的 Configuration 表。
 
 ```bash
 chmod 600 .env
@@ -189,6 +201,36 @@ docker compose -f docker-compose.prod.yml start api
 
 **换 PHI 密钥**：密文带密钥编号（`k1:`），目前只支持一把密钥，没有在线换钥工具。演示环境换钥的办法就是上面的清空重建。
 
+## 可选：持久化工作流（Temporal，规格 6.5）
+
+生产环境不必开。不设 `TEMPORAL_ADDRESS` 时工作流视图显示 "offline"，其余模块照常工作，演示故事线按“离线模式”一步步推进。
+
+`docker-compose.prod.yml` 里已经有 `workflows` profile 的两个服务：`temporal`（单容器 dev server，SQLite 存在数据卷 `temporaldata`，namespace `hospital-demo`，内存约 200MB；Web UI 只绑 127.0.0.1:8233，用 `ssh -L 8233:127.0.0.1:8233` 看）和 `worker`（与 API 同一个镜像，命令 `python -m app.workflows.worker`）。开启：
+
+```bash
+# .env 里加一行
+TEMPORAL_ADDRESS=temporal:7233
+# 演示时可缩短计时（默认签字超时 24 小时、升级再 24 小时、随访 48 小时、产能复核 1 小时，按墙钟走，不跟模拟的医院时钟）
+WORKFLOW_FOLLOWUP_DELAY_S=20
+
+docker compose -f docker-compose.prod.yml --profile workflows up -d
+docker compose -f docker-compose.prod.yml --profile workflows ps     # ioc_temporal healthy，ioc_worker running
+```
+
+关闭：删掉 `.env` 里的 `TEMPORAL_ADDRESS`，`docker compose -f docker-compose.prod.yml up -d`（API 重建），再 `docker compose -f docker-compose.prod.yml --profile workflows stop temporal worker`。worker 挂掉不丢东西：待发的启动和信号留在库里的 outbox 或 Temporal 里，worker 重启后从断点继续。“Reset demo” 会终止正在跑的工作流。
+
+## 端口
+
+| 服务 | 本机开发（`docker-compose.yml`） | 服务器（`docker-compose.prod.yml`） |
+|---|---|---|
+| Web（nginx + 前端） | `WEB_PORT`，默认 80（`docker compose up`）；开发时 Vite 5173 | 127.0.0.1:`WEB_PORT`（示例 8080，Caddy 反代） |
+| API | 8000（`uvicorn --port`，被占用就换，并设 `VITE_API_PROXY_TARGET`） | 不对外，只在 compose 网络里（nginx 反代 `/api`） |
+| PostgreSQL | 127.0.0.1:5433（`POSTGRES_PORT`） | 不对外 |
+| Temporal gRPC / Web UI | 127.0.0.1:7233 / 127.0.0.1:8233 | gRPC 不对外；UI 127.0.0.1:8233 |
+| HAPI FHIR（可选） | 127.0.0.1:8080（`HAPI_PORT`） | 不部署 |
+
+Windows 开发机常有被 Hyper-V 保留的端口段（`netsh interface ipv4 show excludedportrange protocol=tcp`），绑定报 `Errno 13` / `10013` 就换一个段外的端口。
+
 ## 排查
 
 | 症状 | 原因 |
@@ -201,4 +243,8 @@ docker compose -f docker-compose.prod.yml start api
 | 页面右上角显示 AI: mock | `.env` 里没有可用的 API key，或 `LLM_PROVIDER` 指向的提供方没有 key |
 | AI 调用超时 | 服务器出网访问 api.anthropic.com / Google 受限；可调 `LLM_TIMEOUT_S` |
 | 上传胸片报 413 | 超过 nginx 的 25MB 限制（`apps/web/nginx.conf`） |
+| 工作流页面显示 "unreachable" | 设了 `TEMPORAL_ADDRESS` 但 `ioc_temporal` 没起来，或没加 `--profile workflows` |
+| 工作流页面显示 "offline" 但想开 | API 没读到 `TEMPORAL_ADDRESS=temporal:7233`：写进 `.env` 后 `up -d` 重建 API |
+| API 容器被 OOM 杀掉（`docker inspect ioc_api` 里 `OOMKilled: true`） | 内存不够：见上文“资源”，加内存或 swap；不要在小机器上开 HAPI |
+| “Reset demo” 后几十秒页面很慢 | 正在重新生成全院数据，等它完成；每日自动重置（`DEMO_DAILY_RESET_HOUR`）挑没人用的时间 |
 | 审计日志里 IP 全是同一个内网地址 | 代理链没有传 `X-Forwarded-For`；Caddy 默认会传，检查是否被改过 |

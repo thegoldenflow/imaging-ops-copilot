@@ -1,0 +1,44 @@
+{
+  "resourceType": "Task",
+  "id": "task-000011",
+  "status": "requested",
+  "intent": "order",
+  "priority": "routine",
+  "code": {
+    "coding": [
+      {
+        "system": "urn:demo-hospital:task",
+        "code": "preop-labs",
+        "display": "Pre-operative labs resulted"
+      }
+    ],
+    "text": "Pre-operative labs resulted"
+  },
+  "authoredOn": "2026-09-16T09:45:00-04:00",
+  "lastModified": "2026-09-16T09:45:00-04:00",
+  "for": {
+    "reference": "Patient/pat-0119"
+  },
+  "encounter": {
+    "reference": "Encounter/enc-000176"
+  },
+  "focus": {
+    "reference": "Appointment/surg-00440"
+  },
+  "performerType": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/practitioner-role",
+          "code": "nurse"
+        }
+      ]
+    }
+  ],
+  "description": "Pre-operative labs resulted before Repair of inguinal hernia",
+  "restriction": {
+    "period": {
+      "end": "2026-10-08T08:45:00-04:00"
+    }
+  }
+}

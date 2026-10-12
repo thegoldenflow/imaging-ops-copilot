@@ -9,11 +9,13 @@ import secrets
 
 from fastapi import Depends, HTTPException, Request
 
-from app.core.models import Role, StaffUser
+from app.core.context import request_context
+from app.core.models import IMAGING_ROLES, Role, StaffUser
 from app.core.store import get_store
 
 ALL_ROLES = set(Role)
-CLINICAL_STAFF = ALL_ROLES - {Role.REFERRER}
+# Imaging-centre staff (phases 0-4). The hospital roles (6.3) do not get the imaging screens.
+CLINICAL_STAFF = set(IMAGING_ROLES) - {Role.REFERRER}
 
 
 def issue_token(user_id: str) -> str:
@@ -38,6 +40,9 @@ def current_user(request: Request) -> StaffUser:
     user = store.staff.get(user_id) if user_id else None
     if user is None:
         raise HTTPException(status_code=401, detail="Not signed in")
+    ctx = request_context()
+    if ctx is not None:
+        ctx.user = user  # for layers without the request, e.g. the LLM gateway's ai_call audit event
     return user
 
 

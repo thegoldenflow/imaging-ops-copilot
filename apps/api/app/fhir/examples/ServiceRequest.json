@@ -1,0 +1,54 @@
+{
+  "resourceType": "ServiceRequest",
+  "id": "bedreq-ed-00001",
+  "status": "completed",
+  "intent": "order",
+  "priority": "urgent",
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "urn:demo-hospital:code",
+          "code": "bed-request",
+          "display": "bed-request"
+        }
+      ],
+      "text": "bed-request"
+    }
+  ],
+  "code": {
+    "coding": [
+      {
+        "system": "http://snomed.info/sct",
+        "code": "32485007",
+        "display": "Hospital admission"
+      }
+    ],
+    "text": "Hospital admission"
+  },
+  "subject": {
+    "reference": "Patient/pat-0603"
+  },
+  "authoredOn": "2026-08-09T02:32:07-04:00",
+  "encounter": {
+    "reference": "Encounter/ed-00001"
+  },
+  "occurrenceDateTime": "2026-08-09T02:52:07-04:00",
+  "locationReference": [
+    {
+      "reference": "Location/MEDB"
+    }
+  ],
+  "reasonCode": [
+    {
+      "coding": [
+        {
+          "system": "http://snomed.info/sct",
+          "code": "29857009",
+          "display": "Chest pain"
+        }
+      ],
+      "text": "Chest pain"
+    }
+  ]
+}

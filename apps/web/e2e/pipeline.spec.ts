@@ -108,7 +108,8 @@ test("requisition pipeline end to end", async ({ page, context }) => {
 
   // 8. Eval results are visible.
   await signInAs(page, "radiologist");
-  await page.getByRole("link", { name: "AI evaluations" }).click();
+  await page.getByRole("link", { name: "AI Ops" }).click();
+  await page.getByRole("tab", { name: "Imaging reports" }).click();
   await expect(page.getByTestId("eval-triage")).toBeVisible();
   await shot(page, "p2-07-evals");
 });

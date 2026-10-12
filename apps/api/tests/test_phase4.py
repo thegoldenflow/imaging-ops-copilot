@@ -284,6 +284,27 @@ def test_cancelled_exam_billed_is_flagged_live(client, login):
     assert any(r["id"] == f"not_performed.{appt.id}" for r in rows)
 
 
+def test_planted_discrepancies_stay_in_the_window_whatever_the_time_of_seeding():
+    # The seed plants discrepancies among the exams of the 30 days before the seeding hour, while the reconciliation
+    # counts its 30 days back from the moment it runs: seed the claims as of every 3 hours over 3 days and reconcile
+    # at seeding time and a day later.
+    import random
+
+    from app.core.store import Store
+
+    db = get_store()
+    appointments = dict(db.appointments.items())
+    base = db.modules["seed_time"]
+    for hours in range(0, 72, 3):
+        s, now = Store(), base - timedelta(hours=hours)
+        s.appointments.update(appointments)
+        billing.seed(s, random.Random(42), now)
+        planted = set(s.modules["billing_planted"])
+        for later in (timedelta(0), billing.PLANTED_MARGIN):
+            found = {(f["kind"], f["appointment_id"]) for f in billing.reconcile(s, now + later)}
+            assert planted <= found, (now, later, planted - found)
+
+
 # ---------- System 19 · Patient feedback ----------
 
 def test_completion_sends_survey_in_patient_language_and_low_rating_alerts(client, login):
@@ -366,6 +387,55 @@ def test_feedback_dashboard_confirm_and_follow_up(client, login):
     assert r.status_code == 200 and r.json()["status"] == "followed_up"
     fd = client.get("/api/feedback/overview", headers=login("U-FD")).json()
     assert {s["site_id"] for s in fd["by_site"]} == {"LKS"}
+
+
+def test_seed_plants_an_open_chinese_survey_even_without_a_recent_chinese_patient():
+    # Whether one of the latest patients speaks Chinese depends on the time of seeding: force the case without.
+    import random
+
+    from app.core.models import AppointmentStatus
+    from app.core.store import Store
+    from app.modules.feedback import service as feedback
+
+    db, s, now = get_store(), Store(), datetime.now()
+    for table in ("sites", "exams", "patients", "appointments"):
+        getattr(s, table).update(dict(getattr(db, table).items()))
+    done = sorted((a for a in s.appointments.values() if a.status == AppointmentStatus.COMPLETED and a.end < now),
+                  key=lambda a: a.end)
+    for a in done[-40:]:
+        s.patients[a.patient_id] = s.patients[a.patient_id].model_copy(update={"preferred_language": "en"})
+    feedback.seed(s, random.Random(7), now)
+    newest = sorted(feedback.surveys(s).values(), key=lambda v: v.sent_at, reverse=True)[:15]  # what the page lists
+    zh = [v for v in newest if v.language == "zh"]
+    assert zh and zh[0].status == "sent" and zh[0].sent_at == now
+    assert sum(v.status == "sent" for v in feedback.surveys(s).values()) == 3
+
+
+def test_seed_keeps_westbrooks_bad_month_whatever_the_time_of_seeding():
+    # Which exams fall in the last 30 days depends on the time of seeding, and the small sites have only a handful
+    # of answers there: seed the feedback as of every 3 hours over 3 days and look at the dashboard's 30-day window,
+    # at seeding time and a day later.
+    import random
+    import statistics
+
+    from app.core.store import Store
+    from app.modules.feedback import service as feedback
+
+    db = get_store()
+    tables = {t: dict(getattr(db, t).items()) for t in ("sites", "exams", "patients", "appointments")}
+    base = datetime.now().replace(minute=0, second=0, microsecond=0)
+    for hours in range(0, 72, 3):
+        s, now = Store(), base - timedelta(hours=hours)
+        for table, rows in tables.items():
+            getattr(s, table).update(rows)
+        feedback.seed(s, random.Random(42), now)
+        for later in (timedelta(0), timedelta(days=1)):
+            ratings: dict[str, list[int]] = {}
+            for r in feedback.responses(s).values():
+                if r.submitted_at >= now + later - timedelta(days=30):
+                    ratings.setdefault(r.site_id, []).append(r.rating)
+            wbk = statistics.mean(ratings.pop("WBK"))
+            assert min(statistics.mean(v) for v in ratings.values()) - wbk >= feedback.BAD_MONTH_MARGIN, (now, later)
 
 
 # ---------- System 20 · PHIPA access monitoring ----------

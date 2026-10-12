@@ -1,0 +1,10 @@
+{
+  "resourceType": "Slot",
+  "id": "slot-or-01-0800",
+  "schedule": {
+    "reference": "Schedule/sched-or-01"
+  },
+  "status": "busy",
+  "start": "2026-10-08T08:00:00-04:00",
+  "end": "2026-10-08T09:45:00-04:00"
+}

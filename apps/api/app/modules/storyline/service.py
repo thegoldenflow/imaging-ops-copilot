@@ -1,0 +1,560 @@
+"""The hospital storyline (spec 8.2, WP9): reset to the start, the twelve steps' live status, the clock's beats,
+and the event subscriber that plays the story.
+
+- `reset(user)`: the demo reset followed by the preset (app/ehr/seed/journey.py), one click from the storyline
+  page. Workflows still running from before are terminated by the reset (6.5).
+- `status(store, user)`: per step what the AI proposed, who signed or approved and when, what the EHR wrote and
+  the audit events of those records, read through FhirGateway as the storyline (system actor, audited) plus the
+  modules' own tables; the current step is the first one not done.
+- `advance(store, user)`: moves the hospital clock to the current step's beat (the INR result, the admission
+  decision, her bed, the first post-operative night, the discharge, 48 hours later) as a background fast-forward
+  (app/ehr/simjobs.py), so the boards move and the subscribers react while it runs.
+- `handle(event)`: the subscriber (consumer `storyline`). It reacts only to the storyline patient's events: the
+  cards of app/modules/storyline/stubs.py, the EHR script of app/ehr/storyline.py, the scripted discharge
+  reconciliation, and, with Temporal configured, the start of her InpatientJourneyWorkflow at the registration
+  (journey-stay-j0001 from the ED, `JourneyInput.ed_visit`).
+
+The page works without Temporal: every card and module step is there either way (the offline mode of 6.5); with
+Temporal the journey also strings the sign-offs together, escalates them when they wait and shows the timeline.
+"""
+
+from __future__ import annotations
+
+import logging
+import threading
+import time
+from datetime import datetime, timedelta
+
+from sqlalchemy import func, select
+
+from app.agents import approvals
+from app.agents import trace as traces
+from app.core.audit import mrn_hash
+from app.core.db.schema import audit_events
+from app.core.models import StaffUser
+from app.core.store import Store, ambient_store, get_store, reset_store
+from app.ehr import simjobs, simulator
+from app.ehr import storyline as ehr_story
+from app.ehr.events import DomainEvent, bus, domain_events
+from app.ehr.seed import journey as preset
+from app.fhir.dt import parse
+from app.modules.storyline import script as S
+from app.modules.storyline import stubs
+
+log = logging.getLogger("app.storyline")
+CONSUMER = "storyline"
+EVENT_TYPES = ("patient.admitted", "patient.discharged", "encounter.updated", "result.available", "task.decided",
+               "exception.decided", "document.signed")
+CLEAN_MAX = timedelta(minutes=102)  # the simulator's housekeeping takes 45-100 minutes
+
+
+def state(store: Store) -> dict | None:
+    return store.modules.get(preset.STATE)
+
+
+# ---------- reset ----------
+
+
+def reset(user: StaffUser) -> dict:
+    """The demo reset, then the storyline's preset: the story starts at 07:00 on the hospital day."""
+    from app.workflows import bridge
+
+    store = reset_store()
+    store.audit.record(user_id=user.id, user_name=user.name, role=str(user.role), action="reset",
+                       resource_type="demo_data", resource_id="storyline", reason="storyline reset (demo reset + "
+                       "preset)", event_type="simulator_event", module="storyline")
+    st = preset.plant(store, user.id)
+    bridge.on_reset()
+    return st
+
+
+# ---------- the subscriber ----------
+
+
+def install() -> bool:
+    if any(s.consumer == CONSUMER for s in bus.subscriptions()):
+        return False
+    bus.subscribe(EVENT_TYPES, handle, consumer=CONSUMER)
+    return True
+
+
+def _id(ref: str | None) -> str | None:
+    return ref.split("/", 1)[1] if isinstance(ref, str) and "/" in ref else None
+
+
+def handle(event: DomainEvent) -> None:
+    store = get_store()
+    st = state(store)
+    if st is None:
+        return
+    t, enc, a = event.type, event.encounter, event.attrs
+    if t == "patient.admitted" and enc == S.VISIT:
+        stubs.ensure_triage_card(store)
+        _start_journey(store, event)
+    elif t == "encounter.updated" and enc == S.VISIT and a.get("change") == "triaged":
+        if ehr_story.after_triage(store) is not None:
+            stubs.ensure_imaging_card(store)
+    elif t == "result.available" and event.refs.get("order") == f"ServiceRequest/ord-{S.VISIT}-inr":
+        stubs.ensure_critical_card(store)
+    elif t == "task.decided" and a.get("decision") == "accept":
+        task = stubs.fhir().read("Task", _id(event.refs.get("task")) or "")
+        if task is not None and stubs.card_kind(task.to_fhir()) == "imaging_order":
+            stubs.confirm_imaging(store, event.actor.removeprefix("user:"))
+    elif t == "exception.decided" and a.get("decision") == "approved":
+        _approved(store, a.get("exception_id"), event.occurred_at)
+    elif t == "patient.discharged" and enc in ((st.get("capacity") or {}).get("surgery_ready") or []):
+        ehr_story.admit_after_cleaning(store, enc, _id(event.refs.get("from_location")))
+    elif t == "patient.admitted" and enc == S.STAY:
+        ehr_story.admission_note(store)
+    elif t == "result.available" and enc == S.STAY:
+        score = next((r for r in event.refs.get("results") or [] if str(r).startswith("Observation/news2-")), None)
+        if score:
+            stubs.news2_alert(store, _id(score))
+    elif t == "patient.discharged" and enc == S.STAY:
+        discharge_medrec(store)
+    elif t == "document.signed" and event.refs.get("document") == f"DocumentReference/dsum-{S.STAY}" and a.get("final"):
+        stubs.ensure_coding_card(store)
+
+
+def _start_journey(store: Store, event: DomainEvent) -> None:
+    """With Temporal configured, her journey starts at the ED registration (spec 8.2: steps 2-12 in one workflow);
+    it waits for her admission through the bridge's `admitted` signal (a wait on her planned stay)."""
+    from app.workflows import bridge, client
+
+    if client.link() is None:
+        return
+    bridge.register_wait(f"Encounter/{S.STAY}", S.JOURNEY, "bedAssignment")
+    bridge.start_journey(S.STAY, S.PATIENT, event.actor, f"{event.event_id}:storyline", ed_visit=S.VISIT)
+
+
+def _approved(store: Store, exception_id: str | None, at: datetime) -> None:
+    from app.modules.control_tower import exceptions as X
+
+    exc = X.get(store, exception_id) if exception_id else None
+    if exc is None or exc.key != "unit_occupancy:ORTH":
+        return
+    actions = [x.get("action_id") for x in (exc.decision or {}).get("actions") or []]
+    if "overflow_discharge_rounds" in actions:
+        ehr_story.early_rounds(store, at)
+
+
+def discharge_medrec(store: Store) -> str | None:
+    """Her discharge reconciliation, done off-screen by the simulator script (the 10-minute demo has no time for
+    it; WP7's summary needs the signed discharge medication table): the pharmacist accepts each discrepancy with a
+    reason that says it is scripted, signs, and the surgeon co-signs. Audited under their names like any MedRec."""
+    from app.modules.med_safety import service as MS
+    from app.modules.med_safety.reconcile import RecItem
+
+    pharmacist, surgeon = store.staff.get(S.CAST["pharmacist"]), store.staff.get(S.CAST["surgeon"])
+    if pharmacist is None or surgeon is None:
+        return None
+    try:
+        session = MS.reconcile(store, S.STAY, "discharge")
+    except MS.DecisionProblem:
+        return None
+    if session.status == "final":
+        return session.id
+    session = MS.settle(store, session.id)
+    if session.status == "open":
+        for item in [RecItem.model_validate(i) for i in session.items]:
+            if (item.discrepancy and item.action is None) or item.indication == "pending":
+                session = MS.handle_item(store, pharmacist, session.id, item.id, "accept",
+                                         "Storyline script (off-screen): discharge list as prescribed by the surgeon")
+        session = MS.sign(store, pharmacist, session.id)
+    if session.status == "pharmacist_signed":
+        session = MS.sign(store, surgeon, session.id)
+    st = state(store)
+    st.setdefault("marks", {})["discharge_medrec"] = {"session": session.id, "status": session.status}
+    store.modules[preset.STATE] = st
+    return session.id
+
+
+# ---------- the clock's beats ----------
+
+
+def _event_at(plan: dict, **match) -> datetime | None:
+    found = [parse(e["at"]) for e in plan["events"] if all(e.get(k) == v for k, v in match.items())]
+    return min(found) if found else None
+
+
+def beats(store: Store) -> dict[str, str | None]:
+    """When each waiting step's moment comes (hospital time), from the plan as it is now (the simulator moves her
+    stay's events while she waits for a bed)."""
+    st, plan = state(store) or {}, store.modules.get("hospital_plan") or {"events": []}
+    marks = st.get("marks", {})
+    out: dict[str, datetime | None] = {
+        "inr": _event_at(plan, kind="result", order=f"ord-{S.VISIT}-inr"),
+        "decision": _event_at(plan, kind="ed_decision", visit=S.VISIT),
+        "night": _event_at(plan, kind="vitals", stay=S.STAY),
+        "discharge": _event_at(plan, kind="discharge", stay=S.STAY),
+    }
+    if out["decision"]:
+        out["decision"] += timedelta(minutes=2)
+    offered = marks.get("bed_offered")
+    if offered:
+        out["admitted"] = parse(offered["at"]) + timedelta(minutes=1)
+    elif marks.get("early_rounds"):
+        last = max((_event_at(plan, kind="discharge", stay=sid) or parse(marks["early_rounds"]["at"])
+                    for sid in marks["early_rounds"]["stays"]), default=parse(marks["early_rounds"]["at"]))
+        out["admitted"] = last + CLEAN_MAX
+    else:
+        out["admitted"] = None
+    discharged = _read("Encounter", S.STAY)
+    end = parse(((discharged or {}).get("period") or {}).get("end")) if discharged else None
+    base = end or out["discharge"]
+    out["followup"] = base + timedelta(hours=48, minutes=6) if base else None
+    for key in ("inr", "night", "discharge"):
+        if out[key]:
+            out[key] += timedelta(minutes=1)
+    return {k: v.isoformat() if v else None for k, v in out.items()}
+
+
+def advance(store: Store, user: StaffUser) -> dict:
+    """Move the clock to the current step's beat, as a background fast-forward (the page follows its progress)."""
+    view = status(store, user)
+    step = next((s for s in view["steps"] if s["n"] == view["current"]), None)
+    if step is None or not step.get("beat"):
+        raise ValueError("The current step needs no time to pass: do it first")
+    target = view["beats"].get(step["beat"])
+    if target is None:
+        raise ValueError(f"Not yet: {step['beat_hint']}")
+    target_t = parse(target)
+    now = parse(simulator.clock(store)["now"])
+    if target_t <= now:
+        raise ValueError("Already there: the step is ready")
+    if target_t > parse(view["horizon"]):
+        raise ValueError("Past the hospital plan's horizon: reset the storyline")
+    job = simjobs.start(store, operator=user.id, until=target_t)
+    store.audit.record(user_id=user.id, user_name=user.name, role=str(user.role), action="fast-forward",
+                       resource_type="hospital_clock", resource_id=None, outcome="allowed",
+                       reason=f"storyline step {step['n']}: to {target}", event_type="simulator_event",
+                       module="storyline")
+    return {"job": job, "beat": step["beat"], "target": target}
+
+
+# ---------- status ----------
+
+
+def _read(rtype: str, rid: str) -> dict | None:
+    found = stubs.fhir().read(rtype, rid)
+    return found.to_fhir() if found is not None else None
+
+
+def _user(store: Store, user_id: str | None) -> dict | None:
+    user = store.staff.get(user_id) if user_id else None
+    return {"id": user.id, "name": user.name, "role": str(user.role), "units": list(user.unit_ids)} if user else None
+
+
+def _decided(task: dict | None) -> dict | None:
+    if task is None or task.get("status") not in ("completed", "rejected"):
+        return None
+    out = approvals.outputs(task)
+    return {"by": out.get("decided_by"), "decision": out.get("decision"), "note": out.get("note"),
+            "at": task.get("lastModified"), "ref": f"Task/{task['id']}", "status": task["status"]}
+
+
+def _proposal(task: dict | None, label: str) -> dict | None:
+    if task is None:
+        return None
+    run_id = traces.run_of(task)
+    trace = traces.get(run_id) if run_id else None
+    return {"label": label, "ref": f"Task/{task['id']}", "at": task.get("authoredOn"),
+            "agent": approvals._agent_of(task), "run_id": run_id, "summary": task.get("description"),
+            "recommendation": approvals.inputs(task).get("recommendation"),
+            "model": trace.model if trace else None, "mode": trace.mode if trace else None}
+
+
+def _signature(doc: dict | None) -> dict | None:
+    from app.ehr.signing import signatures
+
+    if not doc:
+        return None
+    sigs = signatures(doc)
+    if doc.get("docStatus") != "final" and not sigs:
+        return None
+    return {"ref": f"DocumentReference/{doc['id']}", "status": doc.get("docStatus"), "signatures": len(sigs),
+            "by": ", ".join(x["name"] or x["by"] or "?" for x in sigs) or None,
+            "at": sigs[-1]["at"] if sigs else doc.get("date")}
+
+
+def _facts(store: Store, st: dict) -> dict:
+    from app.modules.control_tower import exceptions as X
+    from app.modules.med_safety import service as MS
+    from app.modules.voice_services import followup
+
+    gw = stubs.fhir()
+    tasks = gw.search("Task", patient=S.PATIENT)
+    cards = {}
+    for task in sorted(tasks, key=lambda t: t.get("authoredOn") or ""):
+        kind = stubs.card_kind(task)
+        if kind and kind not in cards:
+            cards[kind] = task
+    journey_tasks = [t for t in tasks if approvals.inputs(t).get("workflow") == S.JOURNEY]
+    orth = sorted((e for e in X.all_exceptions(store) if e.key == "unit_occupancy:ORTH"),
+                  key=lambda e: e.detected_at)
+    # her exception: the one approved with the early rounds (Orthopedics fills up again later in the story and
+    # the Control Tower opens new ones), else the latest
+    rounds = [e for e in orth if (e.decision or {}).get("decision") == "approved" and any(
+        a.get("action_id") == "overflow_discharge_rounds" for a in (e.decision or {}).get("actions") or [])]
+    orth = [*[e for e in orth if e not in rounds], *rounds[:1]]
+    order_review = MS.reviews(store).get(f"MedicationRequest/medrx-{S.STAY}-03")
+    medrec = MS.sessions(store).get(f"{S.STAY}:admission")
+    appointment = next(iter(gw.search("Appointment", focus=f"orreq-{S.SURGERY}")), None)
+    return {
+        "cards": cards, "journey_tasks": journey_tasks, "visit": _read("Encounter", S.VISIT),
+        "stay": _read("Encounter", S.STAY), "ctas": _read("Observation", f"ctas-{S.VISIT}"),
+        "xr": _read("ServiceRequest", f"ord-{S.VISIT}-xr-hip"), "ct": _read("ServiceRequest", f"ord-{S.VISIT}-ct-hip"),
+        "inr": _read("Observation", f"obs-ord-{S.VISIT}-inr"), "exception": orth[-1] if orth else None,
+        "order_review": order_review, "medrec": medrec, "appointment": appointment,
+        "news2": next(iter(gw.search("Flag", encounter=S.STAY, code="news2")), None),
+        "summary": _read("DocumentReference", f"dsum-{S.STAY}"),
+        "instructions": _read("DocumentReference", f"pinstr-{S.STAY}"),
+        "followup": followup.get(followup.call_id_for(S.STAY), store),
+        "requisitions": [store.requisitions.get(r) for r in S.REQUISITIONS],
+        "audit": sorted([*(e for t in AUDITED for e in store.audit.query(
+            patient_mrn_hash=mrn_hash(S.MRN), event_type=t, newest_first=True, limit=400)),
+            # the bed manager's decision is on the hospital's exception and its Tasks, not on her record
+            *(e for rid in _exception_tasks(orth[-1] if orth else None)
+              for e in store.audit.query(resource_type="Task", resource_id=rid))],
+            key=lambda e: e.seq, reverse=True),
+    }
+
+
+AUDITED = ("approve", "sign", "write", "tool_call", "privileged_call")
+
+
+def _exception_tasks(exc) -> list[str]:
+    """The review Task the bed manager's decision completed and the Tasks the approved actions created."""
+    if exc is None:
+        return []
+    return [t for t in [exc.review_task_id, *((a.get("task_id") for a in (exc.decision or {}).get("actions") or []))]
+            if t]
+
+# The page polls the status every few seconds and each EHR read of hers is audited: the facts are kept while nothing
+# that they show could have changed (as the Control Tower keeps its snapshot), and for a few seconds at most while
+# a fast-forward runs (the clock and the job's progress are read fresh every time).
+_FACTS: dict = {}
+_FACTS_LOCK = threading.Lock()
+FACTS_WHILE_RUNNING_S = 8.0
+
+
+def _facts_key(store: Store, st: dict) -> str:
+    store.save()  # the test's shared store: pending changes count (a request's own store has none)
+    conn = store.conn()
+    last_event = conn.execute(select(func.max(domain_events.c.seq))).scalar() or 0
+    last_audit = conn.execute(select(func.max(audit_events.c.seq)).where(
+        audit_events.c.event_type.in_(AUDITED))).scalar() or 0
+    shared = id(store) if store is ambient_store() else 0  # tests: one store per test, rolled back after it
+    return f"{shared}:{st.get('prepared_at')}:{store.version}:{simulator.clock(store)['now']}:{last_event}:{last_audit}"
+
+
+def _cached(store: Store, st: dict, job: dict | None) -> tuple[dict, dict]:
+    key = _facts_key(store, st)
+    with _FACTS_LOCK:
+        hit = _FACTS.get("last")
+    running = (job or {}).get("status") == "running"
+    if hit and (hit["key"] == key or (running and hit["prepared_at"] == st.get("prepared_at")
+                                      and time.monotonic() - hit["at"] < FACTS_WHILE_RUNNING_S)):
+        return hit["facts"], hit["beats"]
+    facts, story_beats = _facts(store, st), beats(store)
+    with _FACTS_LOCK:
+        _FACTS["last"] = {"key": key, "at": time.monotonic(), "prepared_at": st.get("prepared_at"), "facts": facts,
+                          "beats": story_beats}
+    return facts, story_beats
+
+
+def _audit(events: list, refs: list[str]) -> list[dict]:
+    """The approve, sign and write events on the step's records (the hash-chained audit log)."""
+    ids = {r.split("/", 1)[1] for r in refs if r and "/" in r}
+    if not ids:
+        return []
+    out = []
+    for e in events:
+        if e.resource_id in ids and e.event_type in AUDITED:
+            out.append({"event_type": e.event_type, "action": e.action, "resource": f"{e.resource_type}/{e.resource_id}",
+                        "user": e.user_name, "role": e.role, "at": e.ts.isoformat(timespec="seconds"),
+                        "outcome": e.outcome})
+    return out[:6]
+
+
+def _step_state(step: S.Step, f: dict, store: Store) -> dict:
+    """proposal / signed / written / detail for one step, from the records."""
+    c, out = f["cards"], {"proposal": None, "signed": None, "written": [], "detail": None, "done": False}
+    if step.key == "call":
+        card = c.get("registration")
+        out.update(proposal=_proposal(card, "ED registration pre-filled from the verified call"),
+                   signed=_decided(card), written=[f"Encounter/{S.VISIT}"] if f["visit"] else [])
+        out["done"] = bool(f["visit"])
+    elif step.key == "triage":
+        card = c.get("triage")
+        marks = (state(store) or {}).get("marks", {}).get("triage_suggestion") or {}
+        out.update(proposal=_proposal(card, f"CTAS {marks.get('ctas', '?')} suggested"), signed=_decided(card),
+                   written=[r for r in (f"Observation/ctas-{S.VISIT}" if f["ctas"] else None,
+                                        f"Flag/flag-{S.VISIT}-fall-risk" if f["ctas"] else None) if r])
+        if marks.get("admission"):
+            out["detail"] = marks["admission"]["sentence"]
+        out["done"] = bool(f["ctas"])
+    elif step.key == "imaging":
+        card = c.get("imaging_order")
+        out.update(proposal=_proposal(card, "Urgency and protocol per exam"), signed=_decided(card),
+                   written=[f"ServiceRequest/{r['id']}" for r in (f["xr"], f["ct"]) if r])
+        out["done"] = bool(f["xr"] and f["ct"])
+    elif step.key == "inr":
+        card = c.get("critical")
+        out.update(proposal=_proposal(card, "Critical value routed (roadmap stub)"), signed=_decided(card),
+                   written=[f"Observation/obs-ord-{S.VISIT}-inr"] if f["inr"] else [])
+        out["done"] = bool(out["signed"])
+    elif step.key == "bed":
+        exc = f["exception"]
+        if exc is not None:
+            out["proposal"] = {"label": exc.title, "ref": f"FlowException/{exc.id}", "at": exc.detected_at.isoformat(),
+                               "agent": "control_tower", "summary": exc.summary,
+                               "recommendation": "; ".join(a.get("action", "") for a in
+                                                           (exc.narration or {}).get("recommended_actions") or [])}
+            out["audit_refs"] = [f"Task/{t}" for t in _exception_tasks(exc)]
+            if exc.decision:
+                out["signed"] = {"by": exc.decision.get("name") or exc.decision.get("by"),
+                                 "decision": exc.decision.get("decision"),
+                                 "at": exc.decision.get("at"), "ref": f"FlowException/{exc.id}",
+                                 "tasks": [a.get("task_id") for a in exc.decision.get("actions") or [] if a.get("task_id")]}
+        stay = f["stay"]
+        if stay:
+            beds = [((x.get("location") or {}).get("reference")) for x in stay.get("location") or []]
+            out["written"] = [f"Encounter/{S.STAY}"] + [b for b in beds if b]
+            out["detail"] = f"bed {beds[-1].split('/')[-1]}" if beds and beds[-1] else None
+        out["done"] = bool(stay and out["signed"])
+    elif step.key == "medrec":
+        rev, ses = f["order_review"], f["medrec"]
+        if rev is not None:
+            out["proposal"] = {"label": f"{len(rev.findings)} rule finding(s) on the naproxen order ({rev.severity})",
+                               "ref": rev.order_ref, "at": rev.reviewed_at.isoformat(), "agent": "order_review",
+                               "summary": "; ".join(str(fi.get("message") or fi.get("title") or fi.get("rule") or "")
+                                                    for fi in rev.findings)[:300],
+                               "decision": (rev.decision or {}).get("decision")}
+        if ses is not None:
+            out["signed"] = {"by": ", ".join(s.get("name") or s.get("by") for s in ses.signatures) or None,
+                             "decision": ses.status, "ref": f"DocumentReference/{ses.document_id}",
+                             "at": ses.signatures[-1]["at"] if ses.signatures else None}
+            out["written"] = [f"DocumentReference/{ses.document_id}"] if ses.document_id else []
+            out["detail"] = f"MedRec {ses.id}: {ses.status}"
+        out["done"] = bool(ses and ses.status == "final")
+    elif step.key == "or":
+        appt = f["appointment"]
+        signoff = next((t for t in f["journey_tasks"] if approvals.inputs(t).get("step") == "proposeSchedule"), None)
+        if appt:
+            out["written"] = [f"Appointment/{appt['id']}"]
+            out["detail"] = f"booked {appt.get('minutesDuration')} min"
+        adjusted = appt is not None and (appt.get("minutesDuration") or 0) > ehr_story.BOOKED_MINUTES
+        audit = _audit(f["audit"], [f"Appointment/{appt['id']}"]) if appt else []
+        if adjusted:
+            who = next((a for a in audit if a["event_type"] == "write"), None)
+            out["signed"] = {"by": who["user"] if who else None, "decision": "adjusted",
+                             "at": who["at"] if who else None, "ref": f"Appointment/{appt['id']}"}
+        out["proposal"] = _proposal(signoff, "OR booking check (journey)") if signoff else (
+            {"label": "Surgical duration prediction", "ref": f"Appointment/{appt['id']}", "agent": "control_tower"}
+            if appt else None)
+        out["done"] = adjusted
+    elif step.key == "news2":
+        card = c.get("news2") or next((t for t in f["journey_tasks"] if approvals.code_of(t) == "news2-response"), None)
+        flag = f["news2"]
+        out.update(proposal=_proposal(card, "NEWS2 flag and nurse task (roadmap stub)") if card else None,
+                   signed=_decided(card), written=[f"Flag/{flag['id']}"] if flag else [])
+        out["done"] = bool(out["signed"])
+    elif step.key == "summary":
+        doc = f["summary"]
+        out.update(proposal={"label": "Discharge summary draft with sources", "ref": f"DocumentReference/{doc['id']}",
+                             "agent": "discharge_summary"} if doc else None, signed=_signature(doc),
+                   written=[f"DocumentReference/{doc['id']}"] if doc else [])
+        out["done"] = bool(doc and doc.get("docStatus") == "final")
+    elif step.key == "instructions":
+        doc = f["instructions"]
+        out.update(proposal={"label": "Bilingual patient instructions", "ref": f"DocumentReference/{doc['id']}",
+                             "agent": "patient_instructions"} if doc else None, signed=_signature(doc),
+                   written=[f"DocumentReference/{doc['id']}"] if doc else [])
+        out["done"] = bool(doc and doc.get("docStatus") == "final")
+    elif step.key == "followup":
+        call = f["followup"]
+        if call is not None:
+            out["proposal"] = {"label": f"Follow-up call {call.id} ({call.language})", "ref": f"FollowupCall/{call.id}",
+                               "agent": "followup_calls", "summary": call.summary}
+            handled = [a for a in call.nurse_actions if a.get("kind") in ("callback", "close", "refer")]
+            if handled:
+                last = handled[-1]
+                out["signed"] = {"by": last.get("by"), "decision": last.get("kind"), "at": last.get("at"),
+                                 "ref": f"Communication/{last.get('communication_id')}"}
+            out["written"] = [r for r in ([f"Communication/{call.communication_id}"] if call.communication_id else [])
+                              + [f"Task/{call.task_id}"] if r and not r.endswith("/None")]
+            out["detail"] = f"{call.status}; escalated: {'yes' if call.escalated else 'no'}"
+            out["done"] = bool(call.escalated and handled)
+    elif step.key == "coding":
+        card = c.get("coding")
+        out.update(proposal=_proposal(card, "Coding suggestion (roadmap stub)"), signed=_decided(card))
+        out["done"] = bool(out["signed"] and out["signed"].get("status") == "completed")
+    refs = [r for r in [(out["proposal"] or {}).get("ref"), (out["signed"] or {}).get("ref"), *out["written"],
+                        *out.pop("audit_refs", [])] if r]
+    out["audit"] = _audit(f["audit"], refs)
+    return out
+
+
+BEAT_HINT = {"inr": "the INR result comes back about 45 minutes after the orders",
+             "decision": "the admission decision comes about 95 minutes after she was seen",
+             "admitted": "approve the early rounds on Surgery first; her bed is the first one they free",
+             "night": "the first night after surgery (02:00)",
+             "discharge": "the discharge on the third day after surgery",
+             "followup": "48 hours after the discharge"}
+
+
+def status(store: Store, user: StaffUser) -> dict:
+    from app.workflows import client, progress
+
+    st = state(store)
+    clock = simulator.status(store, upcoming=0)
+    link = client.link()
+    view: dict = {
+        "prepared": st is not None, "now": clock["now"].isoformat(), "day_start": clock["day_start"].isoformat(),
+        "horizon": clock["horizon"].isoformat(), "running": clock["running"], "job": simjobs.current(),
+        "total_seconds": S.TOTAL_SECONDS, "you": _user(store, user.id) or {"id": user.id, "name": user.name,
+                                                                           "role": str(user.role), "units": []},
+        "temporal": {"configured": link is not None,
+                     "status": (link.status() if link is not None else client.offline_status())},
+        "patient": None, "steps": [], "current": None, "beats": {}}
+    journey = progress.get(S.JOURNEY)
+    view["journey"] = progress.summary(journey) if journey is not None else None
+    facts, story_beats = _cached(store, st, view["job"]) if st is not None else (None, {})
+    if st is not None:
+        day = parse(st["prepared_at"]).date()
+        view["patient"] = {"id": S.PATIENT, "mrn": S.MRN, "name": f"{S.GIVEN} {S.FAMILY}", "name_zh": S.FAMILY_ZH + S.GIVEN_ZH,
+                           "birth_date": st["birth_date"], "age": S.AGE, "language": S.LANGUAGE,
+                           "call_lines": [line.format(birth_zh=S.birth_zh(day)) for line in S.CALL_LINES],
+                           "followup_lines": [line.format(birth_zh=S.birth_zh(day)) for line in S.FOLLOWUP_LINES],
+                           "imaging_record": S.IMAGING_PATIENT, "mpi": st.get("mpi")}
+        view["beats"] = story_beats
+        view["capacity"] = {"surgery_ready": (st.get("capacity") or {}).get("surgery_ready"),
+                            "warnings": (st.get("capacity") or {}).get("warnings")}
+    now = parse(view["now"])
+    current_found = False
+    for step in S.STEPS:
+        item = {"n": step.n, "key": step.key, "title": step.title, "module": step.module, "route": step.route,
+                "click_path": list(step.click_path), "say": step.say, "expect": list(step.expect), "ai": step.ai,
+                "signoff": step.signoff, "writes": step.writes, "seconds": step.seconds, "stub": step.stub,
+                "beat": step.beat, "beat_hint": BEAT_HINT.get(step.beat or ""), "permission": step.permission,
+                "cast": _user(store, S.CAST[step.cast]), "cast_key": step.cast}
+        if facts is not None:
+            item.update(_step_state(step, facts, store))
+        else:
+            item.update(proposal=None, signed=None, written=[], audit=[], detail=None, done=False)
+        if not item["done"] and not current_found:
+            current_found = True
+            view["current"] = step.n
+            beat = step.beat
+            if step.key == "bed" and item["signed"]:  # approved: then the wait for the first bed the rounds free
+                beat = "admitted"
+                item.update(beat=beat, beat_hint=BEAT_HINT[beat])
+            beat_at = view["beats"].get(beat) if beat else None
+            item["status"] = "waiting" if beat and (beat_at is None or parse(beat_at) > now) and \
+                (not item["proposal"] or beat != step.beat) else "active"
+            item["beat_at"] = beat_at
+        else:
+            item["status"] = "done" if item["done"] else "pending"
+        view["steps"].append(item)
+    return view

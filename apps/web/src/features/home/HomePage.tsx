@@ -1,5 +1,5 @@
-import { ArrowRight, CheckCircle2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ArrowRight, CheckCircle2, Route as RouteIcon } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { Badge, Card, PageHeader } from "../../components/ui";
 import { useAuth } from "../../lib/auth";
 import { ROLE_LABEL, type Role } from "../../lib/types";
@@ -82,7 +82,7 @@ const PIPELINE: Step[] = [
 const OPERATIONS: Step[] = [
   {
     title: "An exam finishes and lands in the reading backlog",
-    detail: "Mark one of today's or tomorrow's exams done. A study is created and assigned to a credentialed radiologist; CT exams also get a dose record from the scanner.",
+    detail: "Mark an upcoming exam done (the list opens on the site's next open day). A study is created and assigned to a credentialed radiologist; CT exams also get a dose record from the scanner.",
     role: "technologist", userId: "U-TECH", to: "/scheduling?tab=appointments", system: "Backlog · CT dose",
   },
   {
@@ -150,6 +150,80 @@ const BUSINESS: Step[] = [
   },
 ];
 
+// Hospital platform (spec 6.3): roles, unit scope, break-glass, consent and signing. The hospital
+// staff are generated (app/ehr/seed/platform.py); their user ids follow the practitioner ids.
+const HOSPITAL: Step[] = [
+  {
+    title: "A Medicine A physician sees only their unit's patients",
+    detail: "Open the census and a patient's chart: encounter, consent, medication orders, observations and documents. Sign the discharge summary draft: only a physician can, and only through the signing service.",
+    role: "physician", userId: "U-DOC-09", to: "/hospital/patients", system: "Access · signing",
+  },
+  {
+    title: "Break-glass for an ICU patient",
+    detail: "Type the MRN of an ICU patient (the operations manager's ICU census lists them). The record is closed; open it with a reason of at least 10 characters. A red banner stays for 4 hours.",
+    role: "physician", userId: "U-DOC-09", to: "/hospital/patients", system: "Break-glass",
+  },
+  {
+    title: "The pharmacist works the medication safety queue",
+    detail: "Rules flag every new order first (allergies block; interactions, renal dosing, dose bounds, repeat tests), the AI comments with its confidence and evidence. A hip-fracture patient on warfarin got naproxen: a major interaction; reconcile the admission, handle every discrepancy, sign. A physician co-signs.",
+    role: "pharmacist", userId: "U-PHAR-01", to: "/med-safety", system: "Medication safety",
+  },
+  {
+    title: "Documentation: the physician signs a discharge summary that cites its sources",
+    detail: "Draft a discharge summary with AI: every diagnosis, procedure and medication traces to a FHIR resource (click an item to see its sources). A medicine the AI took from a note is marked red and blocks the signature until it is removed. Then a nurse reviews the bilingual patient instructions and confirms the shift handoff.",
+    role: "physician", userId: "U-DOC-09", to: "/documentation", system: "Documentation",
+  },
+  {
+    title: "The call centre answers in the caller's language",
+    detail: "Play a caller: visiting hours and parking come from the FAQ without an identity check; for an appointment the AI first checks the name, birth date and the last four card digits. A reschedule or cancellation is only proposed: confirm it in one click. A medical question is never answered: it goes to the nurse line. Speak Chinese and it answers in Chinese.",
+    role: "clerk", userId: "U-CLER-01", to: "/call-centre", system: "Call centre",
+  },
+  {
+    title: "A Chinese follow-up call escalates a red flag",
+    detail: "48 hours after discharge the AI calls with questions from the signed instructions, in the patient's language. Place the call for the Chinese-speaking patient and answer that the wound keeps leaking: the rules escalate at once (no AI needed), the nurse queue puts it on top with the patient's words. Write the call-back note and close or refer it.",
+    role: "nurse", userId: "U-NURS-05", to: "/follow-up", system: "Follow-up calls",
+  },
+  {
+    title: "Registration records a consent change",
+    detail: "The clerk sees demographics and visits without clinical content. Record a withdrawal of SMS consent: it is audited and published as consent.revoked on the event bus.",
+    role: "clerk", userId: "U-CLER-01", to: "/hospital/patients", system: "Consent",
+  },
+  {
+    title: "The administrator reviews the emergency access",
+    detail: "The break-glass queue shows who opened which patient, why and what they read. Mark it justified or not; the decision goes to the hash-chained audit log, filterable by event type and patient.",
+    role: "admin", userId: "U-ADMIN", to: "/break-glass-review", system: "Audit",
+  },
+];
+
+// Hospital flow Control Tower (spec 7.1): the bed manager's one screen for the ED, the beds and the OR.
+const FLOW: Step[] = [
+  {
+    title: "Read the hospital at 07:00",
+    detail: "Three boards from FHIR: the ED with admission probabilities, the beds with expected discharges and the net gap, the OR lists with predicted durations and pre-op readiness. Full wards and long OR cases are already exceptions.",
+    role: "operations_manager", userId: "U-OPS", to: "/control-tower", system: "Control Tower",
+  },
+  {
+    title: "Approve what the AI recommends",
+    detail: "Open an exception: the narrative and the actions come from the rule engine's facts and action menu, the evidence is checked in the EHR. Approve: a Task goes to each action's owner role and the approval is audited. Or reject with a reason, or defer.",
+    role: "operations_manager", userId: "U-OPS", to: "/control-tower", system: "Action drawer",
+  },
+  {
+    title: "Inject an ICU surge and let the day run",
+    detail: "From the control bar: an ICU surge of 6 patients, then run the clock. ICU fills, patients board in the ED and new exceptions appear within seconds. Fast-forward to 08:00 tomorrow runs in the background.",
+    role: "operations_manager", userId: "U-OPS", to: "/control-tower", system: "Day simulator",
+  },
+  {
+    title: "Drill down: unit, bed grid, patient card",
+    detail: "Click a unit for its bed grid and a bed for the patient card. The bed manager sees MRN, admission and expected discharge only; everything else is hidden for the role.",
+    role: "operations_manager", userId: "U-OPS", to: "/control-tower", system: "RBAC",
+  },
+  {
+    title: "The charge nurse sees the clinical card",
+    detail: "As the Medicine A nurse the same bed shows name, reason for admission, vital signs and the discharge prediction with its three main factors. Patients of other units keep their MRN hidden.",
+    role: "nurse", userId: "U-NURS-05", to: "/control-tower", system: "RBAC",
+  },
+];
+
 function StoryCard({ title, steps, onGo, userId }: { title: string; steps: Step[]; onGo: (s: Step) => void; userId: string }) {
   return (
     <Card title={title} className="mb-4">
@@ -180,10 +254,14 @@ export function HomePage() {
   const navigate = useNavigate();
   if (!user) return null;
 
+  const hospitalFirst = ["physician", "nurse", "pharmacist", "clerk"].includes(user.role);
+  const flowFirst = user.role === "operations_manager";
+
   const go = async (step: Step) => {
     if (user.id !== step.userId) await login(step.userId);
     navigate(step.to);
   };
+  const flow = <StoryCard title="Storyline 6 · hospital flow Control Tower: ED, beds and OR" steps={FLOW} onGo={go} userId={user.id} />;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -191,10 +269,30 @@ export function HomePage() {
         title={`Welcome, ${user.name.split(" ").slice(-2).join(" ")}`}
         subtitle="Follow the demo storyline below, or use the menu to explore your role's tools."
       />
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3" data-testid="storyline-card">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-sm font-semibold text-slate-900"><RouteIcon className="size-4 text-brand-600" />Storyline 7 · one patient through the hospital (10 minutes)</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Wang Xiuying, 72, Mandarin, on warfarin, breaks her hip: the call centre, triage, imaging, a critical INR, a full
+              Orthopedics, medication safety, the OR, a NEWS2 night, the discharge documents, a Chinese follow-up call and
+              coding. Twelve steps, each one AI proposes, a person signs, the audit trail records it.
+            </p>
+          </div>
+          <Link to="/storyline" className="flex shrink-0 items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700">
+            Open the guided storyline<ArrowRight className="size-3.5" />
+          </Link>
+        </div>
+      </Card>
+      {flowFirst && flow}
+      {hospitalFirst && <StoryCard title="Storyline 5 · hospital platform: roles, break-glass, consent, signing" steps={HOSPITAL} onGo={go} userId={user.id} />}
+      {hospitalFirst && flow}
       <StoryCard title="Storyline 1 · one patient through scheduling, reporting and the front desk" steps={STORY} onGo={go} userId={user.id} />
       <StoryCard title="Storyline 2 · the requisition intake pipeline" steps={PIPELINE} onGo={go} userId={user.id} />
       <StoryCard title="Storyline 3 · radiology operations" steps={OPERATIONS} onGo={go} userId={user.id} />
       <StoryCard title="Storyline 4 · business and compliance" steps={BUSINESS} onGo={go} userId={user.id} />
+      {!hospitalFirst && <StoryCard title="Storyline 5 · hospital platform: roles, break-glass, consent, signing" steps={HOSPITAL} onGo={go} userId={user.id} />}
+      {!hospitalFirst && !flowFirst && flow}
       <p className="flex items-center gap-1.5 text-xs text-slate-500">
         <CheckCircle2 className="size-3.5" /> Use “Reset demo” in the header to start over.
       </p>

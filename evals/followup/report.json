@@ -1,0 +1,1415 @@
+{
+ "eval": "followup",
+ "spec": "7.4",
+ "cases": 50,
+ "red_flag_cases": 15,
+ "recall": 1.0,
+ "recall_gate": 0.95,
+ "rules_only": {
+  "cases": 15,
+  "escalated_by_rules": 15,
+  "results": [
+   {
+    "id": "fu-01",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "fever"
+    ]
+   },
+   {
+    "id": "fu-02",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "chest_pain"
+    ]
+   },
+   {
+    "id": "fu-03",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "short_breath"
+    ]
+   },
+   {
+    "id": "fu-04",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wound_drainage"
+    ]
+   },
+   {
+    "id": "fu-05",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "fall"
+    ]
+   },
+   {
+    "id": "fu-06",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "cannot_eat_drink"
+    ]
+   },
+   {
+    "id": "fu-07",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "altered_consciousness"
+    ]
+   },
+   {
+    "id": "fu-08",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wants_person"
+    ]
+   },
+   {
+    "id": "fu-09",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "heavy_bleeding"
+    ]
+   },
+   {
+    "id": "fu-10",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wound_drainage"
+    ]
+   },
+   {
+    "id": "fu-11",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "fever"
+    ]
+   },
+   {
+    "id": "fu-12",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "chest_pain"
+    ]
+   },
+   {
+    "id": "fu-13",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "fall"
+    ]
+   },
+   {
+    "id": "fu-14",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "cannot_eat_drink"
+    ]
+   },
+   {
+    "id": "fu-15",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "short_breath"
+    ]
+   }
+  ]
+ },
+ "rule_codes_as_labelled": "15 of 15",
+ "over_escalation": {
+  "cases": 35,
+  "escalated": 9,
+  "rate": 0.257,
+  "by": {
+   "model": 9
+  }
+ },
+ "false_rule_hits": [],
+ "write_back": {
+  "communications": 50,
+  "with_observations": 22,
+  "tasks": 24
+ },
+ "results": [
+  {
+   "id": "fu-01",
+   "patient": "en",
+   "red_flag": true,
+   "note": "fever reading",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "fever"
+   ],
+   "expected_codes": [
+    "fever"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "red flags from the rule layer (fever)"
+   },
+   "questions": 16,
+   "answered": 3,
+   "seconds": 1.58,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-02",
+   "patient": "en",
+   "red_flag": true,
+   "note": "emergency",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "stat",
+   "emergency": true,
+   "rule_codes": [
+    "chest_pain"
+   ],
+   "expected_codes": [
+    "chest_pain"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "red flags from the rule layer (chest_pain)"
+   },
+   "questions": 16,
+   "answered": 2,
+   "seconds": 1.44,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-03",
+   "patient": "en",
+   "red_flag": true,
+   "note": "emergency",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "stat",
+   "emergency": true,
+   "rule_codes": [
+    "short_breath"
+   ],
+   "expected_codes": [
+    "short_breath"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "breathing concern"
+   },
+   "questions": 16,
+   "answered": 2,
+   "seconds": 3.11,
+   "observations": 2,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-04",
+   "patient": "en",
+   "red_flag": true,
+   "note": "heavy drainage, told at the end",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "wound_drainage"
+   ],
+   "expected_codes": [
+    "wound_drainage"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "wound concern"
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.92,
+   "observations": 2,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-05",
+   "patient": "en",
+   "red_flag": true,
+   "note": "a fall",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "fall"
+   ],
+   "expected_codes": [
+    "fall"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "red flags from the rule layer (fall)"
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.38,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-06",
+   "patient": "en",
+   "red_flag": true,
+   "note": "cannot eat or drink",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "cannot_eat_drink"
+   ],
+   "expected_codes": [
+    "cannot_eat_drink"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "nausea vomiting"
+   },
+   "questions": 16,
+   "answered": 3,
+   "seconds": 0.67,
+   "observations": 2,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-07",
+   "patient": "en",
+   "red_flag": true,
+   "note": "altered consciousness",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "stat",
+   "emergency": true,
+   "rule_codes": [
+    "altered_consciousness"
+   ],
+   "expected_codes": [
+    "altered_consciousness"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "red flags from the rule layer (altered_consciousness)"
+   },
+   "questions": 16,
+   "answered": 2,
+   "seconds": 0.45,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-08",
+   "patient": "en",
+   "red_flag": true,
+   "note": "asks for a person",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "wants_person"
+   ],
+   "expected_codes": [
+    "wants_person"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "red flags from the rule layer (wants_person)"
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 2.16,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-09",
+   "patient": "en",
+   "red_flag": true,
+   "note": "heavy bleeding",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "stat",
+   "emergency": true,
+   "rule_codes": [
+    "heavy_bleeding"
+   ],
+   "expected_codes": [
+    "heavy_bleeding"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "bleeding concern"
+   },
+   "questions": 16,
+   "answered": 2,
+   "seconds": 0.94,
+   "observations": 2,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-10",
+   "patient": "zh",
+   "red_flag": true,
+   "note": "the demo case",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "wound_drainage"
+   ],
+   "expected_codes": [
+    "wound_drainage"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "wound concern"
+   },
+   "questions": 16,
+   "answered": 3,
+   "seconds": 1.12,
+   "observations": 2,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-11",
+   "patient": "zh",
+   "red_flag": true,
+   "note": "fever in Chinese numerals",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "fever"
+   ],
+   "expected_codes": [
+    "fever"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "red flags from the rule layer (fever)"
+   },
+   "questions": 16,
+   "answered": 3,
+   "seconds": 0.86,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-12",
+   "patient": "zh",
+   "red_flag": true,
+   "note": "chest tightness",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "stat",
+   "emergency": true,
+   "rule_codes": [
+    "chest_pain"
+   ],
+   "expected_codes": [
+    "chest_pain"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "red flags from the rule layer (chest_pain)"
+   },
+   "questions": 16,
+   "answered": 2,
+   "seconds": 1.51,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-13",
+   "patient": "zh",
+   "red_flag": true,
+   "note": "a fall, told at the end",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "fall"
+   ],
+   "expected_codes": [
+    "fall"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "red flags from the rule layer (fall)"
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 3.08,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-14",
+   "patient": "zh",
+   "red_flag": true,
+   "note": "cannot eat or drink",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "cannot_eat_drink"
+   ],
+   "expected_codes": [
+    "cannot_eat_drink"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "red flags from the rule layer (cannot_eat_drink)"
+   },
+   "questions": 16,
+   "answered": 3,
+   "seconds": 5.56,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-15",
+   "patient": "zh",
+   "red_flag": true,
+   "note": "yes to their own first warning sign",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "stat",
+   "emergency": true,
+   "rule_codes": [
+    "short_breath"
+   ],
+   "expected_codes": [
+    "short_breath"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "answered yes to a warning sign (short_breath)"
+   },
+   "questions": 16,
+   "answered": 3,
+   "seconds": 1.98,
+   "observations": 2,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-16",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.52,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-17",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 2.26,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-18",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear, tired",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.84,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-19",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.23,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-20",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.28,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-21",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 1.52,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-22",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.8,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-23",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.67,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-24",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.23,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-25",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.2,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-26",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.31,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-27",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.58,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-28",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear, tired",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.8,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-29",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 1.38,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-30",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.97,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-31",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.48,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-32",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 1.58,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-33",
+   "patient": "en",
+   "red_flag": false,
+   "note": "low reading",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.69,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-34",
+   "patient": "en",
+   "red_flag": false,
+   "note": "negations",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.36,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-35",
+   "patient": "en",
+   "red_flag": false,
+   "note": "light drainage",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.56,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-36",
+   "patient": "en",
+   "red_flag": false,
+   "note": "negated fall",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.3,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-37",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "low reading",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.51,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-38",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "light drainage",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "wound concern"
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.5,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-39",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "negations",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.41,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-40",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "negated fall",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.69,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-41",
+   "patient": "en",
+   "red_flag": false,
+   "note": "dizziness",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "dizziness"
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.5,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-42",
+   "patient": "en",
+   "red_flag": false,
+   "note": "a missed medicine",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "not taking a medicine as on the timetable"
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 1.56,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-43",
+   "patient": "en",
+   "red_flag": false,
+   "note": "ran out",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "a problem with the medicines"
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.38,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-44",
+   "patient": "en",
+   "red_flag": false,
+   "note": "a question for the nurse",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "question for nurse"
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.77,
+   "observations": 0,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-45",
+   "patient": "en",
+   "red_flag": false,
+   "note": "did not know the follow-up",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 1.45,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-46",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "dizziness",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "dizziness"
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.58,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-47",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "a missed medicine",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "not taking a medicine as on the timetable"
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 3.88,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-48",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "a question for the nurse",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "question for nurse"
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.3,
+   "observations": 0,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-49",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "swelling",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.85,
+    "reason": "swelling"
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 0.78,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-50",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "did not know the follow-up",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.9,
+    "reason": "No warning signs or concerns reported."
+   },
+   "questions": 16,
+   "answered": 16,
+   "seconds": 1.62,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  }
+ ],
+ "passed": true,
+ "mode": "mock",
+ "run_at": "2026-10-10T04:39:39",
+ "seconds": 157.7
+}

@@ -17,7 +17,7 @@ from app.core.store import Store, get_store
 from app.core.templates import render
 from app.integrations.mocks import queue_message
 from app.llm.gateway import get_gateway
-from app.llm.prompts import Prompt
+from app.agents.prompts import registered
 from app.llm.providers import mock_fixture
 from app.modules.requisitions import service as requisitions
 from app.modules.scheduling import service as scheduling
@@ -74,17 +74,7 @@ class DeviceExtraction(BaseModel):
     devices: list[Device]
 
 
-IMPLANT_PROMPT = Prompt(
-    name="mri_implant_extract",
-    version="mri_implant_extract@1",
-    system=(
-        "Patients describe implants and metal in their bodies in their own words, in any language. "
-        "List each distinct device: quote the patient's words, give a standard English device name, and a category "
-        f"from: {', '.join(CATEGORIES)}. Do not judge MRI safety; staff review every answer. Return an empty list "
-        "if nothing is described."
-    ),
-    template="Patient answer:\n{text}",
-)
+IMPLANT_PROMPT = registered("mri_implant_extract")
 
 
 def match_device(text: str) -> dict | None:

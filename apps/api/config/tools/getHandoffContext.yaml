@@ -1,0 +1,55 @@
+# Tool registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# side_effect_level read / recommend / action / privileged; schemas are JSON Schema (the subset in
+# app/agents/jsonschema.py); fhir_writes is what the tool may write (agents' write rights derive from it).
+tool_id: getHandoffContext
+description: 'What a nursing shift handoff needs (7.3): the encounter, the patient, the stay''s diagnoses and
+  procedures, its medication orders, the observations since the cut-off, open tasks and active flags.'
+side_effect_level: read
+handler: app.modules.documentation.tools:get_handoff_context
+domain: fhir
+reads:
+- Encounter
+- Patient
+- Condition
+- Procedure
+- MedicationRequest
+- Observation
+- Task
+- Flag
+input_schema:
+  type: object
+  properties:
+    encounter_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    since:
+      type: string
+      pattern: ^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}
+  required:
+  - encounter_id
+  - since
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    resources:
+      type: array
+      items:
+        type: object
+  required:
+  - resources
+  additionalProperties: false
+permission_policy:
+  roles:
+  - nurse
+  - physician
+  - system
+  target:
+    encounter: encounter_id
+idempotency:
+  required: false
+timeout_ms: 5000
+retry:
+  max_attempts: 2
+  backoff_ms: 50
+audit_level: standard

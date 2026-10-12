@@ -1,0 +1,23 @@
+{
+  "resourceType": "Practitioner",
+  "id": "prac-doc-01",
+  "active": true,
+  "name": [
+    {
+      "family": "Salazar",
+      "given": [
+        "Dmitri"
+      ],
+      "text": "Dr. Dmitri Salazar",
+      "prefix": [
+        "Dr."
+      ]
+    }
+  ],
+  "identifier": [
+    {
+      "system": "urn:demo-hospital:staff",
+      "value": "prac-doc-01"
+    }
+  ]
+}

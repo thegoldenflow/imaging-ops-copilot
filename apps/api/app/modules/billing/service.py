@@ -19,6 +19,7 @@ from app.core.store import Store
 
 WINDOW_DAYS = 30
 SUBMISSION_DAYS = 2  # a claim is expected within two days of the exam
+PLANTED_MARGIN = timedelta(days=1)  # the seed's planted discrepancies stay inside the window this long after seeding
 
 # Synthetic fee table: exam code -> (fee code, description, amount in CAD).
 FEES = {
@@ -174,6 +175,18 @@ def to_csv(rows: list[dict]) -> str:
     return buf.getvalue()
 
 
+def _trade_places(picks: list, pool: list, start: datetime) -> dict:
+    """Pair each pick starting before `start` with the earliest unpicked exam of the pool from `start` on, both ways."""
+    picked = {a.id for a in picks}
+    spare = iter(sorted((a for a in pool if a.start >= start and a.id not in picked), key=lambda a: (a.start, a.id)))
+    swap = {}
+    for a in picks:
+        if a.start < start:
+            b = next(spare)
+            swap[a.id], swap[b.id] = b, a
+    return swap
+
+
 def seed(s: Store, rng: random.Random, now: datetime) -> None:
     """Claims for the last 30 days of exams, with planted discrepancies of every kind."""
     since = now - timedelta(days=WINDOW_DAYS)
@@ -183,6 +196,12 @@ def seed(s: Store, rng: random.Random, now: datetime) -> None:
                       if a.status in (AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW) and since <= a.start < now),
                      key=lambda a: a.id)
     picks = rng.sample(done, 26)
+    # The reconciliation counts its 30 days back from the moment it runs, so a discrepancy planted on an exam of the
+    # window's first day would drop out of it soon after seeding. Such a pick trades places with an unpicked exam
+    # further in, among the picks and in the order the claims are written, so every draw stays the same and only the
+    # two exams' claims change.
+    swap = _trade_places(picks, done, since + PLANTED_MARGIN)
+    picks, done = [swap.get(a.id, a) for a in picks], [swap.get(a.id, a) for a in done]
     missing, duplicate, mismatch, amount, rejected = picks[:7], picks[7:12], picks[12:18], picks[18:21], picks[21:26]
     planted = [("missing", a.id) for a in missing]
     missing_ids = {a.id for a in missing}
@@ -220,7 +239,9 @@ def seed(s: Store, rng: random.Random, now: datetime) -> None:
             if appt in duplicate:
                 claim(appt)
                 planted.append(("duplicate", appt.id))
-    for appt in rng.sample(skipped, 4):
+    billed = rng.sample(skipped, 4)
+    swap = _trade_places(billed, skipped, since + PLANTED_MARGIN)
+    for appt in [swap.get(a.id, a) for a in billed]:
         claim(appt)
         planted.append(("not_performed", appt.id))
     s.modules["billing_planted"] = planted

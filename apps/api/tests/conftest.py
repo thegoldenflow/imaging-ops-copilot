@@ -15,6 +15,7 @@ os.environ["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
 os.environ["PHI_ENCRYPTION_KEY"] = base64.b64encode(b"test-only-phi-encryption-key-32b").decode()
 os.environ["PHI_BLIND_INDEX_KEY"] = base64.b64encode(b"test-only-phi-blind-index-key-32").decode()
 os.environ["BACKGROUND_WORKERS"] = "0"
+os.environ["TEMPORAL_ADDRESS"] = ""  # the workflow tests bring their own test server (tests/temporal_harness.py)
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -24,6 +25,8 @@ from sqlalchemy.engine import make_url  # noqa: E402
 from app.core.db.migrate import upgrade  # noqa: E402
 from app.core.db.repo import clear_process_cache  # noqa: E402
 from app.core.store import ConnectionSource, Store, get_engine, reset_store, set_ambient_store, unit_of_work  # noqa: E402
+from app.core.store import _busy, _release  # noqa: E402
+from app.integrations.mocks import reset_adapters  # noqa: E402
 from app.llm.gateway import LlmGateway, set_gateway  # noqa: E402
 from app.llm.providers import MockProvider  # noqa: E402
 
@@ -50,12 +53,16 @@ def fresh_state(database):
     store = Store(ConnectionSource(conn))
     set_ambient_store(store)
     set_gateway(LlmGateway(MockProvider(latency_s=0)))
+    reset_adapters()  # circuit breakers are per process; each test starts with closed circuits
     yield store
     set_gateway(None)
     set_ambient_store(None)
     store.expunge()
-    outer.rollback()
-    conn.close()
+    if _busy(conn):  # left mid-query (a workflow activity cancelled in its thread: tests/temporal_harness.py)
+        _release(conn)  # it refuses ROLLBACK: cancel the query and drop the connection, which ends the transaction
+    else:
+        outer.rollback()
+        conn.close()
     clear_process_cache()
 
 

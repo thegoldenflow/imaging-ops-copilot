@@ -1,0 +1,62 @@
+{
+  "resourceType": "Appointment",
+  "id": "appt-000553",
+  "status": "booked",
+  "serviceType": [
+    {
+      "coding": [
+        {
+          "system": "http://snomed.info/sct",
+          "code": "52734007",
+          "display": "Total replacement of hip"
+        }
+      ],
+      "text": "Total replacement of hip"
+    }
+  ],
+  "start": "2026-10-08T08:00:00-04:00",
+  "end": "2026-10-08T09:45:00-04:00",
+  "minutesDuration": 105,
+  "participant": [
+    {
+      "actor": {
+        "reference": "Patient/pat-0706"
+      },
+      "status": "accepted"
+    },
+    {
+      "actor": {
+        "reference": "Location/OR-01"
+      },
+      "status": "accepted"
+    },
+    {
+      "actor": {
+        "reference": "Practitioner/prac-surg-03"
+      },
+      "status": "accepted"
+    }
+  ],
+  "description": "Total replacement of hip",
+  "basedOn": [
+    {
+      "reference": "ServiceRequest/orreq-surg-00436"
+    }
+  ],
+  "extension": [
+    {
+      "url": "urn:demo-hospital:ext:asa-class",
+      "valueInteger": 3
+    },
+    {
+      "url": "urn:demo-hospital:ext:surgical-urgency",
+      "valueCode": "elective"
+    },
+    {
+      "url": "urn:demo-hospital:ext:encounter",
+      "valueReference": {
+        "reference": "Encounter/stay-01170"
+      }
+    }
+  ]
+}

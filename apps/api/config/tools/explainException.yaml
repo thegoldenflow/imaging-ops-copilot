@@ -1,0 +1,117 @@
+# Tool registry entry (docs/SPEC-hospital.md 6.4; loader app/agents/registry.py).
+# side_effect_level read / recommend / action / privileged; schemas are JSON Schema (the subset in
+# app/agents/jsonschema.py); fhir_writes is what the tool may write (agents' write rights derive from it).
+tool_id: explainException
+description: Put the narrative and recommended actions for a Control Tower exception into the review queue of the
+  bed manager and the charge nurse (a Task with intent proposal); nothing is executed.
+side_effect_level: recommend
+handler: app.modules.control_tower.tools:explain_exception
+domain: fhir
+fhir_writes:
+  Task:
+  - requested
+input_schema:
+  type: object
+  properties:
+    exception_id:
+      type: string
+      pattern: ^EXC-[0-9]{5,}$
+    unit_id:
+      type: string
+      pattern: ^[A-Z]{2,5}$
+    severity:
+      type: string
+      enum:
+      - low
+      - med
+      - high
+    title:
+      type: string
+      minLength: 1
+      maxLength: 200
+    narrative:
+      type: string
+      minLength: 1
+      maxLength: 2000
+    recommended_actions:
+      type: array
+      maxItems: 5
+      items:
+        type: object
+        properties:
+          action_id:
+            type: string
+            pattern: ^[a-z][a-z0-9_]{1,40}$
+          action:
+            type: string
+            minLength: 1
+            maxLength: 300
+          rationale:
+            type: string
+            minLength: 1
+            maxLength: 600
+          owner_role:
+            type: string
+            enum:
+            - physician
+            - nurse
+            - operations_manager
+          expected_effect:
+            type: string
+            minLength: 1
+            maxLength: 300
+        required:
+        - action_id
+        - action
+        - rationale
+        - owner_role
+        - expected_effect
+        additionalProperties: false
+    evidence_refs:
+      type: array
+      maxItems: 40
+      items:
+        type: string
+        pattern: ^[A-Z][A-Za-z]+/[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    source:
+      type: string
+      enum:
+      - model
+      - template
+  required:
+  - exception_id
+  - unit_id
+  - severity
+  - title
+  - narrative
+  - recommended_actions
+  - evidence_refs
+  - source
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    task_id:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$
+    status:
+      type: string
+  required:
+  - task_id
+  - status
+  additionalProperties: false
+permission_policy:
+  roles:
+  - operations_manager
+  - nurse
+  - physician
+  - system
+  target:
+    unit: unit_id
+idempotency:
+  required: false
+timeout_ms: 5000
+retry:
+  max_attempts: 2
+  backoff_ms: 50
+audit_level: detailed

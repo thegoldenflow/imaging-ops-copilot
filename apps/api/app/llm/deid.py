@@ -17,6 +17,19 @@ HEALTH_CARD_RE = re.compile(r"\b\d{10}\b")
 ISO_DATE_RE = re.compile(r"\b(19|20)\d{2}-\d{2}-\d{2}\b")
 MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December"
 LONG_DATE_RE = re.compile(rf"\b({MONTHS})\s+\d{{1,2}}(st|nd|rd|th)?,?\s+(19|20)\d{{2}}\b", re.IGNORECASE)
+# Birth dates as callers say them (the phone agent, `redact(..., spoken_dates=True)`): Chinese with Arabic or
+# Chinese numerals, day first with an English or French month, numeric with the year first or last. Other text
+# keeps the patterns above. app/modules/frontdesk/tools.py `parse_dob` reads every form these restore to.
+FR_MONTHS = "janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre"
+CN_DIGITS, CN_NUMBERS = "〇零一二三四五六七八九", "一二三四五六七八九十"
+SPOKEN_DATE_RES = (
+    re.compile(r"(?:19|20)\d{2}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*[日号號]?"),
+    re.compile(rf"[{CN_DIGITS}]{{4}}\s*年\s*[{CN_NUMBERS}]{{1,3}}\s*月\s*[{CN_NUMBERS}]{{1,3}}\s*[日号號]?"),
+    re.compile(rf"\b\d{{1,2}}(?:st|nd|rd|th|er)?\s+(?:of\s+)?(?:{MONTHS}|{FR_MONTHS}),?\s+(?:19|20)\d{{2}}\b",
+               re.IGNORECASE),
+    re.compile(r"\b(?:19|20)\d{2}([/.-])\d{1,2}\1\d{1,2}\b"),
+    re.compile(r"(?<![\d/.-])\d{1,2}([/.-])\d{1,2}\1(?:19|20)?\d{2}(?![\d/.-]?\d)"),
+)
 
 
 class Pseudonymizer:
@@ -24,7 +37,12 @@ class Pseudonymizer:
         self._forward: dict[str, str] = {}
         self._reverse: dict[str, str] = {}
         self._counts: dict[str, int] = {}
-        self._patients = known_patients or []
+        self._known: dict[str, str] = {}  # identifier text -> kind, replaced wherever it appears
+        self._longest_first: list[str] | None = None
+        for patient in known_patients or []:
+            for value, kind in ((patient.full_name, "PERSON"), (patient.address, "ADDRESS"),
+                                (patient.health_card, "HEALTH_CARD"), (patient.email, "EMAIL")):
+                self.add_known(value, kind)
 
     def _token(self, kind: str, value: str) -> str:
         key = value.strip()
@@ -36,22 +54,67 @@ class Pseudonymizer:
         self._reverse[token] = key
         return token
 
-    def redact(self, text: str) -> str:
-        for patient in self._patients:
-            for value, kind in (
-                (patient.full_name, "PERSON"),
-                (patient.address, "ADDRESS"),
-                (patient.health_card, "HEALTH_CARD"),
-                (patient.email, "EMAIL"),
-            ):
-                if value and value.lower() in text.lower():
-                    text = re.sub(re.escape(value), self._token(kind, value), text, flags=re.IGNORECASE)
+    def token(self, kind: str, value: str, *, same_as: str | None = None) -> str:
+        """The placeholder for an identifier. `same_as` gives a second spelling the same token
+        (a patient's Chinese name and English name are one person)."""
+        if same_as is not None:
+            token = self.token(kind, same_as)
+            self._forward.setdefault(value.strip().lower(), token)
+            return self._forward[value.strip().lower()]
+        return self._token(kind, value)
+
+    def register(self, value: str, token: str) -> None:
+        """Use a given token for a value (e.g. an MRN's keyed hash), restorable like the others."""
+        self._forward.setdefault(value.strip().lower(), token)
+        self._reverse.setdefault(token, value.strip())
+
+    def alias(self, token: str, value: str) -> None:
+        """Another token text that restores to a value (a date token that carries its relative day)."""
+        self._reverse.setdefault(token, value.strip())
+
+    def add_known(self, value: str | None, kind: str) -> None:
+        """An identifier to replace wherever it appears in free text."""
+        if value and value.strip() and value.strip() not in self._known:
+            self._known[value.strip()] = kind
+            self._longest_first = None
+
+    def redact_known(self, text: str) -> str:
+        """Only the identifiers learned so far (no patterns): safe to repeat on text that is
+        already de-identified, e.g. FHIR resources or notes passed through the free-text layer."""
+        # Longest first, so "Fang Wang" is replaced before a shorter known value inside it.
+        if self._longest_first is None:
+            self._longest_first = sorted(self._known, key=len, reverse=True)
+        for value in self._longest_first:
+            if value.lower() in text.lower():
+                text = re.sub(re.escape(value), self._token(self._known[value], value), text, flags=re.IGNORECASE)
+        return text
+
+    def redact(self, text: str, *, spoken_dates: bool = False) -> str:
+        """`spoken_dates`: also the birth dates as callers say them (SPOKEN_DATE_RES), before the phone pattern
+        takes a numeric one."""
+        text = self.redact_known(text)
         text = EMAIL_RE.sub(lambda m: self._token("EMAIL", m.group()), text)
         text = HEALTH_CARD_RE.sub(lambda m: self._token("HEALTH_CARD", m.group()), text)
         text = ISO_DATE_RE.sub(lambda m: self._token("DATE", m.group()), text)
         text = LONG_DATE_RE.sub(lambda m: self._token("DATE", m.group()), text)
+        for regex in SPOKEN_DATE_RES if spoken_dates else ():
+            text = regex.sub(lambda m: self._token("DATE", m.group()), text)
         text = PHONE_RE.sub(lambda m: self._token("PHONE", m.group()), text)
         return text
+
+    def retokenize(self, value):
+        """The reverse of restore: put the tokens back into re-identified output (strings, lists and dicts), e.g.
+        to keep a model's answer as an eval case without the identifiers."""
+        if isinstance(value, str):
+            for token, original in sorted(self._reverse.items(), key=lambda kv: len(kv[1]), reverse=True):
+                if original and original in value:
+                    value = value.replace(original, token)
+            return value
+        if isinstance(value, list):
+            return [self.retokenize(v) for v in value]
+        if isinstance(value, dict):
+            return {k: self.retokenize(v) for k, v in value.items()}
+        return value
 
     def restore(self, value):
         """Re-identify tokens inside strings, lists and dicts (e.g. tool inputs)."""
