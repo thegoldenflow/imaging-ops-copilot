@@ -18,6 +18,7 @@ from app.llm.prompts import Prompt
 from app.llm.providers import (
     GeminiProvider,
     MockProvider,
+    OutputTruncated,
     ProviderRefusal,
     ProviderUnavailable,
     TextBlock,
@@ -49,6 +50,8 @@ class FakeModels:
     def generate_content(self, *, model, contents, config):
         self.calls.append({"model": model, "contents": contents, "config": config})
         reply = self.replies.pop(0)
+        if callable(reply):  # e.g. one that lets time pass on a FakeClock first
+            reply = reply()
         if isinstance(reply, Exception):
             raise reply
         return reply
@@ -74,9 +77,9 @@ def json_reply(data) -> types.GenerateContentResponse:
     return response([types.Part(text=json.dumps(data))])
 
 
-def gemini_gateway(replies: list) -> tuple[LlmGateway, FakeClient]:
+def gemini_gateway(replies: list, thinking: dict | None = None) -> tuple[LlmGateway, FakeClient]:
     client = FakeClient(replies)
-    return LlmGateway(GeminiProvider("test-key", 5, client=client)), client
+    return LlmGateway(GeminiProvider("test-key", 5, client=client, thinking=thinking)), client
 
 
 def api_error(code: int, status: str) -> genai_errors.APIError:
@@ -146,6 +149,163 @@ def test_schema_sent_to_gemini_has_no_item_limits_and_the_gateway_still_enforces
     assert "maxItems" not in json.dumps(sent)
     assert sent["properties"]["items"]["items"]["required"] == ["answer"]
     assert outcome.status == "needs_human"  # three items break the limit of two: refused twice by validation
+
+
+# --- thinking level and output limit -------------------------------------------------------------------------
+
+THINKING = {"reasoning": "HIGH", "fast": "LOW", "voice": "MINIMAL"}
+
+
+def test_thinking_level_is_sent_per_tier():
+    client = FakeClient([json_reply({"answer": "a"}), json_reply({"answer": "b"}), json_reply({"answer": "c"}),
+                         response([types.Part(text="Hello.")])])
+    provider = GeminiProvider("k", 5, client=client, thinking={**THINKING, "fast": "DEFAULT"})
+    for tier in ("reasoning", "fast", None):
+        provider.complete_json(task="t", model="m", system="s", text="x", schema={}, tier=tier)
+    provider.tool_turn(model="m", system="s", messages=[{"role": "user", "content": "Hi"}], tools=TOOL_DEFINITIONS,
+                       tier="voice")
+    sent = [c["config"].thinking_config for c in client.models.calls]
+    assert sent[0].thinking_level == types.ThinkingLevel.HIGH
+    assert sent[1] is None and sent[2] is None  # DEFAULT, or no tier: the model's own default
+    assert sent[3].thinking_level == types.ThinkingLevel.MINIMAL
+
+
+def test_gateway_sends_the_thinking_level_of_the_agents_model_tier():
+    pinned_prompt = Prompt(name="t_pinned", version="t-v1", system="s", template="{q}")
+    with registry.temporary("t_pinned", {"kind": "embedded_agent", "model_policy": {
+            "tier": "fast", "model": "gemini-reasoning", "max_tokens": 900}}):
+        gw, client = gemini_gateway([json_reply({"answer": "a"}), json_reply({"answer": "b"})], thinking=THINKING)
+        gw.structured(task="t", prompt=PROMPT, variables={"q": "x"}, schema_cls=Answer)  # the fast tier
+        gw.structured(task="t_pinned", prompt=pinned_prompt, variables={"q": "x"}, schema_cls=Answer)
+    fast, pinned = (c["config"] for c in client.models.calls)
+    assert fast.thinking_config.thinking_level == types.ThinkingLevel.LOW and fast.max_output_tokens == 2000
+    # A policy pinned to a registered model gets that model's tier.
+    assert pinned.thinking_config.thinking_level == types.ThinkingLevel.HIGH and pinned.max_output_tokens == 900
+
+
+def test_phone_agent_turns_use_the_voice_thinking_level():
+    gw, client = gemini_gateway([response([types.Part(text="We are open today.")])], thinking=THINKING)
+    set_gateway(gw)
+    store = get_store()
+    frontdesk_agent.agent_reply(store, frontdesk_agent.new_session(store), "What are your hours?")
+    assert client.models.calls[0]["config"].thinking_config.thinking_level == types.ThinkingLevel.MINIMAL
+
+
+def test_thinking_levels_come_from_the_environment(monkeypatch):
+    for tier in ("REASONING", "FAST", "VOICE"):
+        monkeypatch.delenv(f"GEMINI_THINKING_{tier}", raising=False)
+    defaults = config.load_settings()
+    assert (defaults.gemini_thinking_reasoning, defaults.gemini_thinking_fast, defaults.gemini_thinking_voice) == (
+        "LOW", "LOW", "MINIMAL")
+    monkeypatch.setenv("GEMINI_THINKING_REASONING", "medium")
+    monkeypatch.setenv("GEMINI_THINKING_VOICE", "default")
+    custom = config.load_settings()
+    assert (custom.gemini_thinking_reasoning, custom.gemini_thinking_voice) == ("MEDIUM", "DEFAULT")
+    monkeypatch.setattr(gateway_module, "settings", config.Settings(**{
+        **vars(custom), "llm_provider": "gemini", "google_agent_platform_api_key": "g"}))
+    monkeypatch.setattr("app.llm.providers.genai.Client", lambda **_: FakeClient([]))
+    assert gateway_module.make_provider().thinking == {"reasoning": "MEDIUM", "fast": "LOW", "voice": "DEFAULT"}
+    monkeypatch.setenv("GEMINI_THINKING_FAST", "none")
+    with pytest.raises(ValueError, match="GEMINI_THINKING_FAST"):
+        config.load_settings()
+
+
+def truncated(thoughts=7676, answer=309):
+    """The 2026-10-12 live run's documentation synthesis: thinking used up the 8,000-token output limit."""
+    return response([types.Part(text='{"answer": "the discharge summary sta')], finish="MAX_TOKENS",
+                    prompt_tokens=3000, out_tokens=answer, thoughts=thoughts)
+
+
+def test_max_tokens_finish_is_its_own_error():
+    provider = GeminiProvider("k", 5, client=FakeClient([truncated()]))
+    with pytest.raises(OutputTruncated, match="output limit of 8000 tokens") as raised:
+        provider.complete_json(task="t", model="m", system="s", text="x", schema={}, max_tokens=8000)
+    assert "MAX_TOKENS; 7676 of 7985 output tokens were thinking" in str(raised.value)
+    assert (raised.value.input_tokens, raised.value.output_tokens) == (3000, 7985)
+
+
+def test_gateway_retries_a_truncated_answer_once_and_logs_why_and_its_tokens():
+    gw, client = gemini_gateway([truncated(), json_reply({"answer": "ok"})])
+    outcome = gw.structured(task="t", prompt=PROMPT, variables={"q": "x"}, schema_cls=Answer)
+    assert outcome.status == "ok"
+    assert "stopped at the output limit" in client.models.calls[1]["contents"][-1]
+    call = get_store().llm_calls[-1]
+    assert call.outcome == "retried_ok" and call.output_tokens == 7985 + 25  # the truncated attempt is billed too
+
+    gw, _ = gemini_gateway([truncated(), truncated()])
+    assert gw.structured(task="t", prompt=PROMPT, variables={"q": "x"}, schema_cls=Answer).status == "needs_human"
+    call = get_store().llm_calls[-1]
+    assert call.outcome == "needs_human" and "finish reason MAX_TOKENS" in call.error
+    assert (call.input_tokens, call.output_tokens) == (6000, 2 * 7985)
+
+
+# --- retries --------------------------------------------------------------------------------------------------
+
+
+class FakeClock:
+    def __init__(self) -> None:
+        self.now = 0.0
+        self.sleeps: list[float] = []
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.now += seconds
+
+    def after(self, seconds: float, outcome):
+        """A reply that arrives `seconds` after its request."""
+        def reply():
+            self.now += seconds
+            return outcome
+        return reply
+
+
+def retrying_provider(replies: list, timeout_s: float):
+    """Replies may be functions of the clock (FakeClock.after)."""
+    clock = FakeClock()
+    client = FakeClient([r(clock) if callable(r) else r for r in replies])
+    provider = GeminiProvider("k", timeout_s, client=client, clock=clock)
+    provider.RETRY_JITTER_S = 0
+    return provider, client, clock
+
+
+def test_rate_limits_and_gateway_timeouts_are_retried_with_backoff():
+    provider, client, clock = retrying_provider([
+        lambda c: c.after(1, api_error(429, "RESOURCE_EXHAUSTED")),
+        lambda c: c.after(3, api_error(504, "DEADLINE_EXCEEDED")),
+        lambda c: c.after(2, json_reply({"answer": "ok"})),
+    ], timeout_s=30)
+    result = provider.complete_json(task="t", model="m", system="s", text="x", schema={})
+    assert result.data == {"answer": "ok"}
+    assert clock.sleeps == [2.0, 4.0]
+    # Each attempt may use what is left of the call's 30 s: 30, then 30 - 1 - 2, then 30 - 1 - 2 - 3 - 4.
+    assert [c["config"].http_options.timeout for c in client.models.calls] == [30000, 27000, 20000]
+
+
+def test_retries_stop_after_four_attempts():
+    provider, client, clock = retrying_provider([api_error(429, "RESOURCE_EXHAUSTED")] * 4, timeout_s=60)
+    with pytest.raises(ProviderUnavailable, match=r"rate or quota limit reached \(after 4 attempts\)"):
+        provider.complete_json(task="t", model="m", system="s", text="x", schema={})
+    assert len(client.models.calls) == 4 and clock.sleeps == [2.0, 4.0, 8.0]
+
+
+def test_retries_stay_inside_the_call_timeout():
+    # Each 504 comes 10 s after its request: after the second (at 22 s) a third attempt would have under 5 s left.
+    provider, client, clock = retrying_provider(
+        [lambda c: c.after(10, api_error(504, "DEADLINE_EXCEEDED"))] * 3, timeout_s=30)
+    with pytest.raises(ProviderUnavailable, match=r"\(after 2 attempts\)"):
+        provider.complete_json(task="t", model="m", system="s", text="x", schema={})
+    assert len(client.models.calls) == 2 and clock.sleeps == [2.0] and clock.now == 22
+
+
+@pytest.mark.parametrize("error", [api_error(400, "INVALID_ARGUMENT"), api_error(403, "PERMISSION_DENIED")])
+def test_request_errors_are_not_retried(error):
+    provider, client, clock = retrying_provider([error], timeout_s=60)
+    with pytest.raises(ProviderUnavailable):
+        provider.complete_json(task="t", model="m", system="s", text="x", schema={})
+    assert len(client.models.calls) == 1 and clock.sleeps == []
 
 
 # --- degradation and refusals -------------------------------------------------------------------------------
@@ -331,6 +491,8 @@ def test_vertex_client_uses_agent_platform_configuration(monkeypatch):
     assert captured["vertexai"] is True
     assert captured["api_key"] == "agent-platform-key"
     assert captured["http_options"].api_version == "v1"
+    assert captured["http_options"].timeout == 5000
+    assert captured["http_options"].retry_options is None  # the provider retries, inside the call's timeout
 
 
 @pytest.mark.parametrize("code, expected", [
