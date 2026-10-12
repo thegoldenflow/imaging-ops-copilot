@@ -25,6 +25,7 @@ import app.core.config  # noqa: E402,F401  (loads apps/api/.env)
 from app.modules.documentation import evals  # noqa: E402
 
 OUT = evals.EVALS / "documentation"
+NOT_DRAFTED = "(not drafted: see the cases table in report.md)"
 
 
 def run(live: bool) -> dict:
@@ -51,16 +52,20 @@ def run(live: bool) -> dict:
     return report
 
 
+def _proxy(r: dict, step: str) -> str:
+    if r[f"{step}_status"] not in ("signed", "drafted"):
+        return f"{r[f'{step}_status']}: {r.get(f'{step}_error') or '; '.join(r.get('missing') or [])}"
+    x = r[f"{step}_proxy"]
+    return f"{x['completeness']}/{x['accuracy']}/{x['readability']}/{x['format']}"
+
+
 def _row(r: dict) -> str:
-    if r["summary_status"] != "signed":
-        return f"| {r['id']} | {r['title']} | insufficient: {'; '.join(r['missing'])} | | | | | |"
-    s, i, h = r["summary_proxy"], r["instructions_proxy"], r["handoff_proxy"]
-    return (f"| {r['id']} | {r['title']} | {r['raw_red']} of {r['items']}"
-            + (f" ({', '.join(r['raw_red_codes'])})" if r["raw_red"] else "")
-            + f" | {len(r['untraceable_after'])} | {s['completeness']}/{s['accuracy']}/{s['readability']}/{s['format']}"
-            f" | {i['completeness']}/{i['accuracy']}/{i['readability']}/{i['format']}"
-            f" | {h['completeness']}/{h['accuracy']}/{h['readability']}/{h['format']}"
-            f" | {r['fk_grade']} | {r['summary_seconds']} s, {r['model_calls']} calls |")
+    raw = after = draft = ""
+    if r["summary_status"] == "signed":
+        raw = f"{r['raw_red']} of {r['items']}" + (f" ({', '.join(r['raw_red_codes'])})" if r["raw_red"] else "")
+        after, draft = len(r["untraceable_after"]), f"{r['summary_seconds']} s, {r['model_calls']} calls"
+    return (f"| {r['id']} | {r['title']} | {raw} | {after} | {_proxy(r, 'summary')} | {_proxy(r, 'instructions')} "
+            f"| {_proxy(r, 'handoff')} | {r.get('fk_grade', '')} | {draft} |")
 
 
 def write(report: dict) -> None:
@@ -98,6 +103,9 @@ def write(report: dict) -> None:
         f"{m['zh_terms_explained']:.0%}; explanations from the knowledge graph {m['terms_from_knowledge_graph']:.0%} "
         "(the rest are reviewed plain-language explanations or the medicine's class: the graph's facts are noisy).",
         f"- Validator red items left on the drafts: instructions {m['instructions_red']}, handoffs {m['handoff_red']}.",
+        f"- Documents drafted: summaries signed {m['summaries_signed']}, instructions {m['instructions_drafted']}, "
+        f"handoffs {m['handoffs_drafted']} of {m['cases']} cases (a document the model could not draft fails its "
+        "case; the reason is in the cases table).",
         f"- Discharge summary drafting time (pipeline, zero-latency mock): median {m['summary_seconds_p50']} s, max "
         f"{m['summary_seconds_max']} s; model calls per summary {m['model_calls_per_summary']} (one per chunk of "
         "resources, then the synthesis). With a live model the time is about calls x per-call latency: under 30 s while "
@@ -129,11 +137,11 @@ def write(report: dict) -> None:
             "discharge summary (after the validator; red items removed as the physician must), the patient "
             "instructions in three languages, the SBAR handoff. Rate them in rating_sheet.md.", ""]
     for d in report["documents"]:
-        docs += [f"## {d['id']}: {d['title']}", "", "### Discharge summary", "", "```", d["summary"], "```", "",
-                 "### Patient instructions", ""]
-        for lang, text in d["instructions"].items():
+        docs += [f"## {d['id']}: {d['title']}", "", "### Discharge summary", "", "```", d["summary"] or NOT_DRAFTED,
+                 "```", "", "### Patient instructions", ""]
+        for lang, text in (d["instructions"] or {"all languages": NOT_DRAFTED}).items():
             docs += [f"#### {lang}", "", "```", text, "```", ""]
-        docs += ["### SBAR handoff", "", "```", d["handoff"], "```", ""]
+        docs += ["### SBAR handoff", "", "```", d["handoff"] or NOT_DRAFTED, "```", ""]
     (OUT / "documents.md").write_text("\n".join(docs), encoding="utf-8")
     sheet = ["# Documentation: human rating sheet", "",
              "The spec (7.3) asks a person to rate each of the 30 cases' three documents on four dimensions from 1 to 5 "
@@ -142,13 +150,10 @@ def write(report: dict) -> None:
              "reference (they are not the rating). Fill in the C / A / R / F columns.", "",
              "| Case | Document | Proxy C/A/R/F | C | A | R | F |", "| --- | --- | --- | --- | --- | --- | --- |"]
     for r in report["rows"]:
-        if r["summary_status"] != "signed":
-            continue
-        for kind, label in (("summary_proxy", "Discharge summary"), ("instructions_proxy", "Patient instructions"),
-                            ("handoff_proxy", "SBAR handoff")):
-            x = r[kind]
-            sheet.append(f"| {r['id']} | {label} | {x['completeness']}/{x['accuracy']}/{x['readability']}/{x['format']} "
-                         f"|  |  |  |  |")
+        for step, label in (("summary", "Discharge summary"), ("instructions", "Patient instructions"),
+                            ("handoff", "SBAR handoff")):
+            if r[f"{step}_status"] in ("signed", "drafted"):
+                sheet.append(f"| {r['id']} | {label} | {_proxy(r, step)} |  |  |  |  |")
     sheet += ["", "Mean (fill in): C ___ A ___ R ___ F ___ per document type. Rater: ______  Date: ______", ""]
     (OUT / "rating_sheet.md").write_text("\n".join(sheet), encoding="utf-8")
 
@@ -169,4 +174,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    from _stdio import utf8_stdio
+
+    utf8_stdio()
     main()

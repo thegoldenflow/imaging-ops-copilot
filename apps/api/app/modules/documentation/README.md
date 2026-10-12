@@ -61,7 +61,9 @@ person signing each: the **discharge summary** (physician), the **bilingual pati
 validator 0; validator recall 1.0 on the oracle's untraceable items; schema validity 1.0; bilingual consistency 1.0
 on 10 instructions; the 5 injected hallucinations blocked; the human rating's four dimensions mean >= 4 (sheet
 outstanding; automated proxies meanwhile). Monitored: the raw hallucination rate (0.0138 with the mock), the English
-grade, the Chinese checks, the drafting time (5 model calls per summary). Tests: `tests/test_documentation.py`,
+grade, the Chinese checks, the drafting time (5 model calls per summary). A document the model could not draft fails
+that case for its agent with the reason, not the run (the instructions fail with the summary they are drafted from).
+Tests: `tests/test_documentation.py`,
 `tests/test_documentation_validator.py`, `tests/test_documentation_eval.py`; Playwright `e2e/documentation.spec.ts`.
 
 Release gate (6.6): `discharge_summary` eval_threshold 0.9, `patient_instructions` eval_threshold 0.9, `nursing_handoff` eval_threshold 0.9 in the agent registry (`apps/api/config/agents/`); the runner `uv run python -m app.aiops.evalrun` judges every agent against it, and the latest results of every agent are in [evals/README.md](../../../../../evals/README.md).

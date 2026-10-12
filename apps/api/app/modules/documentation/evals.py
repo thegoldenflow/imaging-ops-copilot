@@ -18,6 +18,9 @@ Measured:
   Chinese, with the same numbers (doses, dates, phone, temperatures);
 - the 5 injected hallucinations: each blocked by the validator;
 - the summary's drafting time and model calls per encounter.
+A document the model could not draft (unavailable, refused, output invalid twice) fails that case for that agent,
+not the run: the instructions, drafted from the signed summary, fail with the summary; the handoff is drafted
+anyway. The metrics are over the documents drafted, schema validity counts the failures.
 The mock model was written by the author of the cases: the mock numbers are optimistic and show the pipeline.
 """
 
@@ -243,90 +246,127 @@ def _doc(doc_id: str) -> dict:
     return docs._system(docs.VIEW).read("DocumentReference", doc_id).to_fhir()
 
 
-def run(store: Store, cases: list[dict]) -> dict:
-    now = hospital_now(store)
-    physician, nurse, pharmacist = (_user(store, r) for r in (Role.PHYSICIAN, Role.NURSE, Role.PHARMACIST))
-    rows, documents, consistency, injections = [], [], [], None
-    for i, case in enumerate(cases):
-        made = doccases.materialize(store, case, now, index=i)
-        enc = made["encounter"]
-        sign_medrec(store, enc, pharmacist, physician)
-        started = time.monotonic()
-        view = docs.draft_summary(store, physician, enc)
-        seconds = time.monotonic() - started
-        if view.get("status") == "insufficient":
-            rows.append({"id": case["id"], "title": case["title"], "summary_status": "insufficient",
-                         "missing": view["missing"]})
-            continue
-        raw = view["raw_validation"]
-        content = view["content"]
-        model_calls, chunks = view.get("model_calls"), len((view.get("inputs") or {}).get("chunks") or [])
-        raw_red = [i for i in raw["issues"] if i["severity"] == "red"]
-        raw_oracle = oracle(case, content)
-        data = D.read_data(_doc(view["id"])) or {}
-        table = (data.get("inputs") or {}).get("table") or {}
-        if injections is None:
-            injections = injected(summary_agent.sources_from(data["sources"]), table, content)
-        fixed = copy.deepcopy(content)
-        for path in sorted({x["path"] for x in raw_red if "[" in x["path"]}, reverse=True):
-            section, _, index = path.rstrip("]").rpartition("[")
-            group = fixed
-            for part in section.split("."):
-                group = group[part]
-            del group[int(index)]
-        if raw_red:
-            view = docs.save(store, physician, view["id"], fixed)
-        signed = docs.sign(store, physician, view["id"])
-        after = oracle(case, signed["content"])
-        flagged_values = {x["value"].lower() for x in raw_red}
-        missed = [o for o in raw_oracle if not any(v and v in o.lower() for v in flagged_values)]
-        summary_proxy = _summary_proxies(case, signed["content"], table, signed["validation"])
+def _summary_step(store: Store, physician, case: dict, encounter_id: str, on_draft) -> tuple[dict, str | None]:
+    """Draft the summary, remove its red items (as the physician must) and sign it: (the row's summary fields, the
+    signed text). `on_draft(sources, table, content)` gets the AI draft before it is signed (the injected samples)."""
+    started = time.monotonic()
+    view = docs.draft_summary(store, physician, encounter_id)
+    seconds = time.monotonic() - started
+    if view.get("status") == "insufficient":
+        return {"summary_status": "insufficient", "missing": view["missing"]}, None
+    raw = view["raw_validation"]
+    content = view["content"]
+    model_calls, chunks = view.get("model_calls"), len((view.get("inputs") or {}).get("chunks") or [])
+    raw_red = [i for i in raw["issues"] if i["severity"] == "red"]
+    raw_oracle = oracle(case, content)
+    data = D.read_data(_doc(view["id"])) or {}
+    table = (data.get("inputs") or {}).get("table") or {}
+    on_draft(summary_agent.sources_from(data["sources"]), table, content)
+    fixed = copy.deepcopy(content)
+    for path in sorted({x["path"] for x in raw_red if "[" in x["path"]}, reverse=True):
+        section, _, index = path.rstrip("]").rpartition("[")
+        group = fixed
+        for part in section.split("."):
+            group = group[part]
+        del group[int(index)]
+    if raw_red:
+        view = docs.save(store, physician, view["id"], fixed)
+    signed = docs.sign(store, physician, view["id"])
+    after = oracle(case, signed["content"])
+    flagged_values = {x["value"].lower() for x in raw_red}
+    missed = [o for o in raw_oracle if not any(v and v in o.lower() for v in flagged_values)]
+    fields = {"summary_status": "signed", "summary_seconds": round(seconds, 3), "model_calls": model_calls,
+              "chunks": chunks, "items": raw["checked"], "raw_red": len(raw_red),
+              "raw_red_codes": sorted({x["code"] for x in raw_red}), "raw_oracle": raw_oracle,
+              "validator_missed": missed, "untraceable_after": after,
+              "summary_proxy": _summary_proxies(case, signed["content"], table, signed["validation"])}
+    return fields, D.read_texts(_doc(signed["id"]))["en"]
 
-        inst = docs.draft_instructions(store, nurse, enc)
-        items = inst.get("summary_items") or {}
-        inst_proxy = _instruction_proxies(inst, items)
-        if case["patient"]["language"] != "en" and len(consistency) < 10:
-            consistency.append({"id": case["id"], "language": case["patient"]["language"], **bilingual(inst)})
-        inst_red = [x for x in inst["validation"]["issues"] if x["severity"] == "red"]
-        inst_signed = docs.sign(store, nurse, inst["id"]) if not inst_red else inst
 
-        hand = docs.draft_handoff(store, nurse, enc)
-        hand_proxy = _handoff_proxies(hand)
-        hand_red = [x for x in hand["validation"]["issues"] if x["severity"] == "red"]
-        if not hand_red:
-            docs.sign(store, nurse, hand["id"])
-        r = inst["renderings"]
-        row = {
-            "id": case["id"], "title": case["title"], "summary_status": "signed",
-            "summary_seconds": round(seconds, 3), "model_calls": model_calls, "chunks": chunks,
-            "items": raw["checked"], "raw_red": len(raw_red), "raw_red_codes": sorted({x["code"] for x in raw_red}),
-            "raw_oracle": raw_oracle, "validator_missed": missed, "untraceable_after": after,
-            "summary_proxy": summary_proxy, "instructions_proxy": inst_proxy, "handoff_proxy": hand_proxy,
-            "instructions_red": len(inst_red), "instructions_signed": inst_signed.get("doc_status") == "final",
-            "handoff_red": len(hand_red), "language": inst.get("default_language"),
+def _instructions_step(store: Store, nurse, encounter_id: str) -> tuple[dict, dict]:
+    """Draft the patient instructions from the signed summary, sign them when no item is red: (fields, the view)."""
+    inst = docs.draft_instructions(store, nurse, encounter_id)
+    proxy = _instruction_proxies(inst, inst.get("summary_items") or {})
+    red = [x for x in inst["validation"]["issues"] if x["severity"] == "red"]
+    signed = docs.sign(store, nurse, inst["id"]) if not red else inst
+    r = inst["renderings"]
+    return {"instructions_status": "drafted", "instructions_proxy": proxy, "instructions_red": len(red),
+            "instructions_signed": signed.get("doc_status") == "final", "language": inst.get("default_language"),
             "fk_grade": r["en"]["readability"]["grade"], "fk_band": r["en"]["readability"].get("band"),
             "zh_no_abbreviations": r["zh-Hans"]["readability"]["no_abbreviations"] and
             r["zh-Hant"]["readability"]["no_abbreviations"],
             "zh_terms_explained": r["zh-Hans"]["readability"]["terms_explained"],
-            "terms": r["zh-Hans"]["readability"]["terms"], "terms_from_kg": r["zh-Hans"]["readability"]["from_knowledge_graph"],
-            "tempting_drug": case["expected"]["tempting_drug"],
-        }
+            "terms": r["zh-Hans"]["readability"]["terms"],
+            "terms_from_kg": r["zh-Hans"]["readability"]["from_knowledge_graph"]}, inst
+
+
+def _handoff_step(store: Store, nurse, encounter_id: str) -> tuple[dict, str]:
+    """Draft the SBAR handoff, sign it when no item is red: (fields, the text)."""
+    hand = docs.draft_handoff(store, nurse, encounter_id)
+    red = [x for x in hand["validation"]["issues"] if x["severity"] == "red"]
+    if not red:
+        docs.sign(store, nurse, hand["id"])
+    return ({"handoff_status": "drafted", "handoff_proxy": _handoff_proxies(hand), "handoff_red": len(red)},
+            D.read_texts(_doc(hand["id"]))["en"])
+
+
+def _step(name: str, step, *args) -> tuple[dict, object]:
+    """One document of a case. A draft the model could not write (unavailable, refused, output invalid twice) or
+    one that cannot be signed raises DocProblem: that document of this case fails, the run goes on."""
+    try:
+        return step(*args)
+    except docs.DocProblem as e:
+        return {f"{name}_status": "failed", f"{name}_error": str(e)}, None
+
+
+def _mean(values: list[float]) -> float | None:
+    return round(sum(values) / len(values), 2) if values else None
+
+
+def run(store: Store, cases: list[dict]) -> dict:
+    now = hospital_now(store)
+    physician, nurse, pharmacist = (_user(store, r) for r in (Role.PHYSICIAN, Role.NURSE, Role.PHARMACIST))
+    rows, documents, consistency, injections = [], [], [], []
+
+    def first_draft(sources, table, content) -> None:  # the five injected samples go into the first AI draft
+        if not injections:
+            injections.extend(injected(sources, table, content))
+
+    for i, case in enumerate(cases):
+        made = doccases.materialize(store, case, now, index=i)
+        enc = made["encounter"]
+        sign_medrec(store, enc, pharmacist, physician)
+        row = {"id": case["id"], "title": case["title"], "tempting_drug": case["expected"]["tempting_drug"]}
+        document = {"id": case["id"], "title": case["title"], "summary": None, "instructions": None, "handoff": None}
+        fields, document["summary"] = _step("summary", _summary_step, store, physician, case, enc, first_draft)
+        row.update(fields)
+        if row["summary_status"] == "signed":
+            fields, inst = _step("instructions", _instructions_step, store, nurse, enc)
+        else:  # the instructions are drafted from the signed summary
+            fields, inst = {"instructions_status": "skipped",
+                            "instructions_error": f"no signed discharge summary ({row['summary_status']})"}, None
+        row.update(fields)
+        if inst is not None:
+            document["instructions"] = {lang: inst["renderings"][lang]["text"] for lang in P.LANGS}
+            if case["patient"]["language"] != "en" and len(consistency) < 10:
+                consistency.append({"id": case["id"], "language": case["patient"]["language"], **bilingual(inst)})
+        fields, document["handoff"] = _step("handoff", _handoff_step, store, nurse, enc)
+        row.update(fields)
         rows.append(row)
-        documents.append({"id": case["id"], "title": case["title"],
-                          "summary": D.read_texts(_doc(signed["id"]))["en"],
-                          "instructions": {lang: r[lang]["text"] for lang in P.LANGS},
-                          "handoff": D.read_texts(_doc(hand["id"]))["en"]})
+        documents.append(document)
     done = [r for r in rows if r["summary_status"] == "signed"]
+    inst_done = [r for r in rows if r["instructions_status"] == "drafted"]
+    hand_done = [r for r in rows if r["handoff_status"] == "drafted"]
     items = sum(r["items"] for r in done)
     raw_red = sum(r["raw_red"] for r in done)
-    proxies = {}
-    for kind in ("summary_proxy", "instructions_proxy", "handoff_proxy"):
-        proxies[kind.replace("_proxy", "")] = {dim: round(sum(r[kind][dim] for r in done) / len(done), 2)
-                                               for dim in ("completeness", "accuracy", "readability", "format")}
+    proxies = {kind: {dim: _mean([r[f"{kind}_proxy"][dim] for r in have])
+                      for dim in ("completeness", "accuracy", "readability", "format")}
+               for kind, have in (("summary", done), ("instructions", inst_done), ("handoff", hand_done))}
     seconds = sorted(r["summary_seconds"] for r in done)
     calls = Counter(r["model_calls"] for r in done)
     metrics = {
         "cases": len(rows), "summaries_signed": len(done),
+        "instructions_drafted": len(inst_done), "handoffs_drafted": len(hand_done),
         "schema_validity": _ratio(len(done), len(rows)),
         "fact_items_checked": items, "raw_untraceable_items": raw_red,
         "raw_hallucination_rate": _ratio(raw_red, items),
@@ -334,17 +374,18 @@ def run(store: Store, cases: list[dict]) -> dict:
         "validator_recall": _ratio(sum(len(r["raw_oracle"]) - len(r["validator_missed"]) for r in done),
                                    sum(len(r["raw_oracle"]) for r in done)),
         "untraceable_after_validator": sum(len(r["untraceable_after"]) for r in done),
-        "instructions_red": sum(r["instructions_red"] for r in done),
-        "handoff_red": sum(r["handoff_red"] for r in done),
-        "fk_grade_mean": round(sum(r["fk_grade"] for r in done) / len(done), 2),
-        "fk_grade_max": max(r["fk_grade"] for r in done),
-        "fk_within_or_below_8": _ratio(sum(r["fk_grade"] <= 8 for r in done), len(done)),
-        "zh_no_abbreviations": _ratio(sum(r["zh_no_abbreviations"] for r in done), len(done)),
-        "zh_terms_explained": _ratio(sum(r["zh_terms_explained"] for r in done), len(done)),
-        "terms_from_knowledge_graph": _ratio(sum(r["terms_from_kg"] for r in done), sum(r["terms"] for r in done)),
+        "instructions_red": sum(r["instructions_red"] for r in inst_done),
+        "handoff_red": sum(r["handoff_red"] for r in hand_done),
+        "fk_grade_mean": _mean([r["fk_grade"] for r in inst_done]),
+        "fk_grade_max": max((r["fk_grade"] for r in inst_done), default=None),
+        "fk_within_or_below_8": _ratio(sum(r["fk_grade"] <= 8 for r in inst_done), len(inst_done)),
+        "zh_no_abbreviations": _ratio(sum(r["zh_no_abbreviations"] for r in inst_done), len(inst_done)),
+        "zh_terms_explained": _ratio(sum(r["zh_terms_explained"] for r in inst_done), len(inst_done)),
+        "terms_from_knowledge_graph": _ratio(sum(r["terms_from_kg"] for r in inst_done),
+                                             sum(r["terms"] for r in inst_done)),
         "bilingual_documents": len(consistency),
         "bilingual_consistency": _ratio(sum(c["consistent"] for c in consistency), len(consistency)),
-        "injected_blocked": sum(x["blocked"] for x in injections or []),
+        "injected_blocked": sum(x["blocked"] for x in injections),
         "summary_seconds_p50": seconds[len(seconds) // 2] if seconds else 0,
         "summary_seconds_max": seconds[-1] if seconds else 0,
         "model_calls_per_summary": dict(sorted(calls.items())),
@@ -357,7 +398,7 @@ def run(store: Store, cases: list[dict]) -> dict:
         "bilingual_consistency": metrics["bilingual_consistency"] >= GATES["bilingual_consistency"]
         and len(consistency) >= 10,
         "injected_blocked": metrics["injected_blocked"] == GATES["injected_blocked"],
-        "automated_proxies_mean_ge_4": all(v >= 4 for p in proxies.values() for v in p.values()),
+        "automated_proxies_mean_ge_4": all(v is not None and v >= 4 for p in proxies.values() for v in p.values()),
     }
     return {"metrics": metrics, "gates": gates, "passed": all(gates.values()), "rows": rows,
-            "consistency": consistency, "injected": injections or [], "documents": documents}
+            "consistency": consistency, "injected": injections, "documents": documents}

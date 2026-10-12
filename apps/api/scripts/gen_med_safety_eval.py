@@ -290,6 +290,9 @@ def write(path: Path, rows: list[dict]) -> None:
 
 
 if __name__ == "__main__":
+    from _stdio import utf8_stdio
+
+    utf8_stdio()
     assert len(ORDER_REVIEW) == 60 and len({c["id"] for c in ORDER_REVIEW}) == 60
     assert len(MEDREC) == 20
     write(ROOT / "evals" / "order_review" / "cases.jsonl", ORDER_REVIEW)
