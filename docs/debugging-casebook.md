@@ -111,6 +111,7 @@
 | 6.5 | 路径太长，DLL 加载失败 | 环境 | 环境 · 路径 |
 | 6.6 | Windows、shell 和进程 | 环境 | 速查表 |
 | 6.7 | Docker、数据库、测试工具 | 环境 | 速查表 |
+| 6.8 | 脚本输出重定向到文件时崩在 GBK 编码（SpO₂） | 环境 | 环境 · 编码 |
 | 7.1 | 重置写入 INSERT 换 COPY | 平台 | 性能 |
 | 7.2 | 计时测试在机器忙时失败 | 平台 | 性能 · 负载 |
 | 7.3 | 迁到 PostgreSQL 后变慢：五步优化 | imaging | 性能 |
@@ -756,12 +757,18 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 
 ### 3.9 一个用例失败，整个评测套件就中断
 
-- **现象：** 文书评测在第 1 个病例的一次超时（以及后来的 `MAX_TOKENS`）后，3 个 agent 全部记为 error，30 个病例一个分数都没有。
-- **根因：** `draft_summary` 在模型不可用时抛 `DocProblem`（这在产品里是对的：提示医生改用模板），但评测 harness 没有按病例捕获它，异常一路冒出，整个套件失败。
-- **怎么修：** 评测按病例捕获，把该病例记为失败，继续跑其余病例（已开单独的会话处理）。
-- **经验：** 评测和批处理要做到"单条失败不影响整体"，否则一个偶发错误就会让你什么数据都拿不到。同一个道理在产品里也成立：
-  一条记录的权限失败不该让整个列表报错（12.2）。
-- **范围：** hospital（WP7 文书评测）。
+- **现象：** 2026-10-12 真实 key 跑文书评测，第 1 个病例的出院小结合成调用超时（把 `LLM_TIMEOUT_S` 设到 90 秒后，Gemini 停在 `MAX_TOKENS`），`discharge_summary`、`patient_instructions`、`nursing_handoff` 3 个 agent 在评测报告里全部记为 `error`，30 个病例一个分数都没有。
+- **怎么查的：**
+  1. 看报错：`DocProblem: The AI draft could not be written (model unavailable (synthesis)); use the template`。这是产品代码 `draft_summary` 在模型不可用时主动抛的（提示医生改用模板），本身是对的。
+  2. 假设异常从按病例的循环里冒出来、没人接。读 `app/modules/documentation/evals.py` 的 `run()`，确认循环里 `docs.draft_summary(...)` 没有 try/except；异常一路冒到 `app/aiops/evalrun.py` `run_suite()` 顶层的 `except Exception`，那里把套件里**每个** agent 都记成 `error`——所以一个调用失败，3 个 agent、30 个病例全没了。
+  3. 加测试复现：mock provider 只在第 1 个病例（`ev-doc-02-stay`）的 `SYNTHESIS` 调用抛 `ProviderUnavailable`，跑整套 `run_suite`，确认未修时整套 error。
+  4. 顺手读其它套件的 harness，确认只有文书评测会这样（见“经验”）。
+- **根因：** 评测 harness 把“每个病例、每份文书”当成一个不可分割的整体跑，任何一步抛 `DocProblem` 都会让整套评测挂掉；而真实模型本来就会偶发不可用/超时。
+- **怎么修：** `run()` 改成把每个病例的三份文书各作为一个 step（`_summary_step` / `_instructions_step` / `_handoff_step`），用 `_step()` 统一捕获 `DocProblem`：哪份文书没出来就把**那一份**记为 `<step>_status="failed"` 并带上原因 `<step>_error`，继续跑。患者指引是从已签发的小结生成的，所以小结失败时它记为 `skipped`；交班（handoff）不依赖小结，照常生成（连小结 `insufficient` 的病例也生成，以前这种会整例跳过）。指标只统计“真正出了的文书”（全失败时均值用 `None`，让 proxies 闸门判失败而不是空集判通过）；schema validity 把失败计入分母。`app/aiops/suites.py` 的 `_documentation_run` 对每个 agent、每个病例都产出一行，失败/跳过的行 `schema_valid=False`、`passed=False`，原因放在 `got`；`scripts/documentation_eval.py` 的报告、文档、评分表也改成能渲染失败的病例，而不是因为少字段崩掉。
+- **怎么证明：** 新测试 `tests/test_documentation_eval.py::test_a_document_the_model_cannot_draft_fails_its_case_not_the_suite`：第 1 个病例合成调用抛 `ProviderUnavailable` 后，没有 agent 记为 `error`；该病例小结 `failed`（原因含 `model unavailable (synthesis)`）、指引 `skipped`、交班照常；其余两个病例正常测到；小结 schema validity = 2/3，其它闸门在这两例上照常计算。自己的测试库 `ioc_test_evalrobust`（5433）上，`test_documentation_eval.py`、`test_script_stdio.py`、`test_module_readmes.py`、`test_aiops.py` 共 64/64 通过。
+- **经验：** 评测/批处理要“单条失败不影响整体”，否则一次偶发错误就什么数据都拿不到。排查时顺手把同类 harness 都查一遍：本仓库其它套件没有这个问题——影像各套件、分诊、去标识、通用回放都按病例读 gateway 状态；医嘱审核和用药核对（`comment`、`settle`）把失败记为 `unavailable` 并回退到规则；控制塔叙述回退到模板；电话 agent 捕获 `ProviderUnavailable`、通话小结记 `Summary unavailable`；注入集把崩掉的用例算失败。runner 顶层仍在 harness 真抛异常时把套件记 `error`，这对“harness 有 bug”是对的。同一个道理在产品里也成立：一条记录的权限失败不该让整个列表报错（12.2）。做“优雅降级”的改动，别忘了把“全降级”（某类文书一份都没出）的边界也处理掉，否则 `sum(...)/len()` 会除零。
+- **范围：** hospital（WP7 文书评测）/ 平台（`app/aiops` runner）。
+- **代码与提交：** `apps/api/app/modules/documentation/evals.py`、`apps/api/app/aiops/suites.py`、`apps/api/scripts/documentation_eval.py`、`apps/api/tests/test_documentation_eval.py`。在 worktree 分支 `claude/dazzling-northcutt-41fb23`，提交 `6be8255`（换模型前的实现）。
 
 > **附：Claude 的一条接口兼容性记录**（PROGRESS WP4b Notes）：Claude Sonnet 5.5 拒绝非默认的采样参数，所以不发送 temperature，也不声称有上限。
 
@@ -1271,7 +1278,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 | 放在 `%TEMP%` 的 Python 脚本一 import 就崩，栈是 sqlalchemy → `typing_extensions` → `inspect` → `import dis` → `C:\Users\lenovo\AppData\Local\Temp\dis.py` 第 3 行去打开一个 APK 解包路径（`FileNotFoundError`） | `%TEMP%` 里有一个别的任务留下的 `dis.py`，遮蔽了标准库（Python 会先从脚本所在目录找模块）。栈里出现既不属于项目、也不属于标准库的路径，就是"模块被遮蔽"的信号 | 临时脚本放在会话的 scratchpad 目录；运行不可信目录里的脚本时用 `python -I` |
 | `No module named 'websockets.client'`；`.pyd` `Access is denied` | 见 6.2 | 有进程占用 venv 时用 `uv run --no-sync`；`uv sync --reinstall-package websockets` |
 | 端口 9001、9017 等启动报 `Errno 13` | 重启后 Hyper-V 保留了 TCP 8430–9329。更早 8000 就被系统保留（`apps/web/vite.local.config.ts` 注释 "Windows reserves port 8000 on this machine"），所以 API 改用 9001；10-09 重启前 9001、9015、9017 都正常，重启后都落进保留范围 | `netsh interface ipv4 show excludedportrange protocol=tcp` 查保留范围，换端口（例如 9417、9461） |
-| 输出重定向到文件时 `UnicodeEncodeError: 'gbk' codec can't encode character '₂'`（"SpO₂"），或打印法语人名时 `... character '\xc9'` | 中文区域的 Windows 上，Python 重定向输出默认用 GBK 编码 | 设置 `PYTHONUTF8=1` 或 `PYTHONIOENCODING=utf-8`（或在脚本里把 stdout 重新配置为 UTF-8） |
+| 输出重定向到文件时 `UnicodeEncodeError: 'gbk' codec can't encode character '₂'`（"SpO₂"），或打印法语人名时 `... character '\xc9'` | 中文区域的 Windows 上，Python 重定向输出默认用 GBK 编码 | 设置 `PYTHONUTF8=1` 或 `PYTHONIOENCODING=utf-8`（本仓库 `scripts/*.py` 已内置修复，见 6.8） |
 | Windows PowerShell 5.1 里读 UTF-8 的 spec 文件，中文显示成乱码（"鎶ゅ＋浼氬湪…"） | `Get-Content` 不带 `-Encoding UTF8` 时按系统代码页读 | 加 `-Encoding UTF8` |
 | 两个会话的 pytest 互相把对方搞挂 | `conftest.py` 开始时 `DROP DATABASE ioc_test WITH (FORCE)`，并行会话共用同一个测试库。起因可追到 10-08 WP3 和反馈修复会话共用一个 checkout；WP9 自己也忘设过一次，把共享的 `ioc_test` 删了重建 | 每个会话用自己的 `TEST_DATABASE_URL=.../ioc_test_<名字>`；出事后用 `pg_stat_activity` 确认谁还连着 |
 | 停掉后台任务后还有进程在跑：第二次跑 Playwright 随机失败；停掉 bash 扫描后还剩 21 个 pytest 进程；停掉 `npx vite` 后端口 5211 仍被占 | 父进程停了，子进程还活着（孤儿 node 进程、pytest 子进程、真正监听端口的 `node ... vite.js`），两次运行共用了 API 和 Vite | 重跑前用 `Get-CimInstance Win32_Process` 按命令行特征（`*playwright*`、`-p seedat`、端口号）查残留，或按端口查 `OwningProcess` 再 `Stop-Process`。反过来，"有别人的进程"不等于"有冲突"，先查端口和数据库是否真的共用（2.8） |
@@ -1304,6 +1311,20 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 | 放在 scratchpad 里的 Vite 配置报 `"@tailwindcss/vite" resolved to an ESM file. ESM file cannot be loaded by require` | 项目外的 `.ts` 配置按 CommonJS 加载 | 改成 `.mts` 扩展名 |
 
 - **经验：** 把每个环境坑记下来（这个项目记在 Claude 的 memory 里，下次会话自动读到）。同样的坑第二次遇到时，查记录只要一分钟。
+
+### 6.8 脚本把输出重定向到文件时崩在 GBK 编码（SpO₂）
+
+- **现象：** 2026-10-12 真实 key 跑 `scripts/storyline_report.py`，输出重定向到文件，第 2 步崩在 `UnicodeEncodeError: 'gbk' codec can't encode character '₂' in position 3: illegal multibyte sequence`（`₂` 是 “SpO₂” 的下标 2）。
+- **怎么查的：**
+  1. `python -c "import locale; print(locale.getpreferredencoding())"` → `cp936`（中文区域 Windows 的 ANSI 代码页，即 GBK）。
+  2. 最小复现：`env -u PYTHONUTF8 -u PYTHONIOENCODING python -c "print('SpO₂')" > file` → 退出码 1，正是上面的报错；直接打到终端（TTY）不报错。确认是“stdout 被重定向到文件/管道时才按代码页编码”。
+  3. 验证修复方向：脚本启动时把 stdout/stderr 重新配置成 UTF-8，同一条 `print` 就能写出 UTF-8 字节。
+- **根因：** 中文区域 Windows 上，Python 的 stdout 一旦不是终端（重定向到文件或管道），就按本地 ANSI 代码页（GBK）编码，GBK 编不出 `₂`（以及法语人名里的 `É` 等）。原来的办法是手动设 `PYTHONUTF8=1`，容易忘。
+- **怎么修：** 新增 `apps/api/scripts/_stdio.py` 的 `utf8_stdio()`，用 `reconfigure(encoding="utf-8", errors="replace")` 把 `sys.stdout`、`sys.stderr` 切成 UTF-8（取不到流就跳过）。31 个会 `print` 的脚本都在各自 `if __name__ == "__main__":` 里**第一件事**调用它——不在 import 时调用，因为评测 runner 会把 `control_tower_eval.py` 当模块在 API 进程里加载，改全局 stdout 会误伤宿主进程。于是不再依赖 `PYTHONUTF8=1`。
+- **怎么证明：** 新测试 `tests/test_script_stdio.py`：一个 `PYTHONIOENCODING=gbk` 的子进程，不调用 helper 时打印 “SpO₂” 抛 `UnicodeEncodeError`，调用后写出的是 UTF-8；并检查每个会 print 的脚本都在 `__main__` 里调了 helper。开发机本地区域（cp936，不设 `PYTHONUTF8`）实测复现并通过。
+- **经验：** 不要依赖“运行时记得设某个环境变量”来保证脚本能把输出写进文件；让脚本在入口处自己把 stdout 配好。配置位置选 `__main__` 入口，不要放在 import 时——有的脚本会被别的进程当模块导入，import 时改全局状态会误伤宿主。这条是本章“输出重定向 GBK”速查表行的落地修复。
+- **范围：** 环境（开发机）/ 平台（脚本）。
+- **代码与提交：** `apps/api/scripts/_stdio.py`（新）、31 个 `scripts/*.py`（各加 3 行）、`apps/api/tests/test_script_stdio.py`（新）。worktree 分支 `claude/dazzling-northcutt-41fb23`，提交 `6be8255`。
 
 ---
 
