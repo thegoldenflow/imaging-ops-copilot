@@ -7,9 +7,12 @@ platform extension (phases 6–8, `docs/SPEC-hospital.md`) has every work packag
 WP10b, on `feat/hospital-platform` (WP10 on its own branch until the merge). A newcomer gets the whole demo running
 from README.md in about 25 minutes (WP10's check below). Open across the project:
 
-- Every eval result is a mock-model baseline: runs on a real model (Claude or Gemini) are still to be done, and the
-  two human rating sheets (Control Tower narratives, documentation) are unscored ([evals/README.md](../evals/README.md)).
-- Real-key checks of the Gemini provider and the clinical knowledge Q&A; `terminology_en.jsonl` to generate.
+- First real-key run on Gemini done on 2026-10-12 ([evals/live-run-2026-10-12.md](../evals/live-run-2026-10-12.md)):
+  10 agents pass on the live model, 6 are below their bars, the documentation agents are not measured yet (Gemini's
+  thinking fills their output budget). Runs on Claude are still to be done, and the two human rating sheets (Control
+  Tower narratives, documentation) are unscored ([evals/README.md](../evals/README.md)).
+- Gemini follow-ups from that run: thinking level per tier, retry with backoff on 429/504, an AI spending cap;
+  `terminology_en.jsonl` to generate.
 - Merging `feat/hospital-platform` into `main` is the owner's step.
 - Known date-dependent tests and follow-ups are listed in the sections below (WP9 and WP10).
 
@@ -310,7 +313,8 @@ Status: done, needs a real-key check. Branch `feat/gemini-provider` (built on `f
 - [x] UI: header badge "AI: Gemini via Vertex AI API"; AI usage, report review, phone agent and evaluations name the vendor. Eval results record the model id from the call log.
 - [x] `LLM_PROVIDER=gemini uv run python -m app.modules.evals.run` uses the Agent Platform / Vertex AI SDK route and degrades unavailable calls safely.
 - [x] Tests: `tests/test_gemini.py` (31 tests, fake client, no network): JSON output with image and schema, retry after a schema failure and after invalid JSON, timeout / connection / 429 / 503 degradation, refusals, history and tool-call conversion including thought signatures, the phone agent's tool loop and scripted fallback on Gemini, settings and provider selection, `/api/meta` mode, eval labels, Vertex client configuration, API error messages that keep Google's own text. `e2e/llm-provider.spec.ts` checks the badge and the eval labels (Gemini responses simulated in the browser)
-- [ ] Real calls with the Agent Platform key: verify a minimal request, then a chest X-ray draft, requisition, phone call and the evals.
+- [x] Real calls with the Agent Platform key: a minimal request, a chest X-ray draft, requisitions, a phone call, the storyline and every eval (2026-10-12, [evals/live-run-2026-10-12.md](../evals/live-run-2026-10-12.md)). The run found that Vertex AI rejects large `maxItems` in output schemas (fixed: the Gemini provider leaves them out and the gateway still validates them)
+- [ ] Thinking level per tier and a `MAX_TOKENS` error, then the documentation agents' live eval; retry with backoff on 429/504
 
 Choices:
 
@@ -320,9 +324,9 @@ Choices:
 
 Limits:
 
-- Not tested against the live API. The cloud network blocks ai.google.dev, so the model name and price were read from Google's search-indexed docs pages and the SDK source, not the pages themselves; check them on the pricing page when setting up.
+- Run against the live API on 2026-10-12 (see the report above). The model name and price were read from Google's search-indexed docs pages and the SDK source (the cloud network blocks ai.google.dev); check them on the pricing page when setting up.
 - Gemini supports a subset of JSON Schema for structured output. The schemas sent are the same closed Pydantic schemas used for Claude; if Gemini rejects one, the call fails as "unavailable" and the call log shows the API error.
-- No thinking-level tuning: Gemini Flash thinks by default, which adds latency in the phone agent; the 1.5 s speech-to-reply target is unmeasured for Gemini, as for Claude.
+- No thinking-level tuning: Gemini Flash thinks by default. In the 2026-10-12 run that made the phone agent's mean reply 4.7 s (target 1.5 s), put 9-18% of requests past the 30 s timeout and filled the documentation synthesis's 8,000-token output budget with thinking.
 - The server-side refusal fallback used with Claude Sonnet 5.5 has no Gemini counterpart; a Gemini refusal goes to a person.
 - One provider per running backend; switching needs a restart.
 
