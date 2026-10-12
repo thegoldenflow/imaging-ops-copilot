@@ -104,7 +104,11 @@ test("follow-up: the Chinese call escalates heavy wound drainage at once and top
   await page.getByRole("textbox", { name: "输入患者的回答…" }).fill("还行，就是伤口一直在渗液，纱布都湿透了");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(transcript).toContainText("护士会在30分钟内给您回电话");
+  // the last answer ends the call: the server runs the AI classifier and writes the observations and the call record
+  // before it replies, which can take more than an expectation's 5 s in a full run, so wait for that reply
+  const last = page.waitForResponse((r) => r.url().endsWith("/answer") && r.request().method() === "POST");
   await page.getByRole("button", { name: "没有了" }).click();
+  expect((await (await last).json()).ended, "the last answer ends the call").toBe(true);
   // the call has ended: the detail shows the whole call (and the AI's de-identified view of it)
   await expect(page.getByTestId("followup-transcript")).toContainText("再见");
   await expect(page.getByRole("button", { name: "As the AI saw it (de-identified)" })).toBeVisible();

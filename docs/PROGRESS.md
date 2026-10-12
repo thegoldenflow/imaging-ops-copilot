@@ -1211,6 +1211,29 @@ Not changed (follow-ups):
 
 - Under heavy load the writes still take 12–17 s and the lock is held up to 23.5 s (a storyline reset adds about 5 s of preset and audit under the lock), so the 30-second timeout has less margin then. Two options if that margin is needed: a longer start-to-close timeout for the activities that take the lock (it changes workflow timing: the owner's decision), or sending the rows before the lock is taken (COPY into temporary tables first, then `INSERT ... SELECT` under the lock, 4.5–7.0 s for `fhir_resources` above).
 
+### WP10 follow-up · the imaging storyline's backfill step and the follow-up call's end under load — done
+
+The final verification of `feat/hospital-platform` (95c8eef, 2026-10-11) left two Playwright failures.
+
+**`storyline.spec.ts`: Mei missing from the Backfill tab** (Sunday's data; also alone). The suspected cause was the date of the cancelled slot against Mei's constraints at a weekend. That is not it: seeded as of every day of a week at 00:00, 13:00 and 23:00, with AP-DEMO2 cancelled at the seeding hour and at 23:59, Mei (P2) is the top eligible candidate every time. AP-DEMO2 is at 10:00 on Lakeshore's next open day, at least 10 hours ahead (the contrast CT needs 4). Her entry accepts Lakeshore from the seeding day, the other P2 entries are excluded (Eastview only; not ready for 5 days), and the random CT entries are P3/P4. The failure's page snapshot showed the tab still "Loading…". The first scheduling request after a demo reset (`get_store_ready`) trained the no-show model and queued the extra reminders for the high-risk appointments, 168–246 of them depending on the seeding day, each with a database round trip for its id. That took 11 s on Sunday's data, and 75 s in a profile under heavy load, against the spec's 5 s. Saturday's earlier pass came from a quieter machine.
+
+- [x] `app/seed.py` `_add_noshow_risk`, the generator's last step: it scores the upcoming appointments, queues the extra reminders in memory and sets `extra_reminders_done`. It uses no random numbers, so the rest of the data set is unchanged, and it adds about 0.7 s to a reset. The first `GET /api/scheduling/backfill` after a reset went from 11.1 s to 0.03 s.
+- [x] `populate` and `build_store` take an optional `now`, so a test can seed as of any day and hour.
+- [x] Tests in `tests/test_flagships.py`:
+  - `test_storyline_backfill_offers_mei_first_whatever_the_time_of_seeding`: seedings from Saturday to Friday, each at another hour, cancelled at 23:59 (about 45 s under load).
+  - `test_seeded_data_leaves_the_first_scheduling_request_nothing_to_catch_up_on`: fails on the old generator.
+
+**`voice-services.spec.ts`: the follow-up call's transcript not shown within 5 s** (full run only). The last answer ends the call inside the same request: the AI classifier (a model call) runs, then the observation and call-record tools, and only then the reply goes out. The page refetches the call after that. The page has no race: the request commits before its response starts, so the refetch reads the ended call. The spec now waits for that POST's response and checks `ended` before its 5-second expectation on the transcript.
+
+Tests 2026-10-11 (mock model; own databases `ioc_test_backfill` and `ioc_backfill`, API on 9457, Vite on 5235; `--timeout=180000`, because a demo reset in a `beforeAll` takes about 57 s on this machine under load):
+
+- `storyline.spec.ts` 3/3 on data seeded for Saturday 10-10, Sunday 10-11 and Tuesday 10-13. For Saturday and Tuesday, the API ran under time-machine and the browser's `Date` was shifted by the same offset.
+- Full Playwright run on Sunday's data: 43 passed, 2 skipped (the online workflow tests), 1 failed, in 22 min. `storyline.spec.ts` and `voice-services.spec.ts` passed. The failure was `business-compliance.spec.ts` "inspection hub": the background intake loop did not send the new 7-day reminder within the test's 15 s. It is one of the load failures listed under WP9, and it passes on its own (1/1).
+- `npx tsc -b` passes.
+- Backend suite, including the two new tests: 781 of 781 passed in 15 min 18 s.
+
+Not changed: a database seeded before this change still does the work in its first scheduling request, and two such requests at once (the scheduling page asks for the dashboard and the backfill together) could both queue the reminders. A demo reset fixes such a database.
+
 ## Environment notes
 
 - `ANTHROPIC_API_KEY` and `GOOGLE_AGENT_PLATFORM_API_KEY` are not configured in the cloud environment; everything runs in mock mode there.

@@ -1,9 +1,12 @@
 """Phase 1 acceptance: scheduling, report generator and front desk."""
 
 import time
+from datetime import datetime, timedelta
 
-from app.core.store import get_store
-from app.modules.scheduling.noshow import get_model
+from app.core.models import ACTIVE_STATUSES
+from app.core.store import build_store, get_store, use_store
+from app.modules.scheduling import service as scheduling
+from app.modules.scheduling.noshow import HIGH_RISK, get_model
 
 
 def _call(client, headers, *utterances):
@@ -31,6 +34,37 @@ def test_cancellation_produces_ranked_backfill_within_5_seconds(client, login):
     exclusions = {c["patient_id"]: c["exclusion"] for c in case["excluded"]}
     assert "Site not acceptable" in exclusions["PT-00011"]
     assert "Not ready" in exclusions["PT-00012"]
+
+
+def test_storyline_backfill_offers_mei_first_whatever_the_time_of_seeding():
+    # The storyline: Robert Taylor cancels AP-DEMO2 (10:00 on Lakeshore's next open day) by phone and Mei tops the
+    # backfill list. The data set depends on the day and hour of seeding (which days the sites open, which slots are
+    # past), so seed as of every day of a week, each at another hour, and cancel at the last minute of that day: the
+    # least preparation notice a demo on the day of seeding leaves (the contrast CT needs 4 hours).
+    for day, hour in enumerate((0, 4, 8, 12, 16, 20, 23)):
+        wall = datetime(2026, 10, 10, hour) + timedelta(days=day)  # Saturday to Friday
+        store = build_store(hospital=False, now=wall)
+        with use_store(store):
+            appt = store.appointments["AP-DEMO2"]
+            assert appt.start.date() > wall.date() and appt.start.weekday() in store.sites["LKS"].open_days, wall
+            case = scheduling.cancel(store, appt, "test", now=wall.replace(hour=23, minute=59))
+            top = case.candidates[0]
+            assert (top.patient_id, top.urgency) == ("PT-DEMO1", "P2"), (wall, top, case.excluded)
+
+
+def test_seeded_data_leaves_the_first_scheduling_request_nothing_to_catch_up_on(fresh_state):
+    # The generator scores the upcoming appointments and queues the extra reminders for the high-risk ones. When the
+    # first scheduling request after a reset did it, it read every appointment, trained the model and queued ~200
+    # reminders with a database round trip each: 11 s to over a minute under load, and the storyline's backfill tab
+    # stayed on "Loading…" past the end-to-end test's 5 s.
+    store = fresh_state
+    assert store.modules.get("extra_reminders_done")  # get_store_ready() skips the work
+    upcoming = [a for a in store.appointments.values() if a.status in ACTIVE_STATUSES]
+    assert upcoming and all(a.no_show_risk is not None and a.risk_factors for a in upcoming)
+    seeded = store.modules["seed_time"]
+    due = {a.id for a in upcoming if a.no_show_risk >= HIGH_RISK and a.start - seeded <= timedelta(days=7)}
+    reminded = {m.appointment_id for m in store.outbox.values() if m.kind == "reminder_extra"}
+    assert due and reminded == due == {a.id for a in upcoming if a.extra_reminder}
 
 
 def test_first_patient_to_confirm_gets_the_slot(client, login):

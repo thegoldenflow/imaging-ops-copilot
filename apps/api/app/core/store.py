@@ -403,13 +403,14 @@ def persist(src: Store, into: Store, rows: list[tuple[Table, list[dict]]] | None
     into.touch()
 
 
-def build_store(seed: int | None = None, *, hospital: bool = True) -> Store:
-    """The demo data set, generated in memory (detached); `hospital=False`: the imaging data only."""
+def build_store(seed: int | None = None, *, hospital: bool = True, now: datetime | None = None) -> Store:
+    """The demo data set, generated in memory (detached); `hospital=False`: the imaging data only; `now`: the time
+    it is generated for (default: now)."""
     from app.seed import populate
 
     store = Store()
     with use_store(store):
-        populate(store, seed, hospital=hospital)
+        populate(store, seed, hospital=hospital, now=now)
     return store
 
 
