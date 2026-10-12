@@ -30,6 +30,7 @@ The owner chose a lean demo build: data lives in an in-memory store rebuilt from
 3. Backend code for a system goes in `apps/api/app/modules/<system>/`, frontend code in `apps/web/src/features/<system>/`.
 4. A system is done when its acceptance checkboxes pass, its unit tests and at least one Playwright end-to-end test pass, and `docs/PROGRESS.md` is updated. Commit each system separately.
 5. Changing the core data model or the tech stack needs a written rationale and the owner's confirmation first.
+6. When you fix a non-trivial bug or diagnose a failure (a test, an eval, a race, a real-model or API error, an environment problem), add a case to `docs/debugging-casebook.md` in its format: 现象 → 怎么查的 → 根因 → 怎么修 → 怎么证明 → 经验, plus the code paths and the commit. Write it in Chinese, with error messages and code names verbatim, and put the weight on the investigation: the hypotheses and the experiment that confirmed or refuted each. The owner studies this file to learn problem solving.
 
 ## Hard rules
 
