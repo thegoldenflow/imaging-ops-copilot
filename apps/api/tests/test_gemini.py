@@ -7,7 +7,7 @@ import httpx
 import pytest
 from google.genai import errors as genai_errors
 from google.genai import types
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.agents import registry
 from app.core import config
@@ -131,6 +131,21 @@ def test_gateway_retries_after_invalid_json_then_needs_human():
     gw, _ = gemini_gateway([bad, json_reply({"wrong": 1})])
     outcome = gw.structured(task="t", prompt=PROMPT, variables={"q": "x"}, schema_cls=Answer)
     assert outcome.status == "needs_human"
+
+
+class Answers(BaseModel):
+    items: list[Answer] = Field(max_length=2)
+
+
+def test_schema_sent_to_gemini_has_no_item_limits_and_the_gateway_still_enforces_them():
+    # Vertex AI answers 400 INVALID_ARGUMENT to large maxItems on arrays of objects (live run, 2026-10-12).
+    three = {"items": [{"answer": "a"}, {"answer": "b"}, {"answer": "c"}]}
+    gw, client = gemini_gateway([json_reply(three), json_reply(three)])
+    outcome = gw.structured(task="t", prompt=PROMPT, variables={"q": "x"}, schema_cls=Answers)
+    sent = client.models.calls[0]["config"].response_json_schema
+    assert "maxItems" not in json.dumps(sent)
+    assert sent["properties"]["items"]["items"]["required"] == ["answer"]
+    assert outcome.status == "needs_human"  # three items break the limit of two: refused twice by validation
 
 
 # --- degradation and refusals -------------------------------------------------------------------------------

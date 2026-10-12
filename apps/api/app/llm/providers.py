@@ -267,6 +267,18 @@ def blocks_from_gemini(parts: list) -> list:
     return blocks
 
 
+def gemini_schema(node):
+    """The structured-output schema as Gemini accepts it: without `maxItems`. Vertex AI rejects a schema whose
+    arrays of objects carry large item limits (400 INVALID_ARGUMENT; seen with maxItems 40 on medication
+    reconciliation and the documentation agents, while 10 passed). The gateway still validates every answer against
+    the full Pydantic model, so a list that runs over its limit fails validation and is retried there."""
+    if isinstance(node, dict):
+        return {k: gemini_schema(v) for k, v in node.items() if k != "maxItems"}
+    if isinstance(node, list):
+        return [gemini_schema(v) for v in node]
+    return node
+
+
 class GeminiProvider:
     """Google Gemini through the Agent Platform / Vertex AI google-genai route."""
 
@@ -336,7 +348,7 @@ class GeminiProvider:
             system_instruction=system,
             max_output_tokens=max_tokens,
             response_mime_type="application/json",
-            response_json_schema=schema,
+            response_json_schema=gemini_schema(schema),
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
         ))
         parts = self._parts(resp)
