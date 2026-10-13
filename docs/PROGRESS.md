@@ -11,8 +11,12 @@ from README.md in about 25 minutes (WP10's check below). Open across the project
   10 agents pass on the live model, 6 are below their bars, the documentation agents are not measured yet (Gemini's
   thinking fills their output budget). Runs on Claude are still to be done, and the two human rating sheets (Control
   Tower narratives, documentation) are unscored ([evals/README.md](../evals/README.md)).
-- Gemini follow-ups from that run: thinking level per tier, retry with backoff on 429/504, an AI spending cap;
-  `terminology_en.jsonl` to generate.
+- Gemini tuning merged the same day (7f3f91a, a55a7a6): thinking level per tier, MAX_TOKENS error, backoff, and an
+  eval harness where one failed case no longer stops a suite. The rerun (same report, "After tuning") removed the
+  truncation and halved latency; the documentation agents now get scores but lose most cases to Vertex deadline stalls,
+  because the new 504 retry never fires inside the 30 s budget. Open: that retry and longer deadlines for long calls,
+  the voice tier's thinking level (Mandarin failures), the nursing handoff's citation contract, 13 eval-harness
+  defects, an AI spending cap; `terminology_en.jsonl` to generate.
 - Merging `feat/hospital-platform` into `main` is the owner's step.
 - Known date-dependent tests and follow-ups are listed in the sections below (WP9 and WP10).
 
@@ -314,7 +318,8 @@ Status: done, needs a real-key check. Branch `feat/gemini-provider` (built on `f
 - [x] `LLM_PROVIDER=gemini uv run python -m app.modules.evals.run` uses the Agent Platform / Vertex AI SDK route and degrades unavailable calls safely.
 - [x] Tests: `tests/test_gemini.py` (31 tests, fake client, no network): JSON output with image and schema, retry after a schema failure and after invalid JSON, timeout / connection / 429 / 503 degradation, refusals, history and tool-call conversion including thought signatures, the phone agent's tool loop and scripted fallback on Gemini, settings and provider selection, `/api/meta` mode, eval labels, Vertex client configuration, API error messages that keep Google's own text. `e2e/llm-provider.spec.ts` checks the badge and the eval labels (Gemini responses simulated in the browser)
 - [x] Real calls with the Agent Platform key: a minimal request, a chest X-ray draft, requisitions, a phone call, the storyline and every eval (2026-10-12, [evals/live-run-2026-10-12.md](../evals/live-run-2026-10-12.md)). The run found that Vertex AI rejects large `maxItems` in output schemas (fixed: the Gemini provider leaves them out and the gateway still validates them)
-- [ ] Thinking level per tier and a `MAX_TOKENS` error, then the documentation agents' live eval; retry with backoff on 429/504
+- [x] Thinking level per tier (`GEMINI_THINKING_*`; Gemini 3 takes a level, 2.5 a budget), a `MAX_TOKENS` error retried once with a concise hint and minimal thinking, 429/504 backoff (7f3f91a); documentation agents measured live (2026-10-12, report section "After tuning")
+- [ ] The 504 retry never fires: a deadline stall uses up the whole `LLM_TIMEOUT_S` budget (casebook 3.11); give long calls a longer deadline and rerun the documentation agents
 
 Choices:
 
