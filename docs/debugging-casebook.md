@@ -112,6 +112,7 @@
 | 5.9 | 改了数据就按星期扫：两个模拟器边界 bug | hospital | 日期依赖 · 扫描 |
 | 5.10 | 计划 horizon 差一天，时钟原地空转 | hospital | 日期依赖 · 边界 |
 | 5.11 | 积压看板测试全量失败、单独通过 | imaging | 测试 · 未查明 |
+| 5.12 | 周二的"编造诊断"是真的：预埋病人恰好因肺炎入院 | hospital | 日期依赖 · 测试假设 |
 | 6.1 | `localhost` 建连接要 8 秒，播种像卡住 | 环境 | 环境 · 网络 |
 | 6.2 | `websockets` 反复被删坏 | 环境 | 环境 · 依赖 |
 | 6.3 | Docker 数据盘写满（10-09） | 环境 | 环境 · 磁盘 |
@@ -1307,6 +1308,60 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** imaging（系统 11 积压看板）。
 - **来源：** wt-zealous-napier-1d0414 10-09 21:08–21:11。
 
+### 5.12 周二的"编造诊断"是真的：预埋病人恰好因肺炎入院
+
+- **现象：** 10-13（周二）重测 Gemini agent 时，全量后端 `807 passed, 1 failed`：`tests/test_documentation.py::test_template_only_without_ai_consent`
+  第 196 行 `assert (False or False)`。测试让医生在"无 AI 同意、只有模板"的出院小结里加一条诊断 "Pneumonia"，引用的是另一条诊断的来源，
+  期望校验器给出红色的 `untraceable_diagnosis` 或 `source_mismatch`，结果两种都没有。在未修改的 main a347f78 上同样失败，与 provider 改动无关
+  （trusting-hypatia 的交接记录里也记成 a347f78 上的既有失败）。
+- **怎么查的：**
+  1. **先读判定逻辑，列出"什么输入会得到这个输出"。** `TraceabilityValidator.check_item` 对带类型的条目（诊断）先按 code、再按名字
+     （`lexicon.same_name`：规范化后相等、词集包含、difflib ≥ 0.85，加同义词）在输入的 diagnosis / encounter 来源里找匹配：一个都没找到 → `untraceable_diagnosis`；
+     找到了但不在本条引用的来源里 → `source_mismatch`；找到了而且就在引用里 → 没有问题。所以"两种都没有"只剩一种可能：
+     **"Pneumonia" 和测试引用的那条诊断匹配上了**，也就是这位病人可能真的有肺炎。断言 `A or B` 漏掉了第三种结果"没有错误"。
+  2. **假设**（任务说明给的线索，即本章）：预埋病例挑哪个病人取决于医院的星期几，10-13 是周二。读 `app/ehr/seed/documentation.py` 的 `generate()`：
+     `hallucination` 病例从 Medicine A 在院、没被其他预埋用过、同意 AI 处理的住院里，按 `(是否带出院处方, 是否英语, id)` 挑一个，**不看诊断**。
+     再看 `app/ehr/reference.py`：肺炎（233604007）是 Medicine A 最常见的入院诊断之一（"shortness of breath" 权重 0.4，"fever" 0.3）。
+  3. 本机 Docker Desktop 没在运行（5433 拒绝连接），于是先做不依赖数据库的实验（思路同 18.6）。第一版脚本想在脱离数据库的 Store 上重放整个测试，
+     卡在签核对单：`S.sign` → `bus.publish` → `RuntimeError: A detached store has no database connection`（服务层要写事件表）。改成只重放**确定性的那一半**：
+     脱离数据库按指定时刻生成数据（`uv run --with time-machine` 移动整个时钟），按 `read_inputs` 的方式取这次住院的资源，`facts.build` 建来源，
+     按服务的 `_sources_view` 排序取"第一个 diagnosis"，再用 `DischargeSummaryValidator` 校验测试编辑后的内容（探针 `probe_validator.py`，每次约 40 秒）。
+  4. 周二 10:00：预埋住院是 stay-01066，`reasonCode ['Pneumonia']`，第一个诊断来源就是 `Condition/cond-005657 'Pneumonia' 233604007`。
+     测试加的 "Pneumonia" 引用的正是它，匹配且在引用里，0 个问题，`TEST FAIL`。**假设成立。**
+  5. **扫描一周**（10-12 到 10-18，6 个进程并行）：只有周二失败。周一、周日 Sepsis（stay-00931），周三慢阻肺急性加重，周四脑卒中，周五、周六 Sepsis（stay-00942），
+     这些天都是 `red untraceable_diagnosis discharge_diagnoses[1] 'Pneumonia'`。顺带发现断言里的 `source_mismatch` 分支 7 天里一次都没出现过。
+  6. **一直如此，还是后来改坏的？** 95c8eef（10-11，5.3）改过用药安全预埋病例挑的病人，而这些病人会被排除出文书预埋的候选池，可能把周二的病例换了人。
+     用 `git archive a04ca7b apps/api` 取出引入这个测试的 WP7 提交，用当前 worktree 的 venv 跑同一个探针：周二同样是 stay-01066 肺炎、同样 `TEST FAIL`。
+     先确认跑的真是旧代码：`import app.ehr.seed.documentation` 的 `__file__` 指向解出来的目录（`python -c` 会把当前目录放在 `sys.path` 最前面、遮住 `PYTHONPATH`，
+     所以从 scratchpad 目录运行）。结论：测试从写下那天起就在周二失败；它是 10-10（周六，生成周五的数据）写的，10-13 是它遇到的**第一个周二**。
+  7. 启动 Docker Desktop（compose 容器自动重启）后，在自己的库 `ioc_test_brave` 上，同一次 pytest 会话同时跑 HEAD 的原测试（临时拷成
+     `tests/test_zz_head_documentation_tmp.py`，跑完删除）和修改后的测试：原测试 `assert (False or False)`，与报告一致；新测试通过。
+- **根因：** **测试的假设错了，校验器是对的。** 测试把 "Pneumonia" 当成这次住院一定没有的诊断，但预埋病例挑病人时不看诊断，而肺炎是 Medicine A 的常见入院诊断；
+  周二挑中的正好是一位因肺炎入院的病人，"编造"的诊断其实有据可查，也正确引用了来源，校验器不报错才是对的。
+- **怎么修：** 只改测试。"编造"的诊断在运行时挑一个不属于这次住院的名字：依次试 "Pneumonia"、"Pulmonary embolism"，跳过和本次住院任何诊断或入院原因
+  （含 `lexicon.synonyms` 的同义词）`same_name` 匹配的那个。断言收紧成确定的结果：第一条（有据可查的）诊断没有红色问题；第二条在 `discharge_diagnoses[1]`
+  上有 `untraceable_diagnosis`，值就是挑中的名字（原来"或 `source_mismatch`"从没出现过，去掉）。种子不改：数据本身没错，改种子会让演示数据换人。
+- **怎么证明：**
+  - 同一个库、同一次会话：原测试失败、新测试通过（`1 failed, 1 passed`）。
+  - 文书的两个测试文件（`test_documentation.py`、`test_documentation_validator.py`）在周二（真实时钟）和周五各 `30 passed`。周五用 scratchpad 里的 pytest 插件
+    `-p travel`：模块导入时就用 time-machine 把时钟移到 `TRAVEL_TO`，早于 conftest 播种。`-q` 不显示插件的报告头，所以用 SQL 确认两个库确实是不同的医院日：
+    `ioc_test_brave` 的预埋住院是 stay-01066 / 233604007，`ioc_test_brave_fri` 是 stay-00942 / 91302008。新测试的两条路（周二退到 "Pulmonary embolism"，
+    周五仍用 "Pneumonia"）都跑到了。
+  - **变异测试：** 插件 `-p mutate_validator` 把 `TraceabilityValidator.check_item` 换成丢掉 `untraceable_diagnosis` / `source_mismatch` 的版本，新测试失败
+    （`AssertionError: []`），说明它不是空转。插件在 `pytest_collection_modifyitems` 里才 import app，保证 `tests/conftest.py` 先设好 `DATABASE_URL`，不会连到开发库。
+  - 两个测试库用完已删除。没有跑全量后端（只改了一个测试）。
+- **经验：**
+  - 断言"两种错误至少有一种"（`A or B`）时，先问：有没有第三种结果"没有错误"？这里第三种结果恰恰是正确行为，失败报的是测试的假设，不是被测代码。
+  - 测试里的反例（编造的诊断、不存在的药）要在运行时证明它确实不在数据里，不能凭印象挑一个"应该没有"的名字；挑得越常见，越容易撞上。
+    这是 5.3、12.9 那个教训的另一面：那里是预埋病例的前提没写成挑选条件，这里是测试的前提没写成条件。
+  - 读一遍判定逻辑就能把可能性从"三种"缩到"一种"，之后的实验只需确认这一种。
+  - 数据库不可用时，把被测逻辑里确定性的那部分单独拿出来实验（生成器、来源、校验器都不需要数据库），一个星期几几十秒，比等环境快。
+  - "从什么时候开始坏的"用旧提交跑同一个探针回答，先确认真的加载了旧代码。
+- **范围：** hospital（WP7 文书测试，WP1 生成器的预埋病例）。
+- **来源：** wt-brave-grothendieck-30fcc4 10-13 约 16:00–16:45；发现于同日 Gemini 重测的全量后端（807 passed、1 failed）。
+- **代码：** `apps/api/tests/test_documentation.py`（`test_template_only_without_ai_consent`）；相关：`apps/api/app/modules/documentation/validator.py`（`check_item`）、
+  `apps/api/app/ehr/seed/documentation.py`（`generate()` 的 `hallucination` 病例）；提交 a7a7d55。
+
 > **怎么在另一天测试**（本机做法，见 memory 记录）：
 > - 脱离数据库调用 `generate(Store(), seed, datetime(...))`，几十秒就能扫完一周（5.6）；或者写一个 pytest 插件只冻结播种时刻（`seedat`、`seedtime`：`-p seedtime` 加 `SEED_AT`），
 >   每个星期几一个测试库并行跑，并先用 SQL 确认真的换了医院日（5.9）。
@@ -1314,6 +1369,8 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 >   （`test_phase2.py::test_contrast_status_and_threshold_recompute`、`test_phase3.py` 的 3 个、`test_phase4.py` 的 5 个，如 `test_reconciliation_finds_every_planted_discrepancy`、
 >   `test_expired_lots_are_never_consumed` 的 `StopIteration`）；用 `uv run --with time-machine` 把整个时钟移到周四后，这 9 个全部通过（`9 passed in 108.29s`）。
 > - time-machine 把**不带时区的** `datetime` 当作 UTC（本机是 UTC-4），要传带时区的时间。
+> - 整个 pytest 会话换到另一天：scratchpad 里写一个插件，模块导入时就 `time_machine.travel(<带时区的时间>, tick=True).start()`，
+>   用 `PYTHONPATH=<插件目录> uv run --with time-machine pytest -p travel` 运行；`-q` 不显示插件的报告头，用 SQL 确认库里是哪一天的数据（5.12）。
 > - 浏览器端在 Vite 配置里注入一个 `Date` 子类来偏移时间；放在 scratchpad 里的 Vite 配置要用 `.mts` 扩展名（第六章）。改浏览器时钟前先确认前端不拿它比对令牌过期时间（5.2）。
 
 ---
