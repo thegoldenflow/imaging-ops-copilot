@@ -2686,6 +2686,93 @@ WP9 开工前的只读审计、读端到端截图、核对 README 里的一句�
 
 ---
 
+## 十八、换模型续作：同步、合并、重试实现与真实密钥验证
+
+这一节是 2026-10-12 把"真实密钥流程测试"任务从 Opus 5.5 切到 Opus 4.8 后续作时踩的坑（过程另见 [`model-switch-2026-10-12.md`](model-switch-2026-10-12.md)）。
+
+### 18.1 本地独有的 main 提交，让"同步 base 分支"的工具空转
+
+- **现象**：worktree 分支要同步到 main，但 app 的 `sync_with_base_branch`（从 origin 拉 base 再合并）报 "already up to date"，什么也没带进来。
+- **怎么查的**：`git rev-parse main origin/main HEAD` → `main`=d075d95，而 `origin/main`=`HEAD`=6f9a7a8；`git merge-base --is-ancestor 434acf0 origin/main` 为假（434acf0 不在 origin/main 上）。
+- **根因**：换模型前的会话把 5 个提交（434acf0…d075d95）只提交在**本地 main**、没 push；`sync_with_base_branch` 的 base 来自 origin，看到的还是 6f9a7a8=自己的 HEAD，所以判定"已最新"。
+- **怎么修**：本地独有提交用本地合并。HEAD 是 main 的祖先，`git merge --ff-only main` 快进到 d075d95，不产生合并提交。合并前先 `git diff --name-only 6f9a7a8 main` 确认带入的文件不含沙箱保护路径（`.claude/hooks`、`.claude/skills`、`.mcp.json`），本地 merge 才安全。
+- **怎么证明**：`git log --oneline` 线性直达 d075d95，无额外合并提交。
+- **经验**：worktree 的 base 同步工具只认 origin。用它还是本地 merge，先 `git rev-parse` 对比 main / origin/main / HEAD 三个 ref；本地独有提交一律本地 merge。
+- **代码与提交**：无代码改动（仅同步动作）。
+
+### 18.2 工作区不干净时安全合并，并保住未提交的 WIP
+
+- **现象**：要同步 main，但工作区有三个文件（`config.py` / `gateway.py` / `test_gemini.py`）的未提交 WIP（不能丢），直接 merge 会被 git 拒绝或覆盖。
+- **怎么查的**：`git diff --stat` 看 WIP 范围；`git diff 6f9a7a8 main -- <三文件>` 预判冲突——只有 `test_gemini.py` 会冲突（main 的 maxItems 测试与 WIP 都插在 `test_gateway_retries_after_invalid_json_then_needs_human` 之后）。
+- **根因**：WIP 基于 6f9a7a8；main 的 maxItems 测试与新测试插在同一处。
+- **怎么修**：不用共享的 `git stash`（多会话共用一个栈，容易弹错别人的）。改为：`git diff > scratchpad/*.patch` 备份 → `git checkout -- <三文件>` 清空 → `git merge --ff-only main` → `git apply --3way <patch>` 重打 → 手动把 `test_gemini.py` 冲突解成"两套测试都保留"。
+- **怎么证明**：无冲突标记残留；两套测试并存，`uv run pytest tests/test_gemini.py` 43 passed。
+- **经验**：脏工作区合并，补丁文件 + `git apply --3way` 比共享 stash 更安全可控；`--3way` 能找到祖先 blob 时会给出可解析的冲突标记。
+- **代码与提交**：01c1881（换模型前 checkpoint）、0e2f903（实现）。
+
+### 18.3 退避重试要"在调用超时内"：先把测试断言当契约逐条 trace，再写实现
+
+- **现象（预判，没等它咬到）**：`test_retries_stop_after_four_attempts` 用 `match=r"rate or quota limit reached \(after 4 attempts\)"`，要求子串连续。若把 "(after N attempts)" 直接 append 到消息末尾，中间会隔一个 ". Google: …"，正则就不匹配。
+- **怎么查的**：动 `providers.py` 前，把 `test_gemini.py` 里 5 个重试/截断测试的断言逐条手推（时钟推进、每次 attempt 的超时、`sleeps` 列表、消息如何拼）。
+- **根因**：消息结构要让 hint 和 "(after N)" 相邻；退避还不能超出这次调用自己的超时预算。
+- **怎么修**：`_api_error` 返回 `(prefix, detail, retryable)`，消息拼成 `f"{prefix}{suffix}{detail}"`，suffix 夹在 hint 和 Google 详情之间；`_generate` 每次 attempt 用 `self.timeout_s - (clock.now - start)` 作剩余超时，退避前再查剩余够不够（`MIN_ATTEMPT_S=5`），不够就不再试；时钟可注入（`clock or time`）让测试不真睡。
+- **怎么证明**：`uv run pytest tests/test_gemini.py` 43 passed（含 5 个重试/截断测试）。
+- **经验**：实现前把别人写好的测试断言当契约逐条 trace，能在写代码前就定出文案/格式/时序约束，省掉写—跑—红的来回。
+- **代码与提交**：`app/llm/providers.py` 的 `GeminiProvider._api_error`/`_generate`；提交 0e2f903。
+
+### 18.4 放在仓库外(scratchpad)的脚本 import 不到 app 包
+
+- **现象**：从 scratchpad 跑 `setup_live_db.py`，`import app.core.config` 抛 `ModuleNotFoundError: No module named 'app'`。
+- **怎么查的**：看 traceback；对比仓库里 `scripts/documentation_eval.py` 开头有 `sys.path.insert(0, str(Path(__file__).resolve().parents[1]))`。
+- **根因**：`python <script>` 时 `sys.path[0]` 是脚本所在目录（scratchpad），不是 cwd（apps/api），所以 `app` 包不在路径上（cwd 只有 `-m` 或交互式时才进 path）。
+- **怎么修**：运行时设 `PYTHONPATH=<apps/api>`。
+- **怎么证明**：重跑 DB setup 成功（迁移到 0010 + 灌种子）。
+- **经验**：仓库外的一次性脚本要显式把包根加进 `PYTHONPATH` 或脚本内 `sys.path.insert`；仓库内脚本靠自身相对路径 insert。
+- **代码与提交**：无（scratchpad 脚本）。
+
+### 18.5 全量 run 里孤立失败的看板测试：先单独复跑定性，再看接口是否涉及改动面
+
+- **现象**：`apps/api` 广测 776 passed，仅 `test_phase3.py::test_board_updates_with_new_studies_and_sign_offs` 失败：`assert (7 > 5 and 92 == (92 + 1))`——version 5→7（跳了 2）、unread 没 +1。
+- **怎么查的**：(1) 读 `POST /api/backlog/simulate-completion`（`app/modules/backlog/router.py:161`）——它只按 `datetime.now()` 挑下一个预约 `scheduling.complete`，**完全不碰 LLM/gateway**；(2) 单独复跑 `pytest tests/test_phase3.py` → 29 passed（含该用例）。
+- **根因**：本次改动在 provider/gateway 层，测试全走 MockProvider（对 tier/retry/thinking 是 no-op），mock 路径字节级不变——与该用例无关。单独跑全过 → 是全量 run 里的**测试间状态泄漏 flake**（前序某测试改了预约/看板状态，影响了 simulate-completion 选中的"下一个预约"）。哪个前序测试泄漏未深究，属既有问题。
+- **怎么修**：不属本任务范围，列为 follow-up（未修）。
+- **怎么证明**：`pytest tests/test_phase3.py` 29 passed。
+- **经验**：全量 run 里孤立的失败，先单独复跑定性（flake 还是真回归）；"失败接口是否触及本次改动面"是判断相关性的快捷依据——这里接口不碰 LLM，直接排除。
+- **代码与提交**：无（既有 flake，未修）。
+
+### 18.6 Postgres/Docker 卡死挡住 DB 版 live eval：改在 provider 层做不依赖 DB 的因果验证
+
+- **现象**：真实密钥的 2-case 文书 eval 探针在 `get_engine().connect()` 抛 `psycopg.errors.ConnectionTimeout: connection timeout expired`；几分钟前建库还正常。
+- **怎么查的**：(1) traceback 不是 `AssertionError`，说明已过 `assert gw.mode=='gemini'`——**key 生效、网关是通的**，卡在 DB；(2) `netstat :5433` 只有约 8 个连接（不是连接数打满）；(3) 直连 `postgres` 库诊断也 6s 超时——Postgres 本身无响应；(4) `docker ps`/`docker system df` 也 hang（>120s）——Docker 自身卡住。符合本机"Docker 盘(C:)会满导致 Postgres 卡死"的已知 quirk。
+- **根因**：环境问题（Docker/Postgres 无响应），非代码、非 key。
+- **怎么修**：不擅自重启 owner 的 Docker。改走**不依赖 DB** 的验证：直接在 provider 层（不经 gateway 的 store 日志）用真实 discharge-summary synthesis prompt（`discharge_summary@1`）+ 真实 `DischargeSummary` schema + 合成住院数据，对同一输入做默认 thinking vs `thinking_level=LOW` 的因果对照调用，读 `usage_metadata` 的 `finish_reason`/`thoughts_token_count`。
+- **怎么证明**：两次 live 调用都 finish=STOP、JSON 校验通过；LOW 把 thinking token 从 4498 降到 1366（约 1/3）、时延从 23.6s 降到 12.5s——直接印证 Finding 1 的机制（thinking 吃输出预算）被 LOW 缓解。
+- **局限（未复现 MAX_TOKENS）**：合成病例比真实最坏情况（报告里 7676/8000 → MAX_TOKENS）轻，默认 thinking 这次只到 4498/8000、没触发 MAX_TOKENS；真实截断已记录在 [`../evals/live-run-2026-10-12.md`](../evals/live-run-2026-10-12.md)，`MAX_TOKENS`→`OutputTruncated`→重试 由单测覆盖。要真复现截断得用更重的输入或完整 DB 版 eval。
+- **经验**：当"端到端"被环境（DB/Docker）挡住时，把验证下沉到**修复真正所在的那一层**（这里是 provider 的 `thinking_config`），既绕开环境，又更直接。改动面在哪，就在哪一层验证。
+- **代码与提交**：探针为 scratchpad 脚本；被验证的实现在 0e2f903（`app/llm/providers.py`）。
+
+### 18.7 截断后原样重试 = 白花一倍钱：让重试真的不一样（合并前 review 发现）
+
+- **现象**：合并前的 review（两名验证者确认）指出——`OutputTruncated` 后网关重试的是**几乎相同**的请求：同样的 `max_output_tokens`、同样的 thinking（tier 没变），只把截断错误塞进通用的 "failed validation" 文案里。条件没变，第二次极可能再截断 → 成本翻倍却无收益。`OutputTruncated` 的 docstring 与 0e2f903 的提交说明都写了 "shorter-answer hint"，但实际并不存在那个 hint。
+- **怎么查的**：读网关 `structured()` 的重试分支——`error = str(e)`（截断消息）被拼进 `f"...failed validation: {error}\nReturn JSON that matches the schema."`，`complete_json` 的 `max_tokens`/`tier` 原样传入。确认"hint"只是把错误回显，既没告诉模型写短，也没降 thinking。
+- **根因**：重试没有改变导致截断的任何条件（输出预算、thinking 量），也没给模型"写短点"的指令。
+- **怎么修**：网关区分"截断重试"和"校验重试"。截断重试：(a) 明确指令 "你上次在输出上限被截断(MAX_TOKENS)，请更简洁：只给 schema 要求的字段、短值、不重复"；(b) 把该次重试的 thinking 压到 `MINIMAL`（新增 `complete_json(..., thinking_level=...)` 覆盖参，provider 用它而非 tier 的档）以腾出输出预算。
+- **怎么证明**：`test_gateway_retries_a_truncated_answer_once_and_logs_why_and_its_tokens` 改为断言**重试实际发了什么**——重试请求含 "Answer more concisely" / "cut off at the model's output limit"，且 `calls[1]["config"].thinking_config.thinking_level == MINIMAL`（首 call 的 thinking_config 为 None）。`uv run pytest tests/test_gemini.py` 44 passed。
+- **经验**：若"重试"不改变失败的成因，就是等额再花一次钱。重试要么换条件（更小输出、更低 thinking），要么换指令；并用测试断言重试**真的**带了这些，而不只是把错误回显。
+- **代码与提交**：`app/llm/gateway.py` 的 `structured()`、`app/llm/providers.py` 的 `complete_json(thinking_level=...)`；提交 0be9140。
+
+### 18.8 `thinking_level` 只有 Gemini 3.x 认：2.5 要的是 `thinking_budget`（合并前 review 发现）
+
+- **现象**：合并前的 review（分歧票）指出——thinking 以 `ThinkingConfig(thinking_level=...)` 发给 `GEMINI_MODEL_*` 指到的任何模型；而 `docs/PROGRESS.md`（312/322/323 行）把 `gemini-2.5-flash` 列为已验证、已定价、可按档覆盖的模型，2.5 系用的是整数 `thinking_budget`，不是 `thinking_level`。给 2.5 发 `thinking_level` 是不支持的字段。
+- **怎么查的**：`grep -rn "gemini-2\.5" docs/` 确认 PROGRESS.md 确实把 2.5 当可配置模型；核对 google-genai 的 `ThinkingConfig` 同时有 `thinking_level`（3.x）和 `thinking_budget`（2.x）两个字段。
+- **根因**：`_thinking_config` 不看模型名，一律发 `thinking_level`。
+- **怎么修**：`_thinking_config(model, tier, override)` 按模型名分流——名字含 `gemini-2.` 的发 `thinking_budget`（MINIMAL→0、LOW→512、MEDIUM→4096、HIGH→16384），其余（3.x 及默认）发 `thinking_level`。默认 `gemini-3.5-flash` 路径不变。
+- **怎么证明**：新增 `test_thinking_is_a_level_for_gemini_3_and_a_budget_for_gemini_2_5`——gemini-3.5-flash 得 `thinking_level=LOW`（budget 为 None），gemini-2.5-flash 得 `thinking_budget=512`（level 为 None）。44 passed。
+- **局限**：2.5 的 budget 档位是合理映射、**未经真实 2.5 live 调用校准**（本机默认用 3.5）；真要用 2.5 建议 live 核一次。
+- **代码与提交**：`app/llm/providers.py` 的 `_thinking_config`；提交 0be9140。
+
+---
+
 ## 附录、kg-qa 子项目
 
 `apps/kg-qa` 是从早先的 AIMed 仓库连同 git 历史一起导入的子项目（医学知识图谱问答，DeepSeek + Neo4j），不属于规格里的 21 个系统。下面三个问题发生在 2026-08，

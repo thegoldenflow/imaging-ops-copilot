@@ -37,6 +37,7 @@ from app.llm.providers import (
     GeminiProvider,
     InvalidOutput,
     MockProvider,
+    OutputTruncated,
     ProviderRefusal,
     ProviderResult,
     ProviderUnavailable,
@@ -83,7 +84,9 @@ def make_provider():
     if settings.llm_provider == "anthropic" and settings.anthropic_api_key:
         return AnthropicProvider(settings.anthropic_api_key, settings.llm_timeout_s)
     if settings.llm_provider == "gemini" and settings.google_agent_platform_api_key:
-        return GeminiProvider(settings.google_agent_platform_api_key, settings.llm_timeout_s)
+        return GeminiProvider(settings.google_agent_platform_api_key, settings.llm_timeout_s, thinking={
+            "reasoning": settings.gemini_thinking_reasoning, "fast": settings.gemini_thinking_fast,
+            "voice": settings.gemini_thinking_voice})
     return MockProvider()
 
 
@@ -115,18 +118,21 @@ class LlmGateway:
         return entry.id_from(settings) if entry is not None else None
 
     def _agent(self, task: str, prompt: Prompt):
-        """The task's registry entry, its model and, when the call may not go ahead, why (UnregisteredAgent if
-        none)."""
+        """The task's registry entry, its model and model tier (the provider tunes by it: Gemini's thinking level)
+        and, when the call may not go ahead, why (UnregisteredAgent if none)."""
         spec = agent_registry.require_agent(task)
         refusal = agent_registry.gate(spec)
         if refusal is None and spec.prompt_version and spec.prompt_version != prompt.version:
             refusal = f"prompt {prompt.version} is not the registered prompt {spec.prompt_version} of {spec.label}"
-        model = self.model_for_agent(spec)
-        if model is None:
-            model = self.model_for(spec.model_policy.tier)
+        entry = agent_models.resolve(spec, self.mode)
+        if entry is not None:
+            model, tier = entry.id_from(settings), entry.tier
+        else:
+            tier = spec.model_policy.tier
+            model = self.model_for(tier)
             refusal = refusal or (f"{spec.label}: no {agent_models.provider_of(self.mode)} model in config/models.yaml "
                                   f"for its model_policy")
-        return spec, model, refusal
+        return spec, model, tier, refusal
 
     @staticmethod
     def _trace(spec, call: LlmCall, input_refs: list[str]) -> str | None:
@@ -201,7 +207,7 @@ class LlmGateway:
         dates of a resource), and re-identifies the output with the same map.
 
         `tier` is superseded by the agent registry's model_policy (the registry is the source of truth)."""
-        spec, model, refusal = self._agent(task, prompt)
+        spec, model, model_tier, refusal = self._agent(task, prompt)
         refs = list(input_refs or []) + [f"Patient/{p.id}" for p in patients or []]
         flags = {"agent_version": spec.version, "eval_status": spec.eval_status.status, "evaluated": spec.evaluated}
 
@@ -223,15 +229,27 @@ class LlmGateway:
         started = time.monotonic()
         tokens_in = tokens_out = 0
         error = None
+        truncated = False
 
         for attempt in range(2):
-            request_text = text if error is None else (
-                f"{text}\n\nYour previous answer failed validation: {error}\nReturn JSON that matches the schema."
-            )
+            if error is None:
+                request_text, retry_thinking = text, None
+            elif truncated:
+                # The previous answer hit the output-token limit. Ask for a shorter answer and cap thinking on the
+                # retry to free the budget, so we do not repeat the same request and truncate (and pay) again.
+                request_text = (f"{text}\n\nYour previous answer was cut off at the model's output limit "
+                                "(finish reason MAX_TOKENS). Answer more concisely: only the fields the schema "
+                                "requires, short values, no repetition, so the whole JSON fits.")
+                retry_thinking = "MINIMAL"
+            else:
+                request_text = (f"{text}\n\nYour previous answer failed validation: {error}\n"
+                                "Return JSON that matches the schema.")
+                retry_thinking = None
             try:
                 result = self.provider.complete_json(
                     task=task, model=model, system=prompt.system, text=request_text, schema=schema,
-                    images=images, attempt=attempt, max_tokens=spec.model_policy.max_tokens,
+                    images=images, attempt=attempt, max_tokens=spec.model_policy.max_tokens, tier=model_tier,
+                    thinking_level=retry_thinking,
                 )
             except ProviderUnavailable as e:
                 call = self._log(task=task, model=model, prompt=prompt, text=text, started=started,
@@ -242,7 +260,10 @@ class LlmGateway:
                                  outcome="needs_human", error=str(e), input_tokens=tokens_in, output_tokens=tokens_out)
                 return done(call, status="needs_human", error=str(e))
             except InvalidOutput as e:
-                error = f"Invalid JSON: {e}"
+                tokens_in += e.input_tokens
+                tokens_out += e.output_tokens
+                truncated = isinstance(e, OutputTruncated)
+                error = str(e) if truncated else f"Invalid JSON: {e}"
                 continue
             tokens_in += result.input_tokens
             tokens_out += result.output_tokens
@@ -266,7 +287,7 @@ class LlmGateway:
         `messages`; this logs the call and re-raises ProviderUnavailable/Refusal (a call the
         agent registry refuses raises ProviderUnavailable, so the caller falls back the same way).
         The tool calls the model asks for go through the Tool Gateway (app/agents/gateway.py)."""
-        spec, model, refusal = self._agent(task, prompt)
+        spec, model, model_tier, refusal = self._agent(task, prompt)
         started = time.monotonic()
         if refusal is not None:
             call = self._log(task=task, model=model, prompt=prompt, text="", started=started, outcome="refused",
@@ -275,7 +296,7 @@ class LlmGateway:
             raise ProviderUnavailable(refusal)
         try:
             result = self.provider.tool_turn(task=task, model=model, system=prompt.system, messages=messages,
-                                             tools=tools, max_tokens=spec.model_policy.max_tokens)
+                                             tools=tools, max_tokens=spec.model_policy.max_tokens, tier=model_tier)
         except (ProviderUnavailable, ProviderRefusal) as e:
             call = self._log(task=task, model=model, prompt=prompt, text=redacted_text, started=started,
                              outcome="unavailable", error=str(e))

@@ -10,6 +10,7 @@ provider converts to and from Gemini's contents and function calls.
 
 import base64
 import json
+import random
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -31,7 +32,20 @@ class ProviderRefusal(Exception):
 
 
 class InvalidOutput(Exception):
-    """Output was not valid JSON."""
+    """Output was not valid JSON. Carries the tokens the failed attempt still billed, so the gateway can
+    account for them when it retries."""
+
+    def __init__(self, message: str, *, input_tokens: int = 0, output_tokens: int = 0) -> None:
+        super().__init__(message)
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+
+
+class OutputTruncated(InvalidOutput):
+    """The model stopped at its output-token limit (Gemini finish reason MAX_TOKENS), often because thinking ate
+    the budget. Its own error so the gateway can retry it differently from malformed JSON — telling the model to
+    answer concisely and capping its thinking on the retry — instead of repeating the identical request and
+    truncating again."""
 
 
 @dataclass
@@ -99,7 +113,7 @@ class MockProvider:
         self.attempts: dict[str, int] = {}
 
     def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0,
-                      max_tokens=8000) -> ProviderResult:
+                      max_tokens=8000, tier=None, thinking_level=None) -> ProviderResult:
         time.sleep(self.latency_s)
         fixture = MOCK_FIXTURES.get(task)
         if fixture is None:
@@ -145,7 +159,7 @@ class AnthropicProvider:
             raise ProviderUnavailable(f"Connection error: {e}") from e
 
     def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0,
-                      max_tokens=8000) -> ProviderResult:
+                      max_tokens=8000, tier=None, thinking_level=None) -> ProviderResult:
         content: list[dict] = [
             {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}}
             for b64, media_type in (images or [])
@@ -170,7 +184,7 @@ class AnthropicProvider:
             input_tokens=resp.usage.input_tokens, output_tokens=resp.usage.output_tokens,
         )
 
-    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024, task=None) -> ProviderResult:
+    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024, task=None, tier=None) -> ProviderResult:
         resp = self._create(model=model, max_tokens=max_tokens, system=system, messages=messages, tools=tools)
         if resp.stop_reason == "refusal":
             raise ProviderRefusal("Model declined the request")
@@ -285,37 +299,82 @@ class GeminiProvider:
     mode = "gemini"
     REFUSAL_REASONS = {"SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "IMAGE_SAFETY",
                        "IMAGE_PROHIBITED_CONTENT", "IMAGE_RECITATION"}
+    # Retry rate limits and transient server/connection failures with exponential backoff, within the call's own
+    # timeout. The 2026-10-12 live run hit 429s under load; a short backoff let the call ride them out.
+    MAX_ATTEMPTS = 4
+    RETRYABLE_CODES = frozenset({429, 500, 502, 503, 504})
+    RETRY_JITTER_S = 0.5
+    MIN_ATTEMPT_S = 5.0  # don't start another attempt with less than this left of the timeout
 
-    def __init__(self, api_key: str, timeout_s: float, client=None) -> None:
+    def __init__(self, api_key: str, timeout_s: float, client=None, thinking: dict | None = None, clock=None) -> None:
+        self.timeout_s = timeout_s
+        # tier ("reasoning"/"fast"/"voice") -> Gemini thinking level name; missing or "DEFAULT" sends none, so the
+        # model keeps its own default. Gemini bills thinking as output and thinks by default (3), which truncated
+        # the documentation agents and slowed the phone agent in the 2026-10-12 live run.
+        self.thinking = thinking or {}
+        self._clock = clock or time  # monotonic() + sleep(); injectable so retries are testable without real waits
         self.client = client or genai.Client(
             vertexai=True,
             api_key=api_key,
             http_options=genai_types.HttpOptions(
                 api_version="v1",
                 timeout=int(timeout_s * 1000),
-                retry_options=genai_types.HttpRetryOptions(attempts=2),
+                retry_options=None,  # this provider retries itself, bounded by the call's timeout (see _generate)
             ),
         )
 
+    def _thinking_config(self, model, tier, override=None):
+        """The ThinkingConfig for a model and tier, or None to leave the model on its own default (no tier, level
+        DEFAULT, or none configured). `override` forces a level (the gateway's concise truncation retry uses it).
+        Gemini 3.x takes a thinking_level; 2.x takes an integer thinking_budget, so a GEMINI_MODEL_* set to
+        gemini-2.5-flash does not receive an unsupported field (PROGRESS.md lists it as a priced option)."""
+        level = override or (self.thinking.get(tier) if tier is not None else None)
+        if not level or level == "DEFAULT":
+            return None
+        if "gemini-2." in str(model or "").lower():
+            budget = {"MINIMAL": 0, "LOW": 512, "MEDIUM": 4096, "HIGH": 16384}[level]
+            return genai_types.ThinkingConfig(thinking_budget=budget)
+        return genai_types.ThinkingConfig(thinking_level=getattr(genai_types.ThinkingLevel, level))
+
+    @staticmethod
+    def _api_error(e: genai_errors.APIError) -> tuple[str, str, bool]:
+        """(message prefix, Google's own detail, retryable?) for an API error. The prefix and detail are kept
+        apart so an "(after N attempts)" note can sit between them."""
+        code = int(e.code or 0)
+        hint = {
+            401: "authentication or permission error: check the API key and API access",
+            403: "authentication or permission error: check the API key and API access",
+            404: "model or endpoint not found: check the model and Vertex endpoint",
+            429: "rate or quota limit reached",
+            402: "payment required: check billing on the Google Cloud project",
+        }.get(code, "request failed")
+        # Keep Google's own message: it names the actual cause.
+        return (f"Agent Platform {code} {hint}", f". Google: {e.message or e.status}",
+                code in GeminiProvider.RETRYABLE_CODES)
+
     def _generate(self, *, model, contents, config):
-        try:
-            return self.client.models.generate_content(model=model, contents=contents, config=config)
-        except genai_errors.APIError as e:  # 4xx incl. 429 rate limit, 5xx
-            code = int(e.code or 0)
-            if code in (401, 403):
-                hint = "authentication or permission error: check the API key and API access"
-            elif code == 404:
-                hint = "model or endpoint not found: check the model and Vertex endpoint"
-            elif code == 429:
-                hint = "rate or quota limit reached"
-            elif code == 402:
-                hint = "payment required: check billing on the Google Cloud project"
-            else:
-                hint = "request failed"
-            # Keep Google's own message: it names the actual cause.
-            raise ProviderUnavailable(f"Agent Platform {code} {hint}. Google: {e.message or e.status}") from e
-        except (httpx.HTTPError, OSError) as e:  # timeouts and network failures
-            raise ProviderUnavailable(f"Connection error: {type(e).__name__}: {e}") from e
+        """Call Gemini, retrying rate limits and transient server/connection failures with exponential backoff.
+        Each attempt is bounded by what is left of the call's timeout; the loop stops once too little remains to
+        start another attempt."""
+        start = self._clock.monotonic()
+        for attempt in range(1, self.MAX_ATTEMPTS + 1):
+            remaining = self.timeout_s - (self._clock.monotonic() - start)
+            cfg = config.model_copy(update={
+                "http_options": genai_types.HttpOptions(timeout=int(max(remaining, 0.0) * 1000))})
+            try:
+                return self.client.models.generate_content(model=model, contents=contents, config=cfg)
+            except genai_errors.APIError as e:  # 4xx incl. 429 rate limit, 5xx
+                prefix, detail, retryable, cause = (*self._api_error(e), e)
+            except (httpx.HTTPError, OSError) as e:  # timeouts and network failures
+                prefix, detail, retryable, cause = f"Connection error: {type(e).__name__}: {e}", "", True, e
+            if retryable and attempt < self.MAX_ATTEMPTS:
+                backoff = 2 ** attempt + random.uniform(0, self.RETRY_JITTER_S)
+                left = self.timeout_s - (self._clock.monotonic() - start)
+                if left - backoff >= self.MIN_ATTEMPT_S:
+                    self._clock.sleep(backoff)
+                    continue
+            suffix = f" (after {attempt} attempts)" if attempt > 1 else ""
+            raise ProviderUnavailable(f"{prefix}{suffix}{detail}") from cause
 
     def _parts(self, resp) -> list:
         feedback = resp.prompt_feedback
@@ -338,7 +397,7 @@ class GeminiProvider:
         return u.prompt_token_count or 0, (u.candidates_token_count or 0) + (u.thoughts_token_count or 0)
 
     def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0,
-                      max_tokens=8000) -> ProviderResult:
+                      max_tokens=8000, tier=None, thinking_level=None) -> ProviderResult:
         contents: list = [
             genai_types.Part.from_bytes(data=base64.b64decode(b64), mime_type=media_type)
             for b64, media_type in (images or [])
@@ -349,23 +408,32 @@ class GeminiProvider:
             max_output_tokens=max_tokens,
             response_mime_type="application/json",
             response_json_schema=gemini_schema(schema),
+            thinking_config=self._thinking_config(model, tier, thinking_level),
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
         ))
         parts = self._parts(resp)
+        tokens_in, tokens_out = self._usage(resp)
+        if _get(resp.candidates[0].finish_reason, "name", resp.candidates[0].finish_reason) == "MAX_TOKENS":
+            u = resp.usage_metadata
+            thoughts = (u.thoughts_token_count or 0) if u is not None else 0
+            raise OutputTruncated(
+                f"stopped at the output limit of {max_tokens} tokens (finish reason MAX_TOKENS; "
+                f"{thoughts} of {tokens_out} output tokens were thinking)",
+                input_tokens=tokens_in, output_tokens=tokens_out)
         body = "".join(p.text for p in parts if p.text and not p.thought)
         try:
             data = json.loads(body)
         except json.JSONDecodeError as e:
-            raise InvalidOutput(str(e)) from e
-        tokens_in, tokens_out = self._usage(resp)
+            raise InvalidOutput(str(e), input_tokens=tokens_in, output_tokens=tokens_out) from e
         return ProviderResult(data=data, model=resp.model_version or model,
                               input_tokens=tokens_in, output_tokens=tokens_out)
 
-    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024, task=None) -> ProviderResult:
+    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024, task=None, tier=None) -> ProviderResult:
         resp = self._generate(model=model, contents=gemini_contents(messages), config=genai_types.GenerateContentConfig(
             system_instruction=system,
             max_output_tokens=max_tokens,
             tools=gemini_tools(tools),
+            thinking_config=self._thinking_config(model, tier),
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
         ))
         blocks = blocks_from_gemini(self._parts(resp))

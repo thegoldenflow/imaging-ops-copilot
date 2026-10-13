@@ -24,6 +24,8 @@ _load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 # Verified with this Google Cloud project through the Agent Platform endpoint
 # after a successful gemini-2.5-flash smoke test. Used for every tier unless overridden.
 GEMINI_DEFAULT_MODEL = "gemini-3.5-flash"
+# Gemini thinking levels (GEMINI_THINKING_*); DEFAULT sends none, so the model uses its own default.
+GEMINI_THINKING_LEVELS = ("MINIMAL", "LOW", "MEDIUM", "HIGH", "DEFAULT")
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,12 @@ class Settings:
     gemini_model_reasoning: str
     gemini_model_fast: str
     gemini_model_voice: str
+    # Thinking level per tier. Gemini counts thinking against the output limit and thinks by default, which
+    # truncated the documentation agents and slowed the phone agent in the 2026-10-12 live run.
+    gemini_thinking_reasoning: str
+    gemini_thinking_fast: str
+    gemini_thinking_voice: str
+    # Per model call, retries included.
     llm_timeout_s: float
     seed: int
     # When set, demo login requires this passcode (for public deployments).
@@ -96,6 +104,12 @@ def load_settings() -> Settings:
     if fhir_auth_mode not in ("none", "smart_backend"):
         raise ValueError(f"FHIR_AUTH_MODE must be none or smart_backend, not {fhir_auth_mode!r}")
     app_mode = os.getenv("APP_MODE", "demo").strip().lower()
+    thinking = {}
+    for tier, default in (("reasoning", "LOW"), ("fast", "LOW"), ("voice", "MINIMAL")):
+        name = f"GEMINI_THINKING_{tier.upper()}"
+        thinking[tier] = os.getenv(name, default).strip().upper()
+        if thinking[tier] not in GEMINI_THINKING_LEVELS:
+            raise ValueError(f"{name} must be one of {', '.join(GEMINI_THINKING_LEVELS)}, not {thinking[tier]!r}")
     if app_mode not in ("demo", "prod"):
         raise ValueError(f"APP_MODE must be demo or prod, not {app_mode!r}")
     return Settings(
@@ -108,6 +122,9 @@ def load_settings() -> Settings:
         gemini_model_reasoning=os.getenv("GEMINI_MODEL_REASONING", GEMINI_DEFAULT_MODEL),
         gemini_model_fast=os.getenv("GEMINI_MODEL_FAST", GEMINI_DEFAULT_MODEL),
         gemini_model_voice=os.getenv("GEMINI_MODEL_VOICE", GEMINI_DEFAULT_MODEL),
+        gemini_thinking_reasoning=thinking["reasoning"],
+        gemini_thinking_fast=thinking["fast"],
+        gemini_thinking_voice=thinking["voice"],
         llm_timeout_s=float(os.getenv("LLM_TIMEOUT_S", "30")),
         seed=int(os.getenv("SEED", "42")),
         demo_passcode=os.getenv("DEMO_PASSCODE") or None,
