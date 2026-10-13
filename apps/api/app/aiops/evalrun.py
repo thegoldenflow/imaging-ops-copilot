@@ -20,6 +20,11 @@ model calls that validated), grounding_rate (cases whose evidence references all
 evidence), task_success (cases that matched the expectation: the pass rate compared with the threshold),
 human_override_rate (from the production traces: decided outputs a person corrected or rejected), latency p50 / p95
 (model time per case) and cost_per_case (the gateway's cost; list-price estimate for mock calls, app/aiops/cost.py).
+
+These count the agent's own model calls. When a suite's harness also calls an agent that is not one of the suite's
+(the extraction before each triage call, the reconciliation in the order review and documentation suites), each entry
+of that suite carries the suite's `pipeline` block: the other agents' calls, and the whole case across every agent
+(model calls, cost per case, latency); each case result carries `pipeline_cost_usd` and `pipeline_latency_ms`.
 """
 
 from __future__ import annotations
@@ -226,6 +231,45 @@ def _snapshots(col, entry) -> None:
         case["traces"] = snaps
 
 
+def _pipeline(suite, result, col) -> tuple[dict | None, dict]:
+    """The whole case across every agent the suite runs, when the harness also calls an agent that is not one of
+    the suite's (the extraction before triage, the reconciliation beside order review and the discharge documents):
+    those calls are in no entry's metrics. The agents' own metrics stay as they are (their cost gate compares an
+    agent with its own model's max). The block is the suite's, the same on each of its entries; with it, the cost
+    and model time of each case across all its calls. (None, {}) when every call is a suite agent's."""
+    if all(c.agent_id in suite.agents for c in col.calls):
+        return None, {}
+    costs: dict[str | None, float] = defaultdict(float)
+    latencies: dict[str | None, int] = defaultdict(int)
+    others: dict[str, list] = defaultdict(list)
+    estimated = False
+    for c in col.calls:
+        usd, est = cost.call_cost(c.mode, c.model, c.cost_usd, c.tokens_in, c.tokens_out)
+        costs[c.case_id] += usd
+        latencies[c.case_id] += c.latency_ms
+        estimated |= est
+        if c.agent_id not in suite.agents:
+            others[c.agent_id].append((c, usd))
+    cases = {r["id"] for r in result.rows}
+    tagged = [v for k, v in latencies.items() if k is not None]
+    block = {
+        "other_agents": {agent: {"model_calls": len(v),
+                                 "failed_calls": sum(c.outcome not in ("ok", "retried_ok") for c, _ in v),
+                                 "cost_usd": round(sum(usd for _, usd in v), 6),
+                                 "tokens_in": sum(c.tokens_in for c, _ in v),
+                                 "tokens_out": sum(c.tokens_out for c, _ in v),
+                                 "cases": len({c.case_id for c, _ in v if c.case_id is not None})}
+                         for agent, v in sorted(others.items())},
+        "model_calls": len(col.calls), "cases": len(cases),
+        "cost_per_case_usd": round(sum(costs.values()) / len(cases), 6) if cases else None,
+        "cost_estimated": estimated,
+        "latency_p50_ms": _pct(tagged, 0.5), "latency_p95_ms": _pct(tagged, 0.95),
+    }
+    per_case = {k: {"pipeline_cost_usd": round(costs[k], 6), "pipeline_latency_ms": latencies[k]}
+                for k in costs if k is not None}
+    return block, per_case
+
+
 def run_suite(suite, specs, *, gateway, store, overrides, variant, live, on_case=None) -> dict[str, dict]:
     from app.llm.gateway import get_gateway, set_gateway
 
@@ -239,8 +283,14 @@ def run_suite(suite, specs, *, gateway, store, overrides, variant, live, on_case
             with collect.Collector(on_case=on_case) as col:
                 result = suite.run(suites.Context(store=st, live=live))
                 set_gateway(gateway)  # some harnesses reset the gateway when they finish
+                pipeline, per_case = _pipeline(suite, result, col)
                 for spec in specs:
                     entry = _agent_entry(spec, suite, result, col, gateway, overrides, variant)
+                    if pipeline is not None:
+                        entry["pipeline"] = pipeline
+                        for case in entry["case_results"]:
+                            case.update(per_case.get(case["id"], {"pipeline_cost_usd": None,
+                                                                  "pipeline_latency_ms": None}))
                     if st is not None:
                         _snapshots(col, entry)
                     out[spec.agent_id] = entry

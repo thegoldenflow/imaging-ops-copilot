@@ -8,9 +8,9 @@ import { Fragment, useState } from "react";
 import { Badge, Card, EmptyState, ErrorState, Loading, Tabs } from "../../components/ui";
 import { api } from "../../lib/api";
 import { dateTime } from "../../lib/format";
-import { metric, METRIC_LABEL, NONE, rate, short, STATUS_TONE } from "./fmt";
+import { metric, METRIC_LABEL, ms, NONE, rate, short, STATUS_TONE, usd } from "./fmt";
 import { TraceView } from "./TracePanel";
-import type { CaseResult, EvalAgent, EvalCenter as EvalCenterT, RunAgent, RunRow, SixKey } from "./types";
+import type { CaseResult, EvalAgent, EvalCenter as EvalCenterT, Pipeline, RunAgent, RunRow, SixKey } from "./types";
 
 const SIX: SixKey[] = ["schema_validity", "grounding_rate", "task_success", "human_override_rate", "latency_p50_ms",
   "latency_p95_ms", "cost_per_case_usd"];
@@ -141,6 +141,7 @@ function AgentEvals({ row, agent, onBack }: { row?: EvalAgent; agent: string; on
             {row.extra && Object.keys(row.extra).length > 0 && (
               <p className="text-xs text-slate-500">Module metrics: {Object.entries(row.extra).map(([k, v]) => `${k.replaceAll("_", " ")} ${short(v)}`).join(" · ")}</p>
             )}
+            {row.pipeline && <PipelineLine p={row.pipeline} />}
           </div>
         )}
       </Card>
@@ -175,6 +176,18 @@ function AgentEvals({ row, agent, onBack }: { row?: EvalAgent; agent: string; on
         </>
       )}
     </div>
+  );
+}
+
+// The suite also runs agents that are not this one on each case: their calls are outside the metrics above.
+function PipelineLine({ p }: { p: Pipeline }) {
+  const others = Object.entries(p.other_agents).map(([a, o]) =>
+    `${a} ${o.model_calls} calls${o.failed_calls ? ` (${o.failed_calls} failed)` : ""}, ${usd(o.cost_usd, p.cost_estimated)}`);
+  return (
+    <p className="text-xs text-slate-500" data-testid="eval-agent-pipeline">
+      Whole case, every agent the suite runs: {p.model_calls} model calls, {usd(p.cost_per_case_usd, p.cost_estimated)} per
+      case, latency p50 {ms(p.latency_p50_ms)} / p95 {ms(p.latency_p95_ms)}. Not in this agent's metrics: {others.join(" · ")}.
+    </p>
   );
 }
 
@@ -213,6 +226,8 @@ function CaseDetail({ run, agent, caseId, onClose }: { run: string; agent: strin
           <dt className="text-slate-500">Expected</dt><dd className="break-all">{short(c.expected)}</dd>
           <dt className="text-slate-500">Got</dt><dd className="break-all">{short(c.got)}</dd>
           <dt className="text-slate-500">Prompt, model</dt><dd>{c.prompt_version ?? NONE} · {c.model ?? NONE} ({c.mode})</dd>
+          {c.pipeline_cost_usd !== undefined && <><dt className="text-slate-500">Whole case</dt>
+            <dd data-testid="eval-case-pipeline">{usd(c.pipeline_cost_usd, c.mode === "mock")} · {ms(c.pipeline_latency_ms)} model time, every agent (this agent {usd(c.cost_usd, c.mode === "mock")} · {ms(c.latency_ms)})</dd></>}
           <dt className="text-slate-500">Runs</dt><dd>{c.run_ids.join(", ") || NONE}</dd>
         </dl>
       </Card>

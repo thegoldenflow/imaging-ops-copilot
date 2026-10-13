@@ -183,7 +183,8 @@ def eval_center(user: StaffUser = Depends(require_roles(*EVALS))):
                      "latest_run": run.get("run_id"), "latest_mode": entry.get("mode") or run.get("mode"),
                      "metrics": {k: (entry.get("metrics") or {}).get(k) for k in SIX} if entry else None,
                      "cost_estimated": (entry.get("metrics") or {}).get("cost_estimated"),
-                     "status": entry.get("status"), "gates": entry.get("gates"), "extra": entry.get("extra")})
+                     "status": entry.get("status"), "gates": entry.get("gates"), "extra": entry.get("extra"),
+                     "pipeline": entry.get("pipeline")})
     platform = {name: suites.platform_report(name) for name in suites.PLATFORM_REPORTS}
     return {"agents": rows, "platform": platform,
             "command": "cd apps/api && uv run python -m app.aiops.evalrun [AGENT]"}

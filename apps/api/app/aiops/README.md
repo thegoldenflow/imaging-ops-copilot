@@ -32,7 +32,8 @@ manager, medical director; the radiologist sees the Eval Center, Compare, Regist
   suite, source, agent and prompt version, prompt hash, model, threshold, the six common metrics (`schema_validity`,
   `grounding_rate`, `task_success`, `human_override_rate`, `latency_p50_ms` / `latency_p95_ms`,
   `cost_per_case_usd`), the module's extra metrics and gates, the verdict, per-case results and the traces of failing
-  cases; platform suites (injection, workflows, simulator). Field list: `docs/data-model.md`, "AI Ops (WP10b)".
+  cases; for a suite that also calls agents that are not its own, the whole case (`pipeline`); platform suites
+  (injection, workflows, simulator). Field list: `docs/data-model.md`, "AI Ops (WP10b)".
 - Effective eval status (`release.derive`): `status` passed / pending / failed, `run_id`, `task_success`,
   `threshold`, `mode`, `note` — what the runtime watermarks (**Not evaluated**, **Eval failed**) or refuses in prod.
 - Overview (`observe.overview`): the six cards, the agent table, dimension tables and the failure list.
@@ -52,6 +53,8 @@ summary of every agent's latest result is [evals/README.md](../../../../evals/RE
   output carries **Not evaluated**; a mock run never passes an agent except a pipeline eval (de-identification).
 - The human ratings (Control Tower narratives, documentation) stay outside the runner; their sheets are unscored.
 - A report-only suite (a module's own report: `call_center`, `followup_calls`) has no per-case cost or latency.
+- The whole-case cost of a suite that also runs other agents (`pipeline`) is reported, not gated: the
+  `cost_per_case` gate compares an agent's own calls with its own model's max.
 - `followup_calls`: the newest run that names it (`run-2026-10-10T063931`) found no eval set, so its release status
   says "not evaluated in the latest run" although an earlier run judged its module gates; a new run of the agent fixes
   it (see evals/README.md).
