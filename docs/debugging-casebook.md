@@ -824,7 +824,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** 平台（LLM 调用层）。
 - **来源：** 2026-10-12 合并后真实测试（`run-2026-10-12T225622`）的失败分析，复核 2/2；修复和重跑在 2026-10-13 的侧会话（分支 `claude/trusting-hypatia-72ce4a`）。
 - **代码：** `apps/api/app/llm/providers.py`（`GeminiProvider.ATTEMPT_SHARE`、`_generate`）、`apps/api/app/agents/registry.py`（`ModelPolicy.timeout_s`）、`apps/api/config/agents/{discharge_summary,patient_instructions,nursing_handoff}.yaml`、`apps/api/app/llm/gateway.py`、`apps/api/tests/test_gemini.py`。
-- **提交：** 分支 `claude/trusting-hypatia-72ce4a`（等 owner 确认后提交）。
+- **提交：** `2a92b10`（分支 `claude/trusting-hypatia-72ce4a`）。
 
 ### 3.12 文书只过了 10/30：用"单次调用失败率"推算整份文书的通过率
 
@@ -869,7 +869,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** 平台（LLM 调用层）/ imaging（系统 4 前台电话）。
 - **来源：** 2026-10-13 侧会话的 A/B（`evals/runs/voice-thinking-ab/`，未提交）。
 - **代码：** `apps/api/app/core/config.py`（`GEMINI_THINKING_VOICE` 默认值）、`apps/api/app/modules/frontdesk/agent.py`（`LlmAgent`）。
-- **提交：** 分支 `claude/trusting-hypatia-72ce4a`（等 owner 确认后提交）。
+- **提交：** `2a92b10`（分支 `claude/trusting-hypatia-72ce4a`）。
 
 ### 3.15 重试救回 2/3，剩下的是"连环卡顿"：代码没动的 call_summary 反而掉分
 
