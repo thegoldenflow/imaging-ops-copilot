@@ -74,7 +74,8 @@ def _evaluated(agent_id: str, prompt_version: str | None) -> tuple[dict, dict] |
 def _gates(entry: dict) -> tuple[str, list[str]]:
     gates = entry.get("gates") or {}
     failed = [name for name, g in gates.items() if not g.get("passed")]
-    detail = [f"{name} {_fmt(g.get('value'))} (bar {_fmt(g.get('threshold'))}){'' if g.get('passed') else ' FAILED'}"
+    detail = [f"{name} {_fmt(g.get('value'))} (bar {_fmt(g.get('threshold'))})"
+              + ("" if g.get("passed") else " FAILED" + (f": {g['reason']}" if g.get("reason") else ""))
               for name, g in gates.items()]
     summary = f"{len(gates) - len(failed)}/{len(gates)}" if gates else "none"
     return summary, detail

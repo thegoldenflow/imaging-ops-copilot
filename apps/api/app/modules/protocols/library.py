@@ -78,7 +78,7 @@ MODALITY_WORDS = {
     Modality.MRI: r"\bmri\b|\bmr\b|magnetic",
     Modality.CT: r"\bct\b|computed tomography|cat scan",
     Modality.US: r"ultrasound|\bus\b|doppler|sonogra",
-    Modality.XR: r"x-ray|xray|radiograph|\bxr\b",
+    Modality.XR: r"x-ray|xray|radiograph|\b[ac]?xr\b",  # CXR, AXR: chest and abdominal X-ray
 }
 
 

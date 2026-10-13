@@ -283,8 +283,10 @@ def _order_review_run(ctx: Context) -> SuiteResult:
              "grounded": r["grounded"], "expected": r["expected"], "got": r["predicted"],
              "latency_ms": r["latency_ms"]} for r in report["results"]]
     m = report["metrics"]
-    return SuiteResult(rows=rows, extra={"order_review": {k: m[k] for k in ("precision", "recall", "tp", "fp", "fn",
-                                                                            "latency_p50_ms", "latency_p95_ms")}},
+    indication = m["new_without_indication"]  # the reconciliation's "new without indication" call on new orders
+    extra = {**{k: m[k] for k in ("precision", "recall", "tp", "fp", "fn", "latency_p50_ms", "latency_p95_ms")},
+             **{f"new_without_indication_{k}": v for k, v in indication.items()}, "per_type": report["per_type"]}
+    return SuiteResult(rows=rows, extra={"order_review": extra},
                        gates={"order_review": {k: _gate(m[k], report["gates"][k], m[k] >= report["gates"][k])
                                                for k in report["gates"]}},
                        notes="A case passes when the flagged concern types equal the labels (no miss, no extra) with a "
@@ -371,14 +373,23 @@ def _documentation_run(ctx: Context) -> SuiteResult:
     def gates(*names):
         return {n: _gate(m.get(n, ""), "gate", g[n]) for n in names}
 
+    def bilingual() -> dict:  # the ratio counts only over enough non-English documents: the row says over how many
+        n, least = m["bilingual_documents"], doc.MIN_BILINGUAL_DOCUMENTS
+        row = _gate(m["bilingual_consistency"], f">= {doc.GATES['bilingual_consistency']} over >= {least} "
+                    "non-English documents", g["bilingual_consistency"]) | {"documents": n, "min_documents": least}
+        if n < least:
+            row["reason"] = f"{n} non-English instructions drafted; the gate needs {least}"
+        return row
+
     return SuiteResult(rows=rows, extra={
         "discharge_summary": {k: m[k] for k in ("raw_hallucination_rate", "validator_recall",
                                                 "untraceable_after_validator", "summary_seconds_p50")},
-        "patient_instructions": {k: m[k] for k in ("fk_grade_mean", "zh_terms_explained", "bilingual_consistency")},
+        "patient_instructions": {k: m[k] for k in ("fk_grade_mean", "zh_terms_explained", "bilingual_consistency",
+                                                   "bilingual_documents")},
         "nursing_handoff": {"handoff_red": m["handoff_red"]}},
         gates={"discharge_summary": gates("untraceable_after_validator", "validator_recall", "schema_validity",
                                           "injected_blocked"),
-               "patient_instructions": gates("bilingual_consistency"),
+               "patient_instructions": {"bilingual_consistency": bilingual()},
                "nursing_handoff": {"automated_proxies_mean_ge_4": _gate(m["automated_proxies"]["handoff"], ">= 4",
                                                                         g["handoff_proxies_mean_ge_4"])}},
         notes="30 synthetic stays through the real path: summary (traceable items, signed), bilingual instructions "

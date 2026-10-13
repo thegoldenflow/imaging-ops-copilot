@@ -1,9 +1,10 @@
 """What an eval run's model calls and agent runs were, case by case (used by app/aiops/evalrun.py).
 
 The runner installs a `CollectingGateway` (the normal LLM gateway, mock or live) for the duration of a suite. Every
-model call it logs and every trace it joins or writes is recorded with the case in progress. Harnesses mark the
-case they start with `mark(case_id)` (a no-op outside the runner), or the runner's adapters do it for them, so the
-existing per-module harnesses need no other change.
+model call it logs and every trace it joins or writes is recorded with the case in progress and, for a trace, the
+agent whose run it is (a suite runs several agents on the same case). Harnesses mark the case they start with
+`mark(case_id)` (a no-op outside the runner), or the runner's adapters do it for them, so the existing per-module
+harnesses need no other change.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from __future__ import annotations
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 
+from app.agents import trace as agent_trace
 from app.llm.gateway import LlmGateway
 
 _case: ContextVar[str | None] = ContextVar("eval_case", default=None)
@@ -47,6 +49,7 @@ class CallRecord:
 class Collector:
     calls: list[CallRecord] = field(default_factory=list)
     runs: dict[str, str | None] = field(default_factory=dict)  # run id -> case id
+    run_agents: dict[str, str] = field(default_factory=dict)  # run id -> the agent whose run it is
     on_case: object = None  # called with each case id as it starts (a workflow activity's heartbeat)
 
     def __enter__(self) -> "Collector":
@@ -79,4 +82,6 @@ class CollectingGateway(LlmGateway):
         run_id = super()._trace(spec, call, input_refs)
         if run_id and (c := active()) is not None:
             c.runs.setdefault(run_id, current())
+            # A call joins the agent run in progress (whose agent may call another one on its way), or is its own run.
+            c.run_agents.setdefault(run_id, (agent_trace.active() or spec).agent_id)
         return run_id

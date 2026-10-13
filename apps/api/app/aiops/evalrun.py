@@ -40,6 +40,8 @@ from app.aiops import collect, cost, release, runs, suites
 
 OVERRIDE_DECISIONS = frozenset({"reject", "rejected", "corrected", "modify", "modified", "edited"})
 TRIM = 600
+MAX_TRACES = 10  # traces kept per failing case (a phone call has a run per caller turn)
+ANSWERED = ("ok", "retried_ok")
 
 
 # ---------- helpers ----------
@@ -188,12 +190,19 @@ def _agent_entry(spec, suite, result, col, gateway, overrides, variant) -> dict:
                                   "passed": metrics["cost_per_case_usd"] <= entry_model.max_cost_per_case}
     case_results = []
     for r in rows:
+        case_runs = sorted(k for k, v in col.runs.items() if v == r["id"])
         case_results.append({"id": r["id"], "source": r.get("source", "authored"), "passed": bool(r["passed"]),
                              "schema_valid": r.get("schema_valid"), "grounded": r.get("grounded"),
                              "latency_ms": latencies.get(r["id"]) if r["id"] in latencies else r.get("latency_ms"),
                              "cost_usd": round(costs[r["id"]], 6) if r["id"] in costs else None,
                              "expected": _trim(r.get("expected")), "got": _trim(r.get("got")),
-                             "run_ids": sorted(k for k, v in col.runs.items() if v == r["id"])})
+                             # the model calls of this agent that did not answer, with the provider's reason
+                             "call_errors": [{"outcome": c.outcome, "error": c.error}
+                                             for c in by_case.get(r["id"], []) if c.outcome not in ANSWERED],
+                             # this agent's runs; the other agents' runs of the same case (a suite can run several
+                             # agents per case: a pipeline step before this one, or the next agent after it)
+                             "run_ids": [k for k in case_runs if col.run_agents.get(k) == agent],
+                             "related_run_ids": [k for k in case_runs if col.run_agents.get(k) != agent]})
     entry = {
         "suite": suite.id, "suite_kind": suite.kind, "suite_title": suite.title, "source": suite.source,
         "agent_version": spec.version, "kind": spec.kind, "risk_tier": spec.risk_tier,
@@ -210,20 +219,40 @@ def _agent_entry(spec, suite, result, col, gateway, overrides, variant) -> dict:
     return entry
 
 
+def _failed(trace) -> bool:
+    """A run that went wrong on its own terms: it did not complete, a model call did not answer or a tool failed."""
+    return (trace.outcome not in ("completed", "running") or any(c.status not in ANSWERED for c in trace.llm_calls)
+            or any(t.status in ("refused", "failed") for t in trace.tool_calls))
+
+
+def pick_traces(own: list, related: list) -> tuple[list, int]:
+    """The traces kept for a failing case, in the order the runs ran, and how many were left out.
+
+    The agent's failing runs first, then its other runs (every turn of a phone call), up to MAX_TRACES. When none of
+    its own runs failed (or it has none, because a pipeline step before it failed), the other agents' failing runs of
+    the case too: the failure is there."""
+    failing = [t for t in own if _failed(t)]
+    picked = failing + [t for t in own if not _failed(t)]
+    if not failing:
+        picked += [t for t in related if _failed(t)]
+    return sorted(picked[:MAX_TRACES], key=lambda t: t.run_id), max(0, len(picked) - MAX_TRACES)
+
+
 def _snapshots(col, entry) -> None:
     """The traces of the failing cases, captured before the transaction is rolled back (6.6: any failure reaches
     its trace)."""
     from app.agents import trace as traces
 
+    def found(run_ids: list[str]) -> list:
+        return [t for t in map(traces.get, run_ids) if t is not None]
+
     for case in entry["case_results"]:
-        if case["passed"] or not case["run_ids"]:
+        if case["passed"] or not (case["run_ids"] or case["related_run_ids"]):
             continue
-        snaps = []
-        for run_id in case["run_ids"][:3]:
-            t = traces.get(run_id)
-            if t is not None:
-                snaps.append(t.model_dump(mode="json"))
-        case["traces"] = snaps
+        kept, dropped = pick_traces(found(case["run_ids"]), found(case["related_run_ids"]))
+        case["traces"] = [t.model_dump(mode="json") for t in kept]
+        if dropped:
+            case["traces_dropped"] = dropped
 
 
 def run_suite(suite, specs, *, gateway, store, overrides, variant, live, on_case=None) -> dict[str, dict]:

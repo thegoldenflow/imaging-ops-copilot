@@ -4,6 +4,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
+import { Fragment } from "react";
 import { Badge, Card, ErrorState, Loading } from "../../components/ui";
 import { api } from "../../lib/api";
 import { dateTime } from "../../lib/format";
@@ -79,11 +80,14 @@ export function TraceView({ trace: t, failures, cost, estimated, header, modelEn
           <thead className="text-slate-500"><tr><th className="py-1">Call</th><th>Agent</th><th>Model</th><th>Prompt</th><th>Status</th><th>Tokens</th><th>Latency</th></tr></thead>
           <tbody>
             {t.llm_calls.map((c) => (
-              <tr key={c.call_id} className="border-t border-slate-100">
-                <td className="py-1 font-mono">{c.call_id}</td><td>{c.agent_id}</td><td className="font-mono">{c.model}</td>
-                <td className="font-mono">{c.prompt_version}</td><td><Badge tone={STATUS_TONE[c.status] ?? "slate"}>{c.status}</Badge></td>
-                <td>{c.tokens_in} / {c.tokens_out}</td><td>{ms(c.latency_ms)}</td>
-              </tr>
+              <Fragment key={c.call_id}>
+                <tr className="border-t border-slate-100">
+                  <td className="py-1 font-mono">{c.call_id}</td><td>{c.agent_id}</td><td className="font-mono">{c.model}</td>
+                  <td className="font-mono">{c.prompt_version}</td><td><Badge tone={STATUS_TONE[c.status] ?? "slate"}>{c.status}</Badge></td>
+                  <td>{c.tokens_in} / {c.tokens_out}</td><td>{ms(c.latency_ms)}</td>
+                </tr>
+                {c.error && <tr><td colSpan={7} className="break-all pb-1 text-red-700">{c.error}</td></tr>}
+              </Fragment>
             ))}
           </tbody>
         </table>

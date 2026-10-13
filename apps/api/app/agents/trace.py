@@ -8,11 +8,12 @@ embedded agent's model call (the imaging systems) gets a one-call trace from the
 LLM gateway. 6.5 workflows and the 6.6 AI Ops page read traces; there is no other log.
 
 Traces hold references and hashes only (resource ids, args hashes), never
-arguments or text. When a run writes FHIR resources, a Provenance
-`prov-<run_id>` records them as targets with the agent (Device: agent_id and
-version) as author, the on-behalf-of user, the input resources as entities and
-the prompt version, model and run id as extensions; a later signature adds the
-signer. Every resource an agent writes carries the extension `ai-run`, so any
+arguments or text; a model call that failed keeps the error it failed with (the
+provider's message, the refusal or the validation error, as on its LlmCall).
+When a run writes FHIR resources, a Provenance `prov-<run_id>` records them as
+targets with the agent (Device: agent_id and version) as author, the
+on-behalf-of user, the input resources as entities and the prompt version,
+model and run id as extensions; a later signature adds the signer. Every resource an agent writes carries the extension `ai-run`, so any
 output leads back to its trace and Provenance (`lineage`).
 """
 
@@ -62,6 +63,7 @@ class LlmCallRecord(BaseModel):
     tokens_out: int = 0
     cost_usd: float = 0.0
     latency_ms: int = 0
+    error: str | None = None  # why the call failed (a 504, 429, connection error, refusal or invalid output)
 
 
 class AgentTrace(BaseModel):
