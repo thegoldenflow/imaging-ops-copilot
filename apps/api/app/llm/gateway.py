@@ -140,7 +140,7 @@ class LlmGateway:
         record = agent_trace.LlmCallRecord(
             call_id=call.id, agent_id=spec.agent_id, model=call.model, prompt_version=call.prompt_version,
             status=call.outcome, tokens_in=call.input_tokens, tokens_out=call.output_tokens, cost_usd=call.cost_usd,
-            latency_ms=call.latency_ms)
+            latency_ms=call.latency_ms, error=call.error)
         active = agent_trace.active()
         if active is not None:
             active.add_llm_call(record)

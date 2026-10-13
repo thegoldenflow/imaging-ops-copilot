@@ -136,7 +136,7 @@ function AgentEvals({ row, agent, onBack }: { row?: EvalAgent; agent: string; on
               </div>
             )}
             {row.gates && Object.keys(row.gates).length > 0 && (
-              <div className="flex flex-wrap gap-1">{Object.entries(row.gates).map(([k, g]) => <Badge key={k} tone={g.passed ? "green" : "red"}>{k}: {short(g.value)} / {short(g.threshold)}</Badge>)}</div>
+              <div className="flex flex-wrap gap-1">{Object.entries(row.gates).map(([k, g]) => <Badge key={k} tone={g.passed ? "green" : "red"}>{k}: {short(g.value)} / {short(g.threshold)}{!g.passed && g.reason ? ` (${g.reason})` : ""}</Badge>)}</div>
             )}
             {row.extra && Object.keys(row.extra).length > 0 && (
               <p className="text-xs text-slate-500">Module metrics: {Object.entries(row.extra).map(([k, v]) => `${k.replaceAll("_", " ")} ${short(v)}`).join(" · ")}</p>
@@ -214,7 +214,11 @@ function CaseDetail({ run, agent, caseId, onClose }: { run: string; agent: strin
           <dt className="text-slate-500">Got</dt><dd className="break-all">{short(c.got)}</dd>
           <dt className="text-slate-500">Prompt, model</dt><dd>{c.prompt_version ?? NONE} · {c.model ?? NONE} ({c.mode})</dd>
           <dt className="text-slate-500">Runs</dt><dd>{c.run_ids.join(", ") || NONE}</dd>
+          {(c.related_run_ids ?? []).length > 0 && <><dt className="text-slate-500">Other agents' runs</dt><dd>{c.related_run_ids!.join(", ")}</dd></>}
+          {(c.call_errors ?? []).length > 0 && <><dt className="text-slate-500">Model errors</dt>
+            <dd className="break-all text-red-700" data-testid="eval-case-call-errors">{c.call_errors!.map((e) => `${e.outcome}: ${e.error ?? NONE}`).join(" · ")}</dd></>}
         </dl>
+        {!!c.traces_dropped && <p className="mt-1 text-xs text-slate-500">{c.traces_dropped} more runs of this case were not captured.</p>}
       </Card>
       {(c.traces ?? []).length === 0 ? <Card><EmptyState title="No trace captured for this case" hint="Traces are kept for failing cases of suites that run in the runner's transaction." /></Card> :
         (c.traces ?? []).map((t) => <TraceView key={t.run_id} trace={t} captured />)}

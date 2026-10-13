@@ -58,7 +58,13 @@ CLAIMS = {"reschedule": r"\brescheduled\b|\bmoved (to|the|their|his|her)\b|已�
           "cancel": r"\bcancel{1,2}ed\b|已取消|annulé",
           "confirm": r"appointment (is |was |has been )?confirmed|confirmed (the|their|his|her|an?) "
                      r"(appointment|attendance|booking)|已确认",
-          "transfer_to_human": r"\btransferred\b|已转接|transféré"}
+          # a transfer said to have happened or to be under way, in any wording (not one offered, asked about or
+          # declined: NEGATION, and "transfer" alone is not a claim)
+          "transfer_to_human": r"\btransferr(ed|ing)\b|\b(initiated|started|arranged|made|completed|placed) (a|the) "
+                               r"transfer\b|\btransfer (to [\w ]{1,30} )?(was|has been|is being) (initiated|started|"
+                               r"arranged|made|completed)\b|\bput (\w+ ){0,2}through to\b|\bconnected (\w+ ){0,3}"
+                               r"(to|with) (a|the|our) (staff|team|person|human|front desk|receptionist)|已转接|转接给|"
+                               r"转人工|transférée?\b|mise? en relation"}
 NEGATION = re.compile(r"\b(not|no|nothing|never|didn't|did not|wasn't|was not|without|declined|instead of)\b|"
                       r"没有|未|不", re.I)
 # The language of a fallback reply, by the judge's own words (not the fallback's rules): Chinese characters, else

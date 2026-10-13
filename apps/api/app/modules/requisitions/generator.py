@@ -160,6 +160,9 @@ def generate(rng: random.Random, patient: Patient, referrer: Referrer, case: Cas
         urgency = rng.choices(["urgent", "unspecified"], weights=[0.7, 0.3])[0]
     else:
         urgency = rng.choices(["routine", "unspecified"], weights=[0.6, 0.4])[0]
+    # The urgency the referrer states: the drawn Priority line or sentence, or the exam text itself ("MRI lumbar spine
+    # urgent"). Derived after the draw, so the random stream (and every other generated case) stays the same.
+    stated_urgency = "urgent" if urgency == "unspecified" and "urgent" in exam_text.lower() else urgency
     history_items = [h for h in (history, implant_text) if h]
     style = style or rng.choices(["form", "letter"], weights=[0.7, 0.3])[0]
     pronoun = "She" if patient.sex == "F" else "He"
@@ -201,6 +204,6 @@ def generate(rng: random.Random, patient: Patient, referrer: Referrer, case: Cas
         exam_code=protocol.exam_code, protocol_id=protocol.id, priority=case.priority, red_flags=case.red_flags,
         contrast=protocol.contrast, modality=str(protocol.modality), renal_risk=renal,
         contrast_allergy=severity if contrast_allergy else None, implant=implant, prior_facility=prior_facility,
-        stated_urgency=urgency, style=style,
+        stated_urgency=stated_urgency, style=style,
     )
     return text, labels

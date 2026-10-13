@@ -7,7 +7,7 @@ serves as the comparison baseline in the evals."""
 
 import re
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.agents.prompts import registered
 from app.llm.providers import mock_fixture
@@ -21,22 +21,33 @@ class Sourced(BaseModel):
     confidence: float = Field(ge=0, le=1)
 
 
+NONE_WORDS = {"none", "nkda", "none known", "nil", "n/a"}
+
+
 class Extraction(BaseModel):
     requested_exam: Sourced
     clinical_indication: Sourced
     relevant_history: list[Sourced]
-    prior_imaging: list[Sourced]
+    prior_imaging: list[Sourced] = Field(description="Prior imaging at an outside facility the requisition names "
+                                                     "(for retrieval from there); empty when there is none")
     allergies: list[Sourced]
     renal_or_diabetes: list[Sourced]
     implant_hints: list[Sourced]
     stated_urgency: Sourced  # value: urgent, routine or unspecified
+
+    @field_validator("relevant_history", "prior_imaging", "allergies", "renal_or_diabetes", "implant_hints")
+    @classmethod
+    def _drop_none_entries(cls, items: list[Sourced]) -> list[Sourced]:
+        """A form's "Previous imaging: None known" is an empty list, not one item with that value (or an empty one):
+        the eval and the priors module would read it as a prior."""
+        return [i for i in items if i.value.strip().strip(".").strip().lower() not in NONE_WORDS | {""}]
 
 
 FIELD_LABELS = {
     "requested_exam": "Requested exam",
     "clinical_indication": "Clinical indication",
     "relevant_history": "Relevant history",
-    "prior_imaging": "Prior imaging mentioned",
+    "prior_imaging": "Prior imaging at an outside facility",
     "allergies": "Allergies",
     "renal_or_diabetes": "Kidney disease or diabetes",
     "implant_hints": "Implant hints",
@@ -52,7 +63,6 @@ LABELLED = {
     "allergies": r"^Allergies:\s*(.+)$",
     "prior": r"^Previous imaging:\s*(.+)$",
 }
-NONE_WORDS = {"none", "nkda", "none known", "nil", "n/a"}
 RENAL = re.compile(r"[^.;,\n]*(diabet\w*|metformin|chronic kidney disease|\bckd\b|renal (impairment|failure|insufficiency)|kidney (disease|function))[^.;,\n]*", re.I)
 IMPLANT = re.compile(r"[^.;,\n]*(pacemaker|defibrillator|\bicd\b|cochlear|aneurysm clip|neurostimulator|stimulator|insulin pump|"
                      r"metal fragment|shrapnel|shunt|hip replacement|knee replacement|stent|sternal wires)[^.;,\n]*", re.I)
@@ -98,8 +108,11 @@ def baseline_extract(text: str) -> dict:
         m.group(1) if (m := re.search(r"allergic to (.+?\))", text, re.I)) else "")
     out["allergies"] = [] if allergies.lower() in NONE_WORDS else [_s(a, 0.85 if found["allergies"] else 0.7) for a in _split(allergies)]
 
+    # Prior imaging at an outside facility (requisition_extract@2): a form's "Previous imaging:" line or a letter's
+    # "had a ... at ...", only when it names where (not "None known", not imaging mentioned without a facility).
     prior = found["prior"].group(1) if found["prior"] else (m.group(1) if (m := re.search(r"\b(?:had|has had) an? (.+? at .+?)\.", text)) else "")
-    out["prior_imaging"] = [] if prior.lower() in NONE_WORDS else [_s(prior, 0.9 if found["prior"] else 0.6)]
+    at_facility = prior.lower() not in NONE_WORDS and re.search(r"\bat\b", prior, re.I)
+    out["prior_imaging"] = [_s(prior, 0.9 if found["prior"] else 0.6)] if at_facility else []
 
     out["renal_or_diabetes"] = [_s(_strip_label(m.group(0)), 0.85) for m in RENAL.finditer(text)]
     out["implant_hints"] = [_s(_strip_label(m.group(0)), 0.8) for m in IMPLANT.finditer(text)]

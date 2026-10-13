@@ -53,9 +53,9 @@
 | 影像中心的部分 | 案例 |
 | --- | --- |
 | 阶段 0 数据层和部署（迁到 PostgreSQL、Docker、部署文档） | 2.9、5.7、6.1、7.3、10.1、11.1、13.4、14.7、15.3 |
-| 系统 4 前台电话 | 3.14、4.1、11.1、14.1、14.2、14.3 |
+| 系统 4 前台电话 | 3.14、3.17、3.18、4.1、11.1、14.1、14.2、14.3 |
 | 排程与候补（影像故事线） | 5.1、5.2、7.2 |
-| 申请单与协议（系统 5、6） | 3.6、12.7 |
+| 申请单与协议（系统 5、6） | 3.6、3.19、12.7 |
 | 报告草稿 | 3.4 |
 | 阶段 3 放射科运营（积压看板、同行评审） | 2.7、2.9、5.11、11.3 |
 | 系统 18 账单 | 5.4、5.7、13.5、14.6 |
@@ -96,6 +96,9 @@
 | 3.14 | 电话 agent 的"中文失败"其实是 MINIMAL 思考 | 平台 / imaging | 真实模型 · A/B 实验 |
 | 3.15 | 重试救回 2/3，剩下的是连环卡顿 | 平台 / hospital | 真实模型 · 可用性 |
 | 3.16 | 一半预算的副作用：用药两个 agent 的慢调用被 12.5 秒截断 | 平台 / hospital | 真实模型 · 超时 |
+| 3.17 | 失败用例说不出原因：错误没进 trace，run 不分 agent，只留前三条 | 平台 | 评测 harness · 可追溯 |
+| 3.18 | 换个说法的"已转接"、只给比值的双语闸门、被丢掉的医嘱子指标 | 平台 | 评测口径 |
+| 3.19 | 申请单抽取的三个假错误：CXR、标签漏了 urgent、"None known" | imaging | 评测口径 · 标签 |
 | 3.20 | 交班 SBAR 的"未记录"无处可引，代理指标重复计分 | hospital | 真实模型 · 契约 · 评测口径 |
 | 4.1 | 来电者口述的出生日期没被去标识化 | imaging | 隐私 |
 | 4.2 | 两个字母的姓（Hu、Li）泄露 | hospital | 隐私 |
@@ -747,6 +750,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **根因：** 两个原因混在一起。一是**口径不一致**：规格里这个字段是"提到的既往影像"，标签却只算"外院的既往检查"（用于调片），
   Gemini 的理解其实说得通；二是**模型真错**："None known" 不应该成为一条记录。
 - **怎么修：** 需要负责人先定这个字段到底是什么意思，再同时改 prompt 和标签（"None known" 应得到空列表）。
+- **结论（2026-10-13，负责人决定）：** 这个字段指**外院既往检查**（用于系统 10 调片），评分和标签不变，改字段说明和 prompt（`requisition_extract@2`），mock 跟着改；"None known" 在 schema 层变成空列表。经过见 3.19。
 - **补充：** 同类的口径问题更早就出现过：WP4c 的分诊回归 11/12，失败的是一条停车相关消息，prompt 的定义标成 "other"，mock 标成 "administrative"（PROGRESS WP4c）。
 - **经验：** 评测分数低时，先看几条失败用例的**原始输入和模型原始输出**，再看评分代码，最后才下"模型不行"的结论。
 - **范围：** imaging（申请单抽取）。
@@ -917,6 +921,80 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **来源：** 3.15 的后续，2026-10-13 侧会话（分支 `claude/stoic-sutherland-d96ab0`，基于 `claude/reverent-babbage-aad5a2`）。
 - **代码：** `apps/api/config/agents/order_review.yaml`、`apps/api/config/agents/medication_reconciliation.yaml`、`apps/api/app/llm/providers.py`（`ATTEMPT_SHARE`、`_usage`）、`apps/api/app/modules/med_safety/service.py`（`comment`、`settle`、`ai_step`）、`apps/api/app/main.py`（`_narrator_loop`）、`apps/api/tests/test_gemini.py`。
 - **提交：** `d0e1241`（分支 `claude/stoic-sutherland-d96ab0`）。
+### 3.17 失败用例的运行记录说不出"为什么失败"：错误没进 trace，run 不分 agent，只留前三条
+
+- **现象：** 合并后的真实 key 运行 `run-2026-10-12T225622`（a55a7a6）里，失败用例**有 trace 却看不出原因**：
+  - 34 次 `unavailable` 的模型调用只有 status、token 和 latency。出院小结 20 例失败到底是 504、429、连接错误还是拒答，只能从耗时（26–27.7 秒）去猜。
+  - `nursing_handoff` 的 7 个失败用例（doc-01、09、18、24、27、29、30），存下的 trace 只有用药核对、出院小结、患者指引三条，**交班自己那条没有**。
+  - `voice_agent` fd-02 有 7 个 run，只留了第 1–3 轮；出问题的第 4–6 轮（给时段、选时段）不在文件里。
+  - `call_summary` fd-09、fd-17、fd-18 存下的"trace"全是电话 agent 的轮次，小结自己的 run 没存。fd-18 那条"不实声称"因此找不到产生它的那次调用。
+- **怎么查的：**（四位分析员按 agent 组读运行文件，每条结论由两名复核者独立验证，下面是复核时做的实验）
+  1. **假设 A：provider 本来就没给错误信息。** 推翻。`LlmGateway._log` 把 `error=str(e)[:300]` 写进 `LlmCall`；`app/aiops/collect.py` 的 `CollectingGateway._log` 也把它抄进了 `CallRecord.error`。但 `evalrun.py` 只用 `col.calls` 算指标，`case_results` 没有 error 字段；`_snapshots` 存的是 `traces.get(run_id).model_dump()`，而 `app/agents/trace.py` 的 `LlmCallRecord` 只有 9 个字段，没有 error，`gateway._trace` 建它时也没传 `call.error`。在运行文件里搜 provider 错误信息的固定格式（`Agent Platform`、`Connection error`、`after N attempts`、`RESOURCE_EXHAUSTED`），0 次命中；出现的 "504"、"429" 全在 hash 和时间戳里。`LlmCall` 本身存在 `store.llm_calls`，但评测事务最后会回滚，所以错误信息在三个地方都有过、却一个都没落进文件。
+  2. **假设 B：交班 trace 缺失是因为交班根本没跑。** 推翻。这 7 例每例都有 4 个 `run_ids`（如 doc-01 是 RUN-00001..00004），第 4 个 id 只出现在 `run_ids` 里，不在任何 trace 里。`_snapshots` 写的是 `for run_id in case["run_ids"][:3]`；run id 是零填充的（RUN-00001），排序就是时间顺序；文书评测每例的顺序是核对→小结→指引→交班，所以交班永远是第 4 条，`[:3]` 正好把它切掉。只有 `run_ids` 不超过 3 条的失败用例（指引没跑的）才带着交班 trace，这也对得上。
+  3. **为什么电话用例混进了小结的 run：** `Collector.runs` 只记 run id → case id，`_agent_entry` 里 `calls` 按 agent 过滤（`c.agent_id == agent`），`run_ids` 却只按 case id 匹配（`if v == r["id"]`）。电话评测两个 agent 共用同一个 case id，`run_call` 先跑语音轮次、最后跑小结，于是两个 agent 的 `run_ids` 完全一样，再被 `[:3]` 切成"前三轮语音"。
+  4. **写测试时自己绕的一段弯路：** 电话用例的新测试在旧代码上失败了，但失败信息是 `run_ids` 为空，而不是"混进了小结"。假设"mock 下电话 agent 不走网关（走脚本 agent）"。查 `frontdesk/agent.py`：评测里 mode 是 `LLM_AGENT_MODES.get(..., "mock")`，`MOCK_TOOL_FIXTURES["voice_agent"]` 存在，会走 `gateway.tool_turn`，推翻。再写一个临时测试，直接用 `collect.CollectingGateway(MockProvider())` 跑 fd-04，打印出 6 个 run，说明 run 是有的。真正原因是测试辅助函数把 conftest 里普通的 `LlmGateway` 传给了 `run_suite`；只有 `CollectingGateway` 才记账。已有的文书测试也这样传，但它们从来不看 `run_ids`，所以一直没暴露。改成和 runner 一样用 `evalrun._gateway(False)` 后，16 个测试都按预期的原因失败。
+- **根因：** 三处独立的记账缺口叠在一起：错误只停在会被回滚的日志里；run 的归属用的键（case）和指标用的键（agent）不一样；trace 上限是"按时间取前 3 条"，而不是"先取失败的"。
+- **怎么修：**
+  - `LlmCallRecord` 加 `error`（和 LlmCall 一样最多 300 字符；trace 的 `llm_calls` 是 JSONB 列，不需要迁移），`gateway._trace` 传 `error=call.error`。只改了这一行，和改 `providers.py` / 网关调用点的超时会话不冲突。
+  - `case_results` 加 `call_errors` [{outcome, error}]：该 agent 在这个用例里没有答上来的调用。
+  - `Collector.run_agents` 记每个 run 属于哪个 agent（进行中的 run 的 agent，或这次调用自己的 agent）；`run_ids` 只放本 agent 的 run，其它 agent 的放 `related_run_ids`。
+  - `evalrun.pick_traces`：最多 `MAX_TRACES`（10）条，先放本 agent 失败的 run（没完成、有调用没答上、工具被拒或失败），再放它其它的 run（电话的每一轮）；本 agent 一条失败都没有（比如它根本没跑，是前一步失败了）时，再放其它 agent 失败的 run。输出按运行顺序，超出上限时记 `traces_dropped`。
+  - AI Ops 用例详情显示模型错误和其它 agent 的 run，trace 的模型调用行显示错误。
+- **怎么证明：** `tests/test_eval_harness.py`：
+  - 网关层：mock 抛 `ProviderUnavailable("Agent Platform 504 ...")`，trace 里那次调用的 `error` 就是这条信息（调用方看到的仍是 "AI is temporarily unavailable"）。
+  - 文书 doc-02 交班不可用：交班用例的 `call_errors` 是那条 504，`run_ids` 只有交班的 run，trace 就是这些 run，其它三份文书的 run 在 `related_run_ids` 里。
+  - doc-04 小结不可用：指引被跳过、自己没有 run，trace 抓到的是小结那条失败的 run，且只有它。
+  - fd-04（5 轮的取消电话）改成必定失败：语音用例的 `run_ids` 全是 `voice_agent`、多于 3 条、每一轮都有 trace；小结的 run 在 `related_run_ids` 里，反过来也一样。
+  - `pick_traces` 的上限和"失败优先"单测。
+  - 在 a347f78 的临时 worktree 里只加这个测试文件：16 个按各自的缺陷失败，5 个对照（普通的 "transferred"，以及 4 种提出/询问/拒绝转接）通过；修复后 21/21 通过。全量后端 822 过、1 个失败（`test_documentation.py::test_template_only_without_ai_consent`，在 a347f78 上同样失败，与本次无关）。自己的测试库 `ioc_test_harnessfix`。
+- **经验：**
+  - "任何失败都能追到 trace"（6.6）有两个前提：trace 里**有原因**，trace **没被截掉**。只存状态码的 trace 等于没有。
+  - 归属和指标要用**同一个键**。一个套件跑多个 agent 时，按 case 归属的东西都要再按 agent 分一次。
+  - 截断要**先保留失败的**，还要**说明截掉了多少**（`traces_dropped`），否则截断本身就在隐藏证据。
+  - 测 harness 时要走 runner 的同一个入口（这里是 `CollectingGateway`），不然测试看到的是另一套记账。
+- **范围：** 平台（`app/aiops` runner、LLM 调用层、AI Ops 页面）。
+- **代码与提交：** `apps/api/app/agents/trace.py`、`apps/api/app/llm/gateway.py`、`apps/api/app/aiops/collect.py`、`apps/api/app/aiops/evalrun.py`、`apps/web/src/features/ai-ops/{EvalCenter,TracePanel}.tsx`、`types.ts`、`apps/api/tests/test_eval_harness.py`。分支 `claude/affectionate-varahamihira-6d62e6`，提交 3be6d1a（代码、测试、文档），mock 基线在其后一个提交。
+
+### 3.18 打分与报告的三个口径漏洞：换个说法的"已转接"、只给比值的双语闸门、被丢掉的医嘱子指标
+
+- **现象：**
+  - 通话小结 fd-17：电话 agent 没有转接（`got.actions` 为空，结局 `abandoned`），小结却写了 "...could not verify their identity ... and initiated a transfer to a staff member."，`unsupported_claims` 却是 `[]`，这一例被判 grounded。
+  - 患者指引的闸门行是 `bilingual_consistency {"value": 1.0, "threshold": "gate", "passed": false}`：值是满分，却判失败，看不出原因。
+  - 医嘱审核的 `extra` 只有 precision、recall、tp/fp/fn 和延迟；模块算出的 `per_type` 和"新开药无适应证"子指标在运行文件里一个字都没有。
+- **怎么查的：**
+  1. **转接：** 先确认确实没转接：`frontdesk/tools.py` 里只有 `transfer_to_human` 会把结局设为 `transferred`，`service.end_call` 把没解决的电话记为 `abandoned`。再看评分：`CLAIMS["transfer_to_human"]` 是 `\btransferred\b|已转接|transféré`，只认过去分词。拿 fd-17 的原文跑一遍：旧模式不命中；它前 30 个字符里也没有否定词，所以一个更宽的模式不会被 `NEGATION` 挡掉。
+  2. **担心加宽后误报**（"Would you like me to transfer you?"、"declined a transfer" 这类不是声称）。做实验：写一个探测脚本，正例（transferring、initiated a transfer、put through to、a transfer was arranged、转接给、transférée 等）和反例（主动提出、询问、拒绝、mock 小结里的 `Actions: transfer_to_human`）各一组，再把**磁盘上所有运行文件**的通话小结用新旧两个模式各判一遍。结果只有一处判决变化：真实运行的 fd-17。我写的第一个正例 "could not verify their identity and initiated a transfer" 没命中，因为 "not" 落在了 30 字符的否定回看窗口里。这说明 `NEGATION` 只是个启发式规则，测试改用 fd-17 原文的句式。
+  3. **双语闸门：** `documentation/evals.py` 的闸门是 `ratio >= 1.0 and len(consistency) >= 10`；这次 10 个非英文病例里只有 doc-20、doc-29 写出了指引（其余因小结失败被跳过），2/2 = 1.0，但不足 10 份。`suites.py` 的闸门行只放 `m[n]` 和字面量 `"gate"`，`extra` 也没导出 `bilingual_documents`。判决是对的，只是报告藏起了原因。
+  4. **医嘱子指标：** `run_order_review` 返回 `per_type` 和 `metrics["new_without_indication"]`，`_order_review_run` 组 `extra` 时只挑了 7 个键。顺带发现：算这个子指标要在 44/60 个病例上调用用药核对模型，而 `evalrun._agent_entry` 只统计 `agent_id == "order_review"` 的调用，这部分花费不进任何 agent 的成本（没修，列为后续）。
+- **根因：** 评分和报告都只对着"最常见的写法/最常用的字段"写，没有对着实际产生的数据核对：转接只认一种时态；闸门有两个条件，行里只显示了一个；模块算出的指标在适配层被挑掉了。
+- **怎么修：** 转接模式加上进行时、"initiated/arranged/made a transfer"、"a transfer was initiated"、"put … through to"、"connected … to a staff member"、转接给、转人工、transférée、mis en relation（单独一个 "transfer" 不算声称）。双语闸门行加 `documents`、`min_documents`、`reason`，阈值写明"至少 10 份非英文"，常量提成 `MIN_BILINGUAL_DOCUMENTS`，`extra` 导出 `bilingual_documents`；`eval_summary.py` 和 AI Ops 的闸门徽章在失败时显示 reason。医嘱审核 `extra` 加 `per_type` 和 `new_without_indication_*`。
+- **怎么证明：** `tests/test_eval_harness.py`：5 种转接说法都算不实声称（旧代码只有 "transferred" 那一种通过），4 种"提出/询问/拒绝"都不算；doc-02 单病例时双语闸门行是 `documents 1`、`min_documents 10`、reason 里写着 "1 non-English … 10"；医嘱审核子集跑完 `extra` 里有 `per_type` 和子指标。
+- **经验：** 声称类检查（"没做过的事不能说做了"）要拿真实输出里的**各种说法**去测，再拿**全部历史输出**对比新旧规则的判决差异：差异只落在你预期的那几例上，才说明没引入误报。闸门不止一个条件时，行里要把每个条件和没满足的那个写出来。
+- **范围：** 平台（`app/aiops/suites.py`、`scripts/eval_summary.py`）、imaging（系统 4 通话小结）、hospital（WP6 医嘱审核、WP7 患者指引）。
+- **代码与提交：** `apps/api/app/modules/frontdesk/evals.py`、`apps/api/app/modules/documentation/evals.py`、`apps/api/app/aiops/suites.py`、`apps/api/scripts/eval_summary.py`。分支 `claude/affectionate-varahamihira-6d62e6`，提交 3be6d1a（代码、测试、文档），mock 基线在其后一个提交。
+
+### 3.19 申请单抽取的三个"假错误"：CXR 不算 X 光、标签漏了 urgent、"None known" 被当成既往影像
+
+- **现象：** `requisition_extract` 的三个字段在两次真实运行**和 mock 基线**里都有固定的错：req-39 的 `requested_modality`、req-11 的 `stated_urgency`（各自是该字段唯一的错，所以都是 0.98）；`prior_imaging` 28 个错，27 例只错这一个字段。
+- **怎么查的：**
+  1. **先看 mock 基线也错不错。** 规则基线（mock）也错 req-39 和 req-11，说明不是模型问题，是评分或标签问题。
+  2. **req-39：** 评分用 `detect_modality(抽出的检查名)`，原文是生成器写的 "CXR PA and lateral"。XR 的模式是 `x-ray|xray|radiograph|\bxr\b`：在 "cxr" 里 c 和 x 之间没有单词边界，`\bxr\b` 不可能命中，于是返回 None。用正则直接验证：四个模态的模式都不匹配 "CXR PA and lateral"。这个函数也决定协议检索的模态过滤，所以产品里 CXR 申请也没有 XR 过滤。
+  3. **req-11：** 原文 "Exam requested: MRI lumbar spine urgent"，没有 Priority 行，标签却是 `unspecified`。读 `generator.py`：urgency 是独立抽签（P1/P2 是 70% urgent），和检查名里写没写 urgent 无关。抽到 unspecified 时不加 Priority 行，但检查名里的 "urgent" 还在。"转诊医生写了 urgent" 就应该标 urgent，所以是**标签错**。修法有两个候选：改检查名（会改数据集原文），或者在抽签之后由检查名推出标签（不多抽一次随机数）。选后者，因为整套数据集共用一条随机流，多抽一次会让后面所有病例都变。
+  4. **prior_imaging：** 这是 3.6 记下的老问题。28 个错全是假阳性（标签 `prior_facility` 为空），其中 24 例原文唯一的影像信息是 "Previous imaging: None known"，模型把它原样抄成一条；另外 4 例（req-00、07、21、28）是临床信息里真的提到了没写机构的既往影像。前者是确定的 bug；后者取决于这个字段的定义（见下面"待决"）。
+  5. **写测试时的一个错误假设：** 我先断言注入 "None known" 后 mock 的 `prior_imaging_accuracy == 1.0`，修复后得到 0.86。假设"我的过滤器误删了真实的既往影像"。查已提交的 mock 基线 `evals/results/extraction.json`：本来就是 0.86，推翻。我当时随手把这 0.86 解释成"规则基线漏掉了一些信件里的既往影像"，测试先改成"等于规则基线自己的分数"。
+  6. **那句解释是错的（负责人定了口径之后，改 mock 时发现）：** 逐条打印 mock 在 7 个错例上的输出（req-02、28、33、34、44、45、48，全是信件），结果都是 `[{'value': '', ...}]`：信件里**没有**既往影像时，`baseline_extract` 的 `prior` 是空串，`"" in NONE_WORDS` 为假，于是生成了一条空值记录，被当成"有既往影像"。是假阳性，不是漏报。我的 schema 过滤器也只认 `NONE_WORDS`，空值同样放过去了。没有逐条看输出就给一个分数编原因，正是 3.6 说的那种错。
+- **根因：** 一条正则漏了常见缩写；生成器的标签和原文各自抽签；schema 只要求"是个列表"，没有规定"没有"要写成空列表，模型按表单原样抄，mock 则在"没有"时造出一条空值记录。
+- **怎么修：**
+  - XR 模式改成 `\b[ac]?xr\b`（CXR、AXR）。
+  - 生成器在抽签之后算 `stated_urgency`：抽到 unspecified 而检查名写了 urgent 时，标 urgent。重新生成 `evals/datasets` 只变了一行（req-11 的标签）。`build()` 里生成申请单的部分提成 `requisition_items`，测试据此检查"提交的数据集就是生成器的输出"。
+  - `Extraction` 在 schema 层（`field_validator`）把列表字段里值为 `NONE_WORDS`（none、none known、nkda、nil、n/a）和空值的项去掉。网关对模型和 mock 都用这个 schema 校验，所以产品和评测一起生效。
+  - **口径（负责人 2026-10-13 决定）：** `prior_imaging` 是**外院既往检查**（系统 10 去那里调片），评分和标签本来就按这个算，不动。改的是"说法"那一侧：新 prompt `requisition_extract@2`（注册表指向它，agent 版本 1.1.0）写明只列申请单写明了机构的既往检查，"None known" 和临床信息里没写机构的检查都不列；schema 字段加同样的 description，字段标签改成 "Prior imaging at an outside facility"；mock 只在写明地点（`\bat\b`）时才算，没有时返回空列表。
+- **待决的口径怎么定的：** 3.6 时就提过"这个字段到底是什么"，一直没定；这次把两种定义的后果（4 个错例取决于它）列给负责人，负责人选了"外院"。
+- **怎么证明：** `tests/test_eval_harness.py`：`detect_modality("CXR PA and lateral") == XR`；60 个种子里凡是生成 "lumbar spine urgent" 的都标 urgent；`requisition_items(Random(SEED))` 等于提交的数据集，且 req-11 是 urgent；`Extraction` 把 "None known"、"NKDA"、"N/A"、"none."、空值都变成空列表、保留真实的植入物；mock 对没有既往影像的信件返回空列表、对没写机构的既往检查也返回空列表，在 50 份申请单上和 `prior_facility` 标签全部一致；抽取套件端到端：mock 每例都多报一条 "None known" 时，`prior_imaging_accuracy` 是 1.0（旧代码 0.30），`requested_modality` 和 `stated_urgency` 都是 1.0。刷新后的 mock 基线 `run-2026-10-13T171045`：`requisition_extract` 从 39/50 到 48/50，翻过来的正好是 req-11、req-39 和那 7 封信（req-02、28、33、34、44、45、48），其余 8 个 agent 每个用例的判决都没变；prompt gate 25 个版本 0 失败。
+- **经验：** 某个字段总是固定那一两例出错，而且 mock 基线也错，先查**评分和标签**，别查模型。修生成器标签时，**不要多抽随机数**，否则整套数据集都会变，所有历史结果都没法比。"没有"应该是空列表这种约定，要在 schema 层兜住，别指望 prompt 一句话（空串也算"没有"）。一个分数和预期不符时，先逐条看错例的输出再解释；"基线本来就漏报"这种听起来合理的解释，一打印就被推翻了。字段口径不清时，评分、标签、字段说明、prompt、mock 五处要按同一个定义改。
+- **范围：** imaging（系统 5 申请单、系统 6 协议、系统 10 调片）。
+- **代码与提交：** `apps/api/app/modules/protocols/library.py`、`apps/api/app/modules/requisitions/{generator,extraction}.py`、`apps/api/prompts/requisition_extract/2.md`、`apps/api/config/agents/requisition_extract.yaml`、`apps/api/app/modules/evals/build.py`、`evals/datasets/requisitions.json`。分支 `claude/affectionate-varahamihira-6d62e6`，提交 3be6d1a（代码、测试、文档），mock 基线在其后一个提交。
+
 ### 3.20 交班 SBAR 的"未记录"无处可引：prompt 和校验器互相矛盾，代理指标又把一个错扣了两次
 
 - **现象：** 合并后的真实运行 `run-2026-10-12T225622` 里，`nursing_handoff` 写出 22/30 份交班（8 份是 Vertex 卡顿），只过 8 份；代理指标门槛失败：accuracy 2.95、format 3.73（completeness 5.0、readability 4.14）。14 份交班恰好是 accuracy 2.0 + format 3.0，其余 8 份是 5/5 或 4/5。mock 基线全是 5.0，`handoff_red` 0。

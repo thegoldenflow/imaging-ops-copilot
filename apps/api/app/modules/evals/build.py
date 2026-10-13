@@ -196,17 +196,22 @@ def clinical_kg_items() -> list[dict]:
             for i, (q, lang, intent, names, diseases, fact) in enumerate(CLINICAL_KG_QUESTIONS)]
 
 
-def build() -> None:
-    rng = random.Random(SEED)
-    DATASETS.mkdir(parents=True, exist_ok=True)
+def requisition_items(rng: random.Random) -> list[dict]:
+    """The 50 requisitions (the first draws of the build's random stream)."""
     referrer = Referrer(id="EVAL-R", name="Dr. Test Referrer", specialty="Family Medicine", clinic="Eval Clinic",
                         phone="+1-416-555-0100", fax="+1-416-555-0101", is_key=False)
-
     requisitions = []
     for i in range(50):
         case = CASES[i % len(CASES)]  # every case appears at least twice
         text, labels = generate(rng, _patient(rng, i), referrer, case=case)
         requisitions.append({"id": f"req-{i:02d}", "text": text, "labels": labels.to_dict()})
+    return requisitions
+
+
+def build() -> None:
+    rng = random.Random(SEED)
+    DATASETS.mkdir(parents=True, exist_ok=True)
+    requisitions = requisition_items(rng)
     (DATASETS / "requisitions.json").write_text(json.dumps(requisitions, indent=1, ensure_ascii=False), encoding="utf-8")
 
     protocols = []

@@ -48,7 +48,7 @@ Every registry entry declares one tier; the tier decides what the AI may do, who
 | `nursing_handoff` 0.3.0 | runtime agent | SBAR nursing handoff per shift and patient from the last 12 hours (7.3); the nurse's confirmation makes it final. | nurse |
 | `patient_instructions` 0.2.0 | runtime agent | Bilingual patient discharge instructions from the signed discharge summary only (7.3); the model picks codes from menus, English and Chinese are rendered from that one structure. | nurse |
 | `prep_translation` 1.0.0 | embedded agent | Translate patient preparation instructions for staff approval (System 9). | medical director, radiologist |
-| `requisition_extract` 1.0.0 | embedded agent | Extract structured fields from a referral letter (System 5 intake). | radiologist |
+| `requisition_extract` 1.1.0 | embedded agent | Extract structured fields from a referral letter (System 5 intake). | radiologist |
 | `coding_assist` 0.1.0 | module (no model) | Roadmap stub (8.1): suggest the main diagnosis and procedure codes for the coder (preset data). | clerk |
 
 ### `clinical_ds`: 11 registry entries (2 runtime agents, 6 embedded agents, 3 modules)

@@ -125,6 +125,7 @@ export interface LlmCall {
   tokens_out: number;
   cost_usd: number;
   latency_ms: number;
+  error?: string | null;
 }
 
 export interface Trace {
@@ -170,6 +171,7 @@ export interface Gate {
   value: unknown;
   threshold: unknown;
   passed: boolean;
+  reason?: string;
 }
 
 export interface EvalAgent {
@@ -231,8 +233,11 @@ export interface CaseResult {
   expected: unknown;
   got: unknown;
   run_ids: string[];
+  related_run_ids?: string[];
+  call_errors?: { outcome: string; error: string | null }[];
   has_trace?: boolean;
   traces?: Trace[];
+  traces_dropped?: number;
 }
 
 export interface RunAgent {
