@@ -45,7 +45,7 @@ Every registry entry declares one tier; the tier decides what the AI may do, who
 | --- | --- | --- | --- |
 | `discharge_summary` 0.2.0 | runtime agent | Discharge summary draft from the FHIR record (7.3), every item traced to its sources; resources fed in chunks by type, segment summaries, then a synthesis; the DischargeSummaryValidator blocks untraceable items. | physician |
 | `followup_calls` 0.2.0 | runtime agent | Post-discharge follow-up calls (7.4): the call scheduled 48 hours after discharge, its questions built from the signed patient instructions, red flags escalated to a nurse (rules first, then the model classifier), the call record, the patient-reported symptoms and the nurse Task written back. It never gives medical advice. | nurse |
-| `nursing_handoff` 0.2.0 | runtime agent | SBAR nursing handoff per shift and patient from the last 12 hours (7.3); the nurse's confirmation makes it final. | nurse |
+| `nursing_handoff` 0.3.0 | runtime agent | SBAR nursing handoff per shift and patient from the last 12 hours (7.3); the nurse's confirmation makes it final. | nurse |
 | `patient_instructions` 0.2.0 | runtime agent | Bilingual patient discharge instructions from the signed discharge summary only (7.3); the model picks codes from menus, English and Chinese are rendered from that one structure. | nurse |
 | `prep_translation` 1.0.0 | embedded agent | Translate patient preparation instructions for staff approval (System 9). | medical director, radiologist |
 | `requisition_extract` 1.0.0 | embedded agent | Extract structured fields from a referral letter (System 5 intake). | radiologist |
