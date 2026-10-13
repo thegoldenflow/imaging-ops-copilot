@@ -770,6 +770,16 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** hospital（WP7 文书评测）/ 平台（`app/aiops` runner）。
 - **代码与提交：** `apps/api/app/modules/documentation/evals.py`、`apps/api/app/aiops/suites.py`、`apps/api/scripts/documentation_eval.py`、`apps/api/tests/test_documentation_eval.py`。在 worktree 分支 `claude/dazzling-northcutt-41fb23`，提交 `6be8255`（换模型前的实现）。
 
+**复盘：这个“优雅降级”修复自己又引入了几个问题（合并前复核，每条两名复核者确认，提交 `db6568e`）。** 教训是：**给批处理/评测加“单条失败不致命”时，最容易在聚合量和闸门上留新坑**，因为老代码默认“所有病例都成功”。
+
+1. **闸门张冠李戴（中）：** `nursing_handoff` 的模块闸门原来取 `automated_proxies_mean_ge_4`——三类文书 proxy 的**合并**均值。加了 `None` 处理后，只要小结或指引全失败，合并均值里就有 `None`，合并闸门判失败，于是**交班明明每份都过，却被判 below**。改成每个 agent 看自己那一类：`evals.py` 新增 `handoff_proxies_mean_ge_4`，`suites.py` 的 `_documentation_run` 用它。
+2. **except 太宽（低）：** `_step` 把 `_summary_step` 里**签发**时抛的 `DocProblem`（`Untraceable items block signing`）也一起吞了。但模型其实把草稿写出来了，是校验器在拦——这是校验器在干活，不是模型失败。被当成 `failed` 后，这个病例的 raw red / oracle 项就从 `raw_hallucination_rate`、`validator_recall` 里掉了。改法：区分 draft 阶段的 `DocProblem`（不可用/被拒 → 病例 `failed`，无数据）和签发被拦（→ 病例 `unsigned`，保留“校验前”指标）；raw/validator 指标改成在**已起草**的小结上统计，签发后指标（signed-only）才只看**已签发**的。
+3. **空集合=满分（低）：** `_ratio(x, 0)` 返回 `1.0`、`sum([]) == 0`，于是一份文书都没起草时，`validator_recall`、`untraceable_after_validator`、`schema_validity` 这些闸门**空集判通过**。改成空集合时指标给 `None`、闸门判失败；监控比率空集给 `None`，报告打印 `n/a`。
+4. **只修了一半的入口（低）：** 只有 `scripts/*.py` 调了 `utf8_stdio()`，但上线真实跑的 `python -m app.aiops.evalrun`（以及 `promptgate`、`app.modules.evals.run`/`.build`、`app.modules.clinical_kg.terms`、`app.core.db.crypto`、`app.seed`）重定向时照样写 GBK。把 helper 提到 `app/core/stdio.py`，这些 `__main__` 也调用；`scripts/_stdio.py` 改成从它 re-export（两个从不 import `app` 的生成脚本保留内联兜底）。
+
+- **怎么证明：** `tests/test_documentation_eval.py` 加三个用例（签发被拦 → `unsigned` 且保留 raw 指标；一份都没起草 → 闸门全失败不空判；指引全失败 → 交班闸门仍通过），`tests/test_script_stdio.py` 加两个（`app.core.stdio` 在 `PYTHONIOENCODING=gbk` 子进程下写 UTF-8；每个 `python -m` 入口都在 `__main__` 首行调 helper）。自己的测试库 `ioc_test_evalrobust` 上，三个被动文件 24/24 通过。
+- **经验：** 降级改动要把**每个聚合量、每个闸门**按“空集 / 部分失败”重新审一遍——`x/0`、`sum([])`、跨维度合并的闸门、以及“顺手 try 一下”的过宽 `except`，都会把“没数据”或“别的东西失败”误报成“通过”。入口修复要覆盖**所有**会打印的入口（脚本和 `python -m` 都算），否则“不再需要 PYTHONUTF8”的结论只对一半成立。
+
 > **附：Claude 的一条接口兼容性记录**（PROGRESS WP4b Notes）：Claude Sonnet 5.5 拒绝非默认的采样参数，所以不发送 temperature，也不声称有上限。
 
 ---
