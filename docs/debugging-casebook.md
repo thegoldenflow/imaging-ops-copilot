@@ -880,12 +880,21 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
   3. 假设 B：卡顿成串出现，不是彼此独立。用 API 日志验证：412 次请求里 59 次 504。每个失败的调用占 2 次（15 个调用、30 次），每个被救回的占 1 次（29 个），所以 44 个调用至少卡过一次。第一次尝试的卡顿率约 12%（44/约 363），卡过一次后重试再卡的比例是 34%（15/44）。如果卡顿独立，第二次也应该约 12%，B 成立。时间上也对得上：前台套件最后跑（02:55–03:00），20 个通话摘要里 8 个卡过；故事线（03:02–03:11）99 次请求里 57 次 504（58%）。
   4. 故事线第 9 步：walk 同步 POST 出院小结草稿，两次都收到 `409 Conflict`（后台 journey 正在起草同一份文书，起草按文书串行）。它只等 180 秒（`--timeout`），而 60 秒预算下一份小结最长可能要 5 × 60 秒。在 58% 卡顿率的窗口里，这一步注定失败。
 - **根因：** Vertex 的卡顿成串出现，一次重试只救得了零星的卡顿。`call_summary` 掉分是因为它刚好排在一串卡顿里，不是代码回归。
-- **怎么修：** 本次不修，列为待决（PROGRESS.md "Still open"）。可选方向：`ATTEMPT_SHARE` 改成 1/3，换来第三次尝试，但正常调用要在 1/3 预算内完成；按错误率熔断，一段时间内整体退避；评测避开卡顿的时段并记录卡顿率；故事线的等待时间配合新的文书预算。需要 owner 决定。
-- **怎么证明：** 上面的数字都来自 `run-2026-10-13T021309.json`（每个病例的延迟和输出）和 API 日志里的 HTTP 状态计数，统计方法写在 live-run 报告 "After the timeout fix" 一节。
-- **经验：** 修复之后，没改过的东西分数掉了，先看那几个失败病例的**延迟特征**：两次截止时间之和，说明是环境原因。要判断"多重试几次有没有用"，比较"卡过一次后再卡"的条件概率和总体卡顿率：两者接近，说明卡顿独立，多试几次有用；条件概率高得多，说明卡顿成串，多试几次只是等更久，得换策略（熔断、整体退避、换时段）。
+- **怎么修：** 卡顿本身是 Vertex 那边的事，修不掉。先把三个方向逐个拿数据检验，再请 owner 选：
+  1. **(a) `ATTEMPT_SHARE` 改成 1/3，换来第三次尝试。** 前提是"每个正常调用都能在 1/3 预算内完成"，所以先检验这个前提。数据用 `run-2026-10-12T225622`：那时每次尝试还有完整的 30 秒，慢的正常调用没被截断，延迟分布是完整的。运行记录只给**失败**病例存了 trace（调用级延迟），所以样本是"失败病例里的成功调用"，单调用的 agent 再补上通过病例的病例延迟。截断点按"服务器在截止前约 2.5 秒回 504"推算（这是从卡顿观察到的，对"慢但在算"的请求是否同样提前 2.5 秒截断，没有直接证据）：30 秒预算的 agent 从现在的 12.5 秒降到 7.5 秒，60 秒预算的从 27.5 秒降到 17.5 秒。结果：order_review 58 次里 6 次（10%）、medication_reconciliation 53 次里 6 次（11%）、nursing_handoff 23 次里 2 次（9%）、discharge_summary 58 次里 1 次超过新截断点；call_summary（最慢 4.2 秒）和 voice_agent（最慢 1.6 秒）一次都没有。被截断的慢调用，如果慢是因为输出长，重试时还是一样慢，三次全被截断，等于把"慢但成功"变成失败。所以全局 1/3 不可取；只给 call_summary、voice_agent 这类快 agent 配第三次尝试是可行的变体。
+  2. **(b) 进程级熔断：最近 N 次 504 之后，所有调用退避一段时间。** 推演两种做法。"快速失败"：故事线那段 58% 卡顿的窗口里，仍有 42% 的请求没卡，熔断会把它们也丢掉，通过率只会更低。"先等再发"：卡顿串持续好几分钟，单次调用的预算只有 30 或 60 秒，等不过去。剩下的好处只是交互用户更快看到模板回退、少发无用请求，代价是全进程共享状态：文书卡顿会连带电话 agent 一起降级。所以不提高通过率。
+  3. **(c) 在每个运行记录里写下卡顿率。** 不改任何行为，成本低，回答的正好是"这次的分数是不是卡顿造成的"。
+  4. **owner 选了 (c)，加上故事线的等待时间。** 实现：
+     - `GeminiProvider._generate` 把每次调用里每次尝试怎么结束的（成功；卡顿 = 504 或客户端自己超时；429；其他错误）按 task（agent id）记进 `AttemptStats`。默认记到进程级的 `ATTEMPT_STATS`，因为有的评测 harness 自己建网关（`app/modules/evals/run.py`），它的调用也算这次运行；API 里后台循环和请求线程会并发调用，所以计数加锁。
+     - `evalrun.run` 在开始和结束各取一次快照，差值写进运行记录的 `stalls`（总数，加 `by_agent`）和每个 agent 条目的 `stalls`。两个比率：`first_attempt_stall_rate`（第一次尝试就卡的比例）和 `stall_after_stall_rate`（卡过之后的下一次尝试又卡的比例），就是本案"怎么查的"第 3 步手算的 12% 和 34%，现在每次运行自动算。CLI 和运行记录的 `note` 写明卡了几次、重试救回几个、丢了几个。mock 和 Anthropic 运行没有这个计数，`stalls` 为 null。
+     - 故事线第 9 步：`walk.summary_draft_s()` = `SUMMARY_CALLS`（5）× 出院小结 agent 的 `model_policy.timeout_s`（60 秒）= 300 秒。`scripts/storyline_report.py --api` 让第 9 步等 `--timeout` + 300 = 480 秒（后台 journey 可能正在起草同一份，walk 先收到 409，直到它结束），HTTP 客户端超时从 300 秒提到 360 秒，容得下一次同步起草。其他步骤仍等 `--timeout`。5 这个数先验证过：在 mock 下走完整条故事线，读签发的小结里的 `inputs.chunks`，正好 4 段（诊断、用药、观察、计划），加合成 = 5 次调用。
+     - 顺带发现：检验 (a) 时看到，order_review 和 medication_reconciliation 已经有 2–3 个正常调用（14–20 秒）超过**现在**的 12.5 秒截断点。这是 3.11 把比例定为 0.5 的副作用，列为后续（给这两个 agent 设 `timeout_s: 45`）。
+- **怎么证明：** 卡顿的数字来自 `run-2026-10-13T021309.json`（每个病例的延迟和输出）和 API 日志里的 HTTP 状态计数，统计方法写在 live-run 报告 "After the timeout fix" 一节。修复的证明：`test_attempts_are_counted_per_agent_with_the_stalls_a_retry_saved_and_lost` 用 `stalling()` 和 FakeClock 走五种情况（一次成功；卡一次后救回；卡两次后丢掉；客户端超时再 429 再成功；400 不重试），断言每个 agent 的全部计数和 `since()` 的差值。`test_a_live_eval_run_records_the_stall_rate_it_ran_under` 用 `FixtureGemini`（Gemini 的重试循环包着 mock 夹具的答案）真的跑一次 `evalrun.run(..., live=True)`，前四次调用分别卡 1、2、0、1 次，断言运行记录里 3/N 次首次卡顿、3 次卡后重试里 1 次再卡、救回 2 个、丢 1 个，agent 条目、`note` 和 CLI 输出一致。变异检验：删掉失败分支的 `self.stats.record(...)`，这两个测试都挂。故事线：`test_the_whole_story_offline` 加了"段数 + 1 == `SUMMARY_CALLS`"，把常数钉在数据上（病人数据变了，测试会提醒改等待时间）；`test_the_summary_step_can_wait_for_a_whole_draft_against_a_live_model` 断言只有第 9 步用长等待，不传时退回 `timeout_s`。`test_gemini.py`、`test_aiops.py`、`test_storyline.py` 全过；全量 811 过 1 挂，挂的是 `test_template_only_without_ai_consent`（只在周二挂，在没改过的 a347f78 上一样挂，另一个侧会话已查明是测试本身的假设）。没有做真实重跑。
+- **经验：** 修复之后，没改过的东西分数掉了，先看那几个失败病例的**延迟特征**：两次截止时间之和，说明是环境原因。要判断"多重试几次有没有用"，比较"卡过一次后再卡"的条件概率和总体卡顿率：两者接近，说明卡顿独立，多试几次有用；条件概率高得多，说明卡顿成串，多试几次只是等更久，得换策略（熔断、整体退避、换时段）。选方案之前，先用已有数据检验每个方案的**前提**（"正常调用都能在 1/3 预算内完成"），并说清样本从哪来、有什么偏差（只有失败病例存了 trace）。外部问题修不掉时，至少让它在结果里看得见：把诊断时手算的数变成每次运行自动记录的字段，下次就不用再翻日志。
 - **范围：** 平台（LLM 调用层、评测）/ hospital（WP9 故事线）。
-- **来源：** 2026-10-13 侧会话的重跑和故事线实跑。
-- **代码：** `apps/api/app/llm/providers.py`（`_generate`）、`apps/api/app/modules/storyline/walk.py`（`_summary`、`wait`）、`apps/api/app/modules/documentation/service.py`（起草串行，409）。
+- **来源：** 2026-10-13 侧会话的重跑和故事线实跑；方案检验和实现在之后的侧会话（分支 `claude/reverent-babbage-aad5a2`，基于 `claude/trusting-hypatia-72ce4a`）。
+- **代码：** `apps/api/app/llm/providers.py`（`_generate`、`AttemptStats`、`ATTEMPT_STATS`）、`apps/api/app/aiops/evalrun.py`（`_stall_summary`、`_stall_note`）、`apps/api/app/modules/storyline/walk.py`（`_summary`、`wait`、`SUMMARY_CALLS`、`summary_draft_s`）、`apps/api/scripts/storyline_report.py`（`live`）、`apps/api/app/modules/documentation/service.py`（起草串行，409）、`apps/api/tests/test_gemini.py`、`apps/api/tests/test_storyline.py`。
+- **提交：** 待 owner 确认后提交。
 
 ---
 

@@ -34,9 +34,11 @@ OUT = ROOT / "evals" / "storyline"
 def live(base_url: str, timeout_s: float):
     import httpx
 
-    from app.modules.storyline.walk import Walk, WalkFailed
+    from app.modules.storyline.walk import Walk, WalkFailed, summary_draft_s
 
-    client = httpx.Client(base_url=base_url, timeout=300)
+    # Step 9's draft request is synchronous and can take up to summary_draft_s() (5 x 60 s) against a live model.
+    draft_s = summary_draft_s()
+    client = httpx.Client(base_url=base_url, timeout=max(300.0, draft_s + 60))
 
     def pump() -> None:
         time.sleep(1.0)
@@ -60,7 +62,10 @@ def live(base_url: str, timeout_s: float):
     from app.modules.storyline import script as S
 
     walk_user = S.CAST["admin"]
-    walk = Walk(client, pump=pump, advance=advance, log=print, timeout_s=timeout_s)
+    # The background journey may be drafting the same summary (409 until it ends), so step 9 waits for one whole
+    # draft on top of the usual wait (casebook 3.15).
+    walk = Walk(client, pump=pump, advance=advance, log=print, timeout_s=timeout_s,
+                summary_timeout_s=timeout_s + draft_s)
     started = time.monotonic()
     print("resetting the storyline (demo reset + preset) ...")
     r = client.post("/api/storyline/reset", headers=walk.headers(walk_user))
@@ -136,7 +141,9 @@ def main() -> None:
     mode.add_argument("--api", help="base URL of a running API, e.g. http://127.0.0.1:9445")
     mode.add_argument("--in-process", action="store_true")
     parser.add_argument("--report", action="store_true", help="write evals/storyline/report_<mode>.json and .md")
-    parser.add_argument("--timeout", type=float, default=180, help="seconds to wait for one step's background work")
+    parser.add_argument("--timeout", type=float, default=180,
+                        help="seconds to wait for one step's background work (--api: the discharge summary step "
+                             "waits this plus the longest a summary draft can take)")
     args = parser.parse_args()
     from app.core.config import settings
     from app.modules.storyline import script as S

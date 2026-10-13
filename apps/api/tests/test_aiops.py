@@ -142,6 +142,7 @@ def test_the_runner_evaluates_an_agent_and_writes_a_run_file_with_the_six_metric
     assert entry["prompt_version"] == "patient_message_triage@1" and entry["model_key"] == "claude-fast"
     assert entry["prompt_sha256"] == evalrun.prompt_hash("patient_message_triage@1")
     assert entry["mode"] == "mock" and record["baseline"] is True
+    assert record["stalls"] is None and "stalls" not in entry  # only a Gemini run counts its attempts
     # a failing case carries the trace captured before the rollback
     failing = [c for c in entry["case_results"] if not c["passed"]]
     assert failing and failing[0]["traces"][0]["agent_id"] == "patient_message_triage"

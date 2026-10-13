@@ -11,6 +11,7 @@ provider converts to and from Gemini's contents and function calls.
 import base64
 import json
 import random
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -298,6 +299,54 @@ def gemini_schema(node):
     return node
 
 
+class AttemptStats:
+    """How Gemini attempts ended, per task (agent id), so an eval run can record the stall rate it ran under (the run
+    file's `stalls`, app/aiops/evalrun.py). A stall is an attempt that got no answer before its deadline: 504
+    DEADLINE_EXCEEDED, or the client's own timeout. Vertex stalls come in bursts (casebook 3.15): when a retry after a
+    stall stalls again much more often than a first attempt stalls, the eval measured the API's availability as much
+    as the model."""
+
+    FIELDS = ("calls", "attempts", "stalled", "rate_limited", "errors", "first_stalled", "after_stall",
+              "stalled_after_stall", "saved", "lost", "failed")
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._by_task: dict[str, dict[str, int]] = {}
+
+    def record(self, task: str | None, outcomes: list[str], ok: bool) -> None:
+        """One call: its attempts' outcomes in order ("ok", "stall", "rate_limited", "error") and whether it ended
+        with an answer."""
+        stalled = "stall" in outcomes
+        after = [b for a, b in zip(outcomes, outcomes[1:]) if a == "stall"]
+        add = {"calls": 1, "attempts": len(outcomes), "stalled": outcomes.count("stall"),
+               "rate_limited": outcomes.count("rate_limited"), "errors": outcomes.count("error"),
+               "first_stalled": int(outcomes[0] == "stall"), "after_stall": len(after),
+               "stalled_after_stall": after.count("stall"), "saved": int(stalled and ok),
+               "lost": int(stalled and not ok), "failed": int(not ok)}
+        with self._lock:
+            counts = self._by_task.setdefault(task or "", dict.fromkeys(self.FIELDS, 0))
+            for key, n in add.items():
+                counts[key] += n
+
+    def snapshot(self) -> dict[str, dict[str, int]]:
+        with self._lock:
+            return {task: dict(counts) for task, counts in self._by_task.items()}
+
+    def since(self, before: dict[str, dict[str, int]]) -> dict[str, dict[str, int]]:
+        """The counts added after `before` (a snapshot), for each task with calls since."""
+        delta = {}
+        for task, counts in self.snapshot().items():
+            prev = before.get(task, {})
+            if counts["calls"] > prev.get("calls", 0):
+                delta[task] = {key: n - prev.get(key, 0) for key, n in counts.items()}
+        return delta
+
+
+# Every Gemini provider in the process counts here unless given its own (tests): an eval harness may build its own
+# gateway, and its calls still belong to the run.
+ATTEMPT_STATS = AttemptStats()
+
+
 class GeminiProvider:
     """Google Gemini through the Agent Platform / Vertex AI google-genai route."""
 
@@ -317,8 +366,10 @@ class GeminiProvider:
     ATTEMPT_SHARE = 0.5  # the most of the budget one attempt may use
     MIN_ATTEMPT_S = 5.0  # don't start another attempt with less than this left of the budget
 
-    def __init__(self, api_key: str, timeout_s: float, client=None, thinking: dict | None = None, clock=None) -> None:
+    def __init__(self, api_key: str, timeout_s: float, client=None, thinking: dict | None = None, clock=None,
+                 stats: AttemptStats | None = None) -> None:
         self.timeout_s = timeout_s
+        self.stats = stats if stats is not None else ATTEMPT_STATS  # how each call's attempts ended
         # tier ("reasoning"/"fast"/"voice") -> Gemini thinking level name; missing or "DEFAULT" sends none, so the
         # model keeps its own default. Gemini bills thinking as output and thinks by default (3), which truncated
         # the documentation agents and slowed the phone agent in the 2026-10-12 live run.
@@ -363,30 +414,43 @@ class GeminiProvider:
         return (f"Agent Platform {code} {hint}", f". Google: {e.message or e.status}",
                 code in GeminiProvider.RETRYABLE_CODES)
 
-    def _generate(self, *, model, contents, config, timeout_s=None):
+    @staticmethod
+    def _outcome(e: Exception) -> str:
+        """How a failed attempt counts in AttemptStats."""
+        if isinstance(e, genai_errors.APIError):
+            return {504: "stall", 429: "rate_limited"}.get(int(e.code or 0), "error")
+        return "stall" if isinstance(e, (httpx.TimeoutException, TimeoutError)) else "error"
+
+    def _generate(self, *, model, contents, config, timeout_s=None, task=None):
         """Call Gemini, retrying rate limits and transient server/connection failures with exponential backoff.
         `timeout_s` is the call's budget (None: the provider's LLM_TIMEOUT_S). Each attempt gets at most
         ATTEMPT_SHARE of it and never more than is left; the loop stops once too little remains to start another
-        attempt."""
+        attempt. How the attempts ended is counted under `task` (self.stats)."""
         budget = timeout_s or self.timeout_s
         start = self._clock.monotonic()
+        outcomes: list[str] = []
         for attempt in range(1, self.MAX_ATTEMPTS + 1):
             remaining = budget - (self._clock.monotonic() - start)
             deadline = min(budget * self.ATTEMPT_SHARE, remaining)
             cfg = config.model_copy(update={
                 "http_options": genai_types.HttpOptions(timeout=int(max(deadline, 0.0) * 1000))})
             try:
-                return self.client.models.generate_content(model=model, contents=contents, config=cfg)
+                resp = self.client.models.generate_content(model=model, contents=contents, config=cfg)
             except genai_errors.APIError as e:  # 4xx incl. 429 rate limit, 5xx
                 prefix, detail, retryable, cause = (*self._api_error(e), e)
             except (httpx.HTTPError, OSError) as e:  # timeouts and network failures
                 prefix, detail, retryable, cause = f"Connection error: {type(e).__name__}: {e}", "", True, e
+            else:
+                self.stats.record(task, [*outcomes, "ok"], ok=True)
+                return resp
+            outcomes.append(self._outcome(cause))
             if retryable and attempt < self.MAX_ATTEMPTS:
                 backoff = 2 ** attempt + random.uniform(0, self.RETRY_JITTER_S)
                 left = budget - (self._clock.monotonic() - start)
                 if left - backoff >= self.MIN_ATTEMPT_S:
                     self._clock.sleep(backoff)
                     continue
+            self.stats.record(task, outcomes, ok=False)
             suffix = f" (after {attempt} attempts)" if attempt > 1 else ""
             raise ProviderUnavailable(f"{prefix}{suffix}{detail}") from cause
 
@@ -424,7 +488,7 @@ class GeminiProvider:
             response_json_schema=gemini_schema(schema),
             thinking_config=self._thinking_config(model, tier, thinking_level),
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
-        ), timeout_s=timeout_s)
+        ), timeout_s=timeout_s, task=task)
         parts = self._parts(resp)
         tokens_in, tokens_out = self._usage(resp)
         if _get(resp.candidates[0].finish_reason, "name", resp.candidates[0].finish_reason) == "MAX_TOKENS":
@@ -450,7 +514,7 @@ class GeminiProvider:
             tools=gemini_tools(tools),
             thinking_config=self._thinking_config(model, tier),
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
-        ), timeout_s=timeout_s)
+        ), timeout_s=timeout_s, task=task)
         blocks = blocks_from_gemini(self._parts(resp))
         reason = _get(resp.candidates[0].finish_reason, "name", None)
         stop = "tool_use" if any(b.type == "tool_use" for b in blocks) else (
