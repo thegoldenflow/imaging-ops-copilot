@@ -42,9 +42,10 @@ class InvalidOutput(Exception):
 
 
 class OutputTruncated(InvalidOutput):
-    """The model stopped at its output-token limit (Gemini finish reason MAX_TOKENS), often because thinking
-    ate the budget. Its own error so the gateway retries with a shorter-answer hint rather than treating it as
-    malformed JSON."""
+    """The model stopped at its output-token limit (Gemini finish reason MAX_TOKENS), often because thinking ate
+    the budget. Its own error so the gateway can retry it differently from malformed JSON — telling the model to
+    answer concisely and capping its thinking on the retry — instead of repeating the identical request and
+    truncating again."""
 
 
 @dataclass
@@ -112,7 +113,7 @@ class MockProvider:
         self.attempts: dict[str, int] = {}
 
     def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0,
-                      max_tokens=8000, tier=None) -> ProviderResult:
+                      max_tokens=8000, tier=None, thinking_level=None) -> ProviderResult:
         time.sleep(self.latency_s)
         fixture = MOCK_FIXTURES.get(task)
         if fixture is None:
@@ -158,7 +159,7 @@ class AnthropicProvider:
             raise ProviderUnavailable(f"Connection error: {e}") from e
 
     def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0,
-                      max_tokens=8000, tier=None) -> ProviderResult:
+                      max_tokens=8000, tier=None, thinking_level=None) -> ProviderResult:
         content: list[dict] = [
             {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}}
             for b64, media_type in (images or [])
@@ -322,11 +323,17 @@ class GeminiProvider:
             ),
         )
 
-    def _thinking_config(self, tier):
-        """The ThinkingConfig for a tier, or None to leave the model on its default (no tier, or level DEFAULT)."""
-        level = self.thinking.get(tier) if tier is not None else None
+    def _thinking_config(self, model, tier, override=None):
+        """The ThinkingConfig for a model and tier, or None to leave the model on its own default (no tier, level
+        DEFAULT, or none configured). `override` forces a level (the gateway's concise truncation retry uses it).
+        Gemini 3.x takes a thinking_level; 2.x takes an integer thinking_budget, so a GEMINI_MODEL_* set to
+        gemini-2.5-flash does not receive an unsupported field (PROGRESS.md lists it as a priced option)."""
+        level = override or (self.thinking.get(tier) if tier is not None else None)
         if not level or level == "DEFAULT":
             return None
+        if "gemini-2." in str(model or "").lower():
+            budget = {"MINIMAL": 0, "LOW": 512, "MEDIUM": 4096, "HIGH": 16384}[level]
+            return genai_types.ThinkingConfig(thinking_budget=budget)
         return genai_types.ThinkingConfig(thinking_level=getattr(genai_types.ThinkingLevel, level))
 
     @staticmethod
@@ -390,7 +397,7 @@ class GeminiProvider:
         return u.prompt_token_count or 0, (u.candidates_token_count or 0) + (u.thoughts_token_count or 0)
 
     def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0,
-                      max_tokens=8000, tier=None) -> ProviderResult:
+                      max_tokens=8000, tier=None, thinking_level=None) -> ProviderResult:
         contents: list = [
             genai_types.Part.from_bytes(data=base64.b64decode(b64), mime_type=media_type)
             for b64, media_type in (images or [])
@@ -401,7 +408,7 @@ class GeminiProvider:
             max_output_tokens=max_tokens,
             response_mime_type="application/json",
             response_json_schema=gemini_schema(schema),
-            thinking_config=self._thinking_config(tier),
+            thinking_config=self._thinking_config(model, tier, thinking_level),
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
         ))
         parts = self._parts(resp)
@@ -426,7 +433,7 @@ class GeminiProvider:
             system_instruction=system,
             max_output_tokens=max_tokens,
             tools=gemini_tools(tools),
-            thinking_config=self._thinking_config(tier),
+            thinking_config=self._thinking_config(model, tier),
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
         ))
         blocks = blocks_from_gemini(self._parts(resp))

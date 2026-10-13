@@ -170,6 +170,18 @@ def test_thinking_level_is_sent_per_tier():
     assert sent[3].thinking_level == types.ThinkingLevel.MINIMAL
 
 
+def test_thinking_is_a_level_for_gemini_3_and_a_budget_for_gemini_2_5():
+    # Gemini 3.x takes thinking_level; 2.x takes an integer thinking_budget (PROGRESS.md lists gemini-2.5-flash as a
+    # priced option). Sending a thinking_level to a 2.5 model would be an unsupported field.
+    client = FakeClient([json_reply({"answer": "a"}), json_reply({"answer": "b"})])
+    provider = GeminiProvider("k", 5, client=client, thinking={"reasoning": "LOW"})
+    provider.complete_json(task="t", model="gemini-3.5-flash", system="s", text="x", schema={}, tier="reasoning")
+    provider.complete_json(task="t", model="gemini-2.5-flash", system="s", text="x", schema={}, tier="reasoning")
+    g3, g25 = (c["config"].thinking_config for c in client.models.calls)
+    assert g3.thinking_level == types.ThinkingLevel.LOW and g3.thinking_budget is None
+    assert g25.thinking_budget == 512 and g25.thinking_level is None
+
+
 def test_gateway_sends_the_thinking_level_of_the_agents_model_tier():
     pinned_prompt = Prompt(name="t_pinned", version="t-v1", system="s", template="{q}")
     with registry.temporary("t_pinned", {"kind": "embedded_agent", "model_policy": {
@@ -228,7 +240,13 @@ def test_gateway_retries_a_truncated_answer_once_and_logs_why_and_its_tokens():
     gw, client = gemini_gateway([truncated(), json_reply({"answer": "ok"})])
     outcome = gw.structured(task="t", prompt=PROMPT, variables={"q": "x"}, schema_cls=Answer)
     assert outcome.status == "ok"
-    assert "stopped at the output limit" in client.models.calls[1]["contents"][-1]
+    first, retry = client.models.calls
+    # The retry is meaningful, not a copy of the request: a be-concise hint, and thinking capped at MINIMAL to free
+    # the output budget (the first call sent no thinking config for this gateway).
+    assert first["config"].thinking_config is None
+    assert "Answer more concisely" in retry["contents"][-1]
+    assert "cut off at the model's output limit" in retry["contents"][-1]
+    assert retry["config"].thinking_config.thinking_level == types.ThinkingLevel.MINIMAL
     call = get_store().llm_calls[-1]
     assert call.outcome == "retried_ok" and call.output_tokens == 7985 + 25  # the truncated attempt is billed too
 

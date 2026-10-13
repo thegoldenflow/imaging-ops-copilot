@@ -229,15 +229,27 @@ class LlmGateway:
         started = time.monotonic()
         tokens_in = tokens_out = 0
         error = None
+        truncated = False
 
         for attempt in range(2):
-            request_text = text if error is None else (
-                f"{text}\n\nYour previous answer failed validation: {error}\nReturn JSON that matches the schema."
-            )
+            if error is None:
+                request_text, retry_thinking = text, None
+            elif truncated:
+                # The previous answer hit the output-token limit. Ask for a shorter answer and cap thinking on the
+                # retry to free the budget, so we do not repeat the same request and truncate (and pay) again.
+                request_text = (f"{text}\n\nYour previous answer was cut off at the model's output limit "
+                                "(finish reason MAX_TOKENS). Answer more concisely: only the fields the schema "
+                                "requires, short values, no repetition, so the whole JSON fits.")
+                retry_thinking = "MINIMAL"
+            else:
+                request_text = (f"{text}\n\nYour previous answer failed validation: {error}\n"
+                                "Return JSON that matches the schema.")
+                retry_thinking = None
             try:
                 result = self.provider.complete_json(
                     task=task, model=model, system=prompt.system, text=request_text, schema=schema,
                     images=images, attempt=attempt, max_tokens=spec.model_policy.max_tokens, tier=model_tier,
+                    thinking_level=retry_thinking,
                 )
             except ProviderUnavailable as e:
                 call = self._log(task=task, model=model, prompt=prompt, text=text, started=started,
@@ -250,7 +262,8 @@ class LlmGateway:
             except InvalidOutput as e:
                 tokens_in += e.input_tokens
                 tokens_out += e.output_tokens
-                error = str(e) if isinstance(e, OutputTruncated) else f"Invalid JSON: {e}"
+                truncated = isinstance(e, OutputTruncated)
+                error = str(e) if truncated else f"Invalid JSON: {e}"
                 continue
             tokens_in += result.input_tokens
             tokens_out += result.output_tokens
