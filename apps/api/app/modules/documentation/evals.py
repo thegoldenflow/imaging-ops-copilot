@@ -154,8 +154,33 @@ def _instruction_proxies(view: dict, summary_items: dict) -> dict:
             "readability": readability, "format": 5.0 - (0 if blocks else 2) - (0 if same else 2)}
 
 
+ABSENCE = re.compile(r"\b(?:not|no|none|never)\b[^.;]*?\b(?:recorded|documented|charted|available|measured)\b", re.I)
+SENTENCE_END = re.compile(r"[.!?](?:\s+(?=[A-Z\[])|\s*$)")
+
+
+def _handoff_statements(c: dict) -> list[tuple[str, dict]]:
+    return [("situation", c["situation"])] + [(f"{key}[{i}]", item) for key in ("background", "assessment",
+                                                                              "recommendation")
+                                              for i, item in enumerate(c.get(key) or [])]
+
+
 def _handoff_proxies(view: dict) -> dict:
+    """Automated proxies for the SBAR's human rating, each measuring one thing (a defect lowers one proxy):
+
+    - completeness: what the next shift needs is there: the four sections, every open task and flag in the
+      recommendation, a vital-sign trend citing observations, and pain and intake/output each addressed (a statement
+      or a `not_recorded` declaration);
+    - accuracy: the share of claims (statements and `not_recorded` declarations) with no validator issue: cited, every
+      citation an input, names and numbers in the cited sources, a declared gap really absent; 1 + 4 x share;
+    - readability: statement length (the longest at most 45 words);
+    - format: the share of SBAR template checks passed: the situation is one sentence, and per statement, it does not
+      state an absence (that goes in `not_recorded`); 1 + 4 x share.
+    An uncited statement is an accuracy defect only (it used to cost accuracy, as a red, and format too). Version 1's
+    uncited "Intake and output were not recorded." is two defects, untraceable (accuracy) and misplaced (format); the
+    same sentence with a token citation is a format defect only."""
     c = view["content"]
+    statements = _handoff_statements(c)
+    gaps = list(c.get("not_recorded") or [])
     sections = [bool(c["situation"]["text"]), bool(c["background"]), bool(c["assessment"]), bool(c["recommendation"])]
     facts = view.get("facts") or {}
     tasks = {t["id"] for t in facts.get("tasks") or []}
@@ -163,15 +188,19 @@ def _handoff_proxies(view: dict) -> dict:
     cited = {r for item in c["recommendation"] for r in item["source_refs"]}
     covered = [t in cited for t in tasks | flags]
     vitals = any(r.startswith("Observation/") for item in c["assessment"] for r in item["source_refs"])
-    red = len([i for i in view["validation"]["issues"] if i["severity"] == "red"])
-    amber = len([i for i in view["validation"]["issues"] if i["severity"] == "amber"])
-    words = [len(item["text"].split()) for item in [c["situation"], *c["background"], *c["assessment"],
-                                                    *c["recommendation"]]]
-    return {"completeness": _scale(_ratio(sum(sections) + sum(covered) + vitals, 4 + len(covered) + 1)),
-            "accuracy": 5.0 if red == 0 and amber == 0 else 4.0 if red == 0 else 2.0,
+    text = " ".join(item["text"] for _, item in statements)
+    addressed = ["pain" in gaps or bool(re.search(r"\bpain\b", text, re.I)),
+                 "intake_output" in gaps or bool(re.search(r"\b(?:intake|output)\b", text, re.I))]
+    flawed = {i["path"] for i in view["validation"]["issues"]}
+    claims = [path for path, _ in statements] + [f"not_recorded[{i}]" for i in range(len(gaps))]
+    in_place = [len(SENTENCE_END.findall(c["situation"]["text"].strip())) <= 1] + \
+        [not ABSENCE.search(item["text"]) for _, item in statements]
+    words = [len(item["text"].split()) for _, item in statements]
+    return {"completeness": _scale(_ratio(sum(sections) + sum(covered) + vitals + sum(addressed),
+                                          4 + len(covered) + 1 + len(addressed))),
+            "accuracy": _scale(_ratio(sum(p not in flawed for p in claims), len(claims))),
             "readability": 5.0 if max(words or [0]) <= 45 else 4.0,
-            "format": 5.0 if all(item["source_refs"] for item in [c["situation"], *c["background"], *c["assessment"],
-                                                                 *c["recommendation"]]) else 3.0}
+            "format": _scale(_ratio(sum(in_place), len(in_place)))}
 
 
 def numbers(text: str) -> list[str]:

@@ -8,9 +8,13 @@ For one encounter and the shift ending (`at`, hospital time, given by the caller
    laboratory results, new orders written in the window, stopped ones), de-identified
    (dates relative to the admission, names as placeholders);
 3. asks the model for the four SBAR sections, every statement citing ids from the
-   list; ids outside it get one more try;
+   list, and for the topics with nothing in the facts (`not_recorded`: intake and
+   output, which the record does not hold, or no results, tasks, ...) instead of
+   "not recorded" statements, which would have nothing to cite; ids outside the list
+   get one more try;
 4. validates (HandoffValidator: sources, drugs; numbers not in the cited sources are
-   a warning) and writes the draft `sbar-<encounter>-<shift>`. The nurse confirms it,
+   a warning; a topic declared not recorded must have no input) and writes the draft
+   `sbar-<encounter>-<shift>`. The nurse confirms it,
    which makes it final: one signature, no co-signature.
 Agent code: it uses only the run (no FhirGateway, HTTP client or database).
 """
@@ -29,7 +33,7 @@ from app.modules.documentation import document as D
 from app.modules.documentation import facts as F
 from app.modules.documentation import mocks  # noqa: F401  (registers the mock models)
 from app.modules.documentation.deid import Deid
-from app.modules.documentation.models import Handoff, ValidationReport
+from app.modules.documentation.models import GAP_LABELS, Handoff, ValidationReport
 from app.modules.documentation.validator import HandoffValidator
 
 AGENT_ID = "nursing_handoff"
@@ -123,7 +127,7 @@ def build_facts(resources: list[dict], at: datetime) -> tuple[dict, dict[str, F.
                 name = F.LAB_SHORT.get(_code(r.get("code"))) or _display(r.get("code"))
                 value = F.lab_value(r)
                 sources[ref] = F.Source(ref, rtype, "result", name=name, code=_code(r.get("code")),
-                                        date=when.date().isoformat(), detail=f"{name} {value}")
+                                        date=when.date().isoformat(), detail=f"{name} {value} at {when:%H:%M}")
                 facts["results"].append({"id": ref, "name": name, "value": value, "flag": F._interpretation(r) or "N",
                                          "time": when.strftime("%H:%M")})
         elif rtype == "Task":
@@ -145,6 +149,8 @@ def render_text(content: dict, facts: dict, *, shift: str, final: bool = False) 
     for key, title in (("background", "B - Background"), ("assessment", "A - Assessment"),
                        ("recommendation", "R - Recommendation")):
         lines += ["", f"{title}:"] + [f"  - {s.get('text')}" for s in content.get(key) or []]
+        if key == "assessment" and content.get("not_recorded"):
+            lines.append("  - Not recorded: " + ", ".join(GAP_LABELS.get(t, t) for t in content["not_recorded"]) + ".")
     return "\n".join(lines)
 
 

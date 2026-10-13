@@ -13,7 +13,10 @@ structured outputs need every field present.
 - InstructionsPlan is what the model chooses for the patient instructions (codes
   from the menus in phrases.py, per item of the signed summary); InstructionsContent
   is the one structure both languages are rendered from (render.py).
-- Handoff: SBAR, four sections.
+- Handoff: SBAR, four sections, plus `not_recorded`: the topics the next shift
+  expects that have nothing in the 12-hour input (a missing list, spec 7.3 rule 3).
+  A statement always states something the record holds and cites it; an absence has
+  nothing to cite, so it is declared here instead (nursing_handoff@2).
 """
 
 from __future__ import annotations
@@ -186,11 +189,18 @@ class InstructionsContent(BaseModel):
 # ---------- SBAR handoff ----------
 
 
+# what an SBAR may declare not recorded (HandoffValidator checks each against the input)
+GapTopic = Literal["intake_output", "vital_signs", "pain", "laboratory_results", "open_tasks", "flags"]
+GAP_LABELS: dict[str, str] = {"intake_output": "intake and output", "vital_signs": "vital signs", "pain": "pain score",
+                              "laboratory_results": "laboratory results", "open_tasks": "open tasks", "flags": "flags"}
+
+
 class Handoff(BaseModel):
     situation: Fact
     background: list[Fact] = Field(default_factory=list, max_length=12)
     assessment: list[Fact] = Field(default_factory=list, max_length=16)
     recommendation: list[Fact] = Field(default_factory=list, max_length=12)
+    not_recorded: list[GapTopic] = Field(default_factory=list, max_length=6)
 
 
 # ---------- validation ----------

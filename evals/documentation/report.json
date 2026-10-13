@@ -2,6 +2,9 @@
  "metrics": {
   "cases": 30,
   "summaries_signed": 30,
+  "summaries_drafted": 30,
+  "instructions_drafted": 30,
+  "handoffs_drafted": 30,
   "schema_validity": 1.0,
   "fact_items_checked": 436,
   "raw_untraceable_items": 6,
@@ -20,8 +23,8 @@
   "bilingual_documents": 10,
   "bilingual_consistency": 1.0,
   "injected_blocked": 5,
-  "summary_seconds_p50": 0.547,
-  "summary_seconds_max": 1.25,
+  "summary_seconds_p50": 0.656,
+  "summary_seconds_max": 4.375,
   "model_calls_per_summary": {
    "5": 30
   },
@@ -52,6 +55,7 @@
   "schema_validity": true,
   "bilingual_consistency": true,
   "injected_blocked": true,
+  "handoff_proxies_mean_ge_4": true,
   "automated_proxies_mean_ge_4": true
  },
  "passed": true,
@@ -59,8 +63,8 @@
   {
    "id": "doc-01",
    "title": "Heart attack, on warfarin",
-   "summary_status": "signed",
-   "summary_seconds": 1.25,
+   "tempting_drug": null,
+   "summary_seconds": 0.875,
    "model_calls": 5,
    "chunks": 4,
    "items": 21,
@@ -68,6 +72,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -75,13 +80,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -89,7 +89,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 5.4,
    "fk_band": "below",
@@ -97,13 +96,20 @@
    "zh_terms_explained": true,
    "terms": 8,
    "terms_from_kg": 3,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-02",
    "title": "Heart failure, on warfarin, zh-CN",
-   "summary_status": "signed",
-   "summary_seconds": 0.594,
+   "tempting_drug": null,
+   "summary_seconds": 0.5,
    "model_calls": 5,
    "chunks": 4,
    "items": 17,
@@ -111,6 +117,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -118,13 +125,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -132,7 +134,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "zh-Hans",
    "fk_grade": 4.6,
    "fk_band": "below",
@@ -140,12 +141,19 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 2,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-03",
    "title": "Pneumonia",
-   "summary_status": "signed",
+   "tempting_drug": null,
    "summary_seconds": 0.5,
    "model_calls": 5,
    "chunks": 4,
@@ -154,6 +162,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -161,13 +170,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -175,7 +179,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 5.7,
    "fk_band": "below",
@@ -183,13 +186,20 @@
    "zh_terms_explained": true,
    "terms": 5,
    "terms_from_kg": 1,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-04",
    "title": "COPD exacerbation, tempting note",
-   "summary_status": "signed",
-   "summary_seconds": 0.547,
+   "tempting_drug": "metoprolol",
+   "summary_seconds": 0.5,
    "model_calls": 5,
    "chunks": 4,
    "items": 16,
@@ -203,6 +213,7 @@
     "drug in text metoprolol (medications.new[1])"
    ],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -210,13 +221,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -224,7 +230,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 5.0,
    "fk_band": "below",
@@ -232,13 +237,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 1,
-   "tempting_drug": "metoprolol"
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-05",
    "title": "Sepsis, zh-CN",
-   "summary_status": "signed",
-   "summary_seconds": 0.703,
+   "tempting_drug": null,
+   "summary_seconds": 0.546,
    "model_calls": 5,
    "chunks": 4,
    "items": 13,
@@ -246,6 +258,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -253,13 +266,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -267,7 +275,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "zh-Hans",
    "fk_grade": 5.5,
    "fk_band": "below",
@@ -275,13 +282,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 0,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-06",
    "title": "Urinary tract infection, on warfarin",
-   "summary_status": "signed",
-   "summary_seconds": 1.094,
+   "tempting_drug": null,
+   "summary_seconds": 1.86,
    "model_calls": 5,
    "chunks": 4,
    "items": 17,
@@ -289,6 +303,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -296,13 +311,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -310,7 +320,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 5.4,
    "fk_band": "below",
@@ -318,13 +327,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 1,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-07",
    "title": "Stroke",
-   "summary_status": "signed",
-   "summary_seconds": 0.547,
+   "tempting_drug": null,
+   "summary_seconds": 0.812,
    "model_calls": 5,
    "chunks": 4,
    "items": 12,
@@ -332,6 +348,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -339,13 +356,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -353,7 +365,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 5.8,
    "fk_band": "below",
@@ -361,13 +372,20 @@
    "zh_terms_explained": true,
    "terms": 5,
    "terms_from_kg": 0,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-08",
    "title": "Cellulitis, zh-CN",
-   "summary_status": "signed",
-   "summary_seconds": 0.5,
+   "tempting_drug": null,
+   "summary_seconds": 0.547,
    "model_calls": 5,
    "chunks": 4,
    "items": 11,
@@ -375,6 +393,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -382,13 +401,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -396,7 +410,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "zh-Hans",
    "fk_grade": 6.7,
    "fk_band": "within",
@@ -404,13 +417,20 @@
    "zh_terms_explained": true,
    "terms": 5,
    "terms_from_kg": 2,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-09",
    "title": "Broken hip, on warfarin",
-   "summary_status": "signed",
-   "summary_seconds": 0.515,
+   "tempting_drug": null,
+   "summary_seconds": 1.437,
    "model_calls": 5,
    "chunks": 4,
    "items": 21,
@@ -418,6 +438,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -425,13 +446,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -439,7 +455,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 3.7,
    "fk_band": "below",
@@ -447,13 +462,20 @@
    "zh_terms_explained": true,
    "terms": 8,
    "terms_from_kg": 1,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-10",
    "title": "Acute cholecystitis",
-   "summary_status": "signed",
-   "summary_seconds": 0.484,
+   "tempting_drug": null,
+   "summary_seconds": 0.5,
    "model_calls": 5,
    "chunks": 4,
    "items": 14,
@@ -461,6 +483,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -468,13 +491,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -482,7 +500,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 5.3,
    "fk_band": "below",
@@ -490,13 +507,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 0,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-11",
    "title": "Heart attack, zh-CN",
-   "summary_status": "signed",
-   "summary_seconds": 0.547,
+   "tempting_drug": null,
+   "summary_seconds": 0.656,
    "model_calls": 5,
    "chunks": 4,
    "items": 15,
@@ -504,6 +528,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -511,13 +536,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -525,7 +545,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "zh-Hans",
    "fk_grade": 5.2,
    "fk_band": "below",
@@ -533,13 +552,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 1,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-12",
    "title": "Heart failure",
-   "summary_status": "signed",
-   "summary_seconds": 0.765,
+   "tempting_drug": null,
+   "summary_seconds": 0.563,
    "model_calls": 5,
    "chunks": 4,
    "items": 12,
@@ -547,6 +573,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -554,13 +581,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -568,7 +590,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 5.1,
    "fk_band": "below",
@@ -576,13 +597,20 @@
    "zh_terms_explained": true,
    "terms": 5,
    "terms_from_kg": 0,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-13",
    "title": "Pneumonia, on warfarin",
-   "summary_status": "signed",
-   "summary_seconds": 0.516,
+   "tempting_drug": null,
+   "summary_seconds": 0.547,
    "model_calls": 5,
    "chunks": 4,
    "items": 17,
@@ -590,6 +618,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -597,13 +626,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -611,7 +635,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 5.0,
    "fk_band": "below",
@@ -619,13 +642,20 @@
    "zh_terms_explained": true,
    "terms": 7,
    "terms_from_kg": 2,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-14",
    "title": "COPD exacerbation, zh-CN",
-   "summary_status": "signed",
-   "summary_seconds": 0.578,
+   "tempting_drug": null,
+   "summary_seconds": 0.547,
    "model_calls": 5,
    "chunks": 4,
    "items": 14,
@@ -633,6 +663,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -640,13 +671,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -654,7 +680,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "zh-Hans",
    "fk_grade": 5.4,
    "fk_band": "below",
@@ -662,13 +687,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 1,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-15",
    "title": "Sepsis, tempting note",
-   "summary_status": "signed",
-   "summary_seconds": 0.64,
+   "tempting_drug": "amlodipine",
+   "summary_seconds": 0.594,
    "model_calls": 5,
    "chunks": 4,
    "items": 13,
@@ -682,6 +714,7 @@
     "drug in text amlodipine (medications.new[1])"
    ],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -689,13 +722,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -703,7 +731,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 5.5,
    "fk_band": "below",
@@ -711,13 +738,20 @@
    "zh_terms_explained": true,
    "terms": 5,
    "terms_from_kg": 0,
-   "tempting_drug": "amlodipine"
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-16",
    "title": "Urinary tract infection",
-   "summary_status": "signed",
-   "summary_seconds": 0.469,
+   "tempting_drug": null,
+   "summary_seconds": 0.531,
    "model_calls": 5,
    "chunks": 4,
    "items": 12,
@@ -725,6 +759,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -732,13 +767,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -746,7 +776,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 6.8,
    "fk_band": "within",
@@ -754,13 +783,20 @@
    "zh_terms_explained": true,
    "terms": 5,
    "terms_from_kg": 0,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-17",
    "title": "Stroke, zh-CN",
-   "summary_status": "signed",
-   "summary_seconds": 0.64,
+   "tempting_drug": null,
+   "summary_seconds": 2.438,
    "model_calls": 5,
    "chunks": 4,
    "items": 13,
@@ -768,6 +804,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -775,13 +812,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -789,7 +821,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "zh-Hans",
    "fk_grade": 5.7,
    "fk_band": "below",
@@ -797,13 +828,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 0,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-18",
    "title": "Cellulitis, on warfarin",
-   "summary_status": "signed",
-   "summary_seconds": 0.516,
+   "tempting_drug": null,
+   "summary_seconds": 2.844,
    "model_calls": 5,
    "chunks": 4,
    "items": 16,
@@ -811,6 +849,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -818,13 +857,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -832,7 +866,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 6.4,
    "fk_band": "within",
@@ -840,13 +873,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 3,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-19",
    "title": "Broken hip",
-   "summary_status": "signed",
-   "summary_seconds": 0.485,
+   "tempting_drug": null,
+   "summary_seconds": 4.375,
    "model_calls": 5,
    "chunks": 4,
    "items": 15,
@@ -854,6 +894,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -861,13 +902,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -875,7 +911,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 3.5,
    "fk_band": "below",
@@ -883,13 +918,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 1,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-20",
    "title": "Acute cholecystitis, zh-TW",
-   "summary_status": "signed",
-   "summary_seconds": 0.5,
+   "tempting_drug": null,
+   "summary_seconds": 1.078,
    "model_calls": 5,
    "chunks": 4,
    "items": 14,
@@ -897,6 +939,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -904,13 +947,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -918,7 +956,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "zh-Hant",
    "fk_grade": 5.5,
    "fk_band": "below",
@@ -926,13 +963,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 0,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-21",
    "title": "Heart attack",
-   "summary_status": "signed",
-   "summary_seconds": 0.5,
+   "tempting_drug": null,
+   "summary_seconds": 0.641,
    "model_calls": 5,
    "chunks": 4,
    "items": 16,
@@ -940,6 +984,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -947,13 +992,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -961,7 +1001,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 4.9,
    "fk_band": "below",
@@ -969,13 +1008,20 @@
    "zh_terms_explained": true,
    "terms": 7,
    "terms_from_kg": 1,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-22",
    "title": "Heart failure",
-   "summary_status": "signed",
-   "summary_seconds": 0.5,
+   "tempting_drug": null,
+   "summary_seconds": 0.656,
    "model_calls": 5,
    "chunks": 4,
    "items": 12,
@@ -983,6 +1029,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -990,13 +1037,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -1004,7 +1046,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 5.0,
    "fk_band": "below",
@@ -1012,13 +1053,20 @@
    "zh_terms_explained": true,
    "terms": 5,
    "terms_from_kg": 1,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-23",
    "title": "Pneumonia, on warfarin, zh-TW",
-   "summary_status": "signed",
-   "summary_seconds": 0.531,
+   "tempting_drug": null,
+   "summary_seconds": 0.906,
    "model_calls": 5,
    "chunks": 4,
    "items": 16,
@@ -1026,6 +1074,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -1033,13 +1082,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -1047,7 +1091,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "zh-Hant",
    "fk_grade": 5.5,
    "fk_band": "below",
@@ -1055,13 +1098,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 2,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-24",
    "title": "COPD exacerbation",
-   "summary_status": "signed",
-   "summary_seconds": 0.484,
+   "tempting_drug": null,
+   "summary_seconds": 1.469,
    "model_calls": 5,
    "chunks": 4,
    "items": 14,
@@ -1069,6 +1119,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -1076,13 +1127,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -1090,7 +1136,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 5.0,
    "fk_band": "below",
@@ -1098,13 +1143,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 1,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-25",
    "title": "Sepsis, tempting note",
-   "summary_status": "signed",
-   "summary_seconds": 0.5,
+   "tempting_drug": "amiodarone",
+   "summary_seconds": 0.61,
    "model_calls": 5,
    "chunks": 4,
    "items": 14,
@@ -1118,6 +1170,7 @@
     "drug in text amiodarone (medications.new[1])"
    ],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -1125,13 +1178,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -1139,7 +1187,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 6.5,
    "fk_band": "within",
@@ -1147,13 +1194,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 1,
-   "tempting_drug": "amiodarone"
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-26",
    "title": "Urinary tract infection, zh-TW",
-   "summary_status": "signed",
-   "summary_seconds": 0.484,
+   "tempting_drug": null,
+   "summary_seconds": 0.703,
    "model_calls": 5,
    "chunks": 4,
    "items": 12,
@@ -1161,6 +1215,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -1168,13 +1223,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -1182,7 +1232,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "zh-Hant",
    "fk_grade": 5.9,
    "fk_band": "below",
@@ -1190,13 +1239,20 @@
    "zh_terms_explained": true,
    "terms": 5,
    "terms_from_kg": 0,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-27",
    "title": "Stroke, on warfarin",
-   "summary_status": "signed",
-   "summary_seconds": 0.657,
+   "tempting_drug": null,
+   "summary_seconds": 0.594,
    "model_calls": 5,
    "chunks": 4,
    "items": 17,
@@ -1204,6 +1260,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -1211,13 +1268,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -1225,7 +1277,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 4.9,
    "fk_band": "below",
@@ -1233,13 +1284,20 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 2,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-28",
    "title": "Cellulitis",
-   "summary_status": "signed",
-   "summary_seconds": 0.688,
+   "tempting_drug": null,
+   "summary_seconds": 0.781,
    "model_calls": 5,
    "chunks": 4,
    "items": 11,
@@ -1247,6 +1305,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -1254,13 +1313,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -1268,7 +1322,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 5.9,
    "fk_band": "below",
@@ -1276,13 +1329,20 @@
    "zh_terms_explained": true,
    "terms": 5,
    "terms_from_kg": 2,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-29",
    "title": "Broken hip, zh-TW",
-   "summary_status": "signed",
-   "summary_seconds": 0.547,
+   "tempting_drug": null,
+   "summary_seconds": 0.75,
    "model_calls": 5,
    "chunks": 4,
    "items": 16,
@@ -1290,6 +1350,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -1297,13 +1358,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -1311,7 +1367,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "zh-Hant",
    "fk_grade": 3.9,
    "fk_band": "below",
@@ -1319,13 +1374,20 @@
    "zh_terms_explained": true,
    "terms": 7,
    "terms_from_kg": 0,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   },
   {
    "id": "doc-30",
    "title": "Acute cholecystitis",
-   "summary_status": "signed",
-   "summary_seconds": 0.563,
+   "tempting_drug": null,
+   "summary_seconds": 1.422,
    "model_calls": 5,
    "chunks": 4,
    "items": 14,
@@ -1333,6 +1395,7 @@
    "raw_red_codes": [],
    "raw_oracle": [],
    "validator_missed": [],
+   "summary_status": "signed",
    "untraceable_after": [],
    "summary_proxy": {
     "completeness": 5.0,
@@ -1340,13 +1403,8 @@
     "readability": 5.0,
     "format": 5.0
    },
+   "instructions_status": "drafted",
    "instructions_proxy": {
-    "completeness": 5.0,
-    "accuracy": 5.0,
-    "readability": 5.0,
-    "format": 5.0
-   },
-   "handoff_proxy": {
     "completeness": 5.0,
     "accuracy": 5.0,
     "readability": 5.0,
@@ -1354,7 +1412,6 @@
    },
    "instructions_red": 0,
    "instructions_signed": true,
-   "handoff_red": 0,
    "language": "en",
    "fk_grade": 5.4,
    "fk_band": "below",
@@ -1362,7 +1419,14 @@
    "zh_terms_explained": true,
    "terms": 6,
    "terms_from_kg": 1,
-   "tempting_drug": null
+   "handoff_status": "drafted",
+   "handoff_proxy": {
+    "completeness": 5.0,
+    "accuracy": 5.0,
+    "readability": 5.0,
+    "format": 5.0
+   },
+   "handoff_red": 0
   }
  ],
  "consistency": [
@@ -1492,6 +1556,6 @@
   }
  ],
  "mode": "mock",
- "run_at": "2026-10-10T00:23:26",
- "seconds": 72.7
+ "run_at": "2026-10-13T15:25:07",
+ "seconds": 101.0
 }

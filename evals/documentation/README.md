@@ -25,7 +25,10 @@ documentation service (the demo physician and nurse).
   every item with `source_refs[]` (app/modules/documentation/models.py).
 - Patient instructions: one structure (`patient-instructions@1`: reason, medicines with purpose / times / cautions,
   follow-ups, red flags, daily care) rendered in English, Simplified and Traditional Chinese.
-- Handoff: `{situation, background[], assessment[], recommendation[]}`, every statement with `source_refs[]`.
+- Handoff: `{situation, background[], assessment[], recommendation[], not_recorded[]}`, every statement with
+  `source_refs[]`; `not_recorded` lists the topics with nothing in the 12-hour input (`intake_output`,
+  `vital_signs`, `pain`, `laboratory_results`, `open_tasks`, `flags`), which the validator checks against the
+  whole input (an absence has nothing to cite; `nursing_handoff@2`).
 - Labels (`expected`): diagnosis and procedure codes, follow-up clinics, pending tests, the patient's language;
   medication categories are checked against the signed discharge medication table.
 
@@ -41,6 +44,16 @@ documentation service (the demo physician and nurse).
 | Human rating, four dimensions (completeness, accuracy, readability, format), 1-5 | mean >= 4 per dimension (rating_sheet.md, outstanding) |
 | Automated proxies of the four dimensions | mean >= 4 (stand-in until the human rating) |
 
+The handoff's proxies (`_handoff_proxies` in the harness) each measure one thing, so one defect lowers one proxy:
+completeness = the share of needed content present (the four sections, every open task and flag in the
+recommendation, a vital-sign trend citing observations, pain and intake/output each addressed by a statement or a
+`not_recorded` entry); accuracy = 1 + 4 x the share of claims (statements and `not_recorded` entries) with no
+validator issue, red or amber; readability = the longest statement at most 45 words (5, else 4); format = 1 + 4 x
+the share of template checks passed (the situation one sentence; no statement stating an absence, which belongs in
+`not_recorded`). Until 2026-10-13 an uncited statement cost accuracy (any red: 2.0, any amber: 4.0) and format
+(not every statement cited: 3.0), so the live mean accuracy 2.95 of run-2026-10-12T225622 was the share of
+handoffs with a red item, rescaled (docs/debugging-casebook.md).
+
 Monitoring, not gated: the raw (pre-validator) hallucination rate; the English Flesch-Kincaid grade (target 6-8 or
 easier); Chinese without Latin letters; terms explained at first use and how many explanations came from the
 knowledge graph; the summary's drafting time and model calls. A subset of the gates runs in the backend suite
@@ -54,6 +67,11 @@ knowledge graph; the summary's drafting time and model calls. A subset of the ga
   live model can fail in other ways; the validator catches names and sources, not wrong facts about a traced item
   (a wrong date or dose next to a real drug name), which only the physician's review catches. Numbers are checked
   against the cited sources in the handoff only (a warning).
+- Handoff, `nursing_handoff@1` (live, 2026-10-12): the prompt asked for "not recorded" statements (intake and
+  output) while every statement must cite a source; the facts never hold intake and output, so the model wrote
+  "Intake and output were not recorded." with no source (red, 14 of 22 drafted handoffs). Version 2 declares such
+  topics in `not_recorded`. A result's time ("at 01:00") is in its source since then, which removed spurious
+  amber number warnings.
 - Free text is scanned with the EHR's condition and procedure names and the knowledge graph's drug names: a
   negated mention ("no signs of pneumonia") is flagged red; a disease outside the EHR's list is not checked.
 - The knowledge graph's facts are noisy, so most explanations are reviewed plain-language ones or the medicine's

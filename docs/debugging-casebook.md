@@ -96,6 +96,7 @@
 | 3.14 | 电话 agent 的"中文失败"其实是 MINIMAL 思考 | 平台 / imaging | 真实模型 · A/B 实验 |
 | 3.15 | 重试救回 2/3，剩下的是连环卡顿 | 平台 / hospital | 真实模型 · 可用性 |
 | 3.16 | 一半预算的副作用：用药两个 agent 的慢调用被 12.5 秒截断 | 平台 / hospital | 真实模型 · 超时 |
+| 3.20 | 交班 SBAR 的"未记录"无处可引，代理指标重复计分 | hospital | 真实模型 · 契约 · 评测口径 |
 | 4.1 | 来电者口述的出生日期没被去标识化 | imaging | 隐私 |
 | 4.2 | 两个字母的姓（Hu、Li）泄露 | hospital | 隐私 |
 | 4.3 | 去标识化评测满分，说明评测集太简单 | hospital | 隐私 · 评测可信度 |
@@ -916,6 +917,40 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **来源：** 3.15 的后续，2026-10-13 侧会话（分支 `claude/stoic-sutherland-d96ab0`，基于 `claude/reverent-babbage-aad5a2`）。
 - **代码：** `apps/api/config/agents/order_review.yaml`、`apps/api/config/agents/medication_reconciliation.yaml`、`apps/api/app/llm/providers.py`（`ATTEMPT_SHARE`、`_usage`）、`apps/api/app/modules/med_safety/service.py`（`comment`、`settle`、`ai_step`）、`apps/api/app/main.py`（`_narrator_loop`）、`apps/api/tests/test_gemini.py`。
 - **提交：** `d0e1241`（分支 `claude/stoic-sutherland-d96ab0`）。
+### 3.20 交班 SBAR 的"未记录"无处可引：prompt 和校验器互相矛盾，代理指标又把一个错扣了两次
+
+- **现象：** 合并后的真实运行 `run-2026-10-12T225622` 里，`nursing_handoff` 写出 22/30 份交班（8 份是 Vertex 卡顿），只过 8 份；代理指标门槛失败：accuracy 2.95、format 3.73（completeness 5.0、readability 4.14）。14 份交班恰好是 accuracy 2.0 + format 3.0，其余 8 份是 5/5 或 4/5。mock 基线全是 5.0，`handoff_red` 0。
+- **怎么查的：**
+  1. **先读口径，不读模型。** 运行文件只留了每份交班的红项数和代理分，**没有交班内容**。看 `evals.py` 的 `_handoff_proxies`：format 只有在某句 `source_refs` 为空时才是 3.0，所以这 14 份每份至少有一句没引用来源，也就是 `HandoffValidator._cited` 报的红色 `no_source`；accuracy 是"有红 2.0、只有黄 4.0、都没有 5.0"的台阶。算一下：5 − 3×14/22 − 1×3/22 = 2.95。**2.95 只是"有红项的交班占比"换了个刻度**，而且同一句没引用的话在 accuracy 和 format 各扣一次。
+  2. **列假设：**
+     - A（读 prompt 得出）：`nursing_handoff@1` 要求 assessment 写"出入量"，缺了就写 "not recorded"；同时又要求每句都带 `source_refs`。`handoff_agent.build_facts` 的事实里**根本没有出入量**，所以一句如实的"出入量未记录"没有任何资源可引。
+     - B：模型随机漏引用。
+     - C：`unknown_ref` 重试把引用弄丢了。看运行文件：30 个病例正好 30 次模型调用，重试一次都没发生；而且编造的 id 报的是 `unknown_ref`，不是 `no_source`。**C 排除。**
+  3. **mock 实验：** 写了一个复现脚本（自己的库 `ioc_repro_handoff`，只起草交班，事务回滚），在 doc-01、04、19、22、25 上跑 mock：0 红。看 `mocks.py`：mock 的"Intake and output: not recorded this shift."引用的是生命体征观测（没有就引 Encounter）。**mock 的作者替模型把矛盾"解决"了**：随便挂一个来源。所以 mock 永远看不到这个问题，而那个引用其实什么也证明不了（生命体征并不能说明出入量没记）。
+  4. **真实模型实验（负责人同意，10 次调用）：** 同样 5 个病例各起草 2 次。6 次是 Vertex 卡顿（0 token），4 次写出来了：**4 份全都有 "Intake and output were not recorded."**；其中 3 份 `source_refs: []`，而且这是每份交班**唯一**的红项；doc-25 那份引了 Encounter，于是"通过"了，但那个引用是凑数的。其他所有句子都正常引用，**B 排除，A 成立**。
+  5. **顺带发现：** 这 4 份里有 3 份带黄色 `number_not_in_source`，值是 "01" 和 "00"：模型写 "Laboratory results at 01:00 ..."。事实给了化验的时间（`time: "01:00"`），但校验器看的来源 `Source.detail` 只有 "名称 数值"，没有时间。又是一处事实和校验器对不上，正是这类假黄项让 doc-25 拿了 accuracy 4.0。
+- **根因：** 两条规则不能同时满足：prompt 要求把"缺失"写成一句话，校验器要求每句话都能对回一个输入资源。"没有"这件事没有资源可引。模型选择了如实写、不引用，结果被判为不可溯源。mock 和用例是同一个作者写的，矛盾被 mock 悄悄绕过，所以只在真实模型上暴露。另外，代理指标不是互相独立的：一个缺引用同时拉低两项，accuracy 又是台阶函数，整体只剩"有没有红项"这一个信息。
+- **怎么修：**
+  1. **给"缺失"单独一个通道**（规格 7.3 本来就要求"输入缺关键资源时输出缺失清单"）：`Handoff` 加 `not_recorded: list[GapTopic]`，取值固定为 `intake_output`、`vital_signs`、`pain`、`laboratory_results`、`open_tasks`、`flags`。它不是一句话，不需要引用；`HandoffValidator.check_document` 拿它**对照全部输入**：输入里明明有却声明"未记录"（比如有生命体征却写 `vital_signs`），就是红色 `recorded_not_missing`，因为那会让下一班漏看数据。
+  2. 新 prompt `nursing_handoff@2`：缺失的话题放进 `not_recorded`，任何一句话都不许说"没有、未记录、不可用"。注册表改为 `nursing_handoff` 0.3.0 → `@2`，mock 跑完整套件 30/30，`--stamp` 写进头部（`run-2026-10-13T151242`），prompt gate 通过；`@1` 保留为上一版。
+  3. mock 改成同样的契约（不再给缺失挂凑数的引用），情况栏也改成一句话；`render_text` 和网页的 SBAR 面板显示"Not recorded: intake and output"。
+  4. 化验来源的 `detail` 加上时间（`... at 01:00`），和给模型的事实一致。
+  5. 代理指标重新定义，**一个缺陷只动一项**：completeness = 需要的内容在不在（四段、待办和标志都进了建议、生命体征趋势引用了观测、疼痛和出入量要么有一句、要么在 `not_recorded`）；accuracy = 1 + 4 × 没有任何校验问题的论断占比（论断包括每句话和每条 `not_recorded`）；readability 不变（最长一句 ≤ 45 词）；format = 1 + 4 × SBAR 模板检查通过的占比（情况栏只有一句；没有一句话在陈述"缺失"）。
+- **怎么证明：**
+  1. 新测试：`test_documentation_validator.py` 两个（未记录的话题对照全部输入，包括"尿量是出入量不是化验"；化验时间在来源里，不再报黄），`test_documentation_eval.py` 六个（干净交班四项 5.0；缺一个引用只扣 accuracy 且按比例；一个数字黄项按比例而不是台阶 4.0；带凑数引用的"未记录"句只扣 format；不提疼痛和出入量扣 completeness；情况栏多句扣 format），`test_documentation.py` 的交班测试改为检查 `not_recorded` 和文本里的 "Not recorded: intake and output"。
+  2. **证明新测试能抓住旧问题：** 用一个临时 pytest 插件把旧的 `_handoff_proxies` 换回去再跑这六个测试，5 个失败（比如缺引用：旧 accuracy 2.0，新的应为 4.43；带凑数引用的句子：旧 format 5.0，新的应为 4.5），只有"干净交班 5.0"那个两边都过。
+  3. 真实模型（`@2`，同 5 个病例 × 2，负责人同意）：7 次 Vertex 卡顿，写出来的 3 份**全部 0 个问题**，都把 `intake_output` 放进了 `not_recorded`，没有病人标志的两例还声明了 `flags`（校验器确认确实没有）；"from 01:00" 不再报黄。样本小，结论是"契约被遵守"，不是"通过率"。
+  4. 用新代理重新给 `@1` 的 4 份真实草稿打分：accuracy 从 2.0 变成 3.86–4.5，format 从 3.0 变成 4.5（那句"未记录"现在既算不可溯源又算放错地方：是两个缺陷，各扣一项）。
+  5. 注册表、prompt gate、AI Ops、文书、权限和工作流测试共 109 个，108 个通过（`test_agent_registry.py` 改为期望 `nursing_handoff@2`）；失败的 `test_template_only_without_ai_consent` 在 a347f78 上本来就失败（并行会话已记录），和本改动无关。`npx tsc -b` 通过。
+- **经验：**
+  1. 给模型的每条"缺了就写 X"都要拿去和引用契约对一遍：**"没有"不是一个事实资源，需要自己的通道**，否则模型只能在"如实"和"可溯源"之间二选一。
+  2. mock 和用例同一个作者时，mock 会默默替模型解决规格里的矛盾；mock 满分不证明契约是对的。
+  3. 运行记录不保留内容时，不要凭分数猜：挑几个病例复现，先 mock 再真模型，对照着看。
+  4. 检查代理指标的办法：**故意放一个缺陷，数一数有几项分数动了**。超过一项就是重复计分；台阶函数则会把"多少"压成"有没有"。
+- **范围：** hospital（WP7 文书，交班 SBAR）。
+- **来源：** `run-2026-10-12T225622` 失败分析；复现脚本和两轮真实调用（2026-10-13）。
+- **代码：** `apps/api/prompts/nursing_handoff/2.md`、`apps/api/app/modules/documentation/models.py`（`Handoff.not_recorded`）、`validator.py`（`HandoffValidator.check_document`）、`handoff_agent.py`（化验来源的时间、`render_text`）、`mocks.py`、`evals.py`（`_handoff_proxies`）、`apps/web/src/features/documentation/HandoffPanel.tsx`、`apps/api/config/agents/nursing_handoff.yaml`。
+- **提交：** f5e59f3（分支 `claude/vibrant-neumann-40593c`）。
 
 ---
 

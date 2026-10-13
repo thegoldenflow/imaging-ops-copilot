@@ -10,7 +10,12 @@ import { ApiError } from "../../lib/api";
 import { draftHandoff, issuesAt, saveDocument, signDocument, useDocument, type DocView, type EncounterView, type Fact, type HandoffContent } from "./api";
 import { IssueList, SourcePanel, ValidationBar } from "./kit";
 
-const SECTIONS: { key: keyof HandoffContent; letter: string; title: string }[] = [
+const GAP_LABELS: Record<string, string> = {
+  intake_output: "intake and output", vital_signs: "vital signs", pain: "pain score",
+  laboratory_results: "laboratory results", open_tasks: "open tasks", flags: "flags",
+};
+
+const SECTIONS: { key: Exclude<keyof HandoffContent, "not_recorded">; letter: string; title: string }[] = [
   { key: "situation", letter: "S", title: "Situation" },
   { key: "background", letter: "B", title: "Background" },
   { key: "assessment", letter: "A", title: "Assessment (last 12 hours)" },
@@ -148,6 +153,12 @@ function Review({ doc }: { doc: DocView }) {
                     );
                   })}
                 </ul>
+                {s.key === "assessment" && (content.not_recorded ?? []).length > 0 && (
+                  <div className="mt-1 text-xs text-slate-500" data-testid="sbar-not-recorded">
+                    Not recorded: {(content.not_recorded ?? []).map((t) => GAP_LABELS[t] ?? t).join(", ")}
+                    <IssueList issues={(doc.validation?.issues ?? []).filter((i) => i.path.startsWith("not_recorded["))} />
+                  </div>
+                )}
               </section>
             );
           })}

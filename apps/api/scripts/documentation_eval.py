@@ -123,10 +123,13 @@ def write(report: dict) -> None:
           for kind, v in p.items()], "",
         "Proxies: completeness = expected diagnoses, procedures, follow-ups, pending tests and every discharge "
         "medication present (instructions: every summary medicine and follow-up, red flags, daily care; handoff: four "
-        "sections, open tasks and flags in the recommendation, vital signs in the assessment); accuracy = the "
-        "discharge medication table's categories and the expected codes (instructions and handoff: no red item); "
-        "readability = the course's grade level (instructions: grade <= 8, Chinese checks); format = dated, ordered "
-        "course and every item cited (instructions: five blocks, identical item keys in three languages).", "",
+        "sections, open tasks and flags in the recommendation, vital signs in the assessment, pain and intake/output "
+        "stated or declared not recorded); accuracy = the discharge medication table's categories and the expected "
+        "codes (instructions: no red item; handoff: the share of statements and not-recorded declarations with no "
+        "validator issue); readability = the course's grade level (instructions: grade <= 8, Chinese checks; handoff: "
+        "statements of at most 45 words); format = dated, ordered course and every item cited (instructions: five "
+        "blocks, identical item keys in three languages; handoff: a one-sentence situation, no statement stating an "
+        "absence). The handoff's proxies each measure one thing (evals/documentation/README.md).", "",
         "## Injected hallucinations", "", "| Sample | Path | Blocked | Validator |", "| --- | --- | --- | --- |",
         *[f"| {x['sample']} | {x['path']} | {x['blocked']} | {'; '.join(x['issues'])[:180]} |" for x in report["injected"]],
         "", "## Bilingual consistency", "", "| Case | Language | Fact items | Keys match | Number mismatches |",

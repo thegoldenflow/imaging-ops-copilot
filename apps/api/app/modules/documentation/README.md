@@ -48,7 +48,10 @@ person signing each: the **discharge summary** (physician), the **bilingual pati
   take it / notes; follow-up appointments; red flags with what to do; daily care: food, activity, wound) in `en`,
   `zh-Hans` and `zh-Hant` from that one structure. Default language from `communication.language` (zh-CN ->
   Simplified, zh-TW -> Traditional).
-- Handoff: `{situation, background[], assessment[], recommendation[]}`, every statement `{text, source_refs[]}`.
+- Handoff: `{situation, background[], assessment[], recommendation[], not_recorded[]}`, every statement
+  `{text, source_refs[]}`; `not_recorded`: the topics with nothing in the input (`intake_output`, `vital_signs`,
+  `pain`, `laboratory_results`, `open_tasks`, `flags`), never written as a statement (it would have nothing to cite);
+  HandoffValidator checks each against the whole input (a recorded topic declared missing is red).
 - Each document is a DocumentReference (docStatus preliminary until signed) with id `dsum-<encounter>`,
   `pinstr-<encounter>` or `sbar-<encounter>-<YYYYMMDD><D|N>`: text attachments (the instructions in three
   languages) and the JSON attachment `documentation-data` (content, the AI draft as written, the validator's report,

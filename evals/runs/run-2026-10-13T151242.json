@@ -1,0 +1,828 @@
+{
+ "run_id": "run-2026-10-13T151242",
+ "started_at": "2026-10-13T15:12:42",
+ "finished_at": "2026-10-13T15:14:04",
+ "mode": "mock",
+ "baseline": true,
+ "trigger": "cli",
+ "requested": [
+  "nursing_handoff"
+ ],
+ "variant": null,
+ "git": {
+  "commit": "a347f78",
+  "dirty": true
+ },
+ "agents": {
+  "nursing_handoff": {
+   "suite": "documentation",
+   "suite_kind": "builtin",
+   "suite_title": "Documentation agents (7.3)",
+   "source": "evals/documentation/cases.jsonl",
+   "agent_version": "0.3.0",
+   "kind": "runtime_agent",
+   "risk_tier": "documentation",
+   "prompt_version": "nursing_handoff@2",
+   "prompt_sha256": "49470c85dc24bd3b",
+   "model": "claude-sonnet-5-5",
+   "model_key": "claude-reasoning",
+   "mode": "mock",
+   "variant": null,
+   "threshold": 0.9,
+   "pipeline_eval": false,
+   "metrics": {
+    "schema_validity": 1.0,
+    "grounding_rate": null,
+    "task_success": 1.0,
+    "human_override_rate": null,
+    "latency_p50_ms": 0,
+    "latency_p95_ms": 16,
+    "cost_per_case_usd": 0.005298,
+    "cost_estimated": true,
+    "cases": 30,
+    "cases_passed": 30,
+    "model_calls": 30,
+    "tokens_in": 19060,
+    "tokens_out": 12081,
+    "human_decisions": 0
+   },
+   "extra": {
+    "handoff_red": 0
+   },
+   "gates": {
+    "automated_proxies_mean_ge_4": {
+     "value": {
+      "completeness": 5.0,
+      "accuracy": 5.0,
+      "readability": 5.0,
+      "format": 5.0
+     },
+     "threshold": ">= 4",
+     "passed": true
+    },
+    "cost_per_case": {
+     "value": 0.005298,
+     "threshold": 0.25,
+     "passed": true
+    }
+   },
+   "notes": "30 synthetic stays through the real path: summary (traceable items, signed), bilingual instructions (readability, plain Chinese) and SBAR handoff. A document the model could not draft fails that case for its agent, with the reason (the instructions fail with the summary they are drafted from). The human rating sheet is outside the runner.",
+   "module_run_at": null,
+   "case_results": [
+    {
+     "id": "doc-01",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 14,
+     "cost_usd": 0.006168,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00046",
+      "RUN-00047",
+      "RUN-00048",
+      "RUN-00049"
+     ]
+    },
+    {
+     "id": "doc-02",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.00555,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00050",
+      "RUN-00051",
+      "RUN-00052",
+      "RUN-00053"
+     ]
+    },
+    {
+     "id": "doc-03",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005242,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00054",
+      "RUN-00055",
+      "RUN-00056",
+      "RUN-00057"
+     ]
+    },
+    {
+     "id": "doc-04",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005372,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00058",
+      "RUN-00059",
+      "RUN-00060",
+      "RUN-00061"
+     ]
+    },
+    {
+     "id": "doc-05",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 14,
+     "cost_usd": 0.005516,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00062",
+      "RUN-00063",
+      "RUN-00064",
+      "RUN-00065"
+     ]
+    },
+    {
+     "id": "doc-06",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005378,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00066",
+      "RUN-00067",
+      "RUN-00068",
+      "RUN-00069"
+     ]
+    },
+    {
+     "id": "doc-07",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.00446,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00071",
+      "RUN-00072",
+      "RUN-00073"
+     ]
+    },
+    {
+     "id": "doc-08",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.004724,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00074",
+      "RUN-00075",
+      "RUN-00076",
+      "RUN-00077"
+     ]
+    },
+    {
+     "id": "doc-09",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005876,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00078",
+      "RUN-00079",
+      "RUN-00080",
+      "RUN-00081"
+     ]
+    },
+    {
+     "id": "doc-10",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005306,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00082",
+      "RUN-00083",
+      "RUN-00084",
+      "RUN-00085"
+     ]
+    },
+    {
+     "id": "doc-11",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 16,
+     "cost_usd": 0.005328,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00086",
+      "RUN-00087",
+      "RUN-00088",
+      "RUN-00089"
+     ]
+    },
+    {
+     "id": "doc-12",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005006,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00091",
+      "RUN-00092",
+      "RUN-00093"
+     ]
+    },
+    {
+     "id": "doc-13",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005778,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00094",
+      "RUN-00095",
+      "RUN-00096",
+      "RUN-00097"
+     ]
+    },
+    {
+     "id": "doc-14",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005352,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00098",
+      "RUN-00099",
+      "RUN-00100",
+      "RUN-00101"
+     ]
+    },
+    {
+     "id": "doc-15",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005516,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00102",
+      "RUN-00103",
+      "RUN-00104",
+      "RUN-00105"
+     ]
+    },
+    {
+     "id": "doc-16",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005168,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00106",
+      "RUN-00107",
+      "RUN-00108",
+      "RUN-00109"
+     ]
+    },
+    {
+     "id": "doc-17",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.004478,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00110",
+      "RUN-00111",
+      "RUN-00112",
+      "RUN-00113"
+     ]
+    },
+    {
+     "id": "doc-18",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005218,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00114",
+      "RUN-00115",
+      "RUN-00116",
+      "RUN-00117"
+     ]
+    },
+    {
+     "id": "doc-19",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005484,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00118",
+      "RUN-00119",
+      "RUN-00120",
+      "RUN-00121"
+     ]
+    },
+    {
+     "id": "doc-20",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 14,
+     "cost_usd": 0.005274,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00122",
+      "RUN-00123",
+      "RUN-00124",
+      "RUN-00125"
+     ]
+    },
+    {
+     "id": "doc-21",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005534,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00126",
+      "RUN-00127",
+      "RUN-00128",
+      "RUN-00129"
+     ]
+    },
+    {
+     "id": "doc-22",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005014,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00131",
+      "RUN-00132",
+      "RUN-00133"
+     ]
+    },
+    {
+     "id": "doc-23",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005756,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00134",
+      "RUN-00135",
+      "RUN-00136",
+      "RUN-00137"
+     ]
+    },
+    {
+     "id": "doc-24",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005354,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00138",
+      "RUN-00139",
+      "RUN-00140",
+      "RUN-00141"
+     ]
+    },
+    {
+     "id": "doc-25",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005534,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00142",
+      "RUN-00143",
+      "RUN-00144",
+      "RUN-00145"
+     ]
+    },
+    {
+     "id": "doc-26",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.00485,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00146",
+      "RUN-00147",
+      "RUN-00148",
+      "RUN-00149"
+     ]
+    },
+    {
+     "id": "doc-27",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 15,
+     "cost_usd": 0.005152,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00150",
+      "RUN-00151",
+      "RUN-00152",
+      "RUN-00153"
+     ]
+    },
+    {
+     "id": "doc-28",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.004768,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00154",
+      "RUN-00155",
+      "RUN-00156",
+      "RUN-00157"
+     ]
+    },
+    {
+     "id": "doc-29",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 0,
+     "cost_usd": 0.005476,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00158",
+      "RUN-00159",
+      "RUN-00160",
+      "RUN-00161"
+     ]
+    },
+    {
+     "id": "doc-30",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 16,
+     "cost_usd": 0.005298,
+     "expected": "no red item, proxies >= 4",
+     "got": {
+      "red": 0,
+      "proxies": {
+       "completeness": 5.0,
+       "accuracy": 5.0,
+       "readability": 5.0,
+       "format": 5.0
+      }
+     },
+     "run_ids": [
+      "RUN-00162",
+      "RUN-00163",
+      "RUN-00164",
+      "RUN-00165"
+     ]
+    }
+   ],
+   "status": "met",
+   "met": true,
+   "seconds": 81.8,
+   "eval_status": "pending"
+  }
+ },
+ "platform": {},
+ "note": "Mock model: a baseline that shows the pipeline (context, schema, guards, evidence), not a model's quality; mock costs are list-price estimates."
+}

@@ -87,11 +87,13 @@ def test_every_existing_agent_is_registered_with_its_prompt_version():
         spec = agents[name]
         assert spec.kind == "runtime_agent" and spec.prompt_version == f"{name}@1", name
         assert spec.entrypoint and spec.deployment_status == "demo" and spec.eval_status.status == "pending", name
-    # WP7 (7.3): the three documentation agents
-    for name, module in (("discharge_summary", "summary_agent"), ("patient_instructions", "instructions_agent"),
-                         ("nursing_handoff", "handoff_agent")):
+    # WP7 (7.3): the three documentation agents (the handoff on version 2: absences in not_recorded, 2026-10-13)
+    for name, module, version in (("discharge_summary", "summary_agent", 1),
+                                  ("patient_instructions", "instructions_agent", 1),
+                                  ("nursing_handoff", "handoff_agent", 2)):
         spec = agents[name]
-        assert spec.entrypoint == f"app.modules.documentation.{module}" and spec.prompt_version == f"{name}@1", name
+        assert spec.entrypoint == f"app.modules.documentation.{module}" and spec.prompt_version == f"{name}@{version}", \
+            name
         assert spec.deployment_status == "demo" and spec.eval_status.status == "pending", name
     # WP6 (7.2): the order review's commentary and the reconciliation's indication judgements
     for name, module in (("order_review", "review_agent"), ("medication_reconciliation", "medrec_agent")):

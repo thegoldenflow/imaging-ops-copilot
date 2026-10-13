@@ -282,7 +282,11 @@ def test_sbar_handoff_confirmed_by_the_nurse(fresh_state):
     for section in ("background", "assessment", "recommendation"):
         for item in content[section]:
             assert set(item["source_refs"]) <= sources
-    assert any("not recorded" in a["text"] for a in content["assessment"])
+    # nursing_handoff@2: what the input does not hold is declared, never stated (an absence has nothing to cite)
+    assert "intake_output" in content["not_recorded"]
+    assert not any("not recorded" in a["text"].lower() for a in content["assessment"])
+    assert "Not recorded: intake and output" in D.read_texts(service._document(service._fhir(nurse, service.VIEW),
+                                                                              view["id"]))["en"]
     assert not red(view)
     again = service.draft_handoff(store, nurse, stay)
     assert again["id"] == view["id"] and again["run_id"] == view["run_id"]  # one per shift
