@@ -155,6 +155,54 @@ def test_subclasses_share_the_base_class():
     assert any(i.code == "untraceable_drug" for i in report.red())
 
 
+def _handoff(not_recorded: list[str]) -> dict:
+    return {"situation": {"text": "Day 3 of the stay, heart rate 78.", "source_refs": ["Encounter/e1", "Observation/o1"]},
+            "background": [], "assessment": [], "recommendation": [], "not_recorded": not_recorded}
+
+
+def test_handoff_not_recorded_is_checked_against_the_whole_input():
+    """nursing_handoff@2: an absence has nothing to cite, so a declared gap is checked against the input instead.
+    Version 1 made the model write "Intake and output were not recorded." as a statement, which can cite nothing
+    and was red no_source in 14 of 22 live handoffs."""
+    uncited = _handoff([])
+    uncited["assessment"] = [{"text": "Intake and output were not recorded.", "source_refs": []}]
+    assert [i.code for i in HandoffValidator(SOURCES).validate(uncited).red()] == ["no_source"]
+    # the same absence declared: nothing in the input is intake or output, so it holds
+    assert not HandoffValidator(SOURCES).validate(_handoff(["intake_output", "laboratory_results"])).issues
+    # declaring a recorded topic missing hides it from the next shift: red, at the declaration
+    report = HandoffValidator(SOURCES).validate(_handoff(["intake_output", "vital_signs"]))
+    assert [(i.path, i.code, i.value) for i in report.red()] == [("not_recorded[1]", "recorded_not_missing",
+                                                                   "vital_signs")]
+    assert "Observation/o1" in report.red()[0].message
+    with_output = {**SOURCES, "Observation/u1": _src("Observation/u1", "result", "Urine output",
+                                                     detail="Urine output 400 mL at 05:00")}
+    gaps = HandoffValidator(with_output).validate(_handoff(["intake_output", "laboratory_results"]))
+    assert [i.value for i in gaps.red()] == ["intake_output"]  # a urine output is not a laboratory result
+
+
+def test_handoff_lab_time_is_in_its_source():
+    """The facts give each result its time and the model writes it ("at 01:00"); the source must hold it too, or
+    the validator warns about "01" and "00" (amber number_not_in_source, seen live on doc-04, doc-22, doc-25)."""
+    from datetime import datetime
+
+    from app.modules.documentation import handoff_agent
+
+    at = datetime(2026, 10, 13, 7, 0)
+    resources = [{"resourceType": "Encounter", "id": "e1", "period": {"start": "2026-10-10T09:00:00"}},
+                 {"resourceType": "Observation", "id": "l1", "status": "final", "effectiveDateTime": "2026-10-13T01:00:00",
+                  "code": {"coding": [{"code": "6690-2", "display": "Leukocytes"}]},
+                  "valueQuantity": {"value": 8, "unit": "10*3/uL"}}]
+    facts, sources = handoff_agent.build_facts(resources, at)
+    ref = "Observation/l1"
+    assert facts["results"][0]["time"] == "01:00" and "01:00" in sources[ref].detail
+    content = _handoff([])
+    content["situation"]["source_refs"] = ["Encounter/e1"]
+    content["situation"]["text"] = "Day 4 of the stay."
+    content["assessment"] = [{"text": f"{facts['results'][0]['name']} {facts['results'][0]['value']} at 01:00.",
+                              "source_refs": [ref]}]
+    assert not HandoffValidator(sources).validate(content).issues
+
+
 # ---------- patient instructions ----------
 
 

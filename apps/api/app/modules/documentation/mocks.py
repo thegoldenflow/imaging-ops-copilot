@@ -15,7 +15,8 @@ model would write.
   diagnosis, procedure and medication.
 - nursing_handoff: SBAR from the 12-hour facts: latest vital signs and flags,
   diagnoses and procedures, the trend between the first and the last vital signs of
-  the window, open tasks and new orders.
+  the window, open tasks and new orders; what the facts do not hold (always intake
+  and output) in not_recorded (nursing_handoff@2), never as a statement.
 """
 
 from __future__ import annotations
@@ -339,11 +340,12 @@ def _mock_handoff(text: str, images: list, attempt: int) -> dict:
     latest = vitals[-1] if vitals else None
     unit = h.get("unit_name") or h.get("unit") or "the unit"
     situation_refs = [h["encounter"]] + ([latest["id"]] if latest else []) + [f["id"] for f in flags]
-    sit = f"Day {h.get('stay_day', '?')} of the stay on {unit}."
+    sit = f"Day {h.get('stay_day', '?')} of the stay on {unit}"  # one sentence
     if latest:
-        sit += f" Latest vital signs ({latest.get('time')}): {latest.get('line')}."
+        sit += f", latest vital signs ({latest.get('time')}) {latest.get('line')}"
     if flags:
-        sit += " Active flags: " + ", ".join(f["name"].lower() for f in flags) + "."
+        sit += "; active flags: " + ", ".join(f["name"].lower() for f in flags)
+    sit += "."
     background = [{"text": f"Admitted with {d['name'].lower()}.", "source_refs": [d["id"]]}
                   for d in (h.get("diagnoses") or [])[:3]]
     background += [{"text": f"{p['name']} on {p.get('date') or 'a recorded date'}.", "source_refs": [p["id"]]}
@@ -379,8 +381,9 @@ def _mock_handoff(text: str, images: list, attempt: int) -> dict:
         assessment.append({"text": f"{lab['name']} {lab['value']}" + (f" ({lab['flag']})" if lab.get("flag") not in
                                                                        ("", "N") else "") + ".",
                            "source_refs": [lab["id"]]})
-    assessment.append({"text": "Intake and output: not recorded this shift.",
-                       "source_refs": [v["id"] for v in vitals][:5] or [h["encounter"]]})
+    not_recorded = ["intake_output"] + (["vital_signs"] if not vitals else []) + (["pain"] if not pains else []) \
+        + (["laboratory_results"] if not labs else []) + (["open_tasks"] if not h.get("tasks") else []) \
+        + (["flags"] if not flags else [])
     recommendation = [{"text": f"Open task: {t['description'].rstrip('.')}.", "source_refs": [t["id"]]}
                       for t in (h.get("tasks") or [])[:6]]
     recommendation += [{"text": f"Keep {f['name'].lower()} precautions in place.", "source_refs": [f["id"]]}
@@ -388,8 +391,8 @@ def _mock_handoff(text: str, images: list, attempt: int) -> dict:
     recommendation += [{"text": f"New order: {o['name']} {o.get('dose') or ''}".strip() + ".", "source_refs": [o["id"]]}
                        for o in (h.get("new_orders") or [])[:4]]
     recommendation += [{"text": f"Stopped: {o['name']}.", "source_refs": [o["id"]]} for o in (h.get("stopped_orders") or [])[:4]]
-    if not recommendation:
-        recommendation.append({"text": "No open tasks or flags; continue routine observations.",
-                               "source_refs": [h["encounter"]]})
+    if not recommendation:  # no tasks, flags or order changes (declared in not_recorded): routine care
+        recommendation.append({"text": "Continue routine observations.",
+                               "source_refs": [h["encounter"]] + ([latest["id"]] if latest else [])})
     return {"situation": {"text": sit, "source_refs": situation_refs[:30]}, "background": background[:12],
-            "assessment": assessment[:16], "recommendation": recommendation[:12]}
+            "assessment": assessment[:16], "recommendation": recommendation[:12], "not_recorded": not_recorded}

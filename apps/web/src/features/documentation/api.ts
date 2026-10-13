@@ -98,6 +98,7 @@ export interface HandoffContent {
   background: Fact[];
   assessment: Fact[];
   recommendation: Fact[];
+  not_recorded?: string[]; // topics with nothing in the 12-hour input (intake_output, pain, ...)
 }
 
 export interface InstrMedicine {

@@ -346,12 +346,43 @@ class PatientInstructionsValidator(TraceabilityValidator):
         return issues
 
 
+INTAKE_OUTPUT = re.compile(r"\b(?:intake|output|urine|fluid balance)\b", re.I)
+
+
+def _gap_evidence(topic: str, sources: list[Source]) -> list[Source]:
+    """The inputs that show a `not_recorded` topic IS recorded (empty: the declaration holds)."""
+    if topic == "intake_output":  # no input kind carries it today; a result named like it would
+        return [s for s in sources if s.kind == "result" and INTAKE_OUTPUT.search(s.name)]
+    if topic == "vital_signs":
+        return [s for s in sources if s.kind == "observation"]
+    if topic == "pain":
+        return [s for s in sources if s.kind == "observation" and "pain" in s.detail.lower()]
+    if topic == "laboratory_results":
+        return [s for s in sources if s.kind == "result" and not INTAKE_OUTPUT.search(s.name)]
+    if topic == "open_tasks":
+        return [s for s in sources if s.kind == "task"]
+    if topic == "flags":
+        return [s for s in sources if s.kind == "flag"]
+    return []
+
+
 class HandoffValidator(TraceabilityValidator):
     """SBAR: every statement cites the 12-hour inputs; drugs must be the encounter's medications; numbers should be
-    in the cited sources (a warning)."""
+    in the cited sources (a warning). A topic declared `not_recorded` must have no input (an absence has nothing to
+    cite, so it is checked against the whole input instead): declaring a recorded topic missing is red."""
 
     NAME = "HandoffValidator"
     RULES = {"situation": Rule(), "background[]": Rule(), "assessment[]": Rule(), "recommendation[]": Rule()}
+
+    def check_document(self, content: dict) -> list[Issue]:
+        issues = []
+        for i, topic in enumerate(content.get("not_recorded") or []):
+            evidence = _gap_evidence(str(topic), list(self.index.sources.values()))
+            if evidence:
+                issues.append(Issue(path=f"not_recorded[{i}]", severity="red", code="recorded_not_missing",
+                                    value=str(topic), message=f"declared not recorded, but the input has it: "
+                                                              f"{', '.join(s.ref for s in evidence[:3])}"))
+        return issues
 
     def check_item(self, item: Item) -> list[Issue]:
         issues = super().check_item(item)

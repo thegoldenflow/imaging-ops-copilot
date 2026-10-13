@@ -15,8 +15,9 @@ from README.md in about 25 minutes (WP10's check below). Open across the project
   eval harness where one failed case no longer stops a suite. The rerun (same report, "After tuning") removed the
   truncation and halved latency; the documentation agents now get scores but lose most cases to Vertex deadline stalls,
   because the new 504 retry never fires inside the 30 s budget. Open: that retry and longer deadlines for long calls,
-  the voice tier's thinking level (Mandarin failures), the nursing handoff's citation contract, 13 eval-harness
-  defects, an AI spending cap; `terminology_en.jsonl` to generate.
+  the voice tier's thinking level (Mandarin failures), 13 eval-harness
+  defects, an AI spending cap; `terminology_en.jsonl` to generate. The nursing handoff's citation contract is fixed
+  (`nursing_handoff@2`, 2026-10-13, below); its full live rerun is still to do.
 - Merging `feat/hospital-platform` into `main` is the owner's step.
 - Known date-dependent tests and follow-ups are listed in the sections below (WP9 and WP10).
 
@@ -730,7 +731,7 @@ Tasks:
 - [x] One validator base class (`validator.py`, `TraceabilityValidator` with `RULES`: field path pattern → what must trace): cited sources must be inputs of a type the field allows (a medication citing a Condition fails); typed names (drugs, diagnoses, procedures, tests) matched by code first, then by name with synonyms (`lexicon.py`: normalised equality, containment, difflib ≥ 0.85); drug, condition and procedure names in free text must be in the input (the drug lexicon: the EHR's medications and the knowledge graph's single-substance drug names; vitamins and classes left out). Subclasses: `DischargeSummaryValidator` (plus amber warnings when a category differs from the discharge medication table or a table line is missing), `PatientInstructionsValidator` (every medicine, follow-up and reason an item of the signed summary with the same name, category, dose and date; menu codes; drugs in the rendered English), `HandoffValidator` (numbers missing from the cited sources: a warning). Red issues block signing at the signing service: the draft carries the extension `sign-block` and `app/ehr/signing.py` refuses it on every path (one added check); the module's sign endpoint re-validates first
 - [x] Discharge summary agent (`summary_agent.py`, runtime agent `discharge_summary` 0.2.0, prompt `discharge_summary@1`, mock fixture): reads the encounter bundle and the discharge medication table through its read tools (new tool getDischargeMedications wraps WP6's interface); long-context strategy: four chunks by type (diagnoses and procedures; medications with the table; observations and reports; care plan, tasks and pending results; split above 40 facts), one SEGMENT call per chunk with its id list, then a SYNTHESIS call over the segment notes citing only listed ids (one more try with the problems listed when an id is not allowed); dates as `[DATE_n:D+k]` (days from the admission) and names as placeholders (`deid.py`, the runtime's token map; restored by the LLM gateway); the prompt forbids filling in missing information and says a medicine named in a note is not a prescription. Validated raw (the raw hallucination rate), written through the new recommend tool draftClinicalDocument (DocumentReference `dsum-<encounter>`: readable text plus the JSON attachment `documentation-data` with the content, the AI draft as written, the reports, the sources, the run), re-used on a retry
 - [x] Bilingual patient instructions (`instructions_agent.py`, `patient_instructions` 0.2.0, prompt `patient_instructions@1`): input only the signed summary (new read tool getSignedDischargeSummary: the encounter, the patient's language, the summary); the model picks codes per summary item from menus (purpose, times of day, cautions, follow-up department, red flags, daily care; `phrases.py`), the module copies every fact from the summary (names, doses, categories, dates, locations) and adds by rule any medicine the model left out; English, Simplified and Traditional Chinese rendered from that one structure (`render.py`, hand-written phrase tables in all three, doses in 毫克, temperatures in 度; drug and condition names from the knowledge graph's terminology, Traditional via `hant.py`); default language from `communication.language` (zh-CN → Simplified, zh-TW → Traditional), applied at rendering, never sent to the model. Readability: English Flesch-Kincaid (`readability.py`; target 6–8, at or below 8 passes, easier is accepted), Chinese without Latin letters (abbreviations, units) and every medical term explained at first use (`terms.py`: from the knowledge graph's facts when they pass the selection rules, otherwise a reviewed plain-language explanation or the medicine's class; English lists them under "Words to know"). The nurse adjusts codes, reviews the three languages and signs (DocumentReference `pinstr-<encounter>`, LOINC 69730-0). Delivery mocks: print preview page (an `export` audit event), SMS (`consent.send_sms`: queued with SMS consent, otherwise not sent and a clerk Task), patient portal page (a Communication); written as the `patient_messaging` module (WP4's registry keeps Communication out of `patient_instructions`)
-- [x] SBAR handoff (`handoff_agent.py`, `nursing_handoff` 0.2.0, prompt `nursing_handoff@1`): one per shift (day 07:00–19:00, night 19:00–07:00) and patient, `sbar-<encounter>-<YYYYMMDD><D|N>`, from the last 12 hours (new read tool getHandoffContext: observations since the cut-off, open tasks, active flags, new or stopped medication orders, the stay's diagnoses and procedures); four sections, every statement cited; what is not recorded (intake and output) is said to be not recorded. The nurse's confirmation is the one signature that makes it final
+- [x] SBAR handoff (`handoff_agent.py`, `nursing_handoff` 0.2.0, prompt `nursing_handoff@1`): one per shift (day 07:00–19:00, night 19:00–07:00) and patient, `sbar-<encounter>-<YYYYMMDD><D|N>`, from the last 12 hours (new read tool getHandoffContext: observations since the cut-off, open tasks, active flags, new or stopped medication orders, the stay's diagnoses and procedures); four sections, every statement cited; what is not recorded (intake and output) is said to be not recorded. Since 2026-10-13 (0.3.0, `nursing_handoff@2`) such topics are declared in `not_recorded` instead of a statement (see the live-run follow-up below). The nurse's confirmation is the one signature that makes it final
 - [x] Consent (6.3): without `ai_processing` the Tool Gateway refuses the agents and the module writes the template instead (no model call): the empty summary or SBAR with the sources to cite, the instructions with the signed summary's medicines and follow-ups copied in for the nurse to complete; the validators check what the person writes
 - [x] Web `/documentation` (`features/documentation/`, nav "Documentation" for physicians and nurses): worklist of the user's units (in hospital or discharged in the last 72 h; medication table, summary, instructions and handoff status). Physician: the editable draft on the left (items per section, red items with the validator's messages, edit / remove / add citing ticked sources, save re-validates), the source panel on the right (clicking an item highlights and scrolls to its sources), **Sign as physician** disabled while anything is red (the server refuses too), "insufficient information" with what is missing, **Open the template** without consent, **AI draft** / **Not evaluated** badges. Nurse: the instructions with a language switch (English / 简体中文 / 繁體中文, the patient's first), the readability panel, codes adjustable, sign, print / SMS / portal, the print and portal pages; the SBAR with its sources and **Confirm handoff**. The chart's document row shows a sign block. Home: a storyline step
 - [x] Journey: WP4c's placeholders replaced (`app/modules/documentation/journey.py`, called by the activities `journey.draftDischargeSummary` / `journey.draftPatientInstructions`). The summary step drafts as the agent (or finds the draft on a retry: no second model call, one document) and waits for the physician's signature; with key input missing it opens a `workflow-signoff` Task that says what is missing and waits for that Task or the summary signed in Documentation; without consent the activity's by-hand Task, and the document from the template also completes the step. The instructions step drafts from the signed summary and waits for a nurse. Signing in Documentation confirms the journey's open by-hand Task for the step (`approvals.decide`). The workflow code and the captured histories are unchanged (the replay tests pass as they were). Remaining placeholders: WP8 (the follow-up call), WP9 (NEWS2), 8.1 (coding) — WP4c section updated
@@ -1256,6 +1257,59 @@ The real-key Gemini run of 2026-10-12 (`evals/live-run-2026-10-12.md`) could not
 Tests 2026-10-12 (mock model, own test database `ioc_test_evalrobust`): `tests/test_documentation_eval.py`, `tests/test_script_stdio.py`, `tests/test_module_readmes.py` and `tests/test_aiops.py`, 64 of 64 passed in 4 min 11 s; the new documentation test takes about 11 s. On this machine's own locale (cp936, no `PYTHONUTF8`) a redirected `print("SpO₂")` still raises `UnicodeEncodeError` without the helper and writes UTF-8 with it. Not run: the full backend suite, Playwright (no screen changed) and a live-model run of the documentation suite.
 
 Pre-merge review fixes (2026-10-12, four findings, each confirmed by two verifiers, on branch `claude/dazzling-northcutt-41fb23`): (1) `nursing_handoff`'s module gate now follows `handoff`'s own proxy means (`gates["handoff_proxies_mean_ge_4"]`), not the combined mean over all three document kinds, so a failed summary/instruction no longer marks a good handoff below. (2) `_summary_step` separates a model-unavailable/refused draft (the case is `failed`, no data) from a draft the validator blocks at signing (the case is `unsigned`): an `unsigned` summary keeps its pre-validator metrics (raw red and oracle items feed `raw_hallucination_rate` and `validator_recall`, now computed over the drafted summaries), it just does not count as signed. (3) with nothing drafted, the gate-backing metrics are `None` and the gates fail instead of a vacuous `_ratio(x, 0) == 1.0` / `sum([]) == 0` pass; the monitoring ratios are `None` on an empty population and the report prints `n/a`. (4) the GBK fix now also covers the `python -m` entry points (above), not only `scripts/*.py`. Tests extended in `tests/test_documentation_eval.py` and `tests/test_script_stdio.py`.
+
+### Live-run follow-up · the nursing handoff's citation contract and its proxies — done
+
+In the post-merge live run (`run-2026-10-12T225622`) `nursing_handoff` drafted 22 of 30 handoffs and passed 8: the
+proxy gate failed on accuracy 2.95 and format 3.73, and 14 handoffs had an SBAR statement with no source (red
+`no_source`). The run file keeps no handoff content, so the cause was reproduced (casebook 3.16).
+
+Tasks:
+
+- [x] Cause shown: a reproduction (doc-01, 04, 19, 22, 25, only the handoff, own database) gave 0 red on the mock; on
+  Gemini (owner's OK, 10 calls, 6 Vertex stalls) all 4 drafts wrote "Intake and output were not recorded.", 3 of
+  them with `source_refs: []` (each draft's only red), 1 with a token Encounter citation. `nursing_handoff@1` asked
+  for "not recorded" statements while every statement must cite a source, and the facts never hold intake and
+  output. The mock hid it by citing the vital signs for that sentence.
+- [x] Contract: `Handoff.not_recorded` (`intake_output`, `vital_signs`, `pain`, `laboratory_results`, `open_tasks`,
+  `flags`; optional, older drafts still validate) for topics with nothing in the input; `HandoffValidator.check_document`
+  checks each against the whole input (a recorded topic declared missing: red `recorded_not_missing`). Prompt
+  `nursing_handoff@2` (absences only in `not_recorded`, never as a statement); registry `nursing_handoff` 0.3.0 → `@2`;
+  mock eval run `run-2026-10-13T151242` (30/30) stamped, prompt gate passes, `@1` kept as the previous version. The
+  mock follows the contract (and writes a one-sentence situation); `render_text` and the web SBAR panel show "Not
+  recorded: ...".
+- [x] A result's time is in its source (`... at 01:00`), as in the facts: the live drafts' "at 01:00" raised amber
+  `number_not_in_source` ("01", "00").
+- [x] Proxies (`evals.py` `_handoff_proxies`): one uncited statement used to cost accuracy (any red: 2.0, a 5/4/2
+  step) and format (3.0), so the live 2.95 was the share of handoffs with a red item, rescaled. Now each measures one
+  thing: completeness (the sections, tasks and flags covered, a vital-sign trend, pain and intake/output addressed by
+  a statement or `not_recorded`), accuracy (1 + 4 × the share of statements and declarations with no validator
+  issue), readability (unchanged: the longest statement ≤ 45 words), format (1 + 4 × the share of template checks:
+  a one-sentence situation, no statement stating an absence). Documented in `evals/documentation/README.md` and the
+  report text.
+- [x] Tests: `tests/test_documentation_validator.py` (declared gaps against the input, a urine output is not a
+  laboratory result; the result time in its source), `tests/test_documentation_eval.py` (six proxy tests: a clean
+  handoff 5.0; an uncited statement costs accuracy only and in proportion; an amber in proportion; a cited absence
+  statement costs format only; pain and intake/output unaddressed cost completeness; a several-sentence situation
+  costs format), `tests/test_documentation.py` (the mock handoff declares `intake_output`, its text says "Not
+  recorded: intake and output"). With the old `_handoff_proxies` swapped back in (a scratch pytest plugin), five of
+  the six proxy tests fail.
+
+Results (2026-10-13):
+
+- Live, `@2`, the same five cases × 2 (owner's OK): 7 Vertex stalls; the 3 drafts written have no validator issue,
+  each declares `intake_output` (and `flags` where the case has none, which the validator confirmed), and the result
+  time no longer warns. A small sample: the contract is followed; the pass rate needs the full live rerun.
+- The four `@1` live drafts rescored with the new proxies: accuracy 2.0 → 3.86–4.5, format 3.0 → 4.5.
+- Mock: `scripts/documentation_eval.py --check` passes (handoff proxies 5.0, red 0; the report files regenerated, the
+  cases' dates move with the run day). Backend: the registry, prompt gate, AI Ops, documentation, access and
+  workflow tests, 108 of 109 pass (`tests/test_agent_registry.py` now expects `nursing_handoff@2`);
+  `test_template_only_without_ai_consent` fails as it does on a347f78 (reported by the stall-retry session; a
+  discharge-summary template test, not touched here). `npx tsc -b` passes. Playwright not run (the panel change
+  only adds a line).
+
+Open: the full live rerun of `nursing_handoff` (after the Vertex stall fix) for its pass rate; statements over 45
+words (readability 4.0 on most live drafts).
 
 ## Environment notes
 
