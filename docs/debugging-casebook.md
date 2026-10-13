@@ -894,7 +894,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** 平台（LLM 调用层、评测）/ hospital（WP9 故事线）。
 - **来源：** 2026-10-13 侧会话的重跑和故事线实跑；方案检验和实现在之后的侧会话（分支 `claude/reverent-babbage-aad5a2`，基于 `claude/trusting-hypatia-72ce4a`）。
 - **代码：** `apps/api/app/llm/providers.py`（`_generate`、`AttemptStats`、`ATTEMPT_STATS`）、`apps/api/app/aiops/evalrun.py`（`_stall_summary`、`_stall_note`）、`apps/api/app/modules/storyline/walk.py`（`_summary`、`wait`、`SUMMARY_CALLS`、`summary_draft_s`）、`apps/api/scripts/storyline_report.py`（`live`）、`apps/api/app/modules/documentation/service.py`（起草串行，409）、`apps/api/tests/test_gemini.py`、`apps/api/tests/test_storyline.py`。
-- **提交：** 待 owner 确认后提交。
+- **提交：** `967fc77`（分支 `claude/reverent-babbage-aad5a2`）。
 
 ---
 
