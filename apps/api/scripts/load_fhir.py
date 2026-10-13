@@ -56,4 +56,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    from _stdio import utf8_stdio
+
+    utf8_stdio()
     sys.exit(main())

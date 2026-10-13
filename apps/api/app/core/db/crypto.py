@@ -77,5 +77,8 @@ def cipher() -> PhiCipher:
 
 
 if __name__ == "__main__":
+    from app.core.stdio import utf8_stdio
+
+    utf8_stdio()
     print("PHI_ENCRYPTION_KEY=" + base64.b64encode(secrets.token_bytes(32)).decode())
     print("PHI_BLIND_INDEX_KEY=" + base64.b64encode(secrets.token_bytes(32)).decode())

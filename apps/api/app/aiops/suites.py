@@ -333,27 +333,39 @@ def _documentation_run(ctx: Context) -> SuiteResult:
 
     with _patched(doccases, "materialize", _marking(lambda store, case, *a, **k: case["id"])):
         report = doc.run(ctx.store, doc.load_cases())
+
+    def failed(r: dict, step: str) -> dict:  # a document the model could not draft: the reason in `got`
+        return {"schema_valid": False, "passed": False,
+                "got": {"status": r.get(f"{step}_status"), "error": r.get(f"{step}_error") or r.get("missing")}}
+
     rows = []
     for r in report["rows"]:
-        signed = r.get("summary_status") == "signed"
-        rows.append({"agent_id": "discharge_summary", "id": r["id"], "schema_valid": signed,
-                     "grounded": signed and not r.get("untraceable_after"),
-                     "passed": signed and not r.get("untraceable_after") and min((r.get("summary_proxy") or {"x": 0})
-                                                                                .values()) >= 4,
-                     "expected": "every item traceable, signed", "got": {"status": r.get("summary_status"),
-                                                                          "untraceable": r.get("untraceable_after"),
-                                                                          "raw_red": r.get("raw_red")}})
-        if not signed:
-            continue
-        rows.append({"agent_id": "patient_instructions", "id": r["id"], "schema_valid": True,
-                     "passed": r["instructions_red"] == 0 and r["instructions_signed"] and r["fk_grade"] <= 8
-                     and r["zh_no_abbreviations"] and r["zh_terms_explained"],
-                     "expected": "no red item, grade <= 8, Chinese plain", "got": {
-                         "red": r["instructions_red"], "fk_grade": r["fk_grade"], "language": r.get("language")}})
-        rows.append({"agent_id": "nursing_handoff", "id": r["id"], "schema_valid": True,
-                     "passed": r["handoff_red"] == 0 and min(r["handoff_proxy"].values()) >= 4,
-                     "expected": "no red item, proxies >= 4", "got": {"red": r["handoff_red"],
-                                                                      "proxies": r["handoff_proxy"]}})
+        expected = "every item traceable, signed"
+        if r.get("summary_status") == "signed":
+            rows.append({"agent_id": "discharge_summary", "id": r["id"], "schema_valid": True,
+                         "grounded": not r["untraceable_after"],
+                         "passed": not r["untraceable_after"] and min(r["summary_proxy"].values()) >= 4,
+                         "expected": expected, "got": {"status": r["summary_status"],
+                                                       "untraceable": r["untraceable_after"], "raw_red": r["raw_red"]}})
+        else:
+            rows.append({"agent_id": "discharge_summary", "id": r["id"], "grounded": False, "expected": expected,
+                         **failed(r, "summary")})
+        expected = "no red item, grade <= 8, Chinese plain"
+        if r.get("instructions_status") == "drafted":
+            rows.append({"agent_id": "patient_instructions", "id": r["id"], "schema_valid": True,
+                         "passed": r["instructions_red"] == 0 and r["instructions_signed"] and r["fk_grade"] <= 8
+                         and r["zh_no_abbreviations"] and r["zh_terms_explained"], "expected": expected, "got": {
+                             "red": r["instructions_red"], "fk_grade": r["fk_grade"], "language": r.get("language")}})
+        else:
+            rows.append({"agent_id": "patient_instructions", "id": r["id"], "expected": expected,
+                         **failed(r, "instructions")})
+        expected = "no red item, proxies >= 4"
+        if r.get("handoff_status") == "drafted":
+            rows.append({"agent_id": "nursing_handoff", "id": r["id"], "schema_valid": True,
+                         "passed": r["handoff_red"] == 0 and min(r["handoff_proxy"].values()) >= 4,
+                         "expected": expected, "got": {"red": r["handoff_red"], "proxies": r["handoff_proxy"]}})
+        else:
+            rows.append({"agent_id": "nursing_handoff", "id": r["id"], "expected": expected, **failed(r, "handoff")})
     m, g = report["metrics"], report["gates"]
 
     def gates(*names):
@@ -368,9 +380,11 @@ def _documentation_run(ctx: Context) -> SuiteResult:
                                           "injected_blocked"),
                "patient_instructions": gates("bilingual_consistency"),
                "nursing_handoff": {"automated_proxies_mean_ge_4": _gate(m["automated_proxies"]["handoff"], ">= 4",
-                                                                        g["automated_proxies_mean_ge_4"])}},
+                                                                        g["handoff_proxies_mean_ge_4"])}},
         notes="30 synthetic stays through the real path: summary (traceable items, signed), bilingual instructions "
-              "(readability, plain Chinese) and SBAR handoff. The human rating sheet is outside the runner.")
+              "(readability, plain Chinese) and SBAR handoff. A document the model could not draft fails that case "
+              "for its agent, with the reason (the instructions fail with the summary they are drafted from). The "
+              "human rating sheet is outside the runner.")
 
 
 def _documentation_cases() -> list[dict]:
