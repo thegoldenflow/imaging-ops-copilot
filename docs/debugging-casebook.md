@@ -882,7 +882,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** hospital（WP7 文书，交班 SBAR）。
 - **来源：** `run-2026-10-12T225622` 失败分析；复现脚本和两轮真实调用（2026-10-13）。
 - **代码：** `apps/api/prompts/nursing_handoff/2.md`、`apps/api/app/modules/documentation/models.py`（`Handoff.not_recorded`）、`validator.py`（`HandoffValidator.check_document`）、`handoff_agent.py`（化验来源的时间、`render_text`）、`mocks.py`、`evals.py`（`_handoff_proxies`）、`apps/web/src/features/documentation/HandoffPanel.tsx`、`apps/api/config/agents/nursing_handoff.yaml`。
-- **提交：** 待负责人确认后提交（分支 `claude/vibrant-neumann-40593c`）。
+- **提交：** f5e59f3（分支 `claude/vibrant-neumann-40593c`）。
 
 ---
 
