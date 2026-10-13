@@ -234,4 +234,7 @@ def build() -> None:
 
 
 if __name__ == "__main__":
+    from app.core.stdio import utf8_stdio
+
+    utf8_stdio()
     build()

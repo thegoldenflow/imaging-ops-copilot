@@ -547,6 +547,9 @@ def _add_business_compliance(s: Store, rng: random.Random, now: datetime) -> Non
 
 
 if __name__ == "__main__":
+    from app.core.stdio import utf8_stdio
+
+    utf8_stdio()
     # One command for a fresh database: apply migrations, then (re)generate the demo data.
     from app.core.db.migrate import upgrade
     from app.core.store import reset_store, unit_of_work

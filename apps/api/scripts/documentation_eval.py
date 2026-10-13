@@ -59,11 +59,17 @@ def _proxy(r: dict, step: str) -> str:
     return f"{x['completeness']}/{x['accuracy']}/{x['readability']}/{x['format']}"
 
 
+def _pct(x) -> str:
+    return "n/a" if x is None else f"{x:.0%}"
+
+
 def _row(r: dict) -> str:
     raw = after = draft = ""
-    if r["summary_status"] == "signed":
+    if r["summary_status"] in ("signed", "unsigned"):  # a draft the model produced (signed, or blocked at signing)
         raw = f"{r['raw_red']} of {r['items']}" + (f" ({', '.join(r['raw_red_codes'])})" if r["raw_red"] else "")
-        after, draft = len(r["untraceable_after"]), f"{r['summary_seconds']} s, {r['model_calls']} calls"
+        draft = f"{r['summary_seconds']} s, {r['model_calls']} calls"
+    if r["summary_status"] == "signed":
+        after = len(r["untraceable_after"])
     return (f"| {r['id']} | {r['title']} | {raw} | {after} | {_proxy(r, 'summary')} | {_proxy(r, 'instructions')} "
             f"| {_proxy(r, 'handoff')} | {r.get('fk_grade', '')} | {draft} |")
 
@@ -98,14 +104,15 @@ def write(report: dict) -> None:
         f"{m['raw_oracle_items']}). Recorded, not a gate (spec 7.3). With the mock they all come from the three cases "
         "whose note names a medicine that was only discussed.",
         f"- Patient instructions: English Flesch-Kincaid grade mean {m['fk_grade_mean']}, max {m['fk_grade_max']} "
-        f"(target 6-8; at or below 8 in {m['fk_within_or_below_8']:.0%} of documents; below 6 counts as easier); Chinese "
-        f"without abbreviations {m['zh_no_abbreviations']:.0%}, every term explained at first use "
-        f"{m['zh_terms_explained']:.0%}; explanations from the knowledge graph {m['terms_from_knowledge_graph']:.0%} "
+        f"(target 6-8; at or below 8 in {_pct(m['fk_within_or_below_8'])} of documents; below 6 counts as easier); Chinese "
+        f"without abbreviations {_pct(m['zh_no_abbreviations'])}, every term explained at first use "
+        f"{_pct(m['zh_terms_explained'])}; explanations from the knowledge graph {_pct(m['terms_from_knowledge_graph'])} "
         "(the rest are reviewed plain-language explanations or the medicine's class: the graph's facts are noisy).",
         f"- Validator red items left on the drafts: instructions {m['instructions_red']}, handoffs {m['handoff_red']}.",
-        f"- Documents drafted: summaries signed {m['summaries_signed']}, instructions {m['instructions_drafted']}, "
-        f"handoffs {m['handoffs_drafted']} of {m['cases']} cases (a document the model could not draft fails its "
-        "case; the reason is in the cases table).",
+        f"- Documents drafted: summaries drafted {m['summaries_drafted']} (signed {m['summaries_signed']}), "
+        f"instructions {m['instructions_drafted']}, handoffs {m['handoffs_drafted']} of {m['cases']} cases (a document "
+        "the model could not draft fails its case; a draft the validator blocked at signing is 'unsigned' and keeps "
+        "its pre-validator metrics; the reason is in the cases table).",
         f"- Discharge summary drafting time (pipeline, zero-latency mock): median {m['summary_seconds_p50']} s, max "
         f"{m['summary_seconds_max']} s; model calls per summary {m['model_calls_per_summary']} (one per chunk of "
         "resources, then the synthesis). With a live model the time is about calls x per-call latency: under 30 s while "

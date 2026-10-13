@@ -248,7 +248,12 @@ def _doc(doc_id: str) -> dict:
 
 def _summary_step(store: Store, physician, case: dict, encounter_id: str, on_draft) -> tuple[dict, str | None]:
     """Draft the summary, remove its red items (as the physician must) and sign it: (the row's summary fields, the
-    signed text). `on_draft(sources, table, content)` gets the AI draft before it is signed (the injected samples)."""
+    document text). `on_draft(sources, table, content)` gets the AI draft before it is signed (the injected samples).
+
+    A DocProblem from draft_summary (model unavailable / refused) propagates and the case is a failed draft (`_step`).
+    A DocProblem from signing ("Untraceable items block signing") is different: the model DID produce a draft and the
+    validator is doing its job, so the case is recorded `unsigned` and keeps its pre-validator metrics (raw red and
+    oracle items feed the raw hallucination rate and the validator recall); it just does not count as signed."""
     started = time.monotonic()
     view = docs.draft_summary(store, physician, encounter_id)
     seconds = time.monotonic() - started
@@ -262,6 +267,12 @@ def _summary_step(store: Store, physician, case: dict, encounter_id: str, on_dra
     data = D.read_data(_doc(view["id"])) or {}
     table = (data.get("inputs") or {}).get("table") or {}
     on_draft(summary_agent.sources_from(data["sources"]), table, content)
+    flagged_values = {x["value"].lower() for x in raw_red}
+    missed = [o for o in raw_oracle if not any(v and v in o.lower() for v in flagged_values)]
+    # fields known once the draft exists; they stay in the metrics whether or not it is signed
+    base = {"summary_seconds": round(seconds, 3), "model_calls": model_calls, "chunks": chunks,
+            "items": raw["checked"], "raw_red": len(raw_red), "raw_red_codes": sorted({x["code"] for x in raw_red}),
+            "raw_oracle": raw_oracle, "validator_missed": missed}
     fixed = copy.deepcopy(content)
     for path in sorted({x["path"] for x in raw_red if "[" in x["path"]}, reverse=True):
         section, _, index = path.rstrip("]").rpartition("[")
@@ -271,14 +282,12 @@ def _summary_step(store: Store, physician, case: dict, encounter_id: str, on_dra
         del group[int(index)]
     if raw_red:
         view = docs.save(store, physician, view["id"], fixed)
-    signed = docs.sign(store, physician, view["id"])
+    try:
+        signed = docs.sign(store, physician, view["id"])
+    except docs.DocProblem as e:  # the validator blocked signing: a drafted case, not a model failure
+        return {**base, "summary_status": "unsigned", "summary_error": str(e)}, D.read_texts(_doc(view["id"]))["en"]
     after = oracle(case, signed["content"])
-    flagged_values = {x["value"].lower() for x in raw_red}
-    missed = [o for o in raw_oracle if not any(v and v in o.lower() for v in flagged_values)]
-    fields = {"summary_status": "signed", "summary_seconds": round(seconds, 3), "model_calls": model_calls,
-              "chunks": chunks, "items": raw["checked"], "raw_red": len(raw_red),
-              "raw_red_codes": sorted({x["code"] for x in raw_red}), "raw_oracle": raw_oracle,
-              "validator_missed": missed, "untraceable_after": after,
+    fields = {**base, "summary_status": "signed", "untraceable_after": after,
               "summary_proxy": _summary_proxies(case, signed["content"], table, signed["validation"])}
     return fields, D.read_texts(_doc(signed["id"]))["en"]
 
@@ -354,51 +363,62 @@ def run(store: Store, cases: list[dict]) -> dict:
         row.update(fields)
         rows.append(row)
         documents.append(document)
-    done = [r for r in rows if r["summary_status"] == "signed"]
+    # a summary the model drafted (signed, or drafted but blocked at signing) keeps its pre-validator metrics;
+    # the signed-only metrics (untraceable after the validator, schema validity, the proxies) count only `signed`.
+    signed = [r for r in rows if r["summary_status"] == "signed"]
+    drafted = [r for r in rows if r["summary_status"] in ("signed", "unsigned")]
     inst_done = [r for r in rows if r["instructions_status"] == "drafted"]
     hand_done = [r for r in rows if r["handoff_status"] == "drafted"]
-    items = sum(r["items"] for r in done)
-    raw_red = sum(r["raw_red"] for r in done)
+    items = sum(r["items"] for r in drafted)
+    raw_red = sum(r["raw_red"] for r in drafted)
+    oracle_total = sum(len(r["raw_oracle"]) for r in drafted)
+    oracle_caught = sum(len(r["raw_oracle"]) - len(r["validator_missed"]) for r in drafted)
     proxies = {kind: {dim: _mean([r[f"{kind}_proxy"][dim] for r in have])
                       for dim in ("completeness", "accuracy", "readability", "format")}
-               for kind, have in (("summary", done), ("instructions", inst_done), ("handoff", hand_done))}
-    seconds = sorted(r["summary_seconds"] for r in done)
-    calls = Counter(r["model_calls"] for r in done)
+               for kind, have in (("summary", signed), ("instructions", inst_done), ("handoff", hand_done))}
+    seconds = sorted(r["summary_seconds"] for r in drafted)
+    calls = Counter(r["model_calls"] for r in drafted)
     metrics = {
-        "cases": len(rows), "summaries_signed": len(done),
+        "cases": len(rows), "summaries_signed": len(signed), "summaries_drafted": len(drafted),
         "instructions_drafted": len(inst_done), "handoffs_drafted": len(hand_done),
-        "schema_validity": _ratio(len(done), len(rows)),
+        "schema_validity": _ratio(len(signed), len(rows)) if rows else None,
         "fact_items_checked": items, "raw_untraceable_items": raw_red,
-        "raw_hallucination_rate": _ratio(raw_red, items),
-        "raw_oracle_items": sum(len(r["raw_oracle"]) for r in done),
-        "validator_recall": _ratio(sum(len(r["raw_oracle"]) - len(r["validator_missed"]) for r in done),
-                                   sum(len(r["raw_oracle"]) for r in done)),
-        "untraceable_after_validator": sum(len(r["untraceable_after"]) for r in done),
+        "raw_hallucination_rate": _ratio(raw_red, items) if drafted else None,
+        "raw_oracle_items": oracle_total,
+        "validator_recall": _ratio(oracle_caught, oracle_total) if drafted else None,
+        "untraceable_after_validator": sum(len(r["untraceable_after"]) for r in signed),
         "instructions_red": sum(r["instructions_red"] for r in inst_done),
         "handoff_red": sum(r["handoff_red"] for r in hand_done),
         "fk_grade_mean": _mean([r["fk_grade"] for r in inst_done]),
         "fk_grade_max": max((r["fk_grade"] for r in inst_done), default=None),
-        "fk_within_or_below_8": _ratio(sum(r["fk_grade"] <= 8 for r in inst_done), len(inst_done)),
-        "zh_no_abbreviations": _ratio(sum(r["zh_no_abbreviations"] for r in inst_done), len(inst_done)),
-        "zh_terms_explained": _ratio(sum(r["zh_terms_explained"] for r in inst_done), len(inst_done)),
+        "fk_within_or_below_8": _ratio(sum(r["fk_grade"] <= 8 for r in inst_done), len(inst_done)) if inst_done else None,
+        "zh_no_abbreviations": _ratio(sum(r["zh_no_abbreviations"] for r in inst_done), len(inst_done)) if inst_done else None,
+        "zh_terms_explained": _ratio(sum(r["zh_terms_explained"] for r in inst_done), len(inst_done)) if inst_done else None,
         "terms_from_knowledge_graph": _ratio(sum(r["terms_from_kg"] for r in inst_done),
-                                             sum(r["terms"] for r in inst_done)),
+                                             sum(r["terms"] for r in inst_done)) if inst_done else None,
         "bilingual_documents": len(consistency),
-        "bilingual_consistency": _ratio(sum(c["consistent"] for c in consistency), len(consistency)),
+        "bilingual_consistency": _ratio(sum(c["consistent"] for c in consistency), len(consistency)) if consistency else None,
         "injected_blocked": sum(x["blocked"] for x in injections),
         "summary_seconds_p50": seconds[len(seconds) // 2] if seconds else 0,
         "summary_seconds_max": seconds[-1] if seconds else 0,
         "model_calls_per_summary": dict(sorted(calls.items())),
         "automated_proxies": proxies,
     }
+
+    def _proxies_ok(kind: str) -> bool:  # every dimension's mean present and >= 4 (an empty population gives None)
+        return all(v is not None and v >= 4 for v in proxies[kind].values())
+
     gates = {
-        "untraceable_after_validator": metrics["untraceable_after_validator"] == 0,
-        "validator_recall": metrics["validator_recall"] >= GATES["validator_recall"],
-        "schema_validity": metrics["schema_validity"] >= GATES["schema_validity"],
-        "bilingual_consistency": metrics["bilingual_consistency"] >= GATES["bilingual_consistency"]
-        and len(consistency) >= 10,
+        "untraceable_after_validator": bool(signed) and metrics["untraceable_after_validator"] == 0,
+        "validator_recall": metrics["validator_recall"] is not None
+        and metrics["validator_recall"] >= GATES["validator_recall"],
+        "schema_validity": metrics["schema_validity"] is not None
+        and metrics["schema_validity"] >= GATES["schema_validity"],
+        "bilingual_consistency": metrics["bilingual_consistency"] is not None
+        and metrics["bilingual_consistency"] >= GATES["bilingual_consistency"] and len(consistency) >= 10,
         "injected_blocked": metrics["injected_blocked"] == GATES["injected_blocked"],
-        "automated_proxies_mean_ge_4": all(v is not None and v >= 4 for p in proxies.values() for v in p.values()),
+        "handoff_proxies_mean_ge_4": _proxies_ok("handoff"),
+        "automated_proxies_mean_ge_4": all(_proxies_ok(k) for k in ("summary", "instructions", "handoff")),
     }
     return {"metrics": metrics, "gates": gates, "passed": all(gates.values()), "rows": rows,
             "consistency": consistency, "injected": injections, "documents": documents}

@@ -1,19 +1,19 @@
-"""UTF-8 stdout and stderr for the scripts.
+"""UTF-8 stdout/stderr for the scripts. Canonical implementation: apps/api/app/core/stdio.py.
 
-Redirected to a file or a pipe, Python writes stdout and stderr in the locale's code page; on a Windows machine with
-a Chinese locale that is GBK, and a line with "SpO₂" or a Chinese instruction raises UnicodeEncodeError (seen on the
-2026-10-12 live run, evals/live-run-2026-10-12.md). Each script calls `utf8_stdio()` first in its `__main__` block
-(not at import: the eval runner also loads some scripts in the API process). `PYTHONUTF8=1` does the same from
-outside.
+Most scripts put apps/api on sys.path (at import time) and so can import the canonical helper. The few generator
+scripts that never import `app` (e.g. gen_deid_eval.py, gen_med_safety_eval.py) fall back to the inline copy below.
+See app/core/stdio.py for why this exists (GBK on redirected stdout) and why it is called from `__main__`.
 """
 
 from __future__ import annotations
 
-import sys
+try:
+    from app.core.stdio import utf8_stdio  # noqa: F401
+except Exception:  # a script that does not put apps/api on sys.path / does not import app
+    import sys
 
-
-def utf8_stdio() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        reconfigure = getattr(stream, "reconfigure", None)  # None: no stream (pythonw) or a replaced one
-        if reconfigure is not None:
-            reconfigure(encoding="utf-8", errors="replace")
+    def utf8_stdio() -> None:
+        for stream in (sys.stdout, sys.stderr):
+            reconfigure = getattr(stream, "reconfigure", None)
+            if reconfigure is not None:
+                reconfigure(encoding="utf-8", errors="replace")

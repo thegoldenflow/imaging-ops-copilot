@@ -380,7 +380,7 @@ def _documentation_run(ctx: Context) -> SuiteResult:
                                           "injected_blocked"),
                "patient_instructions": gates("bilingual_consistency"),
                "nursing_handoff": {"automated_proxies_mean_ge_4": _gate(m["automated_proxies"]["handoff"], ">= 4",
-                                                                        g["automated_proxies_mean_ge_4"])}},
+                                                                        g["handoff_proxies_mean_ge_4"])}},
         notes="30 synthetic stays through the real path: summary (traceable items, signed), bilingual instructions "
               "(readability, plain Chinese) and SBAR handoff. A document the model could not draft fails that case "
               "for its agent, with the reason (the instructions fail with the summary they are drafted from). The "
