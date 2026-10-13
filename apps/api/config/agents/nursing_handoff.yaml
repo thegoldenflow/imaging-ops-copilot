@@ -29,6 +29,7 @@ data_scope:
 model_policy:
   tier: reasoning
   max_tokens: 4000
+  timeout_s: 60  # long synthesis calls; LLM_TIMEOUT_S (30 s) stays for the rest
   temperature_max: null
 prompt_version: nursing_handoff@1
 required_signoff_role:

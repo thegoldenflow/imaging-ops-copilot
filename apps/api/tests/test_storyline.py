@@ -16,9 +16,10 @@ from app.ehr.seed import journey
 from app.fhir.dt import parse
 from app.modules.control_tower import rules, triage
 from app.modules.control_tower.snapshot import build, tower_fhir
+from app.modules.documentation import document as documents
 from app.modules.storyline import script as S
 from app.modules.storyline import service, stubs
-from app.modules.storyline.walk import Walk
+from app.modules.storyline.walk import SUMMARY_CALLS, Walk, WalkFailed, summary_draft_s
 from app.modules.voice_services import identity
 from tests import storyline_harness as H
 
@@ -179,10 +180,32 @@ def test_the_whole_story_offline(story, client):
     assert steps["bed"]["detail"].startswith("bed SURG-")  # the bed the early discharges freed
     assert steps["or"]["detail"] == "booked 115 min"
     store = story
-    assert store.fhir.read("DocumentReference", f"dsum-{S.STAY}")["docStatus"] == "final"
+    summary = store.fhir.read("DocumentReference", f"dsum-{S.STAY}")
+    assert summary["docStatus"] == "final"
+    # the live walk's wait for this draft counts a call per chunk and the synthesis (summary_draft_s)
+    assert len(documents.read_data(summary)["inputs"]["chunks"]) + 1 == SUMMARY_CALLS
     assert store.fhir.read("DocumentReference", f"pinstr-{S.STAY}")["docStatus"] == "final"
     reported = store.fhir.search("Observation", patient=S.PATIENT, category="patient-reported")
     assert reported and store.fhir.search("Task", patient=S.PATIENT, code="followup-escalation")
+
+
+def test_the_summary_step_can_wait_for_a_whole_draft_against_a_live_model():
+    """A stalled call uses its whole 60 s budget (casebook 3.15), so a draft of five calls can take 300 s: the live
+    walk waits that on top of its usual wait for step 9 only."""
+    assert summary_draft_s() == SUMMARY_CALLS * 60 == 300
+    waits = {}
+
+    def wait(what, check, timeout_s=None):
+        waits[what] = timeout_s
+        raise WalkFailed("stop here")
+
+    for summary_timeout_s, expected in ((480, 480), (None, None)):  # None: the walk's own timeout_s
+        walk = Walk(None, pump=lambda: None, advance=lambda w, b: None, timeout_s=180,
+                    summary_timeout_s=summary_timeout_s)
+        walk.advance, walk.wait = (lambda beat: None), wait
+        with pytest.raises(WalkFailed):
+            walk._summary(S.CAST["admin"])
+        assert waits == {"the discharge summary draft": expected}
 
 
 def test_the_journeys_order_review_counts_decisions_the_pharmacist_made_before_it_asked():

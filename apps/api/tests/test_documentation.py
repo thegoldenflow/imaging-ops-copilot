@@ -20,6 +20,7 @@ from app.ehr.gateway import Actor, FhirAccessDenied, FhirGateway, LocalBackend
 from app.fhir.dt import ref_id
 from app.modules.documentation import document as D
 from app.modules.documentation import journey, service
+from app.modules.documentation import lexicon as L
 from app.modules.documentation import phrases as P
 from app.modules.documentation.render import item_keys
 from app.modules.med_safety import service as S
@@ -186,15 +187,21 @@ def test_template_only_without_ai_consent(fresh_state):
     assert len(store.llm_calls) == calls  # no model call
     assert view["content"]["discharge_diagnoses"] == [] and view["sources"]
     diagnosis = next(s for s in view["sources"] if s["kind"] == "diagnosis")
+    # the invented diagnosis must not be one of the stay's own: the planted stay depends on the hospital weekday, and
+    # on a Tuesday it is a pneumonia admission (a common Medicine A diagnosis)
+    own = [n for s in view["sources"] if s["kind"] in ("diagnosis", "encounter")
+           for n in (s["name"], *L.synonyms("condition", s["code"] or ""))]
+    invented = next(n for n in ("Pneumonia", "Pulmonary embolism") if not any(L.same_name(n, o) for o in own))
     content = view["content"]
     content["reason_for_admission"] = {"text": f"Admitted with {diagnosis['name']}.", "source_refs": [diagnosis["ref"]]}
     content["discharge_diagnoses"] = [{"name": diagnosis["name"], "code": diagnosis["code"], "text": diagnosis["name"],
                                        "source_refs": [diagnosis["ref"]]}]
-    content["discharge_diagnoses"].append({"name": "Pneumonia", "code": "", "text": "Pneumonia",
+    content["discharge_diagnoses"].append({"name": invented, "code": "", "text": invented,
                                            "source_refs": [diagnosis["ref"]]})
     edited = service.save(store, physician, view["id"], content)
-    assert any(i["code"] == "untraceable_diagnosis" for i in red(edited)) or \
-        any(i["code"] == "source_mismatch" for i in red(edited))
+    assert not [i for i in red(edited) if i["path"] == "discharge_diagnoses[0]"]
+    assert any(i["code"] == "untraceable_diagnosis" and i["value"] == invented and i["path"] == "discharge_diagnoses[1]"
+               for i in red(edited)), red(edited)
 
 
 # ---------- patient instructions ----------

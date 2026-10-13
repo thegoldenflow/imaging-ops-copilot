@@ -16,6 +16,10 @@ from app.llm import gateway as gateway_module
 from app.llm.gateway import LlmGateway, set_gateway
 from app.llm.prompts import Prompt
 from app.llm.providers import (
+    ATTEMPT_STATS,
+    MOCK_FIXTURES,
+    AnthropicProvider,
+    AttemptStats,
     GeminiProvider,
     MockProvider,
     OutputTruncated,
@@ -208,7 +212,7 @@ def test_thinking_levels_come_from_the_environment(monkeypatch):
         monkeypatch.delenv(f"GEMINI_THINKING_{tier}", raising=False)
     defaults = config.load_settings()
     assert (defaults.gemini_thinking_reasoning, defaults.gemini_thinking_fast, defaults.gemini_thinking_voice) == (
-        "LOW", "LOW", "MINIMAL")
+        "LOW", "LOW", "LOW")
     monkeypatch.setenv("GEMINI_THINKING_REASONING", "medium")
     monkeypatch.setenv("GEMINI_THINKING_VOICE", "default")
     custom = config.load_settings()
@@ -298,8 +302,8 @@ def test_rate_limits_and_gateway_timeouts_are_retried_with_backoff():
     result = provider.complete_json(task="t", model="m", system="s", text="x", schema={})
     assert result.data == {"answer": "ok"}
     assert clock.sleeps == [2.0, 4.0]
-    # Each attempt may use what is left of the call's 30 s: 30, then 30 - 1 - 2, then 30 - 1 - 2 - 3 - 4.
-    assert [c["config"].http_options.timeout for c in client.models.calls] == [30000, 27000, 20000]
+    # Each attempt may use half the call's 30 s, and no more than is left (30, 30 - 1 - 2, 30 - 1 - 2 - 3 - 4).
+    assert [c["config"].http_options.timeout for c in client.models.calls] == [15000, 15000, 15000]
 
 
 def test_retries_stop_after_four_attempts():
@@ -316,6 +320,136 @@ def test_retries_stay_inside_the_call_timeout():
     with pytest.raises(ProviderUnavailable, match=r"\(after 2 attempts\)"):
         provider.complete_json(task="t", model="m", system="s", text="x", schema={})
     assert len(client.models.calls) == 2 and clock.sleeps == [2.0] and clock.now == 22
+
+
+def stalling(client, clock, early_s=2.5):
+    """A Vertex stall (2026-10-12 live run): nothing until the attempt's deadline, then 504 DEADLINE_EXCEEDED about
+    2.5 s before it (the SDK sends the attempt's timeout as the server deadline)."""
+    def reply():
+        clock.now += client.models.calls[-1]["config"].http_options.timeout / 1000 - early_s
+        return api_error(504, "DEADLINE_EXCEEDED")
+    return reply
+
+
+def test_a_stalled_attempt_is_retried_within_the_call_timeout():
+    provider, client, clock = retrying_provider([], timeout_s=30)
+    client.models.replies = [stalling(client, clock), clock.after(4, json_reply({"answer": "ok"}))]
+    result = provider.complete_json(task="t", model="m", system="s", text="x", schema={})
+    assert result.data == {"answer": "ok"}
+    # The stalled attempt had half the budget, so its 504 at 12.5 s leaves room for a full retry.
+    assert [c["config"].http_options.timeout for c in client.models.calls] == [15000, 15000]
+    assert clock.sleeps == [2.0] and clock.now == 18.5
+
+    # The 7f3f91a design gave one attempt the whole budget: the 504 came at 27.5 s and the retry never fired.
+    provider, client, clock = retrying_provider([], timeout_s=30)
+    provider.ATTEMPT_SHARE = 1.0
+    client.models.replies = [stalling(client, clock), json_reply({"answer": "ok"})]
+    with pytest.raises(ProviderUnavailable, match=r"504 request failed\. Google"):
+        provider.complete_json(task="t", model="m", system="s", text="x", schema={})
+    assert len(client.models.calls) == 1 and clock.now == 27.5
+
+
+def test_two_stalls_give_up_inside_the_call_timeout():
+    provider, client, clock = retrying_provider([], timeout_s=30)
+    client.models.replies = [stalling(client, clock)] * 3
+    with pytest.raises(ProviderUnavailable, match=r"\(after 2 attempts\)"):
+        provider.complete_json(task="t", model="m", system="s", text="x", schema={})
+    assert len(client.models.calls) == 2 and clock.now == 27.0 <= 30
+
+
+def test_attempts_are_counted_per_agent_with_the_stalls_a_retry_saved_and_lost():
+    provider, client, clock = retrying_provider([], timeout_s=30)
+    provider.stats = AttemptStats()
+    client.models.replies = [
+        json_reply({"answer": "a"}),                                          # t: answered at once
+        stalling(client, clock), json_reply({"answer": "b"}),                 # t: saved by the retry
+        stalling(client, clock), stalling(client, clock),                     # t: lost after two stalls
+        httpx.ReadTimeout("timed out"), api_error(429, "RESOURCE_EXHAUSTED"),  # voice: the client's own timeout
+        response([types.Part(text="Hi")]),                                    # is a stall too; then a 429
+        api_error(400, "INVALID_ARGUMENT"),                                   # voice: not retried
+    ]
+    ask = dict(model="m", system="s", text="x", schema={})
+    provider.complete_json(task="t", **ask)
+    provider.complete_json(task="t", **ask)
+    with pytest.raises(ProviderUnavailable):
+        provider.complete_json(task="t", **ask)
+    turn = dict(model="m", system="s", messages=[{"role": "user", "content": "Hi"}], tools=TOOL_DEFINITIONS)
+    provider.tool_turn(task="voice_agent", **turn)
+    with pytest.raises(ProviderUnavailable):
+        provider.tool_turn(task="voice_agent", **turn)
+    assert provider.stats.snapshot() == {
+        "t": {"calls": 3, "attempts": 5, "stalled": 3, "rate_limited": 0, "errors": 0, "first_stalled": 2,
+              "after_stall": 2, "stalled_after_stall": 1, "saved": 1, "lost": 1, "failed": 1},
+        "voice_agent": {"calls": 2, "attempts": 4, "stalled": 1, "rate_limited": 1, "errors": 1, "first_stalled": 1,
+                        "after_stall": 1, "stalled_after_stall": 0, "saved": 1, "lost": 0, "failed": 1},
+    }
+    before = provider.stats.snapshot()
+    client.models.replies = [json_reply({"answer": "c"})]
+    provider.complete_json(task="t", **ask)
+    assert provider.stats.since(before) == {"t": {**dict.fromkeys(AttemptStats.FIELDS, 0), "calls": 1, "attempts": 1}}
+
+
+def test_every_gemini_provider_counts_into_the_process_wide_stats():
+    assert GeminiProvider("k", 30, client=FakeClient([])).stats is ATTEMPT_STATS
+
+
+def test_a_call_timeout_given_per_call_replaces_the_providers():
+    provider, client, clock = retrying_provider([], timeout_s=30)
+    client.models.replies = [stalling(client, clock), json_reply({"answer": "a"}), response([types.Part(text="Hi")])]
+    provider.complete_json(task="t", model="m", system="s", text="x", schema={}, timeout_s=60)
+    provider.tool_turn(model="m", system="s", messages=[{"role": "user", "content": "Hi"}], tools=TOOL_DEFINITIONS)
+    assert [c["config"].http_options.timeout for c in client.models.calls] == [30000, 30000, 15000]
+    assert clock.now == 27.5 + 2.0  # the stall at 27.5 s of a 60 s budget is retried
+
+
+def test_agents_model_policy_sets_the_call_timeout():
+    long_prompt = Prompt(name="t_long", version="t-v1", system="s", template="{q}")
+    with registry.temporary("t_long", {"kind": "embedded_agent", "model_policy": {
+            "tier": "reasoning", "max_tokens": 900, "timeout_s": 60}}):
+        gw, client = gemini_gateway([json_reply({"answer": "a"}), json_reply({"answer": "b"})])
+        gw.structured(task="t", prompt=PROMPT, variables={"q": "x"}, schema_cls=Answer)
+        gw.structured(task="t_long", prompt=long_prompt, variables={"q": "x"}, schema_cls=Answer)
+    default, long = (c["config"].http_options.timeout for c in client.models.calls)
+    assert default == 2500 and long == 30000  # half of the provider's 5 s, half of the agent's 60 s
+
+
+def test_documentation_agents_get_a_longer_timeout_and_the_phone_agent_does_not():
+    for agent_id in ("discharge_summary", "patient_instructions", "nursing_handoff"):
+        assert registry.require_agent(agent_id).model_policy.timeout_s == 60
+    assert registry.require_agent("voice_agent").model_policy.timeout_s is None  # LLM_TIMEOUT_S
+    gw, client = gemini_gateway([response([types.Part(text="We are open today.")])])
+    set_gateway(gw)
+    store = get_store()
+    frontdesk_agent.agent_reply(store, frontdesk_agent.new_session(store), "What are your hours?")
+    assert client.models.calls[0]["config"].http_options.timeout == 2500  # half of the provider's 5 s
+
+
+def test_order_review_and_medication_reconciliation_attempts_outlast_their_slow_healthy_calls():
+    # With whole 30 s attempts (run-2026-10-12T225622) their slowest healthy calls took 14.3 s and 20.2 s; Vertex
+    # answers 504 about 2.5 s before the deadline, so half of LLM_TIMEOUT_S would cut them at 12.5 s (casebook 3.16).
+    for agent_id in ("order_review", "medication_reconciliation"):
+        spec = registry.require_agent(agent_id)
+        assert spec.model_policy.timeout_s == 45
+        gw, client = gemini_gateway([json_reply({"answer": "a"})])
+        prompt = Prompt(name=agent_id, version=spec.prompt_version, system="s", template="{q}")
+        assert gw.structured(task=agent_id, prompt=prompt, variables={"q": "x"}, schema_cls=Answer).status == "ok"
+        assert client.models.calls[0]["config"].http_options.timeout == 22500  # half of the agent's 45 s
+
+
+def test_anthropic_calls_take_the_agents_timeout():
+    sent = []
+
+    class Messages:
+        def create(self, **kwargs):
+            sent.append(kwargs)
+            return type("R", (), {"stop_reason": "end_turn", "content": [], "model": "m",
+                                  "usage": type("U", (), {"input_tokens": 1, "output_tokens": 1})()})()
+
+    provider = AnthropicProvider("k", 30)
+    provider.client = type("C", (), {"messages": Messages()})()
+    provider.tool_turn(model="m", system="s", messages=[], tools=[], timeout_s=60)
+    provider.tool_turn(model="m", system="s", messages=[], tools=[])
+    assert sent[0]["timeout"] == 60 and "timeout" not in sent[1]
 
 
 @pytest.mark.parametrize("error", [api_error(400, "INVALID_ARGUMENT"), api_error(403, "PERMISSION_DENIED")])
@@ -494,6 +628,46 @@ def test_eval_result_names_vendor_and_model(monkeypatch, tmp_path):
     assert result["mode"] == "gemini" and result["model"] == "Gemini: gemini-3.5-flash"
     mock = run._write("t", LlmGateway(MockProvider(latency_s=0)), {}, 0, [], started, "")
     assert mock["model"] == "rule-based baseline"
+
+
+class FixtureGemini(GeminiProvider):
+    """Gemini's retry loop and attempt count around the mock fixtures' answers. `stalls` scripts how often each of
+    the first calls stalls before its answer (two stalls use up a 30 s budget)."""
+
+    def __init__(self, stalls: list[int]) -> None:
+        self.clock = FakeClock()
+        super().__init__("k", 30, client=FakeClient([]), clock=self.clock, stats=AttemptStats())
+        self.RETRY_JITTER_S = 0
+        self.stalls = list(stalls)
+
+    def complete_json(self, *, task, text, images=None, attempt=0, **kw):
+        data = MOCK_FIXTURES[task](text, images or [], attempt)
+        n = self.stalls.pop(0) if self.stalls else 0
+        self.client.models.replies = [stalling(self.client, self.clock)] * n + [json_reply(data)]
+        return super().complete_json(task=task, text=text, images=images, attempt=attempt, **kw)
+
+
+def test_a_live_eval_run_records_the_stall_rate_it_ran_under(fresh_state, tmp_path, monkeypatch):
+    from app.aiops import collect, evalrun, runs
+
+    provider = FixtureGemini(stalls=[1, 2, 0, 1])  # saved, lost, answered at once, saved; then no more stalls
+    monkeypatch.setattr(evalrun, "_gateway", lambda live: collect.CollectingGateway(provider))
+    lines = []
+    with runs.use_folder(tmp_path / "runs") as folder:
+        record = evalrun.run(["patient_message_triage"], live=True, store=fresh_state, platform=False,
+                             progress=lines.append)
+        written = json.loads((folder / f"{record['run_id']}.json").read_text(encoding="utf-8"))
+    entry = written["agents"]["patient_message_triage"]
+    calls = entry["metrics"]["model_calls"]
+    stalls = written["stalls"]
+    assert stalls["calls"] == calls and stalls["attempts"] == calls + 3
+    assert (stalls["first_stalled"], stalls["stalled"], stalls["after_stall"], stalls["stalled_after_stall"],
+            stalls["saved"], stalls["lost"]) == (3, 4, 3, 1, 2, 1)
+    assert stalls["first_attempt_stall_rate"] == round(3 / calls, 4) and stalls["stall_after_stall_rate"] == 0.3333
+    assert stalls["by_agent"] == {"patient_message_triage": entry["stalls"]}
+    assert entry["stalls"]["lost"] == 1 and "by_agent" not in entry["stalls"]
+    assert f"3 of {calls} first attempts" in written["note"] and "1 of 3 retries after a stall" in written["note"]
+    assert any(line.startswith("stalls: The model API stalled") and f"3 of {calls}" in line for line in lines)
 
 
 def test_vertex_client_uses_agent_platform_configuration(monkeypatch):

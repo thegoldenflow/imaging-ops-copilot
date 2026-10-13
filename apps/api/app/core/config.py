@@ -43,11 +43,14 @@ class Settings:
     gemini_model_fast: str
     gemini_model_voice: str
     # Thinking level per tier. Gemini counts thinking against the output limit and thinks by default, which
-    # truncated the documentation agents and slowed the phone agent in the 2026-10-12 live run.
+    # truncated the documentation agents and slowed the phone agent in the 2026-10-12 live run. Voice is LOW, not
+    # MINIMAL: at MINIMAL the phone agent stopped before acting or transferring (29/40 calls against 40/40 at LOW,
+    # 2026-10-13 A/B in evals/live-run-2026-10-12.md) for about 10% more latency per reply.
     gemini_thinking_reasoning: str
     gemini_thinking_fast: str
     gemini_thinking_voice: str
-    # Per model call, retries included.
+    # Per model call, retries included; an agent's model_policy.timeout_s replaces it (the documentation agents:
+    # 60 s). Gemini gives one attempt at most half of it, so a stalled attempt can still be retried.
     llm_timeout_s: float
     seed: int
     # When set, demo login requires this passcode (for public deployments).
@@ -105,7 +108,7 @@ def load_settings() -> Settings:
         raise ValueError(f"FHIR_AUTH_MODE must be none or smart_backend, not {fhir_auth_mode!r}")
     app_mode = os.getenv("APP_MODE", "demo").strip().lower()
     thinking = {}
-    for tier, default in (("reasoning", "LOW"), ("fast", "LOW"), ("voice", "MINIMAL")):
+    for tier, default in (("reasoning", "LOW"), ("fast", "LOW"), ("voice", "LOW")):
         name = f"GEMINI_THINKING_{tier.upper()}"
         thinking[tier] = os.getenv(name, default).strip().upper()
         if thinking[tier] not in GEMINI_THINKING_LEVELS:

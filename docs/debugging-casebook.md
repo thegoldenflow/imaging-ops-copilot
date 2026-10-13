@@ -53,7 +53,7 @@
 | 影像中心的部分 | 案例 |
 | --- | --- |
 | 阶段 0 数据层和部署（迁到 PostgreSQL、Docker、部署文档） | 2.9、5.7、6.1、7.3、10.1、11.1、13.4、14.7、15.3 |
-| 系统 4 前台电话 | 4.1、11.1、14.1、14.2、14.3 |
+| 系统 4 前台电话 | 3.14、4.1、11.1、14.1、14.2、14.3 |
 | 排程与候补（影像故事线） | 5.1、5.2、7.2 |
 | 申请单与协议（系统 5、6） | 3.6、12.7 |
 | 报告草稿 | 3.4 |
@@ -93,6 +93,9 @@
 | 3.11 | 504 重试永远不会触发：重试预算被一次超时吃光 | 平台 | 真实模型 · 重试 |
 | 3.12 | 文书只过 10/30：用单次失败率推算整份通过率 | hospital | 真实模型 · 可用性 |
 | 3.13 | 故事线第 9 步：验证器抓到模型编造的"房颤" | hospital | 真实模型 · 幻觉 |
+| 3.14 | 电话 agent 的"中文失败"其实是 MINIMAL 思考 | 平台 / imaging | 真实模型 · A/B 实验 |
+| 3.15 | 重试救回 2/3，剩下的是连环卡顿 | 平台 / hospital | 真实模型 · 可用性 |
+| 3.16 | 一半预算的副作用：用药两个 agent 的慢调用被 12.5 秒截断 | 平台 / hospital | 真实模型 · 超时 |
 | 4.1 | 来电者口述的出生日期没被去标识化 | imaging | 隐私 |
 | 4.2 | 两个字母的姓（Hu、Li）泄露 | hospital | 隐私 |
 | 4.3 | 去标识化评测满分，说明评测集太简单 | hospital | 隐私 · 评测可信度 |
@@ -109,6 +112,7 @@
 | 5.9 | 改了数据就按星期扫：两个模拟器边界 bug | hospital | 日期依赖 · 扫描 |
 | 5.10 | 计划 horizon 差一天，时钟原地空转 | hospital | 日期依赖 · 边界 |
 | 5.11 | 积压看板测试全量失败、单独通过 | imaging | 测试 · 未查明 |
+| 5.12 | 周二的"编造诊断"是真的：预埋病人恰好因肺炎入院 | hospital | 日期依赖 · 测试假设 |
 | 6.1 | `localhost` 建连接要 8 秒，播种像卡住 | 环境 | 环境 · 网络 |
 | 6.2 | `websockets` 反复被删坏 | 环境 | 环境 · 依赖 |
 | 6.3 | Docker 数据盘写满（10-09） | 环境 | 环境 · 磁盘 |
@@ -816,11 +820,13 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **现象：** 合并的 Gemini 改动对 429/504 做指数退避重试，单元测试全绿；但合并后的真实测试里，文书 agent 仍有 20 个病例因为一次 `unavailable` 直接失败，日志里看不到任何重试。
 - **怎么查的：** 失败分析员按时间看失败调用：每次都是约 26.1–27.7 秒后返回、0 token。再读 `providers.py` 的重试逻辑：总预算就是 `LLM_TIMEOUT_S`（30 秒），SDK 把它作为服务器端截止时间发出去；Vertex 在约 27.5 秒回 504，剩下约 2.5 秒，小于"退避至少 2 秒 + 每次尝试至少 `MIN_ATTEMPT_S` 5 秒"，于是直接放弃。两名复核者读代码确认。
 - **根因：** "总时间不超过超时"和"超时本身就是失败模式"放在同一个预算里：只要失败是**超时**，就永远没有剩余预算去重试。单元测试用的假客户端瞬间返回 504，测不到这一点。
-- **怎么修：** 已开卡片处理：每次尝试的截止时间短于总预算，或总预算至少容纳一次完整重试；长调用的 agent 用更长的截止时间。
-- **经验：** 设计重试时，把"失败要花多长时间"算进去：快速失败（429）和慢速失败（超时）需要的预算完全不同。测试替身要能模拟**慢**失败，否则重试逻辑最关键的分支没有被测到。
+- **怎么修：** 卡片给了两个方向："每次尝试的截止时间短于总预算"，或"总预算至少容纳一次完整重试"。只加大总预算不够：SDK 把整个超时都作为服务器截止时间发出去，卡顿就会一直卡到新的截止时间，还是没有剩余预算。所以选了前者：`GeminiProvider._generate` 里每次尝试最多用总预算的 `ATTEMPT_SHARE`（0.5），而且不超过剩下的时间。卡住的那次尝试在预算一半左右收到 504，退避 2 秒后还有一次完整的尝试，整个调用仍然不超过预算。比例的选法看了数据：`run-2026-10-12T225622` 里 LOW 思考下成功调用的延迟，p50 在 1–5 秒，30 秒预算的 agent 里最慢的成功调用约 20 秒（用药核对），文书最慢约 26 秒（交接）。所以文书 agent 用 60 秒（两次 30 秒，和以前一次尝试一样长），通过 agent 注册表新加的 `model_policy.timeout_s` 配置。其他 agent 保持 `LLM_TIMEOUT_S` 30 秒（两次 15 秒），电话 agent 没有变长。网关把 `timeout_s` 传给 provider，Anthropic 也用它作为单次请求的超时。
+- **怎么证明：** 单元测试的假客户端会模拟**慢**失败：`stalling()` 读取这次尝试的截止时间，让时钟走到截止前 2.5 秒再返回 504，和真实情况一样。`test_a_stalled_attempt_is_retried_within_the_call_timeout` 断言两次尝试的截止时间都是 15000 ms，504 出现在 12.5 秒，第二次在 18.5 秒成功。同一个测试把 `ATTEMPT_SHARE` 设成 1.0（7f3f91a 的设计），断言只尝试 1 次、在 27.5 秒失败，把旧 bug 也钉住。另有：两次卡顿在 27 秒放弃（不超预算）；单次调用传入的预算替换 provider 的预算；agent 的 `timeout_s` 经过网关生效；三个文书 agent 是 60 秒，电话 agent 不变。`tests/test_gemini.py` 50 个测试通过；全量 807 过 1 挂，挂的那个在没改过的 a347f78 上一样挂（见 PROGRESS.md）。改电话层默认值后又跑了 `test_gemini.py` 和 `test_agent_registry.py`，60 个全过。真实重跑 `run-2026-10-13T021309`：44 次调用至少卡过一次，重试救回 29 次（66%）；出院小结 10/30 → 21/30，患者指导 8/30 → 20/30。没救回的 15 次见 3.15。
+- **经验：** 设计重试时，把"失败要花多长时间"算进去：快速失败（429）和慢速失败（超时）需要的预算完全不同。测试替身要能模拟**慢**失败，否则重试逻辑最关键的分支没有被测到。修好以后，把旧设计的参数放进同一个测试再跑一遍，确认测试真的能区分新旧两种行为。
 - **范围：** 平台（LLM 调用层）。
-- **来源：** 2026-10-12 合并后真实测试（`run-2026-10-12T225622`）的失败分析，复核 2/2。
-- **代码：** `apps/api/app/llm/providers.py`（重试预算，约 370–375 行）。
+- **来源：** 2026-10-12 合并后真实测试（`run-2026-10-12T225622`）的失败分析，复核 2/2；修复和重跑在 2026-10-13 的侧会话（分支 `claude/trusting-hypatia-72ce4a`）。
+- **代码：** `apps/api/app/llm/providers.py`（`GeminiProvider.ATTEMPT_SHARE`、`_generate`）、`apps/api/app/agents/registry.py`（`ModelPolicy.timeout_s`）、`apps/api/config/agents/{discharge_summary,patient_instructions,nursing_handoff}.yaml`、`apps/api/app/llm/gateway.py`、`apps/api/tests/test_gemini.py`。
+- **提交：** `2a92b10`（分支 `claude/trusting-hypatia-72ce4a`）。
 
 ### 3.12 文书只过了 10/30：用"单次调用失败率"推算整份文书的通过率
 
@@ -847,6 +853,69 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** hospital（WP7 文书、WP9 故事线）。
 - **来源：** 2026-10-12 合并后的故事线实跑（`scripts/storyline_report.py --api`，未写报告）。
 - **代码：** `apps/api/app/modules/documentation/validator.py`、`apps/api/app/modules/storyline/walk.py`。
+
+### 3.14 电话 agent 的"中文失败"：其实是 MINIMAL 思考，和语言无关
+
+- **现象：** 把电话层思考等级调成 MINIMAL 后，`voice_agent` 从 19/20 降到 16/20。新的 3 个失败（fd-02、fd-08、fd-18）**都是普通话通话**，中文从 7/7 掉到 4/7，英文和法文没变。失败分析的结论是"MINIMAL 有可能，未证明"：每种设置只跑了一次，19/20 对 16/20 的 Fisher 检验 p≈0.34。
+- **怎么查的：**
+  1. 列出假设。H1：中文通话本身有问题（prompt、去标识化或语言处理），MINIMAL 只是巧合。H2：MINIMAL 让模型"想得太少"，多步工具调用时提前收手。H3：纯属抽样波动。
+  2. 设计能区分它们的实验：同一份代码、同一个数据库，**交替**跑 MINIMAL、LOW、MINIMAL、LOW，每次 20 个通话。交替是为了让 Vertex 的时段状态和机器负载对两组一样（只用环境变量 `GEMINI_THINKING_VOICE` 切换，运行记录写到 `EVAL_RUNS_DIR=evals/runs/voice-thinking-ab/<等级>`，不影响发布门禁）。
+  3. 结果：LOW 20/20、20/20，MINIMAL 15/20、14/20。40/40 对 29/40，p = 0.0004，H3 被推翻。
+  4. 看 MINIMAL 的失败分布：除了中文的 fd-02、fd-08、fd-18，英文的 fd-04、fd-07、fd-09、fd-17 也失败。H1 被推翻：之前"全是中文"是一次小样本的巧合。
+  5. 看失败的样子，只有两种：查完预约（`lookup_appointment`）就结束，没有确认或取消，通话记为 abandoned；身份核验三次失败后不调用 `transfer_to_human`。两种都是"该调下一个工具时改成了回一句话"，符合 H2。
+  6. 再看 MINIMAL 换来了什么：平均响应 MINIMAL 约 2.0–2.2 秒，LOW 约 2.4 秒，1500 ms 的门槛两种都过不了。所以 MINIMAL 的延迟优势在门禁上不存在，代价却是 1/4 的通话失败。
+- **根因：** MINIMAL 思考下，Gemini 3.5 Flash 在多步工具循环里更容易提前结束这一轮。语言不是原因。
+- **怎么修：** `GEMINI_THINKING_VOICE` 默认值从 MINIMAL 改为 LOW（`apps/api/app/core/config.py`，注释写明 A/B 的数字），`test_thinking_levels_come_from_the_environment` 跟着改。
+- **怎么证明：** 真实重跑 `run-2026-10-13T021309`（LOW，机器没有其他负载）19/20，中文 6/7。唯一的失败 fd-18 是已知的 prompt 缺口（身份失败没有映射到转人工，live-run 报告发现 7c）。LOW 三次合计 59/60，MINIMAL 三次合计 45/60。每个通话成本 $0.0071 → $0.0114，仍远低于 $0.05 的门槛。
+- **经验：** 小样本里的失败恰好集中在某个属性上（"全是中文"），很容易让人编出一个错误的故事。先列出能互相区分的假设，再做**交替、重复**的 A/B，然后看**全部**失败的形态，不只看那个子群。另外要问调优到底换来了什么：如果 MINIMAL 省下的延迟仍然过不了门槛，这个取舍就不成立。
+- **范围：** 平台（LLM 调用层）/ imaging（系统 4 前台电话）。
+- **来源：** 2026-10-13 侧会话的 A/B（`evals/runs/voice-thinking-ab/`，未提交）。
+- **代码：** `apps/api/app/core/config.py`（`GEMINI_THINKING_VOICE` 默认值）、`apps/api/app/modules/frontdesk/agent.py`（`LlmAgent`）。
+- **提交：** `2a92b10`（分支 `claude/trusting-hypatia-72ce4a`）。
+
+### 3.15 重试救回 2/3，剩下的是"连环卡顿"：代码没动的 call_summary 反而掉分
+
+- **现象：** 修好 3.11 后重跑，文书分数翻倍，但**完全没改过**的 `call_summary` 从 15/20 掉到 11/20。出院小结还有 8 个病例、患者指导 2 个、交接 1 个失败，失败调用都在约 57 秒（两次 30 秒尝试）。紧接着的 12 步故事线，第 9 步等出院小结草稿超时。
+- **怎么查的：**
+  1. 看 `call_summary` 每个病例的延迟和输出。4 个失败的 summary 为空、延迟 26.9–27.2 秒，正好是两次 15 秒尝试各在 12.5 秒收到 504，中间退避 2 秒（12.5 + 2 + 12.5）。另有 4 个延迟 16.5–18 秒，成功：卡一次，重试 2–3 秒完成。其余 5 个失败是老问题（`follow_up_needed` 的定义）。上次重跑 `call_summary` 一次都没卡过，最慢 2.6 秒。
+  2. 假设 A（担心是自己引入的回归）：15 秒的单次截止时间把"慢但正常"的调用砍掉了。反证：正常的 `call_summary` 调用只要 1.5–2.6 秒；服务器总是在"我们给的截止时间减 2.5 秒"返回 504（截止 30 秒时 27.5 秒，15 秒时 12.5 秒），而且 0 token。说明它一直卡到截止时间才放弃，并不是在算一个要 20 秒的答案。这一点是**推测**：无法直接证明这些请求给 30 秒就能完成。不过上次的 30 秒设计下同样的卡顿也全部失败，所以最坏也只是"没变好"。
+  3. 假设 B：卡顿成串出现，不是彼此独立。用 API 日志验证：412 次请求里 59 次 504。每个失败的调用占 2 次（15 个调用、30 次），每个被救回的占 1 次（29 个），所以 44 个调用至少卡过一次。第一次尝试的卡顿率约 12%（44/约 363），卡过一次后重试再卡的比例是 34%（15/44）。如果卡顿独立，第二次也应该约 12%，B 成立。时间上也对得上：前台套件最后跑（02:55–03:00），20 个通话摘要里 8 个卡过；故事线（03:02–03:11）99 次请求里 57 次 504（58%）。
+  4. 故事线第 9 步：walk 同步 POST 出院小结草稿，两次都收到 `409 Conflict`（后台 journey 正在起草同一份文书，起草按文书串行）。它只等 180 秒（`--timeout`），而 60 秒预算下一份小结最长可能要 5 × 60 秒。在 58% 卡顿率的窗口里，这一步注定失败。
+- **根因：** Vertex 的卡顿成串出现，一次重试只救得了零星的卡顿。`call_summary` 掉分是因为它刚好排在一串卡顿里，不是代码回归。
+- **怎么修：** 卡顿本身是 Vertex 那边的事，修不掉。先把三个方向逐个拿数据检验，再请 owner 选：
+  1. **(a) `ATTEMPT_SHARE` 改成 1/3，换来第三次尝试。** 前提是"每个正常调用都能在 1/3 预算内完成"，所以先检验这个前提。数据用 `run-2026-10-12T225622`：那时每次尝试还有完整的 30 秒，慢的正常调用没被截断，延迟分布是完整的。运行记录只给**失败**病例存了 trace（调用级延迟），所以样本是"失败病例里的成功调用"，单调用的 agent 再补上通过病例的病例延迟。截断点按"服务器在截止前约 2.5 秒回 504"推算（这是从卡顿观察到的，对"慢但在算"的请求是否同样提前 2.5 秒截断，没有直接证据）：30 秒预算的 agent 从现在的 12.5 秒降到 7.5 秒，60 秒预算的从 27.5 秒降到 17.5 秒。结果：order_review 58 次里 6 次（10%）、medication_reconciliation 53 次里 6 次（11%）、nursing_handoff 23 次里 2 次（9%）、discharge_summary 58 次里 1 次超过新截断点；call_summary（最慢 4.2 秒）和 voice_agent（最慢 1.6 秒）一次都没有。被截断的慢调用，如果慢是因为输出长，重试时还是一样慢，三次全被截断，等于把"慢但成功"变成失败。所以全局 1/3 不可取；只给 call_summary、voice_agent 这类快 agent 配第三次尝试是可行的变体。
+  2. **(b) 进程级熔断：最近 N 次 504 之后，所有调用退避一段时间。** 推演两种做法。"快速失败"：故事线那段 58% 卡顿的窗口里，仍有 42% 的请求没卡，熔断会把它们也丢掉，通过率只会更低。"先等再发"：卡顿串持续好几分钟，单次调用的预算只有 30 或 60 秒，等不过去。剩下的好处只是交互用户更快看到模板回退、少发无用请求，代价是全进程共享状态：文书卡顿会连带电话 agent 一起降级。所以不提高通过率。
+  3. **(c) 在每个运行记录里写下卡顿率。** 不改任何行为，成本低，回答的正好是"这次的分数是不是卡顿造成的"。
+  4. **owner 选了 (c)，加上故事线的等待时间。** 实现：
+     - `GeminiProvider._generate` 把每次调用里每次尝试怎么结束的（成功；卡顿 = 504 或客户端自己超时；429；其他错误）按 task（agent id）记进 `AttemptStats`。默认记到进程级的 `ATTEMPT_STATS`，因为有的评测 harness 自己建网关（`app/modules/evals/run.py`），它的调用也算这次运行；API 里后台循环和请求线程会并发调用，所以计数加锁。
+     - `evalrun.run` 在开始和结束各取一次快照，差值写进运行记录的 `stalls`（总数，加 `by_agent`）和每个 agent 条目的 `stalls`。两个比率：`first_attempt_stall_rate`（第一次尝试就卡的比例）和 `stall_after_stall_rate`（卡过之后的下一次尝试又卡的比例），就是本案"怎么查的"第 3 步手算的 12% 和 34%，现在每次运行自动算。CLI 和运行记录的 `note` 写明卡了几次、重试救回几个、丢了几个。mock 和 Anthropic 运行没有这个计数，`stalls` 为 null。
+     - 故事线第 9 步：`walk.summary_draft_s()` = `SUMMARY_CALLS`（5）× 出院小结 agent 的 `model_policy.timeout_s`（60 秒）= 300 秒。`scripts/storyline_report.py --api` 让第 9 步等 `--timeout` + 300 = 480 秒（后台 journey 可能正在起草同一份，walk 先收到 409，直到它结束），HTTP 客户端超时从 300 秒提到 360 秒，容得下一次同步起草。其他步骤仍等 `--timeout`。5 这个数先验证过：在 mock 下走完整条故事线，读签发的小结里的 `inputs.chunks`，正好 4 段（诊断、用药、观察、计划），加合成 = 5 次调用。
+     - 顺带发现：检验 (a) 时看到，order_review 和 medication_reconciliation 已经有 2–3 个正常调用（14–20 秒）超过**现在**的 12.5 秒截断点。这是 3.11 把比例定为 0.5 的副作用，列为后续（给这两个 agent 设 `timeout_s: 45`，见 3.16）。
+- **怎么证明：** 卡顿的数字来自 `run-2026-10-13T021309.json`（每个病例的延迟和输出）和 API 日志里的 HTTP 状态计数，统计方法写在 live-run 报告 "After the timeout fix" 一节。修复的证明：`test_attempts_are_counted_per_agent_with_the_stalls_a_retry_saved_and_lost` 用 `stalling()` 和 FakeClock 走五种情况（一次成功；卡一次后救回；卡两次后丢掉；客户端超时再 429 再成功；400 不重试），断言每个 agent 的全部计数和 `since()` 的差值。`test_a_live_eval_run_records_the_stall_rate_it_ran_under` 用 `FixtureGemini`（Gemini 的重试循环包着 mock 夹具的答案）真的跑一次 `evalrun.run(..., live=True)`，前四次调用分别卡 1、2、0、1 次，断言运行记录里 3/N 次首次卡顿、3 次卡后重试里 1 次再卡、救回 2 个、丢 1 个，agent 条目、`note` 和 CLI 输出一致。变异检验：删掉失败分支的 `self.stats.record(...)`，这两个测试都挂。故事线：`test_the_whole_story_offline` 加了"段数 + 1 == `SUMMARY_CALLS`"，把常数钉在数据上（病人数据变了，测试会提醒改等待时间）；`test_the_summary_step_can_wait_for_a_whole_draft_against_a_live_model` 断言只有第 9 步用长等待，不传时退回 `timeout_s`。`test_gemini.py`、`test_aiops.py`、`test_storyline.py` 全过；全量 811 过 1 挂，挂的是 `test_template_only_without_ai_consent`（只在周二挂，在没改过的 a347f78 上一样挂，另一个侧会话已查明是测试本身的假设）。没有做真实重跑。
+- **经验：** 修复之后，没改过的东西分数掉了，先看那几个失败病例的**延迟特征**：两次截止时间之和，说明是环境原因。要判断"多重试几次有没有用"，比较"卡过一次后再卡"的条件概率和总体卡顿率：两者接近，说明卡顿独立，多试几次有用；条件概率高得多，说明卡顿成串，多试几次只是等更久，得换策略（熔断、整体退避、换时段）。选方案之前，先用已有数据检验每个方案的**前提**（"正常调用都能在 1/3 预算内完成"），并说清样本从哪来、有什么偏差（只有失败病例存了 trace）。外部问题修不掉时，至少让它在结果里看得见：把诊断时手算的数变成每次运行自动记录的字段，下次就不用再翻日志。
+- **范围：** 平台（LLM 调用层、评测）/ hospital（WP9 故事线）。
+- **来源：** 2026-10-13 侧会话的重跑和故事线实跑；方案检验和实现在之后的侧会话（分支 `claude/reverent-babbage-aad5a2`，基于 `claude/trusting-hypatia-72ce4a`）。
+- **代码：** `apps/api/app/llm/providers.py`（`_generate`、`AttemptStats`、`ATTEMPT_STATS`）、`apps/api/app/aiops/evalrun.py`（`_stall_summary`、`_stall_note`）、`apps/api/app/modules/storyline/walk.py`（`_summary`、`wait`、`SUMMARY_CALLS`、`summary_draft_s`）、`apps/api/scripts/storyline_report.py`（`live`）、`apps/api/app/modules/documentation/service.py`（起草串行，409）、`apps/api/tests/test_gemini.py`、`apps/api/tests/test_storyline.py`。
+- **提交：** `967fc77`（分支 `claude/reverent-babbage-aad5a2`）。
+
+### 3.16 一半预算的副作用：用药的两个 agent 里慢而正常的调用在 12.5 秒被截断
+
+- **现象：** 3.15 检验方案 (a) 时顺带发现：3.11 让每次尝试最多用预算的一半，30 秒预算的 agent 每次尝试就只有 15 秒；Vertex 在截止前约 2.5 秒回 504，实际截断点约 12.5 秒。order_review 和 medication_reconciliation 有几个**正常**调用比 12.5 秒还慢，它们会被当成卡顿砍掉再重试。owner 要求把这件事单独做，不和卡顿率的改动放在一起。转述的理由是"慢是因为输出长，重试还会一样慢"。
+- **怎么查的：**
+  1. 先自己重算转述里的数字。方法同 3.15 (a)，数据用 `run-2026-10-12T225622.json`：那时每次尝试还有完整的 30 秒，慢的正常调用没被截断。样本 = 所有套件失败病例 trace 里这个 agent 的 `status == "ok"` 调用（按 `call_id` 去重：文书套件的 trace 里也有用药核对的调用），加上本 agent 套件通过病例的 `latency_ms`（这两个都是单调用 agent；有 1 个通过病例没有 `latency_ms`，去掉）。order_review 58 次（trace 24 + 通过 34），超过 12.5 秒的 3 次：12.7、13.9、14.3 秒；medication_reconciliation 53 次（trace 37 + 通过 16），2 次：13.2、20.2 秒。和转述一致。
+  2. 算新的截断点：45 秒预算 → 每次 22.5 秒 → 约 20.0 秒截断。order_review 0/58 超过；medication_reconciliation 还剩 1/53：20.2 秒那次只比截断点慢 0.2 秒，**没有余量**。要全部盖住得 50 秒（约 22.5 秒截断）。
+  3. 检验转述的前提"慢是因为输出长"。先查指标口径：`GeminiProvider._usage` 的输出 token 是 `candidates_token_count + thoughts_token_count`，含思考。整体上延迟和输出长度中等相关（Spearman：order_review 0.44，用药核对 0.48），但**最慢的几次并不长**：20.2 秒那次输出 417 token（48 ms/token），13.2 秒那次 180 token（73 ms/token），而 6 秒以内的用药核对调用输出中位数是 476 token，每 token 中位数约 6 ms；order_review 最慢的 13.9 秒只有 570 token（24 ms/token），6 秒以内的中位数是 751 token。尾巴上的慢不是输出长造成的，前提不成立。
+  4. 那尾巴是什么？把 trace 的 `started_at` 和卡顿排在同一条时间线上：两次慢的用药核对（22:58:58 的 20.2 秒、23:18:15 的 13.2 秒）都落在文书套件 22:57–23:22 的卡顿窗口里；order_review 的两次慢调用（23:43:43、23:43:57）相隔 14 秒，紧挨着 23:44:29 的一次 order_review 卡顿。慢而正常的调用和卡顿**扎堆出现**，像同一段 Vertex 变慢的时间：有的请求卡到截止，有的慢慢算完。所以截断后的重试会落在同一段时间里（3.15：卡过一次后再卡的比例是 34%）。
+  5. 看修复之后的数据：`run-2026-10-13T021309`（2a92b10 之后，每次尝试 15 秒）没有跑用药套件，但文书失败病例的 trace 里有 24 次用药核对调用，其中 5 次在 16.2–19.4 秒成功。单次尝试不会超过 15 秒，所以这 5 次都是第一次在约 12.5 秒被截断，退避 2 秒，重试 2–5 秒完成。trace 不记每次尝试，所以分不出它们是真卡顿还是慢的正常调用被截断；能说明的只是被截断后的重试**大多很快**。
+  6. 列出所有等这两个 agent 的地方（预算从 30 秒变成 45 秒，每个等待方都得容得下）。两个 agent 每次运行只调一次模型（`run.model` → `gateway.structured(task=agent_id)`；网关的 schema 或截断重试最多再调一次，即 2 × 45 = 90 秒）。order_review 的模型调用只在 `service.comment`：后台 narrator 循环的 `ai_step`，或审核页的按钮 `POST /api/med-safety/reviews/{id}/commentary`；journey 的 `orderReview` 步骤只建 Task，不调模型。medication_reconciliation 在 `service.settle`：后台 `ai_step`；journey 的 `medRecAdmission` 活动（`ACTIVITY_TIMEOUT` 2 分钟）；药师打开、处理或签署一个还在 pending 的核对（`session_view`、`handle_item`、`sign` 都同步调用 `settle`）；故事线的出院核对（快进任务排空事件时调用 `discharge_medrec`，walk 最多等 900 秒）。前端请求没有客户端超时；故事线第 6 步等入院核对的 AI 步骤用 `--timeout`（180 秒）。全都容得下。真正变长的是 narrator 循环（`app/main.py` `_narrator_loop`）：一轮最多 2 个点评 + 2 个核对，串行；四个都遇到两连卡时，一轮从约 4 × 27 秒变成约 4 × 42 秒，排在后面的 Control Tower 叙述和文书 intake 要多等。
+- **根因：** `ATTEMPT_SHARE` 0.5 等于给每个 agent 设了一个"卡顿还是慢"的分界线（预算的一半减 2.5 秒）。3.11 按全体 30 秒 agent 统一定了这条线，而这两个 agent 在 Vertex 变慢的时段里，正常延迟的尾巴比 12.5 秒长。
+- **怎么修：** `config/agents/{order_review,medication_reconciliation}.yaml` 的 `model_policy` 加 `timeout_s: 45`：每次尝试 22.5 秒，约 20 秒截断，盖住 58 次 order_review 和 53 次用药核对里的 52 次。代价也写明：真卡顿要等约 20 秒（原来约 12.5 秒）才放弃并重试，两连卡约 42 秒才放弃（原来约 27 秒）。换来的是：变慢时段里慢而正常的调用不再被砍掉，再到同一个时段里去重试。粗算（样本很小）：12.5–20 秒之间的正常调用约 5%（111 次里 5 次）；30 秒预算下，其中约 1/3 的重试会再卡，每 100 次调用约丢 1.5 次，45 秒下不丢。卡顿约占第一次尝试的 12%，每次多等约 7.5 秒。两个 agent 主要在后台跑，等待方都容得下，所以这个取舍成立；要给 20.2 秒那次留余量，就用 50 秒。
+- **怎么证明：** `tests/test_gemini.py::test_order_review_and_medication_reconciliation_attempts_outlast_their_slow_healthy_calls`：断言两个 agent 在注册表里都是 45；再用真实的注册表条目经网关各调一次（假 Gemini 客户端），断言发出的单次截止时间是 22500 ms（45 秒的一半），证明配置值真的到了 provider。变异检验：删掉 medication_reconciliation 的 `timeout_s` 一行，测试以 `assert None == 45` 失败。`test_gemini.py` 54 个全过；全量 812 过 1 挂，挂的还是 `test_template_only_without_ai_consent`（只在周二挂，和本改动无关，见 3.15）。没有做真实重跑：效果要等下次跑用药套件时，看运行记录里的 `stalls` 和这两个 agent 的延迟分布。
+- **经验：** 一个全局比例其实是给每个 agent 定了一个阈值，阈值要看**每个 agent 自己的**正常延迟分布，所以做成按 agent 配置。核对别人给的前提（"慢是因为长"）时，先查指标口径（输出 token 含思考），再单看尾巴上的样本：整体 0.44 的相关，到尾巴上完全不成立。把慢的正常调用和卡顿排在同一条时间线上，就能看出它们是不是同一个现象。改超时之前，把所有等这个调用的地方列出来，逐个确认它们的上限比新预算长。
+- **范围：** 平台（LLM 调用层）/ hospital（WP6 用药安全）。
+- **来源：** 3.15 的后续，2026-10-13 侧会话（分支 `claude/stoic-sutherland-d96ab0`，基于 `claude/reverent-babbage-aad5a2`）。
+- **代码：** `apps/api/config/agents/order_review.yaml`、`apps/api/config/agents/medication_reconciliation.yaml`、`apps/api/app/llm/providers.py`（`ATTEMPT_SHARE`、`_usage`）、`apps/api/app/modules/med_safety/service.py`（`comment`、`settle`、`ai_step`）、`apps/api/app/main.py`（`_narrator_loop`）、`apps/api/tests/test_gemini.py`。
+- **提交：** `d0e1241`（分支 `claude/stoic-sutherland-d96ab0`）。
 
 ---
 
@@ -1239,6 +1308,60 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** imaging（系统 11 积压看板）。
 - **来源：** wt-zealous-napier-1d0414 10-09 21:08–21:11。
 
+### 5.12 周二的"编造诊断"是真的：预埋病人恰好因肺炎入院
+
+- **现象：** 10-13（周二）重测 Gemini agent 时，全量后端 `807 passed, 1 failed`：`tests/test_documentation.py::test_template_only_without_ai_consent`
+  第 196 行 `assert (False or False)`。测试让医生在"无 AI 同意、只有模板"的出院小结里加一条诊断 "Pneumonia"，引用的是另一条诊断的来源，
+  期望校验器给出红色的 `untraceable_diagnosis` 或 `source_mismatch`，结果两种都没有。在未修改的 main a347f78 上同样失败，与 provider 改动无关
+  （trusting-hypatia 的交接记录里也记成 a347f78 上的既有失败）。
+- **怎么查的：**
+  1. **先读判定逻辑，列出"什么输入会得到这个输出"。** `TraceabilityValidator.check_item` 对带类型的条目（诊断）先按 code、再按名字
+     （`lexicon.same_name`：规范化后相等、词集包含、difflib ≥ 0.85，加同义词）在输入的 diagnosis / encounter 来源里找匹配：一个都没找到 → `untraceable_diagnosis`；
+     找到了但不在本条引用的来源里 → `source_mismatch`；找到了而且就在引用里 → 没有问题。所以"两种都没有"只剩一种可能：
+     **"Pneumonia" 和测试引用的那条诊断匹配上了**，也就是这位病人可能真的有肺炎。断言 `A or B` 漏掉了第三种结果"没有错误"。
+  2. **假设**（任务说明给的线索，即本章）：预埋病例挑哪个病人取决于医院的星期几，10-13 是周二。读 `app/ehr/seed/documentation.py` 的 `generate()`：
+     `hallucination` 病例从 Medicine A 在院、没被其他预埋用过、同意 AI 处理的住院里，按 `(是否带出院处方, 是否英语, id)` 挑一个，**不看诊断**。
+     再看 `app/ehr/reference.py`：肺炎（233604007）是 Medicine A 最常见的入院诊断之一（"shortness of breath" 权重 0.4，"fever" 0.3）。
+  3. 本机 Docker Desktop 没在运行（5433 拒绝连接），于是先做不依赖数据库的实验（思路同 18.6）。第一版脚本想在脱离数据库的 Store 上重放整个测试，
+     卡在签核对单：`S.sign` → `bus.publish` → `RuntimeError: A detached store has no database connection`（服务层要写事件表）。改成只重放**确定性的那一半**：
+     脱离数据库按指定时刻生成数据（`uv run --with time-machine` 移动整个时钟），按 `read_inputs` 的方式取这次住院的资源，`facts.build` 建来源，
+     按服务的 `_sources_view` 排序取"第一个 diagnosis"，再用 `DischargeSummaryValidator` 校验测试编辑后的内容（探针 `probe_validator.py`，每次约 40 秒）。
+  4. 周二 10:00：预埋住院是 stay-01066，`reasonCode ['Pneumonia']`，第一个诊断来源就是 `Condition/cond-005657 'Pneumonia' 233604007`。
+     测试加的 "Pneumonia" 引用的正是它，匹配且在引用里，0 个问题，`TEST FAIL`。**假设成立。**
+  5. **扫描一周**（10-12 到 10-18，6 个进程并行）：只有周二失败。周一、周日 Sepsis（stay-00931），周三慢阻肺急性加重，周四脑卒中，周五、周六 Sepsis（stay-00942），
+     这些天都是 `red untraceable_diagnosis discharge_diagnoses[1] 'Pneumonia'`。顺带发现断言里的 `source_mismatch` 分支 7 天里一次都没出现过。
+  6. **一直如此，还是后来改坏的？** 95c8eef（10-11，5.3）改过用药安全预埋病例挑的病人，而这些病人会被排除出文书预埋的候选池，可能把周二的病例换了人。
+     用 `git archive a04ca7b apps/api` 取出引入这个测试的 WP7 提交，用当前 worktree 的 venv 跑同一个探针：周二同样是 stay-01066 肺炎、同样 `TEST FAIL`。
+     先确认跑的真是旧代码：`import app.ehr.seed.documentation` 的 `__file__` 指向解出来的目录（`python -c` 会把当前目录放在 `sys.path` 最前面、遮住 `PYTHONPATH`，
+     所以从 scratchpad 目录运行）。结论：测试从写下那天起就在周二失败；它是 10-10（周六，生成周五的数据）写的，10-13 是它遇到的**第一个周二**。
+  7. 启动 Docker Desktop（compose 容器自动重启）后，在自己的库 `ioc_test_brave` 上，同一次 pytest 会话同时跑 HEAD 的原测试（临时拷成
+     `tests/test_zz_head_documentation_tmp.py`，跑完删除）和修改后的测试：原测试 `assert (False or False)`，与报告一致；新测试通过。
+- **根因：** **测试的假设错了，校验器是对的。** 测试把 "Pneumonia" 当成这次住院一定没有的诊断，但预埋病例挑病人时不看诊断，而肺炎是 Medicine A 的常见入院诊断；
+  周二挑中的正好是一位因肺炎入院的病人，"编造"的诊断其实有据可查，也正确引用了来源，校验器不报错才是对的。
+- **怎么修：** 只改测试。"编造"的诊断在运行时挑一个不属于这次住院的名字：依次试 "Pneumonia"、"Pulmonary embolism"，跳过和本次住院任何诊断或入院原因
+  （含 `lexicon.synonyms` 的同义词）`same_name` 匹配的那个。断言收紧成确定的结果：第一条（有据可查的）诊断没有红色问题；第二条在 `discharge_diagnoses[1]`
+  上有 `untraceable_diagnosis`，值就是挑中的名字（原来"或 `source_mismatch`"从没出现过，去掉）。种子不改：数据本身没错，改种子会让演示数据换人。
+- **怎么证明：**
+  - 同一个库、同一次会话：原测试失败、新测试通过（`1 failed, 1 passed`）。
+  - 文书的两个测试文件（`test_documentation.py`、`test_documentation_validator.py`）在周二（真实时钟）和周五各 `30 passed`。周五用 scratchpad 里的 pytest 插件
+    `-p travel`：模块导入时就用 time-machine 把时钟移到 `TRAVEL_TO`，早于 conftest 播种。`-q` 不显示插件的报告头，所以用 SQL 确认两个库确实是不同的医院日：
+    `ioc_test_brave` 的预埋住院是 stay-01066 / 233604007，`ioc_test_brave_fri` 是 stay-00942 / 91302008。新测试的两条路（周二退到 "Pulmonary embolism"，
+    周五仍用 "Pneumonia"）都跑到了。
+  - **变异测试：** 插件 `-p mutate_validator` 把 `TraceabilityValidator.check_item` 换成丢掉 `untraceable_diagnosis` / `source_mismatch` 的版本，新测试失败
+    （`AssertionError: []`），说明它不是空转。插件在 `pytest_collection_modifyitems` 里才 import app，保证 `tests/conftest.py` 先设好 `DATABASE_URL`，不会连到开发库。
+  - 两个测试库用完已删除。没有跑全量后端（只改了一个测试）。
+- **经验：**
+  - 断言"两种错误至少有一种"（`A or B`）时，先问：有没有第三种结果"没有错误"？这里第三种结果恰恰是正确行为，失败报的是测试的假设，不是被测代码。
+  - 测试里的反例（编造的诊断、不存在的药）要在运行时证明它确实不在数据里，不能凭印象挑一个"应该没有"的名字；挑得越常见，越容易撞上。
+    这是 5.3、12.9 那个教训的另一面：那里是预埋病例的前提没写成挑选条件，这里是测试的前提没写成条件。
+  - 读一遍判定逻辑就能把可能性从"三种"缩到"一种"，之后的实验只需确认这一种。
+  - 数据库不可用时，把被测逻辑里确定性的那部分单独拿出来实验（生成器、来源、校验器都不需要数据库），一个星期几几十秒，比等环境快。
+  - "从什么时候开始坏的"用旧提交跑同一个探针回答，先确认真的加载了旧代码。
+- **范围：** hospital（WP7 文书测试，WP1 生成器的预埋病例）。
+- **来源：** wt-brave-grothendieck-30fcc4 10-13 约 16:00–16:45；发现于同日 Gemini 重测的全量后端（807 passed、1 failed）。
+- **代码：** `apps/api/tests/test_documentation.py`（`test_template_only_without_ai_consent`）；相关：`apps/api/app/modules/documentation/validator.py`（`check_item`）、
+  `apps/api/app/ehr/seed/documentation.py`（`generate()` 的 `hallucination` 病例）；提交 a7a7d55。
+
 > **怎么在另一天测试**（本机做法，见 memory 记录）：
 > - 脱离数据库调用 `generate(Store(), seed, datetime(...))`，几十秒就能扫完一周（5.6）；或者写一个 pytest 插件只冻结播种时刻（`seedat`、`seedtime`：`-p seedtime` 加 `SEED_AT`），
 >   每个星期几一个测试库并行跑，并先用 SQL 确认真的换了医院日（5.9）。
@@ -1246,6 +1369,8 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 >   （`test_phase2.py::test_contrast_status_and_threshold_recompute`、`test_phase3.py` 的 3 个、`test_phase4.py` 的 5 个，如 `test_reconciliation_finds_every_planted_discrepancy`、
 >   `test_expired_lots_are_never_consumed` 的 `StopIteration`）；用 `uv run --with time-machine` 把整个时钟移到周四后，这 9 个全部通过（`9 passed in 108.29s`）。
 > - time-machine 把**不带时区的** `datetime` 当作 UTC（本机是 UTC-4），要传带时区的时间。
+> - 整个 pytest 会话换到另一天：scratchpad 里写一个插件，模块导入时就 `time_machine.travel(<带时区的时间>, tick=True).start()`，
+>   用 `PYTHONPATH=<插件目录> uv run --with time-machine pytest -p travel` 运行；`-q` 不显示插件的报告头，用 SQL 确认库里是哪一天的数据（5.12）。
 > - 浏览器端在 Vite 配置里注入一个 `Date` 子类来偏移时间；放在 scratchpad 里的 Vite 配置要用 `.mts` 扩展名（第六章）。改浏览器时钟前先确认前端不拿它比对令牌过期时间（5.2）。
 
 ---

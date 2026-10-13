@@ -271,6 +271,35 @@ def _gateway(live: bool):
     return collect.CollectingGateway(provider)
 
 
+def _stall_rates(counts: dict) -> dict:
+    """One task's (or the run's) attempt counts with the two rates that tell a burst of stalls apart (casebook 3.15):
+    how often a call's first attempt stalled, and how often the attempt after a stall stalled again. Independent
+    stalls give about the same rate twice; a much higher second rate means they came in a burst, and a retry only
+    waited longer."""
+    def rate(part: str, whole: str) -> float | None:
+        return round(counts[part] / counts[whole], 4) if counts[whole] else None
+
+    return {**counts, "first_attempt_stall_rate": rate("first_stalled", "calls"),
+            "stall_after_stall_rate": rate("stalled_after_stall", "after_stall")}
+
+
+def _stall_summary(by_task: dict[str, dict]) -> dict | None:
+    """The run file's `stalls`: the attempts of the run's Gemini calls (AttemptStats.since) in total and per agent;
+    None when the run made none (mock or Anthropic)."""
+    if not by_task:
+        return None
+    total = {key: sum(c[key] for c in by_task.values()) for key in next(iter(by_task.values()))}
+    return {**_stall_rates(total), "by_agent": {task: _stall_rates(c) for task, c in sorted(by_task.items())}}
+
+
+def _stall_note(stalls: dict) -> str:
+    return (f"The model API stalled (504 or no answer before the deadline) on {stalls['first_stalled']} of "
+            f"{stalls['calls']} first attempts ({stalls['first_attempt_stall_rate']:.0%}); "
+            f"{stalls['stalled_after_stall']} of {stalls['after_stall']} retries after a stall stalled again"
+            + (f" ({stalls['stall_after_stall_rate']:.0%})" if stalls["after_stall"] else "")
+            + f". Calls a retry saved: {stalls['saved']}; calls lost to stalls: {stalls['lost']}.")
+
+
 def new_run_id() -> str:
     base = "run-" + datetime.now().strftime("%Y-%m-%dT%H%M%S")
     run_id, n = base, 1
@@ -301,6 +330,8 @@ def run(agent_ids: list[str] | None = None, *, live: bool = False, prompt: str |
     targets = agent_ids or sorted(all_agents)
     platform = (agent_ids is None) if platform is None else platform
     gateway = _gateway(live)
+    attempts = getattr(gateway.provider, "stats", None)  # Gemini counts its attempts (app/llm/providers.py)
+    attempts_before = attempts.snapshot() if attempts is not None else {}
     run_id = new_run_id()
     started_at = datetime.now()
     with _rolled_back(store) as st:
@@ -331,6 +362,12 @@ def run(agent_ids: list[str] | None = None, *, live: bool = False, prompt: str |
                 progress(f"  {a}: {e['status']}" + (f" task_success {m.get('task_success')} "
                                                    f"({m.get('cases_passed')}/{m.get('cases')}), threshold "
                                                    f"{e.get('threshold')}" if m else f" {e.get('error', '')}"))
+    stalls = _stall_summary(attempts.since(attempts_before)) if attempts is not None else None
+    if stalls is not None:
+        for agent_id, counts in stalls["by_agent"].items():
+            if agent_id in agents:
+                agents[agent_id]["stalls"] = counts
+        progress(f"stalls: {_stall_note(stalls)}")
     platform_suites = {}
     if platform:
         progress("platform: prompt injection ...")
@@ -357,10 +394,10 @@ def run(agent_ids: list[str] | None = None, *, live: bool = False, prompt: str |
               "finished_at": datetime.now().isoformat(timespec="seconds"), "mode": gateway.mode,
               "baseline": gateway.mode == "mock", "trigger": trigger, "requested": agent_ids,
               "variant": {"agent": target, **variant} if (target and (prompt or model)) else None,
-              "git": _git(), "agents": agents, "platform": platform_suites,
+              "git": _git(), "agents": agents, "platform": platform_suites, "stalls": stalls,
               "note": ("Mock model: a baseline that shows the pipeline (context, schema, guards, evidence), not a "
                        "model's quality; mock costs are list-price estimates.") if gateway.mode == "mock" else
-                      "Live model run."}
+                      "Live model run." + (f" {_stall_note(stalls)}" if stalls and stalls["stalled"] else "")}
     stub = {"run_id": run_id, "started_at": record["started_at"], "mode": gateway.mode}
     for agent_id, entry in agents.items():
         spec = all_agents[agent_id]

@@ -21,6 +21,21 @@ from typing import Any, Callable
 
 from app.modules.storyline import script as S
 
+# The discharge summary is drafted in one synchronous request: a model call per chunk of the stay's facts (four for
+# the storyline's stay) and the synthesis, each within the summary agent's budget. A Vertex stall uses up a call's
+# whole budget (casebook 3.15), so a draft that gets past its stalls can take this many budgets.
+SUMMARY_CALLS = 5
+
+
+def summary_draft_s() -> float:
+    """The longest the storyline's discharge summary draft can take: SUMMARY_CALLS x the summary agent's
+    model_policy.timeout_s (LLM_TIMEOUT_S when it has none)."""
+    from app.agents import registry
+    from app.core.config import settings
+
+    return SUMMARY_CALLS * (registry.require_agent("discharge_summary").model_policy.timeout_s
+                            or settings.llm_timeout_s)
+
 
 class WalkFailed(AssertionError):
     pass
@@ -40,8 +55,12 @@ class StepRun:
 
 class Walk:
     def __init__(self, client: Any, *, pump: Callable[[], None], advance: Callable[["Walk", str], None],
-                 log: Callable[[str], None] = lambda _m: None, timeout_s: float = 120) -> None:
+                 log: Callable[[str], None] = lambda _m: None, timeout_s: float = 120,
+                 summary_timeout_s: float | None = None) -> None:
         self.client, self.pump, self._advance, self.log, self.timeout_s = client, pump, advance, log, timeout_s
+        # Step 9 waits for the discharge summary draft: against a live model longer than for other background work
+        # (scripts/storyline_report.py passes timeout_s + summary_draft_s()); None: timeout_s.
+        self.summary_timeout_s = summary_timeout_s
         self.tokens: dict[str, str] = {}
         self.runs: list[StepRun] = []
 
@@ -234,7 +253,7 @@ class Walk:
 
     def _summary(self, user: str):
         self.advance("discharge")
-        view = self.wait("the discharge summary draft", lambda: self._draft_summary(user))
+        view = self.wait("the discharge summary draft", lambda: self._draft_summary(user), self.summary_timeout_s)
         red = [i for i in (view.get("validation") or {}).get("issues") or [] if i.get("severity") == "red"]
         names = {(i.get("value") or "").lower() for i in red}
         if not red or view.get("can_sign"):

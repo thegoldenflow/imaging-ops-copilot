@@ -8,7 +8,7 @@ the task as module and the prompt version.
 
 Agent registry (spec 6.4): the task is the agent id. A task without a registry
 entry is refused (`UnregisteredAgent`); the entry's model_policy picks the model
-tier and max_tokens; its prompt_version must be the prompt sent; in
+tier, max_tokens and the call's timeout; its prompt_version must be the prompt sent; in
 APP_MODE=prod an agent that has not passed its evaluation (or is not prod_ready)
 is refused, which the modules handle like an unavailable model. The outcome says
 whether the agent is evaluated, so the UI can flag output that is not. Inside an
@@ -249,7 +249,7 @@ class LlmGateway:
                 result = self.provider.complete_json(
                     task=task, model=model, system=prompt.system, text=request_text, schema=schema,
                     images=images, attempt=attempt, max_tokens=spec.model_policy.max_tokens, tier=model_tier,
-                    thinking_level=retry_thinking,
+                    thinking_level=retry_thinking, timeout_s=spec.model_policy.timeout_s,
                 )
             except ProviderUnavailable as e:
                 call = self._log(task=task, model=model, prompt=prompt, text=text, started=started,
@@ -296,7 +296,8 @@ class LlmGateway:
             raise ProviderUnavailable(refusal)
         try:
             result = self.provider.tool_turn(task=task, model=model, system=prompt.system, messages=messages,
-                                             tools=tools, max_tokens=spec.model_policy.max_tokens, tier=model_tier)
+                                             tools=tools, max_tokens=spec.model_policy.max_tokens, tier=model_tier,
+                                             timeout_s=spec.model_policy.timeout_s)
         except (ProviderUnavailable, ProviderRefusal) as e:
             call = self._log(task=task, model=model, prompt=prompt, text=redacted_text, started=started,
                              outcome="unavailable", error=str(e))

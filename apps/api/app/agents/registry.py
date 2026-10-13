@@ -96,6 +96,9 @@ class ModelPolicy(_Strict):
     # a registered model (config/models.yaml) by name instead of the tier's model; None: the tier decides
     model: str | None = None
     max_tokens: int = Field(ge=1, le=64000)
+    # Seconds per model call, retries included; None: LLM_TIMEOUT_S. For agents whose calls run long (the
+    # documentation agents), so the phone agent keeps the short default.
+    timeout_s: float | None = Field(default=None, gt=0, le=600)
     # None: provider default, nothing sent (Claude Sonnet 5.5 refuses non-default sampling values)
     temperature_max: float | None = Field(default=None, ge=0, le=1)
 
