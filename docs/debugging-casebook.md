@@ -914,6 +914,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** 平台（LLM 调用层）/ hospital（WP6 用药安全）。
 - **来源：** 3.15 的后续，2026-10-13 侧会话（分支 `claude/stoic-sutherland-d96ab0`，基于 `claude/reverent-babbage-aad5a2`）。
 - **代码：** `apps/api/config/agents/order_review.yaml`、`apps/api/config/agents/medication_reconciliation.yaml`、`apps/api/app/llm/providers.py`（`ATTEMPT_SHARE`、`_usage`）、`apps/api/app/modules/med_safety/service.py`（`comment`、`settle`、`ai_step`）、`apps/api/app/main.py`（`_narrator_loop`）、`apps/api/tests/test_gemini.py`。
+- **提交：** `d0e1241`（分支 `claude/stoic-sutherland-d96ab0`）。
 
 ---
 
