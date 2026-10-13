@@ -11,7 +11,7 @@ uv run python scripts/eval_summary.py
 
 ## What these numbers are
 
-- **All 8 committed runs are mock-model baselines.** The mock provider returns built-in outputs written alongside the eval cases, so these numbers show that the pipeline works (context assembly, de-identification, schema validation, guards, evidence checks, review queues, write-back), not a model's quality. Mock costs are list-price estimates.
+- **All 9 committed runs are mock-model baselines.** The mock provider returns built-in outputs written alongside the eval cases, so these numbers show that the pipeline works (context assembly, de-identification, schema validation, guards, evidence checks, review queues, write-back), not a model's quality. Mock costs are list-price estimates.
 - **Runs on a real model (Claude or Gemini) are still to be done.** Until then the release gate keeps every agent `pending` (de-identification, a pipeline eval, is the exception), so AI output carries **Not evaluated** in demo mode and prod mode refuses those agents.
 - **The human rating sheets are still to be scored:** Control Tower narratives (7.1): accuracy 1-5 per narrative, gate mean >= 4 (`evals/control_tower/narrator/rating_sheet.md`: 0 of 30 rows scored); Documentation (7.3): completeness, accuracy, readability, format 1-5 per document, gate every mean >= 4 (`evals/documentation/rating_sheet.md`: 0 of 90 rows scored).
 - All data is synthetic. Even a live run would show performance on synthetic cases written alongside the rules, not clinical performance.
@@ -23,28 +23,28 @@ Status words: **pending** = met its bar on the mock model (or not judged yet); *
 | Agent | Tier | Eval set | Threshold (task_success) | Latest result | Module gates met | Run | Release status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `call_center` | ops | `evals/call_center/report.json` | 0.80 | module gates only (report suite) | 1/1 | run-2026-10-10T063931 (mock) | pending |
-| `call_summary` | ops | `evals/voice_agent/cases.jsonl` (20 cases) | 0.90 | 1.000 (20/20) | 3/3 | run-2026-10-10T150508 (mock) | pending |
+| `call_summary` | ops | `evals/voice_agent/cases.jsonl` (20 cases) | 0.90 | 1.000 (20/20) | 3/3 | run-2026-10-13T171045 (mock) | pending |
 | `clinical_kg_answer` | clinical_ds | `evals/datasets/clinical_kg.json` (30 cases) | 0.90 | 1.000 (30/30) | 1/1 | run-2026-10-10T062526 (mock) | pending |
 | `clinical_kg_parse` | clinical_ds | `evals/datasets/clinical_kg.json` (30 cases) | 0.90 | 1.000 (30/30) | 1/1 | run-2026-10-10T062526 (mock) | pending |
 | `control_tower` | ops | `evals/control_tower/narrator/cases.jsonl` (30 cases) | 0.90 | 1.000 (30/30) | 4/4 | run-2026-10-10T062526 (mock) | pending |
 | `cxr_draft` | clinical_ds | none | 0.80 | not evaluated: no eval set (no adapter, no evals/<agent>/cases.jsonl, no module report) | | run-2026-10-10T062526 | pending |
 | `deid_check` | ops | `evals/deid/cases.jsonl` (200 cases) | 0.90 | 0.935 (187/200) | 3/3 | run-2026-10-10T062526 (mock) | passed |
-| `discharge_summary` | documentation | `evals/documentation/cases.jsonl` (30 cases) | 0.90 | 1.000 (30/30) | 6/6 | run-2026-10-10T062526 (mock) | pending |
+| `discharge_summary` | documentation | `evals/documentation/cases.jsonl` (30 cases) | 0.90 | 1.000 (30/30) | 6/6 | run-2026-10-13T171045 (mock) | pending |
 | `feedback_classify` | ops | `evals/datasets/feedback.json` (60 cases) | 0.75 | 0.783 (47/60) | 1/1 | run-2026-10-10T062526 (mock) | pending |
 | `followup_calls` | documentation | `evals/followup/report.json` | 0.80 | module gates only (report suite) | 2/2 | run-2026-10-10T062526 (mock) | pending |
 | `medication_reconciliation` | clinical_ds | `evals/medrec/cases.jsonl` (20 cases) | 0.90 | 1.000 (20/20) | 2/2 | run-2026-10-10T062526 (mock) | pending |
 | `mri_implant_extract` | clinical_ds | `evals/datasets/implants.json` (30 cases) | 0.90 | 0.967 (29/30) | 1/1 | run-2026-10-10T062526 (mock) | pending |
-| `nursing_handoff` | documentation | `evals/documentation/cases.jsonl` (30 cases) | 0.90 | 1.000 (30/30) | 2/2 | run-2026-10-10T062526 (mock) | pending |
-| `order_review` | clinical_ds | `evals/order_review/cases.jsonl` (60 cases) | 0.80 | 0.850 (51/60) | 5/5 | run-2026-10-10T062526 (mock) | pending |
-| `patient_instructions` | documentation | `evals/documentation/cases.jsonl` (30 cases) | 0.90 | 1.000 (30/30) | 3/3 | run-2026-10-10T062526 (mock) | pending |
+| `nursing_handoff` | documentation | `evals/documentation/cases.jsonl` (30 cases) | 0.90 | 1.000 (30/30) | 2/2 | run-2026-10-13T171045 (mock) | pending |
+| `order_review` | clinical_ds | `evals/order_review/cases.jsonl` (60 cases) | 0.80 | 0.850 (51/60) | 5/5 | run-2026-10-13T171045 (mock) | pending |
+| `patient_instructions` | documentation | `evals/documentation/cases.jsonl` (30 cases) | 0.90 | 1.000 (30/30) | 3/3 | run-2026-10-13T171045 (mock) | pending |
 | `patient_message_triage` | ops | `evals/patient_message_triage/cases.jsonl` (12 cases) | 0.90 | 0.917 (11/12) | 2/2 | run-2026-10-10T062526 (mock) | pending |
 | `policy_qa` | ops | `evals/datasets/policy_qa.json` (20 cases) | 0.80 | 0.850 (17/20) | 1/1 | run-2026-10-10T062526 (mock) | pending |
 | `prep_translation` | documentation | none | 0.80 | not evaluated: no eval set (no adapter, no evals/<agent>/cases.jsonl, no module report) | | run-2026-10-10T062526 | pending |
-| `protocol_suggest` | clinical_ds | `evals/datasets/protocols.json` (40 cases) | 0.90 | 0.950 (38/40) | 1/1 | run-2026-10-10T062526 (mock) | pending |
+| `protocol_suggest` | clinical_ds | `evals/datasets/protocols.json` (40 cases) | 0.90 | 0.950 (38/40) | 1/1 | run-2026-10-13T171045 (mock) | pending |
 | `referral_weekly_summary` | ops | `evals/datasets/referral_summary.json` (3 cases) | 1.00 | 1.000 (3/3) | 1/1 | run-2026-10-10T062526 (mock) | pending |
-| `requisition_extract` | documentation | `evals/datasets/requisitions.json` (50 cases) | 0.75 | 0.780 (39/50) | 1/1 | run-2026-10-10T062526 (mock) | pending |
-| `requisition_triage` | clinical_ds | `evals/datasets/requisitions.json` (50 cases) | 0.85 | 0.900 (45/50) | 1/1 | run-2026-10-10T062526 (mock) | pending |
-| `voice_agent` | ops | `evals/voice_agent/cases.jsonl` (20 cases) | 0.90 | 1.000 (20/20) | 5/5 | run-2026-10-10T150508 (mock) | pending |
+| `requisition_extract` | documentation | `evals/datasets/requisitions.json` (50 cases) | 0.75 | 0.960 (48/50) | 1/1 | run-2026-10-13T171045 (mock) | pending |
+| `requisition_triage` | clinical_ds | `evals/datasets/requisitions.json` (50 cases) | 0.85 | 0.900 (45/50) | 1/1 | run-2026-10-13T171045 (mock) | pending |
+| `voice_agent` | ops | `evals/voice_agent/cases.jsonl` (20 cases) | 0.90 | 1.000 (20/20) | 6/6 | run-2026-10-13T171045 (mock) | pending |
 
 Notes:
 
@@ -53,32 +53,32 @@ Notes:
 ### Module gates per agent
 
 - `call_center` (call_center@1, model claude-haiku-4-5, mock): module_verdict yes (bar yes).
-- `call_summary` (call_summary@1, model claude-haiku-4-5, mock): unsupported_claims 0 (bar 0); calls_with_raw_identifiers_to_model 0 (bar 0); cost_per_case 0.000303 (bar 0.05). Extra: follow_up_accuracy 1, actions_named 1, unsupported_claims 0, calls_with_raw_identifiers_to_model 0.
+- `call_summary` (call_summary@1, model claude-haiku-4-5, mock): unsupported_claims 0 (bar 0); calls_with_raw_identifiers_to_model 0 (bar 0); cost_per_case 0.000304 (bar 0.05). Extra: follow_up_accuracy 1, actions_named 1, unsupported_claims 0, calls_with_raw_identifiers_to_model 0.
 - `clinical_kg_answer` (clinical_kg_answer@1, model claude-sonnet-5-5, mock): cost_per_case 0.001677 (bar 0.25). Extra: entity_alignment 1, intent_accuracy 1, expected_fact_retrieved 1, answered_with_expected_citation 1, correct_not_found 1, rejected_unverifiable_answers 0, failed_calls 0.
 - `clinical_kg_parse` (clinical_kg_parse@1, model claude-haiku-4-5, mock): cost_per_case 0.000221 (bar 0.05). Extra: entity_alignment 1, intent_accuracy 1, expected_fact_retrieved 1, answered_with_expected_citation 1, correct_not_found 1, rejected_unverifiable_answers 0, failed_calls 0.
 - `control_tower` (control_tower@1, model claude-sonnet-5-5, mock): rule_engine 20/20 (bar all); thirty_exceptions 30 (bar 30); cost_per_case 0.005031 (bar 0.25); injection_refused 2/2 (bar all). Extra: guard_pass_rate 1, template_fallbacks 0, rule_scenarios_passed 20, rule_scenarios 20.
 - `deid_check` (deid_check@1, model claude-haiku-4-5, mock): recall 0.9932 (bar 0.98); precision 0.9992 (bar 0.9); cost_per_case 0.000158 (bar 0.05). Extra: recall 0.9932, precision 0.9992, rule_layer_recall 0.9889.
-- `discharge_summary` (discharge_summary@1, model claude-sonnet-5-5, mock): untraceable_after_validator 0 (bar gate); validator_recall 1 (bar gate); schema_validity 1 (bar gate); injected_blocked 5 (bar gate); cost_per_case 0.02903 (bar 0.25); injection_refused 5/5 (bar all). Extra: raw_hallucination_rate 0.0138, validator_recall 1, untraceable_after_validator 0, summary_seconds_p50 0.578.
+- `discharge_summary` (discharge_summary@1, model claude-sonnet-5-5, mock): untraceable_after_validator 0 (bar gate); validator_recall 1 (bar gate); schema_validity 1 (bar gate); injected_blocked 5 (bar gate); cost_per_case 0.02903 (bar 0.25); injection_refused 5/5 (bar all). Extra: raw_hallucination_rate 0.0138, validator_recall 1, untraceable_after_validator 0, summary_seconds_p50 0.531.
 - `feedback_classify` (feedback_classify@1, model claude-haiku-4-5, mock): cost_per_case 0.000189 (bar 0.05). Extra: sentiment_accuracy 0.95, theme_exact_match 0.833, theme_f1 0.93, failed_calls 0, both_correct_en 0.6, both_correct_fr 0.8, both_correct_pa 0.867, both_correct_zh 0.867.
 - `followup_calls` (followup_calls@1, model claude-sonnet-5-5, mock): module_verdict yes (bar yes); injection_refused 4/4 (bar all).
 - `medication_reconciliation` (medication_reconciliation@1, model claude-sonnet-5-5, mock): row_accuracy 1 (bar 0.9); cost_per_case 0.001916 (bar 0.25). Extra: row_accuracy 1, rows 57.
 - `mri_implant_extract` (mri_implant_extract@1, model claude-haiku-4-5, mock): cost_per_case 0.000179 (bar 0.05). Extra: device_accuracy 0.967, failed_calls 0, accuracy_en 0.917, accuracy_fr 1, accuracy_pa 1, accuracy_zh 1.
 - `nursing_handoff` (nursing_handoff@1, model claude-sonnet-5-5, mock): automated_proxies_mean_ge_4 {'completeness': 5.0, 'accuracy': 5.0, 'readability': 5.0, 'format': 5.0} (bar >= 4); cost_per_case 0.005498 (bar 0.25). Extra: handoff_red 0.
-- `order_review` (order_review@1, model claude-sonnet-5-5, mock): precision 0.9455 (bar 0.8); recall 0.8966 (bar 0.85); schema_validity 1 (bar 1); grounding_rate 1 (bar 1); cost_per_case 0.005177 (bar 0.25). Extra: precision 0.9455, recall 0.8966, tp 52, fp 3, fn 6, latency_p50_ms 391, latency_p95_ms 860.
-- `patient_instructions` (patient_instructions@1, model claude-sonnet-5-5, mock): bilingual_consistency 1 (bar gate); cost_per_case 0.005676 (bar 0.25); injection_refused 1/1 (bar all). Extra: fk_grade_mean 5.34, zh_terms_explained 1, bilingual_consistency 1.
+- `order_review` (order_review@1, model claude-sonnet-5-5, mock): precision 0.9455 (bar 0.8); recall 0.8966 (bar 0.85); schema_validity 1 (bar 1); grounding_rate 1 (bar 1); cost_per_case 0.005177 (bar 0.25). Extra: precision 0.9455, recall 0.8966, tp 52, fp 3, fn 6, latency_p50_ms 250, latency_p95_ms 313, new_without_indication_cases 44, new_without_indication_accuracy 1, new_without_indication_precision 1, new_without_indication_recall 1, new_without_indication_flagged 8, new_without_indication_labelled_without_indication 8.
+- `patient_instructions` (patient_instructions@1, model claude-sonnet-5-5, mock): bilingual_consistency 1 (bar >= 1.0 over >= 10 non-English documents); cost_per_case 0.005676 (bar 0.25); injection_refused 1/1 (bar all). Extra: fk_grade_mean 5.34, zh_terms_explained 1, bilingual_consistency 1, bilingual_documents 10.
 - `patient_message_triage` (patient_message_triage@1, model claude-haiku-4-5, mock): cost_per_case 0.000521 (bar 0.05); injection_refused 16/16 (bar all). Extra: accuracy 0.9167.
 - `policy_qa` (policy_qa@1, model claude-sonnet-5-5, mock): cost_per_case 0.001119 (bar 0.25). Extra: answered_with_right_citation 0.875, correct_not_found 0.75, rejected_unverifiable_answers 0, failed_calls 0.
-- `protocol_suggest` (protocol_suggest@1, model claude-sonnet-5-5, mock): cost_per_case 0.000925 (bar 0.25). Extra: top1 0.95, top3 1, failed_calls 0.
+- `protocol_suggest` (protocol_suggest@1, model claude-sonnet-5-5, mock): cost_per_case 0.000922 (bar 0.25). Extra: top1 0.95, top3 1, failed_calls 0.
 - `referral_weekly_summary` (referral_weekly_summary@1, model claude-haiku-4-5, mock): cost_per_case 0.000994 (bar 0.05). Extra: valid_drafts 1, numbers_traceable 1, fact_coverage 1, failed_calls 0.
-- `requisition_extract` (requisition_extract@1, model claude-haiku-4-5, mock): cost_per_case 0.001112 (bar 0.05). Extra: requested_modality_accuracy 0.98, renal_or_diabetes_accuracy 1, contrast_allergy_accuracy 1, implant_hints_accuracy 0.96, prior_imaging_accuracy 0.86, stated_urgency_accuracy 0.98, field_accuracy 0.963, failed_calls 0.
+- `requisition_extract` (requisition_extract@2, model claude-haiku-4-5, mock): cost_per_case 0.001103 (bar 0.05). Extra: requested_modality_accuracy 1, renal_or_diabetes_accuracy 1, contrast_allergy_accuracy 1, implant_hints_accuracy 0.96, prior_imaging_accuracy 1, stated_urgency_accuracy 1, field_accuracy 0.993, failed_calls 0.
 - `requisition_triage` (requisition_triage@1, model claude-sonnet-5-5, mock): cost_per_case 0.000438 (bar 0.25). Extra: agreement 0.9, within_one_tier 1, over_triage_rate 0.08, under_triage_rate 0.02, failed_calls 0.
-- `voice_agent` (voice_agent@1, model claude-haiku-4-5, mock): required_transfers 5/5 (bar all); unverified_disclosures 0 (bar 0); response_latency_mean_ms 91 (bar 1500); calls_with_raw_identifiers_to_model 0 (bar 0); cost_per_case 0.003062 (bar 0.05). Extra: task_success_en 1, task_success_fr 1, task_success_zh 1, response_latency_mean_ms 91, response_latency_p95_ms 327, caller_turns 68, calls_with_raw_identifiers_to_model 0, fallback_task_success 1.
+- `voice_agent` (voice_agent@1, model claude-haiku-4-5, mock): required_transfers 5/5 (bar all); unverified_disclosures 0 (bar 0); response_latency_mean_ms 55 (bar 1500); calls_with_raw_identifiers_to_model 0 (bar 0); cost_per_case 0.003064 (bar 0.05); injection_refused 4/4 (bar all). Extra: task_success_en 1, task_success_fr 1, task_success_zh 1, response_latency_mean_ms 55, response_latency_p95_ms 155, caller_turns 68, calls_with_raw_identifiers_to_model 0, fallback_task_success 1.
 
 ## Platform suites and model reports
 
 | Suite | What it checks | Result | Source |
 | --- | --- | --- | --- |
-| Prompt injection (6.4) | attack tool calls a fully compromised model asks for; gate: none executed | 38/38 cases refused, 0 unauthorised calls executed | `evals/injection/` (run-2026-10-10T062526, mock) |
+| Prompt injection (6.4) | attack tool calls a fully compromised model asks for; gate: none executed | 38/38 cases refused, 0 unauthorised calls executed | `evals/injection/` (run-2026-10-13T171045, mock) |
 | Durable workflows (6.5) | the 6.5 acceptance criteria (retry without a duplicate side effect, worker restart, sign-off timeout, low-confidence loop, replay) | passed: 10/10 criteria, 35/35 tests | `evals/workflows/report.md` (2026-10-10T06:05:16) |
 | Day simulator (6.2) | a planned day with and without the ICU surge: event order, bed consistency, valid FHIR | passed | `evals/simulator/day_run.json` (2026-10-09T15:52:38) |
 | Flow models (7.1) | the four Control Tower models against the spec's baselines (synthetic data) | passed: admission AUROC 0.8516 vs baseline 0.717; discharge AUROC 0.8686 vs baseline 0.6228; or_duration MAE 15.62 vs baseline 27.77; ed_wait MAE 20.67 vs baseline 24.55 | `apps/api/models/flow/report.md` (2026-10-09T15:53:08) |

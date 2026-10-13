@@ -884,7 +884,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
   - 截断要**先保留失败的**，还要**说明截掉了多少**（`traces_dropped`），否则截断本身就在隐藏证据。
   - 测 harness 时要走 runner 的同一个入口（这里是 `CollectingGateway`），不然测试看到的是另一套记账。
 - **范围：** 平台（`app/aiops` runner、LLM 调用层、AI Ops 页面）。
-- **代码与提交：** `apps/api/app/agents/trace.py`、`apps/api/app/llm/gateway.py`、`apps/api/app/aiops/collect.py`、`apps/api/app/aiops/evalrun.py`、`apps/web/src/features/ai-ops/{EvalCenter,TracePanel}.tsx`、`types.ts`、`apps/api/tests/test_eval_harness.py`。分支 `claude/affectionate-varahamihira-6d62e6`。
+- **代码与提交：** `apps/api/app/agents/trace.py`、`apps/api/app/llm/gateway.py`、`apps/api/app/aiops/collect.py`、`apps/api/app/aiops/evalrun.py`、`apps/web/src/features/ai-ops/{EvalCenter,TracePanel}.tsx`、`types.ts`、`apps/api/tests/test_eval_harness.py`。分支 `claude/affectionate-varahamihira-6d62e6`，提交 3be6d1a（代码、测试、文档），mock 基线在其后一个提交。
 
 ### 3.18 打分与报告的三个口径漏洞：换个说法的"已转接"、只给比值的双语闸门、被丢掉的医嘱子指标
 
@@ -902,7 +902,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **怎么证明：** `tests/test_eval_harness.py`：5 种转接说法都算不实声称（旧代码只有 "transferred" 那一种通过），4 种"提出/询问/拒绝"都不算；doc-02 单病例时双语闸门行是 `documents 1`、`min_documents 10`、reason 里写着 "1 non-English … 10"；医嘱审核子集跑完 `extra` 里有 `per_type` 和子指标。
 - **经验：** 声称类检查（"没做过的事不能说做了"）要拿真实输出里的**各种说法**去测，再拿**全部历史输出**对比新旧规则的判决差异：差异只落在你预期的那几例上，才说明没引入误报。闸门不止一个条件时，行里要把每个条件和没满足的那个写出来。
 - **范围：** 平台（`app/aiops/suites.py`、`scripts/eval_summary.py`）、imaging（系统 4 通话小结）、hospital（WP6 医嘱审核、WP7 患者指引）。
-- **代码与提交：** `apps/api/app/modules/frontdesk/evals.py`、`apps/api/app/modules/documentation/evals.py`、`apps/api/app/aiops/suites.py`、`apps/api/scripts/eval_summary.py`。分支 `claude/affectionate-varahamihira-6d62e6`。
+- **代码与提交：** `apps/api/app/modules/frontdesk/evals.py`、`apps/api/app/modules/documentation/evals.py`、`apps/api/app/aiops/suites.py`、`apps/api/scripts/eval_summary.py`。分支 `claude/affectionate-varahamihira-6d62e6`，提交 3be6d1a（代码、测试、文档），mock 基线在其后一个提交。
 
 ### 3.19 申请单抽取的三个"假错误"：CXR 不算 X 光、标签漏了 urgent、"None known" 被当成既往影像
 
@@ -921,10 +921,10 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
   - `Extraction` 在 schema 层（`field_validator`）把列表字段里值为 `NONE_WORDS`（none、none known、nkda、nil、n/a）和空值的项去掉。网关对模型和 mock 都用这个 schema 校验，所以产品和评测一起生效。
   - **口径（负责人 2026-10-13 决定）：** `prior_imaging` 是**外院既往检查**（系统 10 去那里调片），评分和标签本来就按这个算，不动。改的是"说法"那一侧：新 prompt `requisition_extract@2`（注册表指向它，agent 版本 1.1.0）写明只列申请单写明了机构的既往检查，"None known" 和临床信息里没写机构的检查都不列；schema 字段加同样的 description，字段标签改成 "Prior imaging at an outside facility"；mock 只在写明地点（`\bat\b`）时才算，没有时返回空列表。
 - **待决的口径怎么定的：** 3.6 时就提过"这个字段到底是什么"，一直没定；这次把两种定义的后果（4 个错例取决于它）列给负责人，负责人选了"外院"。
-- **怎么证明：** `tests/test_eval_harness.py`：`detect_modality("CXR PA and lateral") == XR`；60 个种子里凡是生成 "lumbar spine urgent" 的都标 urgent；`requisition_items(Random(SEED))` 等于提交的数据集，且 req-11 是 urgent；`Extraction` 把 "None known"、"NKDA"、"N/A"、"none."、空值都变成空列表、保留真实的植入物；mock 对没有既往影像的信件返回空列表、对没写机构的既往检查也返回空列表，在 50 份申请单上和 `prior_facility` 标签全部一致；抽取套件端到端：mock 每例都多报一条 "None known" 时，`prior_imaging_accuracy` 是 1.0（旧代码 0.30），`requested_modality` 和 `stated_urgency` 都是 1.0。
+- **怎么证明：** `tests/test_eval_harness.py`：`detect_modality("CXR PA and lateral") == XR`；60 个种子里凡是生成 "lumbar spine urgent" 的都标 urgent；`requisition_items(Random(SEED))` 等于提交的数据集，且 req-11 是 urgent；`Extraction` 把 "None known"、"NKDA"、"N/A"、"none."、空值都变成空列表、保留真实的植入物；mock 对没有既往影像的信件返回空列表、对没写机构的既往检查也返回空列表，在 50 份申请单上和 `prior_facility` 标签全部一致；抽取套件端到端：mock 每例都多报一条 "None known" 时，`prior_imaging_accuracy` 是 1.0（旧代码 0.30），`requested_modality` 和 `stated_urgency` 都是 1.0。刷新后的 mock 基线 `run-2026-10-13T171045`：`requisition_extract` 从 39/50 到 48/50，翻过来的正好是 req-11、req-39 和那 7 封信（req-02、28、33、34、44、45、48），其余 8 个 agent 每个用例的判决都没变；prompt gate 25 个版本 0 失败。
 - **经验：** 某个字段总是固定那一两例出错，而且 mock 基线也错，先查**评分和标签**，别查模型。修生成器标签时，**不要多抽随机数**，否则整套数据集都会变，所有历史结果都没法比。"没有"应该是空列表这种约定，要在 schema 层兜住，别指望 prompt 一句话（空串也算"没有"）。一个分数和预期不符时，先逐条看错例的输出再解释；"基线本来就漏报"这种听起来合理的解释，一打印就被推翻了。字段口径不清时，评分、标签、字段说明、prompt、mock 五处要按同一个定义改。
 - **范围：** imaging（系统 5 申请单、系统 6 协议、系统 10 调片）。
-- **代码与提交：** `apps/api/app/modules/protocols/library.py`、`apps/api/app/modules/requisitions/{generator,extraction}.py`、`apps/api/prompts/requisition_extract/2.md`、`apps/api/config/agents/requisition_extract.yaml`、`apps/api/app/modules/evals/build.py`、`evals/datasets/requisitions.json`。分支 `claude/affectionate-varahamihira-6d62e6`。
+- **代码与提交：** `apps/api/app/modules/protocols/library.py`、`apps/api/app/modules/requisitions/{generator,extraction}.py`、`apps/api/prompts/requisition_extract/2.md`、`apps/api/config/agents/requisition_extract.yaml`、`apps/api/app/modules/evals/build.py`、`evals/datasets/requisitions.json`。分支 `claude/affectionate-varahamihira-6d62e6`，提交 3be6d1a（代码、测试、文档），mock 基线在其后一个提交。
 
 ---
 

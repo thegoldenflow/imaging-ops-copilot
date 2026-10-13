@@ -1,6 +1,6 @@
 {
  "task": "protocol",
- "run_at": "2026-10-10T04:30:05",
+ "run_at": "2026-10-13T17:10:48",
  "mode": "mock",
  "model": "rule-based baseline",
  "n": 40,
