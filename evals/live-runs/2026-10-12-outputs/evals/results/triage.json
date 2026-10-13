@@ -1,0 +1,66 @@
+{
+ "task": "triage",
+ "run_at": "2026-10-12T23:32:59",
+ "mode": "gemini",
+ "model": "Gemini: gemini-3.5-flash",
+ "n": 50,
+ "metrics": {
+  "agreement": 0.84,
+  "within_one_tier": 1.0,
+  "over_triage_rate": 0.14,
+  "under_triage_rate": 0.02,
+  "failed_calls": 0
+ },
+ "errors": [
+  {
+   "id": "req-05",
+   "expected": "P4",
+   "got": "P3",
+   "rationale": "The patient presents with a persistent mild headache following a fall two weeks ago, with no anticoagulation therapy or red flag symptoms. This fits the P3 category for symptomatic patients without acute red flags."
+  },
+  {
+   "id": "req-09",
+   "expected": "P4",
+   "got": "P3",
+   "rationale": "The patient presents with gradual cognitive decline over 12 months. This is symptomatic but there are no acute red flags or sudden neurological changes, warranting a P3 priority (imaging within 1 month) for elective diagnostic workup of dementia."
+  },
+  {
+   "id": "req-19",
+   "expected": "P4",
+   "got": "P3",
+   "rationale": "The patient is experiencing symptomatic bilateral knee pain worse on stairs, indicating a chronic musculoskeletal issue without any red flags or acute symptoms that would warrant higher urgency."
+  },
+  {
+   "id": "req-20",
+   "expected": "P4",
+   "got": "P3",
+   "rationale": "The patient presents with acute mechanical back pain following a lifting incident. There are no red flag symptoms or history of malignancy/trauma suggesting a higher priority, but since the patient is currently symptomatic, scheduling is appropriate within 1 month."
+  },
+  {
+   "id": "req-29",
+   "expected": "P3",
+   "got": "P2",
+   "rationale": "The patient presents with episodes of numbness and blurred vision raising concern for a demyelinating process (such as optic neuritis or multiple sclerosis). These significant neurological symptoms warrant semi-urgent evaluation within 1 week. Note: The presence of a cerebral aneurysm clip from 2010 requires urgent safety clearance prior to MRI scheduling."
+  },
+  {
+   "id": "req-31",
+   "expected": "P4",
+   "got": "P3",
+   "rationale": "The patient presents with lumbar radiculopathy L5 that has failed conservative physiotherapy management. There are no documented red flags such as progressive neurological deficits, bowel/bladder dysfunction, or suspected malignancy. Note: The patient has a cochlear implant, which is a major MRI safety contraindication and requires formal safety clearance before the scan can proceed."
+  },
+  {
+   "id": "req-35",
+   "expected": "P3",
+   "got": "P4",
+   "rationale": "The requisition is for a routine abdominal ultrasound to investigate elevated liver enzymes and query fatty liver. There are no acute symptoms, red flags, or urgent indications described, making this a routine (P4) scheduling priority."
+  },
+  {
+   "id": "req-47",
+   "expected": "P4",
+   "got": "P3",
+   "rationale": "The patient reports a persistent mild headache following a fall two weeks ago. Because they are not on anticoagulants and have no reported focal neurological deficits or severe acute symptoms, this does not require emergency P1 imaging but warrants a P3 scan within one month to rule out a subacute subdural hematoma or other post-traumatic sequelae."
+  }
+ ],
+ "seconds": 318.6,
+ "notes": "Agreement with the labelled priority (P1-P4). Under-triage is the safety-relevant error."
+}

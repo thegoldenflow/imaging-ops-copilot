@@ -1,0 +1,146 @@
+{
+ "task": "feedback",
+ "run_at": "2026-10-12T00:48:17",
+ "mode": "gemini",
+ "model": "Gemini: gemini-3.5-flash",
+ "n": 60,
+ "metrics": {
+  "sentiment_accuracy": 0.95,
+  "theme_exact_match": 0.833,
+  "theme_f1": 0.942,
+  "failed_calls": 3,
+  "both_correct_en": 0.867,
+  "both_correct_fr": 0.786,
+  "both_correct_pa": 0.929,
+  "both_correct_zh": 0.929
+ },
+ "errors": [
+  {
+   "id": "fb-02",
+   "language": "en",
+   "comment": "The receptionist was rude and did not listen.",
+   "expected": {
+    "sentiment": "negative",
+    "themes": [
+     "staff_attitude"
+    ]
+   },
+   "got": {
+    "sentiment": "negative",
+    "themes": [
+     "communication",
+     "staff_attitude"
+    ]
+   }
+  },
+  {
+   "id": "fb-08",
+   "language": "en",
+   "comment": "Booking an appointment online was quick.",
+   "expected": {
+    "sentiment": "positive",
+    "themes": [
+     "scheduling",
+     "wait_time"
+    ]
+   },
+   "got": {
+    "sentiment": "positive",
+    "themes": [
+     "scheduling"
+    ]
+   }
+  },
+  {
+   "id": "fb-17",
+   "language": "fr",
+   "comment": "La facture était fausse et personne ne répond.",
+   "expected": {
+    "sentiment": "negative",
+    "themes": [
+     "billing"
+    ]
+   },
+   "got": {
+    "sentiment": "negative",
+    "themes": [
+     "billing",
+     "communication"
+    ]
+   }
+  },
+  {
+   "id": "fb-25",
+   "language": "fr",
+   "comment": "Résultats arrivés chez mon médecin, mais un peu lents.",
+   "expected": {
+    "sentiment": "neutral",
+    "themes": [
+     "results"
+    ]
+   },
+   "got": {
+    "sentiment": "neutral",
+    "themes": [
+     "results",
+     "wait_time"
+    ]
+   }
+  },
+  {
+   "id": "fb-28",
+   "language": "fr",
+   "comment": "Mon rendez-vous a été reporté sans prévenir.",
+   "expected": {
+    "sentiment": "negative",
+    "themes": [
+     "scheduling"
+    ]
+   },
+   "got": {
+    "sentiment": "negative",
+    "themes": [
+     "communication",
+     "scheduling"
+    ]
+   }
+  },
+  {
+   "id": "fb-37",
+   "language": "zh",
+   "comment": "一个星期了医生还没收到报告。",
+   "expected": {
+    "sentiment": "negative",
+    "themes": [
+     "results"
+    ]
+   },
+   "got": {
+    "sentiment": "negative",
+    "themes": [
+     "results",
+     "wait_time"
+    ]
+   }
+  },
+  {
+   "id": "fb-59",
+   "language": "pa",
+   "comment": "ਵ੍ਹੀਲਚੇਅਰ ਲਈ ਲਿਫਟ ਸੀ, ਵਧੀਆ।",
+   "expected": {
+    "sentiment": "positive",
+    "themes": [
+     "parking_access"
+    ]
+   },
+   "got": {
+    "sentiment": "positive",
+    "themes": [
+     "environment"
+    ]
+   }
+  }
+ ],
+ "seconds": 599.1,
+ "notes": "60 comments, 15 per language (EN, FR, ZH, PA), with star rating. Sentiment accuracy, exact theme-set match and micro-F1 over themes."
+}

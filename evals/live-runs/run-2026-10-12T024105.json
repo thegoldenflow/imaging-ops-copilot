@@ -1,0 +1,64 @@
+{
+ "run_id": "run-2026-10-12T024105",
+ "started_at": "2026-10-12T02:41:05",
+ "finished_at": "2026-10-12T02:44:27",
+ "mode": "gemini",
+ "baseline": false,
+ "trigger": "cli",
+ "requested": [
+  "discharge_summary",
+  "nursing_handoff",
+  "patient_instructions"
+ ],
+ "variant": null,
+ "git": {
+  "commit": "6f9a7a8",
+  "dirty": true
+ },
+ "agents": {
+  "discharge_summary": {
+   "suite": "documentation",
+   "suite_kind": "builtin",
+   "suite_title": "Documentation agents (7.3)",
+   "source": "evals/documentation/cases.jsonl",
+   "agent_version": "0.2.0",
+   "prompt_version": "discharge_summary@1",
+   "status": "error",
+   "met": null,
+   "error": "DocProblem: The AI draft could not be written (model needs_human (synthesis)); use the template",
+   "traceback": "Traceback (most recent call last):\n  File \"D:\\code\\AI\\agent\\imaging-ops-copilot\\apps\\api\\app\\aiops\\evalrun.py\", line 240, in run_suite\n    result = suite.run(suites.Context(store=st, live=live))\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"D:\\code\\AI\\agent\\imaging-ops-copilot\\apps\\api\\app\\aiops\\suites.py\", line 335, in _documentation_run\n    report = doc.run(ctx.store, doc.load_cases())\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"D:\\code\\AI\\agent\\imaging-ops-copilot\\apps\\api\\app\\modules\\documentation\\evals.py\", line 255, in run\n    view = docs.draft_summary(store, physician, enc)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"D:\\code\\AI\\agent\\imaging-ops-copilot\\apps\\api\\app\\modules\\documentation\\service.py\", line 384, in draft_summary\n    raise DocProblem(f\"The AI draft could not be written ({result.reason}); use the template\")\napp.modules.documentation.service.DocProblem: The AI draft could not be written (model needs_human (synthesis)); use the template\n",
+   "seconds": 197.2,
+   "eval_status": "pending"
+  },
+  "nursing_handoff": {
+   "suite": "documentation",
+   "suite_kind": "builtin",
+   "suite_title": "Documentation agents (7.3)",
+   "source": "evals/documentation/cases.jsonl",
+   "agent_version": "0.2.0",
+   "prompt_version": "nursing_handoff@1",
+   "status": "error",
+   "met": null,
+   "error": "DocProblem: The AI draft could not be written (model needs_human (synthesis)); use the template",
+   "traceback": "Traceback (most recent call last):\n  File \"D:\\code\\AI\\agent\\imaging-ops-copilot\\apps\\api\\app\\aiops\\evalrun.py\", line 240, in run_suite\n    result = suite.run(suites.Context(store=st, live=live))\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"D:\\code\\AI\\agent\\imaging-ops-copilot\\apps\\api\\app\\aiops\\suites.py\", line 335, in _documentation_run\n    report = doc.run(ctx.store, doc.load_cases())\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"D:\\code\\AI\\agent\\imaging-ops-copilot\\apps\\api\\app\\modules\\documentation\\evals.py\", line 255, in run\n    view = docs.draft_summary(store, physician, enc)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"D:\\code\\AI\\agent\\imaging-ops-copilot\\apps\\api\\app\\modules\\documentation\\service.py\", line 384, in draft_summary\n    raise DocProblem(f\"The AI draft could not be written ({result.reason}); use the template\")\napp.modules.documentation.service.DocProblem: The AI draft could not be written (model needs_human (synthesis)); use the template\n",
+   "seconds": 197.2,
+   "eval_status": "pending"
+  },
+  "patient_instructions": {
+   "suite": "documentation",
+   "suite_kind": "builtin",
+   "suite_title": "Documentation agents (7.3)",
+   "source": "evals/documentation/cases.jsonl",
+   "agent_version": "0.2.0",
+   "prompt_version": "patient_instructions@1",
+   "status": "error",
+   "met": null,
+   "error": "DocProblem: The AI draft could not be written (model needs_human (synthesis)); use the template",
+   "traceback": "Traceback (most recent call last):\n  File \"D:\\code\\AI\\agent\\imaging-ops-copilot\\apps\\api\\app\\aiops\\evalrun.py\", line 240, in run_suite\n    result = suite.run(suites.Context(store=st, live=live))\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"D:\\code\\AI\\agent\\imaging-ops-copilot\\apps\\api\\app\\aiops\\suites.py\", line 335, in _documentation_run\n    report = doc.run(ctx.store, doc.load_cases())\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"D:\\code\\AI\\agent\\imaging-ops-copilot\\apps\\api\\app\\modules\\documentation\\evals.py\", line 255, in run\n    view = docs.draft_summary(store, physician, enc)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"D:\\code\\AI\\agent\\imaging-ops-copilot\\apps\\api\\app\\modules\\documentation\\service.py\", line 384, in draft_summary\n    raise DocProblem(f\"The AI draft could not be written ({result.reason}); use the template\")\napp.modules.documentation.service.DocProblem: The AI draft could not be written (model needs_human (synthesis)); use the template\n",
+   "seconds": 197.2,
+   "eval_status": "pending"
+  }
+ },
+ "platform": {},
+ "note": "Live model run."
+}

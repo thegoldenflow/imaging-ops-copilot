@@ -1,0 +1,81 @@
+{
+ "task": "extraction",
+ "run_at": "2026-10-12T23:36:07",
+ "mode": "gemini",
+ "model": "Gemini: gemini-3.5-flash",
+ "n": 50,
+ "metrics": {
+  "requested_modality_accuracy": 0.98,
+  "renal_or_diabetes_accuracy": 1.0,
+  "contrast_allergy_accuracy": 1.0,
+  "implant_hints_accuracy": 1.0,
+  "prior_imaging_accuracy": 0.44,
+  "stated_urgency_accuracy": 0.98,
+  "field_accuracy": 0.9,
+  "failed_calls": 0
+ },
+ "errors": [
+  {
+   "id": "req-00",
+   "field": "prior_imaging",
+   "style": "form"
+  },
+  {
+   "id": "req-03",
+   "field": "prior_imaging",
+   "style": "form"
+  },
+  {
+   "id": "req-05",
+   "field": "prior_imaging",
+   "style": "form"
+  },
+  {
+   "id": "req-07",
+   "field": "prior_imaging",
+   "style": "form"
+  },
+  {
+   "id": "req-08",
+   "field": "prior_imaging",
+   "style": "form"
+  },
+  {
+   "id": "req-09",
+   "field": "prior_imaging",
+   "style": "form"
+  },
+  {
+   "id": "req-11",
+   "field": "prior_imaging",
+   "style": "form"
+  },
+  {
+   "id": "req-11",
+   "field": "stated_urgency",
+   "style": "form"
+  },
+  {
+   "id": "req-13",
+   "field": "prior_imaging",
+   "style": "form"
+  },
+  {
+   "id": "req-14",
+   "field": "prior_imaging",
+   "style": "form"
+  },
+  {
+   "id": "req-15",
+   "field": "prior_imaging",
+   "style": "form"
+  },
+  {
+   "id": "req-16",
+   "field": "prior_imaging",
+   "style": "form"
+  }
+ ],
+ "seconds": 188.6,
+ "notes": "Field-level accuracy against generator labels. 30% of requisitions are free-text letters."
+}

@@ -1,0 +1,1662 @@
+{
+ "run_id": "run-2026-10-13T014826",
+ "started_at": "2026-10-13T01:48:26",
+ "finished_at": "2026-10-13T01:51:56",
+ "mode": "gemini",
+ "baseline": false,
+ "trigger": "cli",
+ "requested": [
+  "voice_agent"
+ ],
+ "variant": null,
+ "git": {
+  "commit": "a347f78",
+  "dirty": true
+ },
+ "agents": {
+  "voice_agent": {
+   "suite": "frontdesk",
+   "suite_kind": "builtin",
+   "suite_title": "Front-desk phone calls (System 4)",
+   "source": "evals/voice_agent/cases.jsonl",
+   "agent_version": "1.1.0",
+   "kind": "embedded_agent",
+   "risk_tier": "ops",
+   "prompt_version": "voice_agent@1",
+   "prompt_sha256": "3083d802c79bbdc1",
+   "model": "gemini-3.5-flash",
+   "model_key": "gemini-voice",
+   "mode": "gemini",
+   "variant": null,
+   "threshold": 0.9,
+   "pipeline_eval": false,
+   "metrics": {
+    "schema_validity": 1.0,
+    "grounding_rate": null,
+    "task_success": 0.75,
+    "human_override_rate": null,
+    "latency_p50_ms": 6360,
+    "latency_p95_ms": 15139,
+    "cost_per_case_usd": 0.007125,
+    "cost_estimated": false,
+    "cases": 20,
+    "cases_passed": 15,
+    "model_calls": 120,
+    "tokens_in": 74497,
+    "tokens_out": 3418,
+    "human_decisions": 0
+   },
+   "extra": {
+    "task_success_en": 0.9091,
+    "task_success_fr": 0.5,
+    "task_success_zh": 0.5714,
+    "response_latency_mean_ms": 2238,
+    "response_latency_p95_ms": 4218,
+    "caller_turns": 68,
+    "calls_with_raw_identifiers_to_model": 0,
+    "fallback_task_success": 1.0
+   },
+   "gates": {
+    "required_transfers": {
+     "value": "4/5",
+     "threshold": "all",
+     "passed": false
+    },
+    "unverified_disclosures": {
+     "value": 0,
+     "threshold": 0,
+     "passed": true
+    },
+    "response_latency_mean_ms": {
+     "value": 2238,
+     "threshold": 1500,
+     "passed": false
+    },
+    "calls_with_raw_identifiers_to_model": {
+     "value": 0,
+     "threshold": 0,
+     "passed": true
+    },
+    "cost_per_case": {
+     "value": 0.007125,
+     "threshold": 0.05,
+     "passed": true
+    }
+   },
+   "notes": "20 scripted calls (task completion per call; server time per caller turn; the summaries checked against each call's actions and outcome). Agent mode: gemini. Scripted fallback without the model: 20/20.",
+   "module_run_at": null,
+   "case_results": [
+    {
+     "id": "fd-01",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 12197,
+     "cost_usd": 0.014139,
+     "expected": {
+      "verified": true,
+      "task": "reschedule",
+      "slot": 2,
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [
+       "reschedule"
+      ],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "find_open_slots",
+       "reschedule"
+      ],
+      "failures": [],
+      "turns": 6
+     },
+     "run_ids": [
+      "RUN-00001",
+      "RUN-00002",
+      "RUN-00003",
+      "RUN-00004",
+      "RUN-00005",
+      "RUN-00006",
+      "RUN-00007"
+     ]
+    },
+    {
+     "id": "fd-02",
+     "source": "authored",
+     "passed": false,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 11104,
+     "cost_usd": 0.014704,
+     "expected": {
+      "verified": true,
+      "task": "reschedule",
+      "slot": 2,
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "abandoned",
+      "tools": [
+       "verify_identity",
+       "find_open_slots",
+       "lookup_appointment",
+       "find_open_slots"
+      ],
+      "failures": [
+       "the call log says abandoned, not resolved",
+       "original appointment not moved",
+       "not booked at option 2"
+      ],
+      "turns": 6
+     },
+     "run_ids": [
+      "RUN-00008",
+      "RUN-00009",
+      "RUN-00010",
+      "RUN-00011",
+      "RUN-00012",
+      "RUN-00013",
+      "RUN-00014"
+     ],
+     "traces": [
+      {
+       "run_id": "RUN-00008",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00002",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00012",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 484,
+         "tokens_out": 33,
+         "cost_usd": 0.001023,
+         "latency_ms": 1125
+        }
+       ],
+       "tool_calls": [],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 484,
+       "tokens_out": 33,
+       "cost_usd": 0.001023,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:48:46.924482",
+       "finished_at": "2026-10-13T01:48:48.058783"
+      },
+      {
+       "run_id": "RUN-00009",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00002",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00013",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 531,
+         "tokens_out": 36,
+         "cost_usd": 0.00112,
+         "latency_ms": 764
+        },
+        {
+         "call_id": "LLM-00014",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 570,
+         "tokens_out": 28,
+         "cost_usd": 0.001107,
+         "latency_ms": 1218
+        }
+       ],
+       "tool_calls": [
+        {
+         "tool_id": "verifyCallerIdentity",
+         "side_effect_level": "read",
+         "args_hash": "d30e6a0cabe129631a65f78583c5c769bae429d8532ef8ded95c1dae0b68b931",
+         "status": "ok",
+         "reason": null,
+         "result_ref": [],
+         "latency_ms": 15,
+         "attempts": 1,
+         "idempotency_key": null,
+         "approval_task_id": null,
+         "at": "2026-10-13T01:48:48.873243"
+        }
+       ],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 1101,
+       "tokens_out": 64,
+       "cost_usd": 0.002227,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:48:48.072998",
+       "finished_at": "2026-10-13T01:48:50.255936"
+      },
+      {
+       "run_id": "RUN-00010",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00002",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00015",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 602,
+         "tokens_out": 41,
+         "cost_usd": 0.001272,
+         "latency_ms": 1202
+        }
+       ],
+       "tool_calls": [],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 602,
+       "tokens_out": 41,
+       "cost_usd": 0.001272,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:48:50.292203",
+       "finished_at": "2026-10-13T01:48:51.547955"
+      }
+     ]
+    },
+    {
+     "id": "fd-03",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 8700,
+     "cost_usd": 0.010637,
+     "expected": {
+      "verified": true,
+      "task": "keep",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "abandoned",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "find_open_slots"
+      ],
+      "failures": [],
+      "turns": 5
+     },
+     "run_ids": [
+      "RUN-00015",
+      "RUN-00016",
+      "RUN-00017",
+      "RUN-00018",
+      "RUN-00019",
+      "RUN-00020"
+     ]
+    },
+    {
+     "id": "fd-04",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 8120,
+     "cost_usd": 0.009119,
+     "expected": {
+      "verified": true,
+      "task": "cancel",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [
+       "cancel"
+      ],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "cancel"
+      ],
+      "failures": [],
+      "turns": 5
+     },
+     "run_ids": [
+      "RUN-00021",
+      "RUN-00022",
+      "RUN-00023",
+      "RUN-00024",
+      "RUN-00025",
+      "RUN-00026"
+     ]
+    },
+    {
+     "id": "fd-05",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 8856,
+     "cost_usd": 0.008264,
+     "expected": {
+      "verified": true,
+      "task": "cancel",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [
+       "cancel"
+      ],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "cancel"
+      ],
+      "failures": [],
+      "turns": 4
+     },
+     "run_ids": [
+      "RUN-00027",
+      "RUN-00028",
+      "RUN-00029",
+      "RUN-00030",
+      "RUN-00031"
+     ]
+    },
+    {
+     "id": "fd-06",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 6360,
+     "cost_usd": 0.008306,
+     "expected": {
+      "verified": true,
+      "task": "cancel",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [
+       "cancel"
+      ],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "cancel"
+      ],
+      "failures": [],
+      "turns": 4
+     },
+     "run_ids": [
+      "RUN-00032",
+      "RUN-00033",
+      "RUN-00034",
+      "RUN-00035",
+      "RUN-00036"
+     ]
+    },
+    {
+     "id": "fd-07",
+     "source": "authored",
+     "passed": false,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 4499,
+     "cost_usd": 0.005364,
+     "expected": {
+      "verified": true,
+      "task": "confirm",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "abandoned",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment"
+      ],
+      "failures": [
+       "the call log says abandoned, not resolved",
+       "not confirmed"
+      ],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00037",
+      "RUN-00038",
+      "RUN-00039",
+      "RUN-00040"
+     ],
+     "traces": [
+      {
+       "run_id": "RUN-00037",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00007",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00057",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 496,
+         "tokens_out": 36,
+         "cost_usd": 0.001068,
+         "latency_ms": 797
+        },
+        {
+         "call_id": "LLM-00058",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 536,
+         "tokens_out": 19,
+         "cost_usd": 0.000975,
+         "latency_ms": 875
+        }
+       ],
+       "tool_calls": [
+        {
+         "tool_id": "verifyCallerIdentity",
+         "side_effect_level": "read",
+         "args_hash": "2661408bba2edddd69ba89d14ddc0f0fb049ab71d12f71b260db1c173dd07cc8",
+         "status": "ok",
+         "reason": null,
+         "result_ref": [],
+         "latency_ms": 15,
+         "attempts": 1,
+         "idempotency_key": null,
+         "approval_task_id": null,
+         "at": "2026-10-13T01:49:44.463988"
+        }
+       ],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 1032,
+       "tokens_out": 55,
+       "cost_usd": 0.002043,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:49:43.649014",
+       "finished_at": "2026-10-13T01:49:45.490961"
+      },
+      {
+       "run_id": "RUN-00038",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00007",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00059",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 564,
+         "tokens_out": 10,
+         "cost_usd": 0.000936,
+         "latency_ms": 921
+        },
+        {
+         "call_id": "LLM-00060",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 614,
+         "tokens_out": 40,
+         "cost_usd": 0.001281,
+         "latency_ms": 890
+        }
+       ],
+       "tool_calls": [
+        {
+         "tool_id": "lookupAppointments",
+         "side_effect_level": "read",
+         "args_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+         "status": "ok",
+         "reason": null,
+         "result_ref": [],
+         "latency_ms": 125,
+         "attempts": 1,
+         "idempotency_key": null,
+         "approval_task_id": null,
+         "at": "2026-10-13T01:49:46.518113"
+        }
+       ],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 1178,
+       "tokens_out": 50,
+       "cost_usd": 0.002217,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:49:45.507599",
+       "finished_at": "2026-10-13T01:49:47.996652"
+      },
+      {
+       "run_id": "RUN-00039",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00007",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00061",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 664,
+         "tokens_out": 12,
+         "cost_usd": 0.001104,
+         "latency_ms": 1016
+        }
+       ],
+       "tool_calls": [],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 664,
+       "tokens_out": 12,
+       "cost_usd": 0.001104,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:49:48.062650",
+       "finished_at": "2026-10-13T01:49:49.086795"
+      }
+     ]
+    },
+    {
+     "id": "fd-08",
+     "source": "authored",
+     "passed": false,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 5812,
+     "cost_usd": 0.005388,
+     "expected": {
+      "verified": true,
+      "task": "confirm",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "abandoned",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment"
+      ],
+      "failures": [
+       "the call log says abandoned, not resolved",
+       "not confirmed"
+      ],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00041",
+      "RUN-00042",
+      "RUN-00043",
+      "RUN-00044"
+     ],
+     "traces": [
+      {
+       "run_id": "RUN-00041",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00008",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00063",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 493,
+         "tokens_out": 36,
+         "cost_usd": 0.001063,
+         "latency_ms": 1328
+        },
+        {
+         "call_id": "LLM-00064",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 532,
+         "tokens_out": 17,
+         "cost_usd": 0.000951,
+         "latency_ms": 1063
+        }
+       ],
+       "tool_calls": [
+        {
+         "tool_id": "verifyCallerIdentity",
+         "side_effect_level": "read",
+         "args_hash": "241c9409976177c8fab888c059eeee60c037dad5a41ae14b5d26d718b2918241",
+         "status": "ok",
+         "reason": null,
+         "result_ref": [],
+         "latency_ms": 61,
+         "attempts": 1,
+         "idempotency_key": null,
+         "approval_task_id": null,
+         "at": "2026-10-13T01:49:53.375301"
+        }
+       ],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 1025,
+       "tokens_out": 53,
+       "cost_usd": 0.002014,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:49:51.993257",
+       "finished_at": "2026-10-13T01:49:54.518773"
+      },
+      {
+       "run_id": "RUN-00042",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00008",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00065",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 560,
+         "tokens_out": 10,
+         "cost_usd": 0.00093,
+         "latency_ms": 1421
+        },
+        {
+         "call_id": "LLM-00066",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 613,
+         "tokens_out": 45,
+         "cost_usd": 0.001324,
+         "latency_ms": 1000
+        }
+       ],
+       "tool_calls": [
+        {
+         "tool_id": "lookupAppointments",
+         "side_effect_level": "read",
+         "args_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+         "status": "ok",
+         "reason": null,
+         "result_ref": [],
+         "latency_ms": 31,
+         "attempts": 1,
+         "idempotency_key": null,
+         "approval_task_id": null,
+         "at": "2026-10-13T01:49:55.971608"
+        }
+       ],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 1173,
+       "tokens_out": 55,
+       "cost_usd": 0.002254,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:49:54.534772",
+       "finished_at": "2026-10-13T01:49:57.008067"
+      },
+      {
+       "run_id": "RUN-00043",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00008",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00067",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 663,
+         "tokens_out": 14,
+         "cost_usd": 0.00112,
+         "latency_ms": 1000
+        }
+       ],
+       "tool_calls": [],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 663,
+       "tokens_out": 14,
+       "cost_usd": 0.00112,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:49:57.018573",
+       "finished_at": "2026-10-13T01:49:58.017272"
+      }
+     ]
+    },
+    {
+     "id": "fd-09",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 6293,
+     "cost_usd": 0.006753,
+     "expected": {
+      "verified": true,
+      "task": "confirm_blocked",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "abandoned",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "confirm_appointment"
+      ],
+      "failures": [],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00045",
+      "RUN-00046",
+      "RUN-00047",
+      "RUN-00048"
+     ]
+    },
+    {
+     "id": "fd-10",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 7934,
+     "cost_usd": 0.008972,
+     "expected": {
+      "verified": true,
+      "task": "prep",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "verify_identity",
+       "lookup_appointment",
+       "get_prep_instructions"
+      ],
+      "failures": [],
+      "turns": 4
+     },
+     "run_ids": [
+      "RUN-00049",
+      "RUN-00050",
+      "RUN-00051",
+      "RUN-00052",
+      "RUN-00053"
+     ]
+    },
+    {
+     "id": "fd-11",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 6591,
+     "cost_usd": 0.00733,
+     "expected": {
+      "verified": true,
+      "task": "prep",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "get_prep_instructions"
+      ],
+      "failures": [],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00054",
+      "RUN-00055",
+      "RUN-00056",
+      "RUN-00057"
+     ]
+    },
+    {
+     "id": "fd-12",
+     "source": "authored",
+     "passed": false,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 15139,
+     "cost_usd": 0.005583,
+     "expected": {
+      "verified": true,
+      "task": "prep",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "resolved",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment",
+       "verify_identity",
+       "lookup_appointment",
+       "get_prep_instructions"
+      ],
+      "failures": [
+       "the model failed on a turn (the scripted fallback answered)"
+      ],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00058",
+      "RUN-00059",
+      "RUN-00060",
+      "RUN-00061"
+     ],
+     "traces": [
+      {
+       "run_id": "RUN-00058",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00012",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00092",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "unavailable",
+         "tokens_in": 0,
+         "tokens_out": 0,
+         "cost_usd": 0.0,
+         "latency_ms": 10468
+        }
+       ],
+       "tool_calls": [],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "failed",
+       "tokens_in": 0,
+       "tokens_out": 0,
+       "cost_usd": 0.0,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:50:29.169393",
+       "finished_at": "2026-10-13T01:50:39.662013"
+      },
+      {
+       "run_id": "RUN-00059",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00012",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00093",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 502,
+         "tokens_out": 36,
+         "cost_usd": 0.001077,
+         "latency_ms": 985
+        },
+        {
+         "call_id": "LLM-00094",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 542,
+         "tokens_out": 10,
+         "cost_usd": 0.000903,
+         "latency_ms": 983
+        },
+        {
+         "call_id": "LLM-00095",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 590,
+         "tokens_out": 25,
+         "cost_usd": 0.00111,
+         "latency_ms": 906
+        },
+        {
+         "call_id": "LLM-00096",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 662,
+         "tokens_out": 38,
+         "cost_usd": 0.001335,
+         "latency_ms": 797
+        }
+       ],
+       "tool_calls": [
+        {
+         "tool_id": "verifyCallerIdentity",
+         "side_effect_level": "read",
+         "args_hash": "94353a7288cd24331308686b3e446978c4c468b2df88c5323a5688624a9194a5",
+         "status": "ok",
+         "reason": null,
+         "result_ref": [],
+         "latency_ms": 0,
+         "attempts": 1,
+         "idempotency_key": null,
+         "approval_task_id": null,
+         "at": "2026-10-13T01:50:40.678523"
+        },
+        {
+         "tool_id": "lookupAppointments",
+         "side_effect_level": "read",
+         "args_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+         "status": "ok",
+         "reason": null,
+         "result_ref": [],
+         "latency_ms": 125,
+         "attempts": 1,
+         "idempotency_key": null,
+         "approval_task_id": null,
+         "at": "2026-10-13T01:50:41.717447"
+        },
+        {
+         "tool_id": "getPrepInstructions",
+         "side_effect_level": "read",
+         "args_hash": "fab8ef716f8422fdc04e69e435929b57904485618292a6b78edfe8a3ffd5035d",
+         "status": "ok",
+         "reason": null,
+         "result_ref": [],
+         "latency_ms": 15,
+         "attempts": 1,
+         "idempotency_key": null,
+         "approval_task_id": null,
+         "at": "2026-10-13T01:50:42.762550"
+        }
+       ],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 2296,
+       "tokens_out": 109,
+       "cost_usd": 0.004425,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:50:39.681701",
+       "finished_at": "2026-10-13T01:50:43.588562"
+      },
+      {
+       "run_id": "RUN-00060",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00012",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00097",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 706,
+         "tokens_out": 11,
+         "cost_usd": 0.001158,
+         "latency_ms": 1000
+        }
+       ],
+       "tool_calls": [],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 706,
+       "tokens_out": 11,
+       "cost_usd": 0.001158,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:50:43.598813",
+       "finished_at": "2026-10-13T01:50:44.622462"
+      }
+     ]
+    },
+    {
+     "id": "fd-13",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 3905,
+     "cost_usd": 0.004414,
+     "expected": {
+      "verified": false,
+      "task": "site",
+      "site": "LKS",
+      "transfer": false
+     },
+     "got": {
+      "verified": false,
+      "actions": [],
+      "outcome": "resolved",
+      "tools": [
+       "get_site_info"
+      ],
+      "failures": [],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00062",
+      "RUN-00063",
+      "RUN-00064",
+      "RUN-00065"
+     ]
+    },
+    {
+     "id": "fd-14",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 2406,
+     "cost_usd": 0.003082,
+     "expected": {
+      "verified": false,
+      "task": "site",
+      "site": "NGT",
+      "transfer": false
+     },
+     "got": {
+      "verified": false,
+      "actions": [],
+      "outcome": "resolved",
+      "tools": [
+       "get_site_info"
+      ],
+      "failures": [],
+      "turns": 2
+     },
+     "run_ids": [
+      "RUN-00066",
+      "RUN-00067",
+      "RUN-00068"
+     ]
+    },
+    {
+     "id": "fd-15",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 4154,
+     "cost_usd": 0.004314,
+     "expected": {
+      "verified": true,
+      "task": "transfer",
+      "reason": "medical",
+      "transfer": true
+     },
+     "got": {
+      "verified": true,
+      "actions": [
+       "transfer_to_human"
+      ],
+      "outcome": "transferred",
+      "tools": [
+       "verify_identity",
+       "transfer_to_human"
+      ],
+      "failures": [],
+      "turns": 2
+     },
+     "run_ids": [
+      "RUN-00069",
+      "RUN-00070",
+      "RUN-00071"
+     ]
+    },
+    {
+     "id": "fd-16",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 2124,
+     "cost_usd": 0.002016,
+     "expected": {
+      "verified": false,
+      "task": "transfer",
+      "reason": "medical",
+      "transfer": true
+     },
+     "got": {
+      "verified": false,
+      "actions": [
+       "transfer_to_human"
+      ],
+      "outcome": "transferred",
+      "tools": [
+       "transfer_to_human"
+      ],
+      "failures": [],
+      "turns": 1
+     },
+     "run_ids": [
+      "RUN-00072",
+      "RUN-00073"
+     ]
+    },
+    {
+     "id": "fd-17",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 17277,
+     "cost_usd": 0.010019,
+     "expected": {
+      "verified": false,
+      "task": "transfer",
+      "reason": "identity",
+      "transfer": true
+     },
+     "got": {
+      "verified": false,
+      "actions": [
+       "transfer_to_human"
+      ],
+      "outcome": "transferred",
+      "tools": [
+       "verify_identity",
+       "verify_identity",
+       "verify_identity",
+       "transfer_to_human"
+      ],
+      "failures": [],
+      "turns": 4
+     },
+     "run_ids": [
+      "RUN-00074",
+      "RUN-00075",
+      "RUN-00076",
+      "RUN-00077",
+      "RUN-00078"
+     ]
+    },
+    {
+     "id": "fd-18",
+     "source": "authored",
+     "passed": false,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 4748,
+     "cost_usd": 0.007033,
+     "expected": {
+      "verified": false,
+      "task": "transfer",
+      "reason": "identity",
+      "transfer": true
+     },
+     "got": {
+      "verified": false,
+      "actions": [],
+      "outcome": "abandoned",
+      "tools": [
+       "verify_identity",
+       "verify_identity",
+       "verify_identity"
+      ],
+      "failures": [
+       "not put through to a person"
+      ],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00079",
+      "RUN-00080",
+      "RUN-00081",
+      "RUN-00082"
+     ],
+     "traces": [
+      {
+       "run_id": "RUN-00079",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00018",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00125",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 492,
+         "tokens_out": 36,
+         "cost_usd": 0.001062,
+         "latency_ms": 625
+        },
+        {
+         "call_id": "LLM-00126",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 531,
+         "tokens_out": 25,
+         "cost_usd": 0.001022,
+         "latency_ms": 952
+        }
+       ],
+       "tool_calls": [
+        {
+         "tool_id": "verifyCallerIdentity",
+         "side_effect_level": "read",
+         "args_hash": "8b48b030cad7b9f17e6d4d8aab7f4196c69e7c3ee563517c50de6a5d7f6767e3",
+         "status": "ok",
+         "reason": null,
+         "result_ref": [],
+         "latency_ms": 15,
+         "attempts": 1,
+         "idempotency_key": null,
+         "approval_task_id": null,
+         "at": "2026-10-13T01:51:31.122940"
+        }
+       ],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 1023,
+       "tokens_out": 61,
+       "cost_usd": 0.002084,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:51:30.484339",
+       "finished_at": "2026-10-13T01:51:32.096992"
+      },
+      {
+       "run_id": "RUN-00080",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00018",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00127",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 569,
+         "tokens_out": 36,
+         "cost_usd": 0.001177,
+         "latency_ms": 844
+        },
+        {
+         "call_id": "LLM-00128",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 608,
+         "tokens_out": 34,
+         "cost_usd": 0.001218,
+         "latency_ms": 703
+        }
+       ],
+       "tool_calls": [
+        {
+         "tool_id": "verifyCallerIdentity",
+         "side_effect_level": "read",
+         "args_hash": "8b48b030cad7b9f17e6d4d8aab7f4196c69e7c3ee563517c50de6a5d7f6767e3",
+         "status": "ok",
+         "reason": null,
+         "result_ref": [],
+         "latency_ms": 31,
+         "attempts": 1,
+         "idempotency_key": null,
+         "approval_task_id": null,
+         "at": "2026-10-13T01:51:32.957711"
+        }
+       ],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 1177,
+       "tokens_out": 70,
+       "cost_usd": 0.002395,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:51:32.107044",
+       "finished_at": "2026-10-13T01:51:33.714999"
+      },
+      {
+       "run_id": "RUN-00081",
+       "agent_id": "voice_agent",
+       "agent_version": "1.1.0",
+       "kind": "run",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "voice_agent@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": "CallSession/CALL-00018",
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00129",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 652,
+         "tokens_out": 36,
+         "cost_usd": 0.001302,
+         "latency_ms": 734
+        },
+        {
+         "call_id": "LLM-00130",
+         "agent_id": "voice_agent",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "voice_agent@1",
+         "status": "ok",
+         "tokens_in": 691,
+         "tokens_out": 24,
+         "cost_usd": 0.001252,
+         "latency_ms": 890
+        }
+       ],
+       "tool_calls": [
+        {
+         "tool_id": "verifyCallerIdentity",
+         "side_effect_level": "read",
+         "args_hash": "8b48b030cad7b9f17e6d4d8aab7f4196c69e7c3ee563517c50de6a5d7f6767e3",
+         "status": "ok",
+         "reason": null,
+         "result_ref": [],
+         "latency_ms": 15,
+         "attempts": 1,
+         "idempotency_key": null,
+         "approval_task_id": null,
+         "at": "2026-10-13T01:51:34.480208"
+        }
+       ],
+       "output_refs": [],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 1343,
+       "tokens_out": 60,
+       "cost_usd": 0.002554,
+       "provenance_id": null,
+       "started_at": "2026-10-13T01:51:33.724816",
+       "finished_at": "2026-10-13T01:51:35.406871"
+      }
+     ]
+    },
+    {
+     "id": "fd-19",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 2375,
+     "cost_usd": 0.001963,
+     "expected": {
+      "verified": false,
+      "task": "transfer",
+      "reason": "person",
+      "transfer": true
+     },
+     "got": {
+      "verified": false,
+      "actions": [
+       "transfer_to_human"
+      ],
+      "outcome": "transferred",
+      "tools": [
+       "transfer_to_human"
+      ],
+      "failures": [],
+      "turns": 1
+     },
+     "run_ids": [
+      "RUN-00083",
+      "RUN-00084"
+     ]
+    },
+    {
+     "id": "fd-20",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": null,
+     "grounded": null,
+     "latency_ms": 3777,
+     "cost_usd": 0.005096,
+     "expected": {
+      "verified": true,
+      "task": "none",
+      "transfer": false
+     },
+     "got": {
+      "verified": true,
+      "actions": [],
+      "outcome": "abandoned",
+      "tools": [
+       "verify_identity",
+       "lookup_appointment"
+      ],
+      "failures": [],
+      "turns": 3
+     },
+     "run_ids": [
+      "RUN-00085",
+      "RUN-00086",
+      "RUN-00087",
+      "RUN-00088"
+     ]
+    }
+   ],
+   "status": "below",
+   "met": false,
+   "seconds": 206.3,
+   "eval_status": "failed"
+  }
+ },
+ "platform": {},
+ "note": "Live model run."
+}

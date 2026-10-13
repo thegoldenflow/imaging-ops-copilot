@@ -1,0 +1,15 @@
+{
+ "task": "protocol",
+ "run_at": "2026-10-12T00:57:52",
+ "mode": "gemini",
+ "model": "Gemini: gemini-3.5-flash",
+ "n": 40,
+ "metrics": {
+  "top1": 0.95,
+  "top3": 0.95,
+  "failed_calls": 2
+ },
+ "errors": [],
+ "seconds": 321.0,
+ "notes": "Top-1 and top-3 hit rate over retrieval candidates from the synthetic protocol library."
+}

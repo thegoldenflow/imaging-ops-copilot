@@ -1,0 +1,1416 @@
+{
+ "eval": "followup",
+ "spec": "7.4",
+ "cases": 50,
+ "red_flag_cases": 15,
+ "recall": 1.0,
+ "recall_gate": 0.95,
+ "rules_only": {
+  "cases": 15,
+  "escalated_by_rules": 15,
+  "results": [
+   {
+    "id": "fu-01",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "fever"
+    ]
+   },
+   {
+    "id": "fu-02",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "chest_pain"
+    ]
+   },
+   {
+    "id": "fu-03",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "short_breath"
+    ]
+   },
+   {
+    "id": "fu-04",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wound_drainage"
+    ]
+   },
+   {
+    "id": "fu-05",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "fall"
+    ]
+   },
+   {
+    "id": "fu-06",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "cannot_eat_drink"
+    ]
+   },
+   {
+    "id": "fu-07",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "altered_consciousness"
+    ]
+   },
+   {
+    "id": "fu-08",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wants_person"
+    ]
+   },
+   {
+    "id": "fu-09",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "heavy_bleeding"
+    ]
+   },
+   {
+    "id": "fu-10",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "wound_drainage"
+    ]
+   },
+   {
+    "id": "fu-11",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "fever"
+    ]
+   },
+   {
+    "id": "fu-12",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "chest_pain"
+    ]
+   },
+   {
+    "id": "fu-13",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "fall"
+    ]
+   },
+   {
+    "id": "fu-14",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "cannot_eat_drink"
+    ]
+   },
+   {
+    "id": "fu-15",
+    "escalated": true,
+    "by": "rules",
+    "codes": [
+     "heavy_bleeding"
+    ]
+   }
+  ]
+ },
+ "rule_codes_as_labelled": "15 of 15",
+ "over_escalation": {
+  "cases": 35,
+  "escalated": 13,
+  "rate": 0.371,
+  "by": {
+   "model_unavailable": 2,
+   "model": 11
+  }
+ },
+ "false_rule_hits": [],
+ "write_back": {
+  "communications": 50,
+  "with_observations": 24,
+  "tasks": 28
+ },
+ "results": [
+  {
+   "id": "fu-01",
+   "patient": "en",
+   "red_flag": true,
+   "note": "fever reading",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "fever"
+   ],
+   "expected_codes": [
+    "fever"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reported a fever of 38.9 last night, which is a warning sign that requires escalation."
+   },
+   "questions": 11,
+   "answered": 3,
+   "seconds": 7.72,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-02",
+   "patient": "en",
+   "red_flag": true,
+   "note": "emergency",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "stat",
+   "emergency": true,
+   "rule_codes": [
+    "chest_pain"
+   ],
+   "expected_codes": [
+    "chest_pain"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reports experiencing chest pain since yesterday."
+   },
+   "questions": 11,
+   "answered": 2,
+   "seconds": 6.0,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-03",
+   "patient": "en",
+   "red_flag": true,
+   "note": "emergency",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "stat",
+   "emergency": true,
+   "rule_codes": [
+    "short_breath"
+   ],
+   "expected_codes": [
+    "short_breath"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reports experiencing shortness of breath when walking to the bathroom."
+   },
+   "questions": 11,
+   "answered": 2,
+   "seconds": 14.58,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-04",
+   "patient": "en",
+   "red_flag": true,
+   "note": "heavy drainage, told at the end",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "wound_drainage"
+   ],
+   "expected_codes": [
+    "wound_drainage"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reports that their wound is oozing a lot and the dressing is soaked."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 38.69,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-05",
+   "patient": "en",
+   "red_flag": true,
+   "note": "a fall",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "fall"
+   ],
+   "expected_codes": [
+    "fall"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reported having a fall in the bathroom."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 7.7,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-06",
+   "patient": "en",
+   "red_flag": true,
+   "note": "cannot eat or drink",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "cannot_eat_drink"
+   ],
+   "expected_codes": [
+    "cannot_eat_drink"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reports being unable to keep any food or liquid down and vomiting everything."
+   },
+   "questions": 11,
+   "answered": 3,
+   "seconds": 5.94,
+   "observations": 2,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-07",
+   "patient": "en",
+   "red_flag": true,
+   "note": "altered consciousness",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "stat",
+   "emergency": true,
+   "rule_codes": [
+    "altered_consciousness"
+   ],
+   "expected_codes": [
+    "altered_consciousness"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient's daughter reported that the patient has been confused since this morning, indicating altered consciousness."
+   },
+   "questions": 11,
+   "answered": 2,
+   "seconds": 35.78,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-08",
+   "patient": "en",
+   "red_flag": true,
+   "note": "asks for a person",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "wants_person"
+   ],
+   "expected_codes": [
+    "wants_person"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient explicitly requested to speak with a nurse."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 38.39,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-09",
+   "patient": "en",
+   "red_flag": true,
+   "note": "heavy bleeding",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "stat",
+   "emergency": true,
+   "rule_codes": [
+    "heavy_bleeding"
+   ],
+   "expected_codes": [
+    "heavy_bleeding"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reports continuous nose bleeding that won't stop."
+   },
+   "questions": 11,
+   "answered": 2,
+   "seconds": 5.45,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-10",
+   "patient": "zh",
+   "red_flag": true,
+   "note": "the demo case",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "wound_drainage"
+   ],
+   "expected_codes": [
+    "wound_drainage"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reports continuous wound drainage that has completely soaked the gauze."
+   },
+   "questions": 18,
+   "answered": 3,
+   "seconds": 30.73,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-11",
+   "patient": "zh",
+   "red_flag": true,
+   "note": "fever in Chinese numerals",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "fever"
+   ],
+   "expected_codes": [
+    "fever"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reported having a fever of 38.8 degrees Celsius yesterday."
+   },
+   "questions": 18,
+   "answered": 3,
+   "seconds": 8.44,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-12",
+   "patient": "zh",
+   "red_flag": true,
+   "note": "chest tightness",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "stat",
+   "emergency": true,
+   "rule_codes": [
+    "chest_pain"
+   ],
+   "expected_codes": [
+    "chest_pain"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reports chest tightness and occasional pain."
+   },
+   "questions": 18,
+   "answered": 2,
+   "seconds": 7.58,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-13",
+   "patient": "zh",
+   "red_flag": true,
+   "note": "a fall, told at the end",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "fall"
+   ],
+   "expected_codes": [
+    "fall"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reported a fall at home since discharge."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 10.23,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-14",
+   "patient": "zh",
+   "red_flag": true,
+   "note": "cannot eat or drink",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [
+    "cannot_eat_drink"
+   ],
+   "expected_codes": [
+    "cannot_eat_drink"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reports being unable to eat for two days and vomiting after drinking water, which represents a red flag symptom."
+   },
+   "questions": 18,
+   "answered": 3,
+   "seconds": 7.89,
+   "observations": 2,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-15",
+   "patient": "zh",
+   "red_flag": true,
+   "note": "yes to their own first warning sign",
+   "escalated": true,
+   "escalated_by": "rules",
+   "priority": "stat",
+   "emergency": true,
+   "rule_codes": [
+    "heavy_bleeding"
+   ],
+   "expected_codes": [
+    "heavy_bleeding"
+   ],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reported experiencing bleeding that will not stop."
+   },
+   "questions": 18,
+   "answered": 3,
+   "seconds": 13.28,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-16",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 1.0,
+    "reason": "The patient reports feeling well, has no symptoms or red flags, and is managing their medications and follow-up appointments successfully."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 35.91,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-17",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 1.0,
+    "reason": "The patient reports feeling better every day with no symptoms or medication issues and is aware of their follow-up appointments."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 14.64,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-18",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear, tired",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 1.0,
+    "reason": "The patient reports feeling well with no new symptoms, is taking all medications, and is aware of their follow-up appointments."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 7.52,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-19",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": true,
+   "escalated_by": "model_unavailable",
+   "priority": "routine",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "unavailable",
+    "escalate": null,
+    "confidence": null,
+    "reason": null
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 95.2,
+   "observations": 0,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-20",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 1.0,
+    "reason": "The patient reports feeling much better, has no red flag symptoms or medication issues, and is aware of their follow-up appointments."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 8.42,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-21",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 1.0,
+    "reason": "The patient reports feeling good, is taking their medications without issues, knows their follow-up appointments, and has no concerns."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 5.3,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-22",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 1.0,
+    "reason": "The patient reports feeling well, is taking their medications, knows their follow-up appointments, and has no symptoms or concerns."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 64.53,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-23",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 1.0,
+    "reason": "The patient reports feeling well, has no symptoms or concerns, is taking all medications, and is aware of their follow-up appointments."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 37.83,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-24",
+   "patient": "en",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 1.0,
+    "reason": "The patient reports recovering well without any symptoms, concerns, or medication problems."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 6.75,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-25",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.99,
+    "reason": "The patient reports feeling well, has no symptoms, is taking all medications as prescribed, and knows their follow-up plan."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 9.16,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-26",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 1.0,
+    "reason": "The patient reports feeling better day by day, is compliant with all medications, and has no symptoms or concerns."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 19.81,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-27",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.99,
+    "reason": "The patient reports doing well, has no symptoms, is taking all medications on time, and knows all their follow-up appointments."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 9.69,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-28",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear, tired",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.95,
+    "reason": "The patient reports feeling okay overall with some expected mild tiredness, denies all red flags, and has no medication or follow-up issues."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 11.28,
+   "observations": 1,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-29",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 1.0,
+    "reason": "The patient reports feeling well, has no symptoms or warning signs, is taking all medications on time, and is aware of their follow-up appointments."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 11.39,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-30",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.99,
+    "reason": "The patient is feeling much better, taking all medications on time, knows all follow-up appointments, and reports no concerns or symptoms."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 12.33,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-31",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.99,
+    "reason": "The patient reports feeling well, has no symptoms or red flags, is taking all medications on time, and is aware of their upcoming appointments."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 8.14,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-32",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "all clear",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.99,
+    "reason": "The patient reports feeling well, is taking all medications as prescribed, and has no symptoms or concerns."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 39.27,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-33",
+   "patient": "en",
+   "red_flag": false,
+   "note": "low reading",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.95,
+    "reason": "The patient reports feeling fine, denies any shortness of breath, is taking their medications, and knows their follow-up appointments."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 7.86,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-34",
+   "patient": "en",
+   "red_flag": false,
+   "note": "negations",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 1.0,
+    "reason": "The patient reports feeling fine, has no breathing or chest pain issues, and is managing their medications and follow-up appointments well."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 34.58,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-35",
+   "patient": "en",
+   "red_flag": false,
+   "note": "light drainage",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.95,
+    "reason": "The patient reported having clear fluid on their dressing."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 12.33,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-36",
+   "patient": "en",
+   "red_flag": false,
+   "note": "negated fall",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.95,
+    "reason": "The patient reports feeling good with no symptoms, no medication issues, and is aware of their follow-up appointments."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 10.61,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-37",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "low reading",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.95,
+    "reason": "The patient reports feeling well with a temperature of 37.2°C, has no symptoms or concerns, and is taking all medications as prescribed."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 9.22,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-38",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "light drainage",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 0.95,
+    "reason": "The patient reports active fluid drainage from their wound, although they mentioned it has decreased compared to previous days."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 17.67,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-39",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "negations",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 0.95,
+    "reason": "The patient reports feeling well with no symptoms, denies any concerns or problems, and is taking all medications on time."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 6.61,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-40",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "negated fall",
+   "escalated": false,
+   "escalated_by": null,
+   "priority": null,
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": false,
+    "confidence": 1.0,
+    "reason": "The patient reports feeling well, has no symptoms or red flags, is taking all medications as prescribed, and knows about their follow-up appointments."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 7.08,
+   "observations": 0,
+   "task": false,
+   "communication": true
+  },
+  {
+   "id": "fu-41",
+   "patient": "en",
+   "red_flag": false,
+   "note": "dizziness",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reports experiencing dizziness when standing up."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 7.27,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-42",
+   "patient": "en",
+   "red_flag": false,
+   "note": "a missed medicine",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient did not take their prescribed simvastatin and acetaminophen yesterday because they forgot."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 9.06,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-43",
+   "patient": "en",
+   "red_flag": false,
+   "note": "ran out",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reported running out of one of their medications."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 36.92,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-44",
+   "patient": "en",
+   "red_flag": false,
+   "note": "a question for the nurse",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient asked a question about whether they should continue taking their antibiotics after the box is finished."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 5.28,
+   "observations": 0,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-45",
+   "patient": "en",
+   "red_flag": false,
+   "note": "did not know the follow-up",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient was unaware of their upcoming follow-up appointments with their family doctor and the lung clinic."
+   },
+   "questions": 11,
+   "answered": 11,
+   "seconds": 15.55,
+   "observations": 0,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-46",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "dizziness",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reported experiencing dizziness since returning home."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 37.95,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-47",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "a missed medicine",
+   "escalated": true,
+   "escalated_by": "model_unavailable",
+   "priority": "routine",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "unavailable",
+    "escalate": null,
+    "confidence": null,
+    "reason": null
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 40.23,
+   "observations": 0,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-48",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "a question for the nurse",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient asks a question about whether they need to continue taking their medication after they finish the current supply."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 45.49,
+   "observations": 0,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-49",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "swelling",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient reported experiencing swelling in their leg."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 68.98,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  },
+  {
+   "id": "fu-50",
+   "patient": "zh",
+   "red_flag": false,
+   "note": "did not know the follow-up",
+   "escalated": true,
+   "escalated_by": "model",
+   "priority": "urgent",
+   "emergency": false,
+   "rule_codes": [],
+   "expected_codes": [],
+   "classifier": {
+    "status": "ok",
+    "escalate": true,
+    "confidence": 1.0,
+    "reason": "The patient is not aware of any of their three scheduled follow-up appointments."
+   },
+   "questions": 18,
+   "answered": 18,
+   "seconds": 8.45,
+   "observations": 1,
+   "task": true,
+   "communication": true
+  }
+ ],
+ "passed": true,
+ "mode": "gemini",
+ "run_at": "2026-10-12T03:05:10",
+ "seconds": 1123.9
+}

@@ -1,0 +1,461 @@
+{
+ "run_id": "run-2026-10-11T235239",
+ "started_at": "2026-10-11T23:52:39",
+ "finished_at": "2026-10-11T23:55:07",
+ "mode": "gemini",
+ "baseline": false,
+ "trigger": "cli",
+ "requested": [
+  "referral_weekly_summary",
+  "patient_message_triage"
+ ],
+ "variant": null,
+ "git": {
+  "commit": "6f9a7a8",
+  "dirty": false
+ },
+ "agents": {
+  "referral_weekly_summary": {
+   "suite": "imaging.referral_summary",
+   "suite_kind": "builtin",
+   "suite_title": "Referral weekly summary (System 16)",
+   "source": "evals/datasets/referral_summary.json",
+   "agent_version": "1.0.0",
+   "kind": "embedded_agent",
+   "risk_tier": "ops",
+   "prompt_version": "referral_weekly_summary@1",
+   "prompt_sha256": "5fbf86fcd9dd624e",
+   "model": "gemini-3.5-flash",
+   "model_key": "gemini-fast",
+   "mode": "gemini",
+   "variant": null,
+   "threshold": 1.0,
+   "pipeline_eval": false,
+   "metrics": {
+    "schema_validity": 1.0,
+    "grounding_rate": 1.0,
+    "task_success": 1.0,
+    "human_override_rate": null,
+    "latency_p50_ms": 11203,
+    "latency_p95_ms": 13171,
+    "cost_per_case_usd": 0.018978,
+    "cost_estimated": false,
+    "cases": 3,
+    "cases_passed": 3,
+    "model_calls": 3,
+    "tokens_in": 1242,
+    "tokens_out": 6119,
+    "human_decisions": 0
+   },
+   "extra": {
+    "valid_drafts": 1.0,
+    "numbers_traceable": 1.0,
+    "fact_coverage": 1.0,
+    "failed_calls": 0
+   },
+   "gates": {
+    "cost_per_case": {
+     "value": 0.018978,
+     "threshold": 0.05,
+     "passed": true
+    }
+   },
+   "notes": "Weekly summary drafted for three synthetic data sets. Every number must be a fact filled in by the server; drafts with their own digits fail validation.",
+   "module_run_at": null,
+   "case_results": [
+    {
+     "id": "seed-7",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 10437,
+     "cost_usd": 0.01483,
+     "expected": null,
+     "got": {
+      "numbers": 11,
+      "traceable": 11
+     },
+     "run_ids": [
+      "RUN-00205"
+     ]
+    },
+    {
+     "id": "seed-42",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 13171,
+     "cost_usd": 0.022193,
+     "expected": null,
+     "got": {
+      "numbers": 11,
+      "traceable": 11
+     },
+     "run_ids": [
+      "RUN-00206"
+     ]
+    },
+    {
+     "id": "seed-2026",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": true,
+     "latency_ms": 11203,
+     "cost_usd": 0.019911,
+     "expected": null,
+     "got": {
+      "numbers": 11,
+      "traceable": 11
+     },
+     "run_ids": [
+      "RUN-00207"
+     ]
+    }
+   ],
+   "status": "met",
+   "met": true,
+   "seconds": 55.0,
+   "eval_status": "passed"
+  },
+  "patient_message_triage": {
+   "suite": "patient_message_triage",
+   "suite_kind": "builtin",
+   "suite_title": "Patient message triage (WP4b reference agent)",
+   "source": "evals/patient_message_triage/cases.jsonl",
+   "agent_version": "0.1.0",
+   "kind": "runtime_agent",
+   "risk_tier": "ops",
+   "prompt_version": "patient_message_triage@1",
+   "prompt_sha256": "6c86a84fb1c74272",
+   "model": "gemini-3.5-flash",
+   "model_key": "gemini-fast",
+   "mode": "gemini",
+   "variant": null,
+   "threshold": 0.9,
+   "pipeline_eval": false,
+   "metrics": {
+    "schema_validity": 1.0,
+    "grounding_rate": null,
+    "task_success": 0.9167,
+    "human_override_rate": null,
+    "latency_p50_ms": 6687,
+    "latency_p95_ms": 8125,
+    "cost_per_case_usd": 0.010933,
+    "cost_estimated": false,
+    "cases": 12,
+    "cases_passed": 11,
+    "model_calls": 12,
+    "tokens_in": 10012,
+    "tokens_out": 12908,
+    "human_decisions": 0
+   },
+   "extra": {
+    "accuracy": 0.9167
+   },
+   "gates": {
+    "cost_per_case": {
+     "value": 0.010933,
+     "threshold": 0.05,
+     "passed": true
+    }
+   },
+   "notes": "Category and urgency (after the rule layer) of synthetic patient messages; cases from human review are appended by the low-confidence workflow.",
+   "module_run_at": null,
+   "case_results": [
+    {
+     "id": "authored-chest-pain",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 7922,
+     "cost_usd": 0.013743,
+     "expected": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "got": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "run_ids": [
+      "RUN-00208"
+     ]
+    },
+    {
+     "id": "authored-reschedule",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 5156,
+     "cost_usd": 0.007518,
+     "expected": {
+      "category": "scheduling",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "scheduling",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-00209"
+     ]
+    },
+    {
+     "id": "authored-work-form",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 8125,
+     "cost_usd": 0.012906,
+     "expected": {
+      "category": "administrative",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "administrative",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-00210"
+     ]
+    },
+    {
+     "id": "authored-wound",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 6687,
+     "cost_usd": 0.010881,
+     "expected": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "got": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "run_ids": [
+      "RUN-00211"
+     ]
+    },
+    {
+     "id": "authored-visiting",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 3172,
+     "cost_usd": 0.004827,
+     "expected": {
+      "category": "scheduling",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "scheduling",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-00212"
+     ]
+    },
+    {
+     "id": "authored-fall",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 6687,
+     "cost_usd": 0.013619,
+     "expected": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "got": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "run_ids": [
+      "RUN-00213"
+     ]
+    },
+    {
+     "id": "authored-parking",
+     "source": "authored",
+     "passed": false,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 4796,
+     "cost_usd": 0.007216,
+     "expected": {
+      "category": "other",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "scheduling",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-00214"
+     ],
+     "traces": [
+      {
+       "run_id": "RUN-00214",
+       "agent_id": "patient_message_triage",
+       "agent_version": "0.1.0",
+       "kind": "call",
+       "mode": "gemini",
+       "model": "gemini-3.5-flash",
+       "prompt_version": "patient_message_triage@1",
+       "eval_status": "pending",
+       "evaluated": false,
+       "actor_id": "system",
+       "actor_role": "system",
+       "encounter_id": null,
+       "context_id": null,
+       "input_refs": [],
+       "llm_calls": [
+        {
+         "call_id": "LLM-00935",
+         "agent_id": "patient_message_triage",
+         "model": "gemini-3.5-flash",
+         "prompt_version": "patient_message_triage@1",
+         "status": "ok",
+         "tokens_in": 827,
+         "tokens_out": 664,
+         "cost_usd": 0.007216,
+         "latency_ms": 4796
+        }
+       ],
+       "tool_calls": [],
+       "output_refs": [
+        "LlmCall/LLM-00935"
+       ],
+       "confidence": null,
+       "human_action": null,
+       "outcome": "completed",
+       "tokens_in": 827,
+       "tokens_out": 664,
+       "cost_usd": 0.007216,
+       "provenance_id": null,
+       "started_at": "2026-10-11T23:54:22.333313",
+       "finished_at": "2026-10-11T23:54:22.446002"
+      }
+     ]
+    },
+    {
+     "id": "authored-fever-zh",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 21109,
+     "cost_usd": 0.018128,
+     "expected": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "got": {
+      "category": "clinical",
+      "urgency": "urgent"
+     },
+     "run_ids": [
+      "RUN-00215"
+     ]
+    },
+    {
+     "id": "authored-thanks",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 2733,
+     "cost_usd": 0.00483,
+     "expected": {
+      "category": "other",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "other",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-00216"
+     ]
+    },
+    {
+     "id": "authored-bill",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 6735,
+     "cost_usd": 0.013133,
+     "expected": {
+      "category": "administrative",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "administrative",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-00217"
+     ]
+    },
+    {
+     "id": "authored-pills",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 5844,
+     "cost_usd": 0.010206,
+     "expected": {
+      "category": "clinical",
+      "urgency": "soon"
+     },
+     "got": {
+      "category": "clinical",
+      "urgency": "soon"
+     },
+     "run_ids": [
+      "RUN-00218"
+     ]
+    },
+    {
+     "id": "authored-followup-zh",
+     "source": "authored",
+     "passed": true,
+     "schema_valid": true,
+     "grounded": null,
+     "latency_ms": 6750,
+     "cost_usd": 0.014184,
+     "expected": {
+      "category": "scheduling",
+      "urgency": "routine"
+     },
+     "got": {
+      "category": "scheduling",
+      "urgency": "routine"
+     },
+     "run_ids": [
+      "RUN-00219"
+     ]
+    }
+   ],
+   "status": "met",
+   "met": true,
+   "seconds": 87.9,
+   "eval_status": "passed"
+  }
+ },
+ "platform": {},
+ "note": "Live model run."
+}
