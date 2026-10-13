@@ -424,6 +424,18 @@ def test_documentation_agents_get_a_longer_timeout_and_the_phone_agent_does_not(
     assert client.models.calls[0]["config"].http_options.timeout == 2500  # half of the provider's 5 s
 
 
+def test_order_review_and_medication_reconciliation_attempts_outlast_their_slow_healthy_calls():
+    # With whole 30 s attempts (run-2026-10-12T225622) their slowest healthy calls took 14.3 s and 20.2 s; Vertex
+    # answers 504 about 2.5 s before the deadline, so half of LLM_TIMEOUT_S would cut them at 12.5 s (casebook 3.16).
+    for agent_id in ("order_review", "medication_reconciliation"):
+        spec = registry.require_agent(agent_id)
+        assert spec.model_policy.timeout_s == 45
+        gw, client = gemini_gateway([json_reply({"answer": "a"})])
+        prompt = Prompt(name=agent_id, version=spec.prompt_version, system="s", template="{q}")
+        assert gw.structured(task=agent_id, prompt=prompt, variables={"q": "x"}, schema_cls=Answer).status == "ok"
+        assert client.models.calls[0]["config"].http_options.timeout == 22500  # half of the agent's 45 s
+
+
 def test_anthropic_calls_take_the_agents_timeout():
     sent = []
 

@@ -45,6 +45,7 @@ data_scope:
 model_policy:
   tier: reasoning
   max_tokens: 8000
+  timeout_s: 45  # healthy calls up to ~20 s; half of 30 s cuts each attempt at ~12.5 s (casebook 3.16)
   temperature_max: null
 prompt_version: order_review@1
 required_signoff_role:

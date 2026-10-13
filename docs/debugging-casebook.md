@@ -95,6 +95,7 @@
 | 3.13 | 故事线第 9 步：验证器抓到模型编造的"房颤" | hospital | 真实模型 · 幻觉 |
 | 3.14 | 电话 agent 的"中文失败"其实是 MINIMAL 思考 | 平台 / imaging | 真实模型 · A/B 实验 |
 | 3.15 | 重试救回 2/3，剩下的是连环卡顿 | 平台 / hospital | 真实模型 · 可用性 |
+| 3.16 | 一半预算的副作用：用药两个 agent 的慢调用被 12.5 秒截断 | 平台 / hospital | 真实模型 · 超时 |
 | 4.1 | 来电者口述的出生日期没被去标识化 | imaging | 隐私 |
 | 4.2 | 两个字母的姓（Hu、Li）泄露 | hospital | 隐私 |
 | 4.3 | 去标识化评测满分，说明评测集太简单 | hospital | 隐私 · 评测可信度 |
@@ -888,13 +889,31 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
      - `GeminiProvider._generate` 把每次调用里每次尝试怎么结束的（成功；卡顿 = 504 或客户端自己超时；429；其他错误）按 task（agent id）记进 `AttemptStats`。默认记到进程级的 `ATTEMPT_STATS`，因为有的评测 harness 自己建网关（`app/modules/evals/run.py`），它的调用也算这次运行；API 里后台循环和请求线程会并发调用，所以计数加锁。
      - `evalrun.run` 在开始和结束各取一次快照，差值写进运行记录的 `stalls`（总数，加 `by_agent`）和每个 agent 条目的 `stalls`。两个比率：`first_attempt_stall_rate`（第一次尝试就卡的比例）和 `stall_after_stall_rate`（卡过之后的下一次尝试又卡的比例），就是本案"怎么查的"第 3 步手算的 12% 和 34%，现在每次运行自动算。CLI 和运行记录的 `note` 写明卡了几次、重试救回几个、丢了几个。mock 和 Anthropic 运行没有这个计数，`stalls` 为 null。
      - 故事线第 9 步：`walk.summary_draft_s()` = `SUMMARY_CALLS`（5）× 出院小结 agent 的 `model_policy.timeout_s`（60 秒）= 300 秒。`scripts/storyline_report.py --api` 让第 9 步等 `--timeout` + 300 = 480 秒（后台 journey 可能正在起草同一份，walk 先收到 409，直到它结束），HTTP 客户端超时从 300 秒提到 360 秒，容得下一次同步起草。其他步骤仍等 `--timeout`。5 这个数先验证过：在 mock 下走完整条故事线，读签发的小结里的 `inputs.chunks`，正好 4 段（诊断、用药、观察、计划），加合成 = 5 次调用。
-     - 顺带发现：检验 (a) 时看到，order_review 和 medication_reconciliation 已经有 2–3 个正常调用（14–20 秒）超过**现在**的 12.5 秒截断点。这是 3.11 把比例定为 0.5 的副作用，列为后续（给这两个 agent 设 `timeout_s: 45`）。
+     - 顺带发现：检验 (a) 时看到，order_review 和 medication_reconciliation 已经有 2–3 个正常调用（14–20 秒）超过**现在**的 12.5 秒截断点。这是 3.11 把比例定为 0.5 的副作用，列为后续（给这两个 agent 设 `timeout_s: 45`，见 3.16）。
 - **怎么证明：** 卡顿的数字来自 `run-2026-10-13T021309.json`（每个病例的延迟和输出）和 API 日志里的 HTTP 状态计数，统计方法写在 live-run 报告 "After the timeout fix" 一节。修复的证明：`test_attempts_are_counted_per_agent_with_the_stalls_a_retry_saved_and_lost` 用 `stalling()` 和 FakeClock 走五种情况（一次成功；卡一次后救回；卡两次后丢掉；客户端超时再 429 再成功；400 不重试），断言每个 agent 的全部计数和 `since()` 的差值。`test_a_live_eval_run_records_the_stall_rate_it_ran_under` 用 `FixtureGemini`（Gemini 的重试循环包着 mock 夹具的答案）真的跑一次 `evalrun.run(..., live=True)`，前四次调用分别卡 1、2、0、1 次，断言运行记录里 3/N 次首次卡顿、3 次卡后重试里 1 次再卡、救回 2 个、丢 1 个，agent 条目、`note` 和 CLI 输出一致。变异检验：删掉失败分支的 `self.stats.record(...)`，这两个测试都挂。故事线：`test_the_whole_story_offline` 加了"段数 + 1 == `SUMMARY_CALLS`"，把常数钉在数据上（病人数据变了，测试会提醒改等待时间）；`test_the_summary_step_can_wait_for_a_whole_draft_against_a_live_model` 断言只有第 9 步用长等待，不传时退回 `timeout_s`。`test_gemini.py`、`test_aiops.py`、`test_storyline.py` 全过；全量 811 过 1 挂，挂的是 `test_template_only_without_ai_consent`（只在周二挂，在没改过的 a347f78 上一样挂，另一个侧会话已查明是测试本身的假设）。没有做真实重跑。
 - **经验：** 修复之后，没改过的东西分数掉了，先看那几个失败病例的**延迟特征**：两次截止时间之和，说明是环境原因。要判断"多重试几次有没有用"，比较"卡过一次后再卡"的条件概率和总体卡顿率：两者接近，说明卡顿独立，多试几次有用；条件概率高得多，说明卡顿成串，多试几次只是等更久，得换策略（熔断、整体退避、换时段）。选方案之前，先用已有数据检验每个方案的**前提**（"正常调用都能在 1/3 预算内完成"），并说清样本从哪来、有什么偏差（只有失败病例存了 trace）。外部问题修不掉时，至少让它在结果里看得见：把诊断时手算的数变成每次运行自动记录的字段，下次就不用再翻日志。
 - **范围：** 平台（LLM 调用层、评测）/ hospital（WP9 故事线）。
 - **来源：** 2026-10-13 侧会话的重跑和故事线实跑；方案检验和实现在之后的侧会话（分支 `claude/reverent-babbage-aad5a2`，基于 `claude/trusting-hypatia-72ce4a`）。
 - **代码：** `apps/api/app/llm/providers.py`（`_generate`、`AttemptStats`、`ATTEMPT_STATS`）、`apps/api/app/aiops/evalrun.py`（`_stall_summary`、`_stall_note`）、`apps/api/app/modules/storyline/walk.py`（`_summary`、`wait`、`SUMMARY_CALLS`、`summary_draft_s`）、`apps/api/scripts/storyline_report.py`（`live`）、`apps/api/app/modules/documentation/service.py`（起草串行，409）、`apps/api/tests/test_gemini.py`、`apps/api/tests/test_storyline.py`。
 - **提交：** `967fc77`（分支 `claude/reverent-babbage-aad5a2`）。
+
+### 3.16 一半预算的副作用：用药的两个 agent 里慢而正常的调用在 12.5 秒被截断
+
+- **现象：** 3.15 检验方案 (a) 时顺带发现：3.11 让每次尝试最多用预算的一半，30 秒预算的 agent 每次尝试就只有 15 秒；Vertex 在截止前约 2.5 秒回 504，实际截断点约 12.5 秒。order_review 和 medication_reconciliation 有几个**正常**调用比 12.5 秒还慢，它们会被当成卡顿砍掉再重试。owner 要求把这件事单独做，不和卡顿率的改动放在一起。转述的理由是"慢是因为输出长，重试还会一样慢"。
+- **怎么查的：**
+  1. 先自己重算转述里的数字。方法同 3.15 (a)，数据用 `run-2026-10-12T225622.json`：那时每次尝试还有完整的 30 秒，慢的正常调用没被截断。样本 = 所有套件失败病例 trace 里这个 agent 的 `status == "ok"` 调用（按 `call_id` 去重：文书套件的 trace 里也有用药核对的调用），加上本 agent 套件通过病例的 `latency_ms`（这两个都是单调用 agent；有 1 个通过病例没有 `latency_ms`，去掉）。order_review 58 次（trace 24 + 通过 34），超过 12.5 秒的 3 次：12.7、13.9、14.3 秒；medication_reconciliation 53 次（trace 37 + 通过 16），2 次：13.2、20.2 秒。和转述一致。
+  2. 算新的截断点：45 秒预算 → 每次 22.5 秒 → 约 20.0 秒截断。order_review 0/58 超过；medication_reconciliation 还剩 1/53：20.2 秒那次只比截断点慢 0.2 秒，**没有余量**。要全部盖住得 50 秒（约 22.5 秒截断）。
+  3. 检验转述的前提"慢是因为输出长"。先查指标口径：`GeminiProvider._usage` 的输出 token 是 `candidates_token_count + thoughts_token_count`，含思考。整体上延迟和输出长度中等相关（Spearman：order_review 0.44，用药核对 0.48），但**最慢的几次并不长**：20.2 秒那次输出 417 token（48 ms/token），13.2 秒那次 180 token（73 ms/token），而 6 秒以内的用药核对调用输出中位数是 476 token，每 token 中位数约 6 ms；order_review 最慢的 13.9 秒只有 570 token（24 ms/token），6 秒以内的中位数是 751 token。尾巴上的慢不是输出长造成的，前提不成立。
+  4. 那尾巴是什么？把 trace 的 `started_at` 和卡顿排在同一条时间线上：两次慢的用药核对（22:58:58 的 20.2 秒、23:18:15 的 13.2 秒）都落在文书套件 22:57–23:22 的卡顿窗口里；order_review 的两次慢调用（23:43:43、23:43:57）相隔 14 秒，紧挨着 23:44:29 的一次 order_review 卡顿。慢而正常的调用和卡顿**扎堆出现**，像同一段 Vertex 变慢的时间：有的请求卡到截止，有的慢慢算完。所以截断后的重试会落在同一段时间里（3.15：卡过一次后再卡的比例是 34%）。
+  5. 看修复之后的数据：`run-2026-10-13T021309`（2a92b10 之后，每次尝试 15 秒）没有跑用药套件，但文书失败病例的 trace 里有 24 次用药核对调用，其中 5 次在 16.2–19.4 秒成功。单次尝试不会超过 15 秒，所以这 5 次都是第一次在约 12.5 秒被截断，退避 2 秒，重试 2–5 秒完成。trace 不记每次尝试，所以分不出它们是真卡顿还是慢的正常调用被截断；能说明的只是被截断后的重试**大多很快**。
+  6. 列出所有等这两个 agent 的地方（预算从 30 秒变成 45 秒，每个等待方都得容得下）。两个 agent 每次运行只调一次模型（`run.model` → `gateway.structured(task=agent_id)`；网关的 schema 或截断重试最多再调一次，即 2 × 45 = 90 秒）。order_review 的模型调用只在 `service.comment`：后台 narrator 循环的 `ai_step`，或审核页的按钮 `POST /api/med-safety/reviews/{id}/commentary`；journey 的 `orderReview` 步骤只建 Task，不调模型。medication_reconciliation 在 `service.settle`：后台 `ai_step`；journey 的 `medRecAdmission` 活动（`ACTIVITY_TIMEOUT` 2 分钟）；药师打开、处理或签署一个还在 pending 的核对（`session_view`、`handle_item`、`sign` 都同步调用 `settle`）；故事线的出院核对（快进任务排空事件时调用 `discharge_medrec`，walk 最多等 900 秒）。前端请求没有客户端超时；故事线第 6 步等入院核对的 AI 步骤用 `--timeout`（180 秒）。全都容得下。真正变长的是 narrator 循环（`app/main.py` `_narrator_loop`）：一轮最多 2 个点评 + 2 个核对，串行；四个都遇到两连卡时，一轮从约 4 × 27 秒变成约 4 × 42 秒，排在后面的 Control Tower 叙述和文书 intake 要多等。
+- **根因：** `ATTEMPT_SHARE` 0.5 等于给每个 agent 设了一个"卡顿还是慢"的分界线（预算的一半减 2.5 秒）。3.11 按全体 30 秒 agent 统一定了这条线，而这两个 agent 在 Vertex 变慢的时段里，正常延迟的尾巴比 12.5 秒长。
+- **怎么修：** `config/agents/{order_review,medication_reconciliation}.yaml` 的 `model_policy` 加 `timeout_s: 45`：每次尝试 22.5 秒，约 20 秒截断，盖住 58 次 order_review 和 53 次用药核对里的 52 次。代价也写明：真卡顿要等约 20 秒（原来约 12.5 秒）才放弃并重试，两连卡约 42 秒才放弃（原来约 27 秒）。换来的是：变慢时段里慢而正常的调用不再被砍掉，再到同一个时段里去重试。粗算（样本很小）：12.5–20 秒之间的正常调用约 5%（111 次里 5 次）；30 秒预算下，其中约 1/3 的重试会再卡，每 100 次调用约丢 1.5 次，45 秒下不丢。卡顿约占第一次尝试的 12%，每次多等约 7.5 秒。两个 agent 主要在后台跑，等待方都容得下，所以这个取舍成立；要给 20.2 秒那次留余量，就用 50 秒。
+- **怎么证明：** `tests/test_gemini.py::test_order_review_and_medication_reconciliation_attempts_outlast_their_slow_healthy_calls`：断言两个 agent 在注册表里都是 45；再用真实的注册表条目经网关各调一次（假 Gemini 客户端），断言发出的单次截止时间是 22500 ms（45 秒的一半），证明配置值真的到了 provider。变异检验：删掉 medication_reconciliation 的 `timeout_s` 一行，测试以 `assert None == 45` 失败。`test_gemini.py` 54 个全过；全量 812 过 1 挂，挂的还是 `test_template_only_without_ai_consent`（只在周二挂，和本改动无关，见 3.15）。没有做真实重跑：效果要等下次跑用药套件时，看运行记录里的 `stalls` 和这两个 agent 的延迟分布。
+- **经验：** 一个全局比例其实是给每个 agent 定了一个阈值，阈值要看**每个 agent 自己的**正常延迟分布，所以做成按 agent 配置。核对别人给的前提（"慢是因为长"）时，先查指标口径（输出 token 含思考），再单看尾巴上的样本：整体 0.44 的相关，到尾巴上完全不成立。把慢的正常调用和卡顿排在同一条时间线上，就能看出它们是不是同一个现象。改超时之前，把所有等这个调用的地方列出来，逐个确认它们的上限比新预算长。
+- **范围：** 平台（LLM 调用层）/ hospital（WP6 用药安全）。
+- **来源：** 3.15 的后续，2026-10-13 侧会话（分支 `claude/stoic-sutherland-d96ab0`，基于 `claude/reverent-babbage-aad5a2`）。
+- **代码：** `apps/api/config/agents/order_review.yaml`、`apps/api/config/agents/medication_reconciliation.yaml`、`apps/api/app/llm/providers.py`（`ATTEMPT_SHARE`、`_usage`）、`apps/api/app/modules/med_safety/service.py`（`comment`、`settle`、`ai_step`）、`apps/api/app/main.py`（`_narrator_loop`）、`apps/api/tests/test_gemini.py`。
 
 ---
 
