@@ -55,7 +55,7 @@
 | 阶段 0 数据层和部署（迁到 PostgreSQL、Docker、部署文档） | 2.9、5.7、6.1、7.3、10.1、11.1、13.4、14.7、15.3 |
 | 系统 4 前台电话 | 3.14、3.17、3.18、4.1、11.1、14.1、14.2、14.3 |
 | 排程与候补（影像故事线） | 5.1、5.2、7.2 |
-| 申请单与协议（系统 5、6） | 3.6、3.19、12.7 |
+| 申请单与协议（系统 5、6） | 3.6、3.19、12.7、14.10 |
 | 报告草稿 | 3.4 |
 | 阶段 3 放射科运营（积压看板、同行评审） | 2.7、2.9、5.11、11.3 |
 | 系统 18 账单 | 5.4、5.7、13.5、14.6 |
@@ -186,6 +186,7 @@
 | 14.7 | 换数据库后测试的对象身份假设失效 | imaging | 测试 |
 | 14.8 | 结果文件被覆盖、被抹掉、没标脏 | 平台 | 评测 · 结果文件 |
 | 14.9 | 其他测试与评测小记 | 平台 | 速查表 |
+| 14.10 | 评测成本只记本 agent 的调用：套件顺带调用的别的 agent 谁的账上都没有 | 平台 + imaging + hospital | 评测 · 记账口径 |
 | 15.1 | `\b` 变成退格符 | 环境 | 脚本改代码 |
 | 15.2 | heredoc 和多层转义 | 环境 | 脚本改代码 |
 | 15.3 | 写给别人跑的命令先自己跑一遍 | 平台 | 脚本改代码 · 文档 |
@@ -2822,6 +2823,69 @@ WP9 开工前的只读审计、读端到端截图、核对 README 里的一句�
 | `test_day_simulator.py` 断言出院后没有任何 MedicationRequest 是 active | 出院处方按设计会保持 active，测试的假设错了 | 只检查住院医嘱已完成 | PROGRESS WP6 |
 | 在线 e2e 跑完后仓库里的 `evals/patient_message_triage/cases.jsonl` 多了一条 | 低置信度回路会把人工纠正写成评测用例，没设 `AGENT_EVALS_DIR` 时写进仓库 | e2e 运行时把 `AGENT_EVALS_DIR` 指到 scratchpad；已写入的用例还原 | main__025b79fc 10-09 23:02；wt-wp6-med-safety-570354 10-10 02:22 |
 | 走查脚本自己的 bug：requests 接口把列表包在对象里；异常列表视图不带 menu，要打开详情；MedRec 条目名取错字段（`no amlodipine omission: [None, None]`）；看板的键是 `or_cases`（`KeyError: 'or'`） | 走查脚本对接口形状的假设和实际不符 | 逐个改正 | wt-wp9-storyline-7d11cd 10-10 22:29–23:11 |
+
+### 14.10 评测成本只记"本 agent 的调用"：套件顺带调用的别的 agent 谁的账上都没有
+
+- **现象（两件事，都出自真实运行的分析）：**
+  1. **漏账。** 2026-10-12 真实运行 `run-2026-10-12T225622` 里，`order_review` 的指标写着 `model_calls` 60、`cost_per_case_usd` 0.010446；可它 26 个失败用例里有 15 个的 trace 中还有一条 `medication_reconciliation` 调用
+     （例如 or-001 的 RUN-00340 / LLM-00451），只这 15 条就有 $0.0947，没算进任何 agent。分诊同样：req-05 的 `cost_usd` 0.003502 只是分诊调用 LLM-00311，同一个病例的抽取调用 LLM-00310
+     （`requisition_extract`，$0.008417，3547 ms）不见了，报出来的分诊每例成本大约只是整条流水线的四分之一。
+  2. **失败行掉出分母。** 前一次真实运行 `run-2026-10-11T235646` 里，`requisition_triage` 的 `schema_validity` 是 1.0，`failed_calls` 却是 4：req-19、20、30、37 四例的
+     `schema_valid`、`latency_ms`、`cost_usd` 全是 null，它们唯一的 trace 是一条状态 `unavailable`、耗时约 56 秒的抽取调用。
+- **怎么查的：**
+  1. **假设一：收集器根本没看到别的 agent 的调用**（比如那些调用绕过了 `CollectingGateway`）。读 `app/aiops/collect.py`：`CollectingGateway._log` 对**每一次**调用都记一条
+     `CallRecord`，`agent_id=call.task`，病例号取自 ContextVar；医嘱审核套件把 `medcases.materialize` 包了一层来 `mark(case_id)`，所以核对调用也带着病例号。再看运行文件：失败用例的
+     trace 里确实有核对调用（它们是通过收集器的 `runs` 找到的）。收集器看得见，**假设被否定**，丢失发生在汇总阶段。
+  2. **假设二：汇总时被过滤掉了。** `app/aiops/evalrun.py` `_agent_entry`（a347f78 上的行号，下同）第 151 行 `calls = [c for c in col.calls if c.agent_id == agent]` 只留本 agent 的调用；而 `run_suite`
+     只给 `suite.agents` 里的 agent 各建一个条目。医嘱审核套件的 agents 只有 `("order_review",)`，分诊套件只有 `("requisition_triage",)`，所以 `medication_reconciliation`、
+     `requisition_extract` 的调用落进**没有条目**的缝里。用运行文件对账确认：order_review 失败用例的 `cost_usd` 合计 $0.2824，正好等于这些用例里 order_review 自己 trace 的成本，
+     核对的 $0.0947 一分没进去。**假设成立。**
+  3. **范围有多大？** 真实运行文件只为**失败**用例保存 trace，用它推不出全貌（通过的用例里的调用根本看不到）。于是做实验：在测试库里用 mock 模型、通过 runner 自己的
+     `evalrun.run_suite` + `evalrun._gateway(False)`（收集用的 gateway；conftest 默认那个普通 gateway 什么都不记），把 15 个内置套件各跑一遍，统计每个套件里
+     `agent_id` 不属于该套件的调用。结果：**恰好三个套件**——分诊（50 条抽取）、医嘱审核（60 例里 37 条核对）、文书（30 例里 27 条出院核对，`documentation/evals.py` 第 76 行的
+     `S.settle(store, S.reconcile(store, encounter_id, "discharge").id)`）。文书这一个分析里没提到，但回头翻真实运行文件，它的失败用例 trace 里也有 17–19 条核对调用。其余 12 个套件只调用自己的 agent。
+  4. **调查中的岔路：第一次全量统计"卡住"了 30 多分钟，没有任何输出。** 先怀疑控制塔那个套件（要跑日程模拟器）就是慢。查数据库而不是干等：
+     `select datname, state, now()-query_start, left(query,80) from pg_stat_activity where datname like 'ioc_test_pipecost%'` 显示两条连接：一条 `active`，卡在
+     `SELECT pg_advisory_xact_lock($1)` 已 8 分多钟；另一条 `idle in transaction`，最后一句是 `SELECT nextval('idseq_run')`。也就是说**我自己的两条连接互相等**：统计脚本让所有套件
+     都跑在 pytest 的 `fresh_state` 外层事务里，前面的套件在这个事务里拿到了咨询锁；控制塔套件 `own_transaction=True`，自己另开连接和事务，去等同一把锁，而外层事务要等它跑完才会结束。
+     真实 runner 不会这样（`store=None` 时每个套件各自开事务、各自回滚），所以这是统计脚本的问题，不是产品问题。改成每个套件一个测试、`own_transaction` 的套件传 `store=None`，3 分 20 秒跑完。
+  5. **另一个副作用：** 影像各套件的 harness（`modules/evals/run.py` `_write`）会改写 `evals/results/<task>.json`，统计跑完后工作区里 8 个被跟踪文件变了，`git checkout -- evals/results/`
+     还原；新测试里用 `monkeypatch.setattr(imaging, "RESULTS", tmp_path)` 避免。
+  6. **schema validity 那件事**：`_agent_entry` 第 164 行 `validity_rows = [r["schema_valid"] for r in rows if r.get("schema_valid") is not None]`——**缺这个键的行不计入**，而不是记为 False。
+     `eval_triage` 的抽取失败行（`run.py` 第 121 行）恰好没写 `schema_valid`，于是 4 个没有输出的病例从分母里消失，分数反而是满分。文书套件早就定了规矩（3.9）：跳过/失败的行写 `schema_valid: False`。
+- **根因：** runner 的记账维度是"每个 agent 一个条目、只记它自己的调用"，而有的 harness 是按"一个病例一条流水线"跑的，一条流水线里有不止一个 agent。只要流水线里的某个 agent 不在套件的
+  `agents` 里，它的调用就**不属于任何条目**。"只保留属于我的"这种过滤，默默丢掉了"不属于任何人的"。第二件事的根因是：统计时把"缺失"当"不计"，而失败行忘了显式写 False。
+- **怎么修：**
+  1. 先问 owner 怎么报（这是口径决定，不是 bug 修复能自己定的）。给了三个方案：(a) 每个套件加一个 `pipeline` 块，agent 自己的指标和成本闸门不动；(b) 把别的 agent 的调用并进本 agent 的
+     `cost_per_case`、延迟、`model_calls`；(c) 只在套件说明里写一句。不推荐 (b)：`cost_per_case` 闸门是拿 agent 的成本和**它自己那个模型**的上限（`config/models.yaml` 的 `max_cost_per_case`）比，
+     并进去就成了用抽取的花费去评判分诊模型。也没选"记到另一个 agent 自己的条目上"：那个条目来自它自己的套件、不同的病例，混在一起每例成本就失真了。owner 选了 (a)。
+  2. `evalrun._pipeline(suite, result, col)`：只要套件里有不属于 `suite.agents` 的调用，就算出一个套件级的块，挂到该套件**每个**条目上（同一个块）：`other_agents` 按 agent 列出
+     `model_calls`、`failed_calls`、`cost_usd`、`tokens_in`/`tokens_out`、`cases`（这些调用不在任何条目的指标里），以及整例（所有 agent）的 `model_calls`、`cases`、`cost_per_case_usd`、
+     `cost_estimated`、`latency_p50_ms`/`latency_p95_ms`；每个病例结果加 `pipeline_cost_usd`、`pipeline_latency_ms`。没有这种调用的套件不加，运行文件对它们不变。不设闸门。
+     在 `run_suite` 里算一次、挂到每个条目，而不改 `_agent_entry`：一来它是套件级的量，二来另一个未合并分支（`claude/affectionate-varahamihira-6d62e6`）正在改 `_agent_entry` 的病例结果，
+     放在不同的行上合并时不打架。最初 `_pipeline` 写在 `_snapshots` 前面；用 `git merge-file -p <我的> <基线> <那个分支的>` 模拟三方合并（不动任何文件），发现那个分支也在同一位置插入了 `_failed` / `pick_traces`，报 1 处冲突；挪到 `_snapshots` 之后，代码零冲突，合并结果能被 `ast.parse`。
+  3. AI Ops：`/api/aiops/evals` 的行带上 `pipeline`；agent 页显示一行"Whole case"（`eval-agent-pipeline`），病例详情在本 agent 的成本旁边显示整例的成本和模型耗时（`eval-case-pipeline`）；
+     `scripts/eval_summary.py` 在 evals/README.md 的 agent 明细行里加上整例。
+  4. `eval_triage` 的抽取失败行加 `"schema_valid": False`。
+- **怎么证明：**
+  - 新测试 `apps/api/tests/test_eval_pipeline.py` 6 个，全部走 `evalrun.run_suite` + 收集用的 gateway，mock 模型：分诊 3 例（自己 3 条调用，`pipeline` 里抽取 3 条、整例 6 条，整例每例成本 =
+    自己的每例成本 + 抽取总成本/3）；req-02 的抽取被打成 `ProviderUnavailable`（分诊 `schema_valid` False、`schema_validity` 0.5、抽取 `failed_calls` 1，该例 `latency_ms` 为 None 但
+    `pipeline_latency_ms` 有值）；医嘱审核 or-010（新药，做了核对）和 or-009（家庭用药，不核对）；文书 doc-02（三个条目的块相同，只把核对算作 other）；`evalrun.run` 写出的运行文件、
+    `/api/aiops/evals` 和病例接口、`eval_summary.agent_rows()` 都带上整例；以及对照：抽取套件只调用自己，没有块。
+  - 前后对照：把实现文件还原到 a347f78、只保留测试文件，5 个失败，各自因为它点名的缺陷（`KeyError: 'pipeline'`；`assert (False is False and None is False)`），对照组通过；装回实现后 6/6 通过。
+  - mock 全量（列表价估算）：分诊自己每例 $0.00044，整例 $0.00155（约 3.5 倍）；医嘱审核 $0.00518 → $0.00619；文书三个 agent 合计 $0.0402 → $0.0420。
+  - 后端全量 807 通过、1 失败（`tests/test_documentation.py::test_template_only_without_ai_consent`，文书校验器的断言，与 runner 无关，在 a347f78 上同样失败）；`npx tsc -b` 通过。
+  - 页面手工核对：把 `requisition_triage`、`order_review` 的 mock 运行写到 scratch 运行目录（`EVAL_RUNS_DIR`），起 API 和 Vite，分诊 agent 页显示"Whole case, every agent the suite runs: 100 model calls, ≈$0.0016 per case … Not in this agent's metrics: requisition_extract 50 calls, ≈$0.0556"，req-16 的病例详情显示 "≈$0.0010 · 30 ms model time, every agent (this agent ≈$0.0004 · 14 ms)"。
+- **经验：**
+  - **"只留我的"过滤，要配一张对账表**：所有调用之和 = 各条目之和 + 未归属。只要能算出"未归属"不为零，这类漏账一眼可见。这次的块其实就是把这张对账表写进了运行文件。
+  - **数据按 A 维度组织、程序按 B 维度运行，缝就在两者不重合的地方。** 评测报告按 agent 组织，harness 按病例流水线运行；流水线里"不是本套件 agent 的那一步"就是缝。
+  - **缺失 ≠ False。** 统计时 `if x is not None` 会把缺失当"不计"；失败、跳过的行必须显式写 False，否则失败越多分母越小，分数还可能更好看。
+  - **证据有采样偏差时，用实验定范围。** 真实运行文件只存失败用例的 trace，从里面推"有几个套件漏账"会漏掉文书这种情况；用 mock 把全部套件跑一遍、按套件统计，才是完整的。
+  - **口径问题先问人。** 改成本口径会改变闸门在评判什么，这是 owner 的决定；先把证据和选项（含不推荐的理由）摆出来再动手。
+  - **后台脚本长时间没输出，先看数据库在干什么。** `pg_stat_activity` 里"一条在等锁 + 一条 idle in transaction"，几乎总是自己的两条连接互相等。
+- **范围：** 平台（`app/aiops` runner）/ imaging（分诊套件）/ hospital（医嘱审核、文书套件）。
+- **代码与提交：** `apps/api/app/aiops/evalrun.py`（`_pipeline`、`run_suite`）、`apps/api/app/modules/evals/run.py`（`eval_triage`）、`apps/api/app/aiops/router.py`、`apps/api/scripts/eval_summary.py`、
+  `apps/web/src/features/ai-ops/EvalCenter.tsx`、`types.ts`、`apps/api/tests/test_eval_pipeline.py`。worktree 分支 `claude/recursing-ptolemy-7667ca`（基于 a347f78），等 owner 确认后提交。
 
 ---
 

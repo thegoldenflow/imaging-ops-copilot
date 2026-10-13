@@ -17,6 +17,10 @@ before the run's transaction was rolled back). Field list: docs/data-model.md, "
 - **Prompt gate**: every prompt file's `eval_run` header line names the run that evaluated exactly its text; the
   version in use must have met its agent's threshold there (`uv run python -m app.aiops.promptgate`,
   tests/test_prompt_gate.py).
+- **Whole case**: the metrics count the agent's own model calls. A suite whose harness also calls an agent that is
+  not its own (triage extracts each requisition first; order review and documentation reconcile the medications)
+  adds a `pipeline` block to each of its entries (those agents' calls, and the model calls, cost per case and latency
+  of the whole case across every agent) and `pipeline_cost_usd` / `pipeline_latency_ms` to each case result.
 - **Variants**: a run with `--prompt` or `--model` (a candidate for the comparison view) never changes the release
   status of the version in use.
 

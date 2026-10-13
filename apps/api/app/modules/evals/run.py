@@ -118,8 +118,8 @@ def eval_triage(gateway: LlmGateway) -> dict:
         fields = _extract(gateway, item["text"])
         if fields is None:
             failed += 1
-            cases.append({"id": item["id"], "passed": False, "expected": item["labels"]["priority"], "got": None,
-                          "detail": "extraction failed"})
+            cases.append({"id": item["id"], "passed": False, "schema_valid": False,
+                          "expected": item["labels"]["priority"], "got": None, "detail": "extraction failed"})
             continue
         outcome = gateway.structured(task="requisition_triage", prompt=triage.TRIAGE_PROMPT,
                                      variables={"fields": json.dumps(values_only(fields))},

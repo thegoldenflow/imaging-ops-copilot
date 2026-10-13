@@ -58,6 +58,17 @@ def _share(value) -> str:
     return f"{value:.0%}" if isinstance(value, float) and value <= 1 else _fmt(value)
 
 
+def _pipeline(entry: dict) -> str:
+    """The whole case, when the suite also runs agents that are not its own (their calls are in no agent's metrics)."""
+    p = entry.get("pipeline")
+    if not p:
+        return ""
+    est = "≈" if p.get("cost_estimated") else ""
+    others = ", ".join(f"{a} {o['model_calls']} calls {est}${o['cost_usd']:.4f}" for a, o in p["other_agents"].items())
+    return (f". Whole case, every agent the suite runs: {p['model_calls']} model calls, {est}$"
+            f"{_fmt(p['cost_per_case_usd'])} per case (not in this agent's metrics: {others})")
+
+
 def _evaluated(agent_id: str, prompt_version: str | None) -> tuple[dict, dict] | None:
     """The newest non-variant run that judged this prompt version (a run that found no eval set is skipped)."""
     for run in runs.summaries():
@@ -114,7 +125,7 @@ def agent_rows() -> tuple[list[str], list[str], list[str]]:
                            not isinstance(v, bool))
         details.append(f"- `{agent_id}` ({entry.get('prompt_version')}, model {entry.get('model')}, {mode}): "
                        + ("; ".join(detail) if detail else "no module gates")
-                       + (f". Extra: {extras}" if extras else "") + ".")
+                       + (f". Extra: {extras}" if extras else "") + _pipeline(entry) + ".")
         if latest and latest[0]["run_id"] != run["run_id"]:
             notes.append(f"- `{agent_id}`: the newest run that names it ({latest[0]['run_id']}, status "
                          f"`{latest[1].get('status')}`) did not judge it, so the release gate and the AI Ops page say "

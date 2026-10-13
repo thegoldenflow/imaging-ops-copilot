@@ -193,6 +193,7 @@ export interface EvalAgent {
   status: string | null;
   gates: Record<string, Gate> | null;
   extra: Record<string, number> | null;
+  pipeline?: Pipeline | null;
 }
 
 export interface PlatformSuite {
@@ -202,6 +203,19 @@ export interface PlatformSuite {
   passed: boolean | null;
   run_at: string | null;
   summary: Record<string, string | number | boolean>;
+}
+
+/** The whole case across every agent a suite runs, when it also calls agents that are not its own (their calls are
+ * in no agent's metrics). */
+export interface Pipeline {
+  other_agents: Record<string, { model_calls: number; failed_calls: number; cost_usd: number; tokens_in: number;
+    tokens_out: number; cases: number }>;
+  model_calls: number;
+  cases: number;
+  cost_per_case_usd: number | null;
+  cost_estimated: boolean;
+  latency_p50_ms: number | null;
+  latency_p95_ms: number | null;
 }
 
 export interface EvalCenter {
@@ -230,6 +244,8 @@ export interface CaseResult {
   grounded: boolean | null;
   latency_ms: number | null;
   cost_usd: number | null;
+  pipeline_cost_usd?: number | null;
+  pipeline_latency_ms?: number | null;
   expected: unknown;
   got: unknown;
   run_ids: string[];
