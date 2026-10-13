@@ -16,6 +16,7 @@ from app.llm import gateway as gateway_module
 from app.llm.gateway import LlmGateway, set_gateway
 from app.llm.prompts import Prompt
 from app.llm.providers import (
+    AnthropicProvider,
     GeminiProvider,
     MockProvider,
     OutputTruncated,
@@ -208,7 +209,7 @@ def test_thinking_levels_come_from_the_environment(monkeypatch):
         monkeypatch.delenv(f"GEMINI_THINKING_{tier}", raising=False)
     defaults = config.load_settings()
     assert (defaults.gemini_thinking_reasoning, defaults.gemini_thinking_fast, defaults.gemini_thinking_voice) == (
-        "LOW", "LOW", "MINIMAL")
+        "LOW", "LOW", "LOW")
     monkeypatch.setenv("GEMINI_THINKING_REASONING", "medium")
     monkeypatch.setenv("GEMINI_THINKING_VOICE", "default")
     custom = config.load_settings()
@@ -298,8 +299,8 @@ def test_rate_limits_and_gateway_timeouts_are_retried_with_backoff():
     result = provider.complete_json(task="t", model="m", system="s", text="x", schema={})
     assert result.data == {"answer": "ok"}
     assert clock.sleeps == [2.0, 4.0]
-    # Each attempt may use what is left of the call's 30 s: 30, then 30 - 1 - 2, then 30 - 1 - 2 - 3 - 4.
-    assert [c["config"].http_options.timeout for c in client.models.calls] == [30000, 27000, 20000]
+    # Each attempt may use half the call's 30 s, and no more than is left (30, 30 - 1 - 2, 30 - 1 - 2 - 3 - 4).
+    assert [c["config"].http_options.timeout for c in client.models.calls] == [15000, 15000, 15000]
 
 
 def test_retries_stop_after_four_attempts():
@@ -316,6 +317,88 @@ def test_retries_stay_inside_the_call_timeout():
     with pytest.raises(ProviderUnavailable, match=r"\(after 2 attempts\)"):
         provider.complete_json(task="t", model="m", system="s", text="x", schema={})
     assert len(client.models.calls) == 2 and clock.sleeps == [2.0] and clock.now == 22
+
+
+def stalling(client, clock, early_s=2.5):
+    """A Vertex stall (2026-10-12 live run): nothing until the attempt's deadline, then 504 DEADLINE_EXCEEDED about
+    2.5 s before it (the SDK sends the attempt's timeout as the server deadline)."""
+    def reply():
+        clock.now += client.models.calls[-1]["config"].http_options.timeout / 1000 - early_s
+        return api_error(504, "DEADLINE_EXCEEDED")
+    return reply
+
+
+def test_a_stalled_attempt_is_retried_within_the_call_timeout():
+    provider, client, clock = retrying_provider([], timeout_s=30)
+    client.models.replies = [stalling(client, clock), clock.after(4, json_reply({"answer": "ok"}))]
+    result = provider.complete_json(task="t", model="m", system="s", text="x", schema={})
+    assert result.data == {"answer": "ok"}
+    # The stalled attempt had half the budget, so its 504 at 12.5 s leaves room for a full retry.
+    assert [c["config"].http_options.timeout for c in client.models.calls] == [15000, 15000]
+    assert clock.sleeps == [2.0] and clock.now == 18.5
+
+    # The 7f3f91a design gave one attempt the whole budget: the 504 came at 27.5 s and the retry never fired.
+    provider, client, clock = retrying_provider([], timeout_s=30)
+    provider.ATTEMPT_SHARE = 1.0
+    client.models.replies = [stalling(client, clock), json_reply({"answer": "ok"})]
+    with pytest.raises(ProviderUnavailable, match=r"504 request failed\. Google"):
+        provider.complete_json(task="t", model="m", system="s", text="x", schema={})
+    assert len(client.models.calls) == 1 and clock.now == 27.5
+
+
+def test_two_stalls_give_up_inside_the_call_timeout():
+    provider, client, clock = retrying_provider([], timeout_s=30)
+    client.models.replies = [stalling(client, clock)] * 3
+    with pytest.raises(ProviderUnavailable, match=r"\(after 2 attempts\)"):
+        provider.complete_json(task="t", model="m", system="s", text="x", schema={})
+    assert len(client.models.calls) == 2 and clock.now == 27.0 <= 30
+
+
+def test_a_call_timeout_given_per_call_replaces_the_providers():
+    provider, client, clock = retrying_provider([], timeout_s=30)
+    client.models.replies = [stalling(client, clock), json_reply({"answer": "a"}), response([types.Part(text="Hi")])]
+    provider.complete_json(task="t", model="m", system="s", text="x", schema={}, timeout_s=60)
+    provider.tool_turn(model="m", system="s", messages=[{"role": "user", "content": "Hi"}], tools=TOOL_DEFINITIONS)
+    assert [c["config"].http_options.timeout for c in client.models.calls] == [30000, 30000, 15000]
+    assert clock.now == 27.5 + 2.0  # the stall at 27.5 s of a 60 s budget is retried
+
+
+def test_agents_model_policy_sets_the_call_timeout():
+    long_prompt = Prompt(name="t_long", version="t-v1", system="s", template="{q}")
+    with registry.temporary("t_long", {"kind": "embedded_agent", "model_policy": {
+            "tier": "reasoning", "max_tokens": 900, "timeout_s": 60}}):
+        gw, client = gemini_gateway([json_reply({"answer": "a"}), json_reply({"answer": "b"})])
+        gw.structured(task="t", prompt=PROMPT, variables={"q": "x"}, schema_cls=Answer)
+        gw.structured(task="t_long", prompt=long_prompt, variables={"q": "x"}, schema_cls=Answer)
+    default, long = (c["config"].http_options.timeout for c in client.models.calls)
+    assert default == 2500 and long == 30000  # half of the provider's 5 s, half of the agent's 60 s
+
+
+def test_documentation_agents_get_a_longer_timeout_and_the_phone_agent_does_not():
+    for agent_id in ("discharge_summary", "patient_instructions", "nursing_handoff"):
+        assert registry.require_agent(agent_id).model_policy.timeout_s == 60
+    assert registry.require_agent("voice_agent").model_policy.timeout_s is None  # LLM_TIMEOUT_S
+    gw, client = gemini_gateway([response([types.Part(text="We are open today.")])])
+    set_gateway(gw)
+    store = get_store()
+    frontdesk_agent.agent_reply(store, frontdesk_agent.new_session(store), "What are your hours?")
+    assert client.models.calls[0]["config"].http_options.timeout == 2500  # half of the provider's 5 s
+
+
+def test_anthropic_calls_take_the_agents_timeout():
+    sent = []
+
+    class Messages:
+        def create(self, **kwargs):
+            sent.append(kwargs)
+            return type("R", (), {"stop_reason": "end_turn", "content": [], "model": "m",
+                                  "usage": type("U", (), {"input_tokens": 1, "output_tokens": 1})()})()
+
+    provider = AnthropicProvider("k", 30)
+    provider.client = type("C", (), {"messages": Messages()})()
+    provider.tool_turn(model="m", system="s", messages=[], tools=[], timeout_s=60)
+    provider.tool_turn(model="m", system="s", messages=[], tools=[])
+    assert sent[0]["timeout"] == 60 and "timeout" not in sent[1]
 
 
 @pytest.mark.parametrize("error", [api_error(400, "INVALID_ARGUMENT"), api_error(403, "PERMISSION_DENIED")])

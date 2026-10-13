@@ -113,7 +113,7 @@ class MockProvider:
         self.attempts: dict[str, int] = {}
 
     def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0,
-                      max_tokens=8000, tier=None, thinking_level=None) -> ProviderResult:
+                      max_tokens=8000, tier=None, thinking_level=None, timeout_s=None) -> ProviderResult:
         time.sleep(self.latency_s)
         fixture = MOCK_FIXTURES.get(task)
         if fixture is None:
@@ -146,7 +146,9 @@ class AnthropicProvider:
     def __init__(self, api_key: str, timeout_s: float) -> None:
         self.client = anthropic.Anthropic(api_key=api_key, timeout=timeout_s, max_retries=1)
 
-    def _create(self, **kwargs):
+    def _create(self, timeout_s=None, **kwargs):
+        if timeout_s is not None:  # the agent's own timeout (model_policy.timeout_s) instead of the client's
+            kwargs["timeout"] = timeout_s
         try:
             if kwargs["model"] in self.FALLBACK_MODELS:
                 return self.client.beta.messages.create(
@@ -159,13 +161,14 @@ class AnthropicProvider:
             raise ProviderUnavailable(f"Connection error: {e}") from e
 
     def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0,
-                      max_tokens=8000, tier=None, thinking_level=None) -> ProviderResult:
+                      max_tokens=8000, tier=None, thinking_level=None, timeout_s=None) -> ProviderResult:
         content: list[dict] = [
             {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}}
             for b64, media_type in (images or [])
         ]
         content.append({"type": "text", "text": text})
         resp = self._create(
+            timeout_s=timeout_s,
             model=model,
             max_tokens=max_tokens,
             system=system,
@@ -184,8 +187,10 @@ class AnthropicProvider:
             input_tokens=resp.usage.input_tokens, output_tokens=resp.usage.output_tokens,
         )
 
-    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024, task=None, tier=None) -> ProviderResult:
-        resp = self._create(model=model, max_tokens=max_tokens, system=system, messages=messages, tools=tools)
+    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024, task=None, tier=None,
+                  timeout_s=None) -> ProviderResult:
+        resp = self._create(timeout_s=timeout_s, model=model, max_tokens=max_tokens, system=system,
+                            messages=messages, tools=tools)
         if resp.stop_reason == "refusal":
             raise ProviderRefusal("Model declined the request")
         return ProviderResult(
@@ -300,11 +305,17 @@ class GeminiProvider:
     REFUSAL_REASONS = {"SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "IMAGE_SAFETY",
                        "IMAGE_PROHIBITED_CONTENT", "IMAGE_RECITATION"}
     # Retry rate limits and transient server/connection failures with exponential backoff, within the call's own
-    # timeout. The 2026-10-12 live run hit 429s under load; a short backoff let the call ride them out.
+    # timeout (its budget: LLM_TIMEOUT_S or the agent's model_policy.timeout_s). The 2026-10-12 live run hit 429s
+    # under load; a short backoff let the call ride them out. It also hit Vertex stalls: an attempt that returns
+    # nothing until its deadline, then 504 DEADLINE_EXCEEDED. The SDK sends an attempt's timeout as the server
+    # deadline (X-Server-Timeout), so one attempt may use at most ATTEMPT_SHARE of the budget: a stalled attempt
+    # then leaves room for a full retry instead of eating the whole budget (with one 30 s attempt, the 504 came at
+    # about 27.5 s and the retry never fired). The call as a whole never takes longer than its budget.
     MAX_ATTEMPTS = 4
     RETRYABLE_CODES = frozenset({429, 500, 502, 503, 504})
     RETRY_JITTER_S = 0.5
-    MIN_ATTEMPT_S = 5.0  # don't start another attempt with less than this left of the timeout
+    ATTEMPT_SHARE = 0.5  # the most of the budget one attempt may use
+    MIN_ATTEMPT_S = 5.0  # don't start another attempt with less than this left of the budget
 
     def __init__(self, api_key: str, timeout_s: float, client=None, thinking: dict | None = None, clock=None) -> None:
         self.timeout_s = timeout_s
@@ -352,15 +363,18 @@ class GeminiProvider:
         return (f"Agent Platform {code} {hint}", f". Google: {e.message or e.status}",
                 code in GeminiProvider.RETRYABLE_CODES)
 
-    def _generate(self, *, model, contents, config):
+    def _generate(self, *, model, contents, config, timeout_s=None):
         """Call Gemini, retrying rate limits and transient server/connection failures with exponential backoff.
-        Each attempt is bounded by what is left of the call's timeout; the loop stops once too little remains to
-        start another attempt."""
+        `timeout_s` is the call's budget (None: the provider's LLM_TIMEOUT_S). Each attempt gets at most
+        ATTEMPT_SHARE of it and never more than is left; the loop stops once too little remains to start another
+        attempt."""
+        budget = timeout_s or self.timeout_s
         start = self._clock.monotonic()
         for attempt in range(1, self.MAX_ATTEMPTS + 1):
-            remaining = self.timeout_s - (self._clock.monotonic() - start)
+            remaining = budget - (self._clock.monotonic() - start)
+            deadline = min(budget * self.ATTEMPT_SHARE, remaining)
             cfg = config.model_copy(update={
-                "http_options": genai_types.HttpOptions(timeout=int(max(remaining, 0.0) * 1000))})
+                "http_options": genai_types.HttpOptions(timeout=int(max(deadline, 0.0) * 1000))})
             try:
                 return self.client.models.generate_content(model=model, contents=contents, config=cfg)
             except genai_errors.APIError as e:  # 4xx incl. 429 rate limit, 5xx
@@ -369,7 +383,7 @@ class GeminiProvider:
                 prefix, detail, retryable, cause = f"Connection error: {type(e).__name__}: {e}", "", True, e
             if retryable and attempt < self.MAX_ATTEMPTS:
                 backoff = 2 ** attempt + random.uniform(0, self.RETRY_JITTER_S)
-                left = self.timeout_s - (self._clock.monotonic() - start)
+                left = budget - (self._clock.monotonic() - start)
                 if left - backoff >= self.MIN_ATTEMPT_S:
                     self._clock.sleep(backoff)
                     continue
@@ -397,7 +411,7 @@ class GeminiProvider:
         return u.prompt_token_count or 0, (u.candidates_token_count or 0) + (u.thoughts_token_count or 0)
 
     def complete_json(self, *, task, model, system, text, schema, images=None, attempt=0,
-                      max_tokens=8000, tier=None, thinking_level=None) -> ProviderResult:
+                      max_tokens=8000, tier=None, thinking_level=None, timeout_s=None) -> ProviderResult:
         contents: list = [
             genai_types.Part.from_bytes(data=base64.b64decode(b64), mime_type=media_type)
             for b64, media_type in (images or [])
@@ -410,7 +424,7 @@ class GeminiProvider:
             response_json_schema=gemini_schema(schema),
             thinking_config=self._thinking_config(model, tier, thinking_level),
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
-        ))
+        ), timeout_s=timeout_s)
         parts = self._parts(resp)
         tokens_in, tokens_out = self._usage(resp)
         if _get(resp.candidates[0].finish_reason, "name", resp.candidates[0].finish_reason) == "MAX_TOKENS":
@@ -428,14 +442,15 @@ class GeminiProvider:
         return ProviderResult(data=data, model=resp.model_version or model,
                               input_tokens=tokens_in, output_tokens=tokens_out)
 
-    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024, task=None, tier=None) -> ProviderResult:
+    def tool_turn(self, *, model, system, messages, tools, max_tokens=1024, task=None, tier=None,
+                  timeout_s=None) -> ProviderResult:
         resp = self._generate(model=model, contents=gemini_contents(messages), config=genai_types.GenerateContentConfig(
             system_instruction=system,
             max_output_tokens=max_tokens,
             tools=gemini_tools(tools),
             thinking_config=self._thinking_config(model, tier),
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
-        ))
+        ), timeout_s=timeout_s)
         blocks = blocks_from_gemini(self._parts(resp))
         reason = _get(resp.candidates[0].finish_reason, "name", None)
         stop = "tool_use" if any(b.type == "tool_use" for b in blocks) else (
