@@ -120,6 +120,7 @@
 | 5.12 | 周二的"编造诊断"是真的：预埋病人恰好因肺炎入院 | hospital | 日期依赖 · 测试假设 |
 | 5.13 | 周三的肾功能病例先报了相互作用：预埋病人在吃华法林（顺带查明一个周四失败） | hospital | 日期依赖 · 种子 · 扫描 |
 | 5.14 | 周四的药师签核没被确认：测试的"最后一个决定"不是最后一个 | hospital | 日期依赖 · 测试假设 · 竞态 |
+| 5.15 | 新入院住院的旧医嘱没人审：24 小时和 48 小时两个窗口之间有缝 | hospital | 日期依赖 · 产品缺口 · 扫描 |
 | 6.1 | `localhost` 建连接要 8 秒，播种像卡住 | 环境 | 环境 · 网络 |
 | 6.2 | `websockets` 反复被删坏 | 环境 | 环境 · 依赖 |
 | 6.3 | Docker 数据盘写满（10-09） | 环境 | 环境 · 磁盘 |
@@ -1688,11 +1689,96 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
   - **顺带观察（没改，留给 owner 决定）：** intake 审查医嘱的窗口是 24 小时，开入院核对的窗口是 48 小时。刚播种（或 API 停了超过 24 小时）时，24–48 小时前开的医嘱
     只有 journey 的 orderReview 会审查（`review_encounter_orders` 只有它调用）；不开 Temporal 的演示里，它们永远不进药师队列。例如周四 8.2 住院的华法林 + 舍曲林
     （`warfarin-ssri`，moderate）。持续运行时每张医嘱在开具后 24 小时内都会被 intake 扫到，所以只影响演示数据的"过去"。
+    owner 决定 intake 也审查这些住院的全部医嘱，见 5.15。
 - **范围：** hospital（WP6 用药安全，WP9 journey 签核的 recheck）。
 - **来源：** 5.13 的一周扫描发现；finish 会话诊断，交给单独的会话修（10-14）。
 - **代码：** `apps/api/tests/test_med_safety.py`（`test_a_journey_signoff_written_while_the_last_decision_was_saved_is_confirmed_soon_after`）；
   相关：`apps/api/app/modules/med_safety/journey.py`（`review_orders`、`confirm_signoff`、`recheck_signoffs`）、`apps/api/app/modules/med_safety/service.py`
   （`intake`、`REVIEW_WINDOW`、`review_encounter_orders`、`queue`）、`apps/api/app/workflows/activities.py`（`order_review`、`step_activity`）；提交 7cc2e8c。
+
+### 5.15 新入院住院的旧医嘱没人审：intake 的 24 小时窗口和入院核对的 48 小时窗口之间有缝
+
+- **现象：** 5.14 的顺带观察。周四的 8.2 住院 stay-01109 是前一天（10-13）入院的，华法林 + 舍曲林（`warfarin-ssri`）、依诺肝素这些入院医嘱都开在 24 小时以前。
+  `service.intake` 只审查 `REVIEW_WINDOW = timedelta(hours=24)` 以内开的医嘱，却给 `ADMISSION_WINDOW = timedelta(hours=48)` 以内入院的住院开入院核对。
+  这些医嘱只有 journey 的 orderReview 会审（`journey.review_orders` → `review_encounter_orders`，后者唯一的调用者）。所以它们不进药师队列，
+  入院核对视图（`session_view`）的 `order_flags` 列里也没有它们。没有测试失败，这是产品行为的问题：先量清楚，再请 owner 决定改不改。
+- **怎么查的：**
+  1. **假设 1："只是周四这一个病例。"** 实验：不用数据库的探针 `gap_probe.py`（思路同 5.12、5.13）。对墙上时间周一到周日各 `generate(Store(), seed, wall)` 一次，
+     跑 `S.intake(force=True)`，列出所有没有审查记录的 active 用药医嘱，按两个维度分桶：住院是不是 48 小时内入院的，医嘱开了 24–48 小时还是更久。
+     结果每天都有：48 小时内入院的住院（每天 38–52 个）里有 60–96 条 24–48 小时前开的医嘱没审。再对这些住院补跑 `review_encounter_orders`：
+     规则每天标出 6–18 条，其中有**阻断级的过敏**，例如周二的 ibuprofen（stay-01121）、周三的 aspirin（stay-01058）、周四的 ibuprofen（stay-01119、stay-01120）。
+     **推翻**：不是一个病例的事，每天都有，而且有药师必须处理的阻断标记。
+  2. **假设 2："开了 Temporal，journey 会补上。"** 读 `app/workflows/bridge.py`：journey 只由 `patient.admitted` 事件启动
+     （`if t == "patient.admitted" and a.get("encounter_class") == "IMP" and event.encounter`）。种子里的住院是直接写进库的，生成器的 `event()` 只记录播种时刻之后的事件
+     （`if now < at <= tl.horizon`），所以播种前就在院的住院没有这个事件，也就没有 journey。唯一的办法是调度员在工作流视图里手动调 `POST /api/workflows/journeys`。
+     再用 grep 确认 `review_encounter_orders` 只有 journey 调用，`review_order` 只有评测脚本调用，工作台上没有"审查这次住院"的入口。
+     **推翻**：开不开 Temporal，种子住院的旧医嘱都没人审。
+  3. **把选项量成数字**（同一个探针）：
+     - A：intake 另外审查 48 小时内入院的住院的**全部** active 医嘱。这和 journey 的 orderReview 是同一个范围，也正是入院核对表里列出的医嘱。每天多 60–96 条审查，6–18 条有标记。
+     - B：把 `REVIEW_WINDOW` 改成 48 小时。每天多 67–137 条，比 A 多出 1–56 条更早入院的住院的医嘱；但范围和 journey、入院核对都对不上，"新医嘱"的意思也变模糊了。
+     - 无论选哪个，更早入院的住院里还有约 290–370 条更老的医嘱不会被审，那是演示开始前的"历史"。
+     - 成本：每条新的用药审查都会在后台调一次 AI 写评注。18.9 的空闲探针在新库上数到 162 次 order_review 调用；A 每次重置再加 60–96 次，
+       约多 40%，用真实 key 时每次重置大约多花 1–4 美元。
+  4. **请 owner 决定**（改的是产品行为）：给了四个选项，A、A2（同 A，但只有规则标出的才在后台写 AI 评注，其余点"Ask the AI now"再写）、B、C（不改，写进 Limits）。
+     owner 选了 A。
+  5. **改完后检查连带的常量。** `collect` 读事实的起点原来是 `now - REVIEW_WINDOW - timedelta(hours=72)`，是从 24 小时窗口推出来的：重复检查规则要看每条医嘱开具前
+     72 小时有没有同 code 的结果。intake 现在会审 48 小时前的医嘱，起点应该再往前 24 小时。这个改动会不会改变结果？第二个探针 `window_probe.py` 在每个工作日把这些
+     旧医嘱分别用新旧两套事实跑一遍规则，**0 条结果不同**。原因是这些住院里没有开了 24 小时以上还 active 的化验或影像医嘱（重复检查只看 ServiceRequest）。
+     所以这一处在种子数据上不改变任何结果，只是保住"从 intake 最老的医嘱往前推 72 小时"这个前提。
+- **根因：** 两个窗口单独看都合理，合在一起有缝。24 小时的审查窗口默认 intake 一直在跑，每条医嘱开出后 24 小时内总会被扫到；演示数据却是"从中间开始"的，
+  播种时 24–48 小时前开的医嘱从来没被扫过。入院核对的 48 小时窗口又把这些住院放进了药师的工作台，核对表里却没有它们医嘱的审查结果。
+  设计上指望 journey 的 orderReview 补这个缝，可是种子住院根本没有 journey。
+- **怎么修：** `service.intake` 在原来的审计批次（`fhir.batch("medication safety intake")`）里多查一次 48 小时内入院的住院（`Encounter`，`cls="IMP"`、`status="in-progress"`），
+  再按 `encounter=` 查它们 active 的用药医嘱和化验/影像医嘱。两次搜索都找到的医嘱按 `(resourceType, id)` 去重：不去重的话，`_review_orders` 会给同一条医嘱建两条审查，
+  后一条覆盖前一条，还白白消耗一个 ID。`collect` 的起点改成 `now - max(REVIEW_WINDOW, ADMISSION_WINDOW) - timedelta(hours=72)`。
+  模块 docstring、README、`docs/data-model.md`、PROGRESS.md（WP6 的 follow-up、Notes、Limits）同步更新。
+- **怎么证明：**
+  - 新回归测试 `test_the_intake_reviews_every_order_of_a_new_stay_also_those_older_than_a_day` 断言三件事：48 小时内入院的住院的每条 active 医嘱都有审查；
+    其中开了 24 小时以上、规则标出的用药审查都在药师的队列里；入院核对视图的 `order_flags` 包含核对表里每条 active 医嘱。"有标出的旧医嘱"不会是空集：探针显示每天 6–18 条。
+  - **在旧代码上会失败：** scratchpad 插件 `-p oldintake` 在 `pytest_sessionstart` 里用 `ast` 从 `git show HEAD:` 存下的旧 `service.py` 取出 `intake`，
+    exec 进 `service` 模块（`S.queue` 内部调的也是这个全局名）。周三、真实时钟：`AssertionError: assert ['MedicationR...-005171', ...] == []`，
+    `Left contains 81 more items`，正好是探针在周三数出的 81 条；同一个测试在新代码上 `1 passed`。
+  - **一周扫描加真实时钟**：整个 `tests/test_med_safety.py`（22 个），插件 `-p travel` 把时钟移到当天 10:00 UTC-4，每天一个库（`ioc_test_i48_<日>`），8 个进程并行，
+    每个约 7 分钟。跑完用 `select data->>'generated_for' from module_state where name='hospital_plan'` 确认播种的医院日。
+
+    | 墙上时间 | 播种的医院日 | 结果 |
+    | --- | --- | --- |
+    | 周一 10-12 | 10-12 周一 | 22 passed |
+    | 周二 10-13 | 10-13 周二 | 22 passed |
+    | 周三 10-14 | 10-14 周三 | 22 passed |
+    | 周四 10-15 | 10-15 周四 | 22 passed |
+    | 周五 10-16 | 10-16 周五 | 22 passed |
+    | 周六 10-17 | 10-16 周五 | 22 passed |
+    | 周日 10-18 | 10-19 周一 | 22 passed |
+    | 真实时钟（周三） | 10-14 周三 | 22 passed |
+
+  - `tests/test_workflows.py` 在真实时钟上 `12 passed in 112.73s`。
+  - **多花多少时间，以及一次差点误判的测量。** 插件 `-p timeintake` 包住 `service.intake` 计时，跑 `test_intake_reviews_new_orders_with_the_rules`
+    （它先强制扫一次，再强制扫一次"没有新东西"的），新旧代码交替各两次。首次扫描：新 3.05 / 2.78 秒、284 条审查，旧 2.58 / 2.57 秒、203 条。
+    第二次扫描却是新 0.97 / 0.86 秒、旧 0.07 / 0.07 秒，看起来"什么都没变的一次扫描慢了十几倍"。intake 每次 store 变化、每次刷新队列都会跑，这个代价不能接受，提交前必须查清。
+    1. **假设："多出来的三个搜索很贵。"** 插件 `-p profintake` 用 cProfile 跑第二次扫描，同时给每个 `FhirGateway.search` 计时：整次扫描在 profiler 下才 0.337 秒，
+       大头是缓存结果的 `copy.deepcopy`（0.25 秒，692 个资源）；新加的三个搜索在 profiler 下各 0.018–0.097 秒。profiler 只会让代码变慢，
+       不加 profiler 的 0.9 秒却更慢，这对不上，说明 0.9 秒不是"每次都有"的代价。**推翻。**
+    2. **实验：同一个进程里连续重复扫 5 次**（插件 `-p repeatintake`，同样给搜索计时），新旧各跑两轮。新：0.848、0.106、0.112、0.105、0.111 秒；
+       旧：0.071、0.067、**0.816**、0.075、0.072 秒，第二轮完全一样。每个进程都有**一次**约 0.8 秒的尖峰，几乎全在某一次搜索里，而且**旧代码也有**，
+       只是落在第 3 次重复上；新代码多了几次查询，尖峰提前到第 1 次重复，正好被 `-p timeintake` 只测的那"第二次扫描"撞上。
+       尖峰的来源没有查（**推测**：某条查询执行到一定次数后的一次性开销，例如 psycopg 默认执行 5 次后改用预备语句）。
+    3. **结论：** 稳态下重复扫描是新 0.105–0.129 秒、旧 0.067–0.079 秒，每次多约 35 毫秒，可以接受；首次扫描多 0.2–0.5 秒。
+  - 测试库用完已删除（每个库一条 `DROP DATABASE IF EXISTS`）。
+- **经验：**
+  - 两个时间窗口管同一批对象的不同方面（这里是"审查医嘱"和"入院核对"）时，要问：一个对象落在一个窗口里、不在另一个窗口里，会怎样？
+    这种缝在一直运行的系统里看不出来（每条医嘱迟早会被扫到），只在"从中间开始"的数据上出现：刚播种、刚重置，或者服务停了一天以上。
+  - "另一条路径会补上"要去验证那条路径真的会走到。journey 确实审全部医嘱，但顺着它的触发条件（`patient.admitted` 事件）往回查一步，就发现种子住院根本没有 journey。
+  - 改产品行为之前，把每个选项量成数字：每天多少条、多少条有标记、有没有阻断级、多花多少次 AI 调用。owner 才能在覆盖面和成本之间做选择。
+    最有说服力的是"每天都有阻断级过敏没人看"这一条。
+  - 扩大处理范围后，检查所有从旧范围推出来的常量（这里是 `collect` 的事实窗口）。用探针看它在现有数据上改不改变结果；没改变就如实写"没改变"，不夸大成修了一个 bug。
+  - 性能只量一次会误判：每次量的都是"第二次调用"，正好撞上一个一次性尖峰，于是看起来慢了十几倍。同一个进程里多量几次，新旧代码交替着量，
+    再和 profiler 下的数对一对（profiler 下反而更快，就说明有东西不对），一次性开销和稳态代价就分开了。
+- **范围：** hospital（WP6 用药安全）。
+- **来源：** 5.14 的顺带观察；单独的会话（10-14）测量、请 owner 决定、实现。
+- **代码：** `apps/api/app/modules/med_safety/service.py`（`intake`、`collect`、`ADMISSION_WINDOW`）、`apps/api/tests/test_med_safety.py`
+  （`test_the_intake_reviews_every_order_of_a_new_stay_also_those_older_than_a_day`）；相关：`apps/api/app/modules/med_safety/journey.py`（`review_orders`）、
+  `apps/api/app/workflows/bridge.py`（journey 只由 `patient.admitted` 启动）；提交 cb05b54。
 
 > **怎么在另一天测试**（本机做法，见 memory 记录）：
 > - 脱离数据库调用 `generate(Store(), seed, datetime(...))`，几十秒就能扫完一周（5.6）；或者写一个 pytest 插件只冻结播种时刻（`seedat`、`seedtime`：`-p seedtime` 加 `SEED_AT`），
