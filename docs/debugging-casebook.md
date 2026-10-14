@@ -1088,7 +1088,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **代码：** `apps/api/app/core/activity.py`、`apps/api/app/llm/budget.py`、`apps/api/app/llm/gateway.py`、`apps/api/app/main.py`、`apps/api/app/ehr/simulator.py`（`tick` 的 `awake_since`）、
   `apps/api/app/core/auth.py`、`apps/api/app/core/config.py`、`apps/web/src/lib/api.ts`、`apps/web/src/features/control-tower/ControlBar.tsx`、`apps/web/src/features/ai-ops/BudgetStrip.tsx`、
   `apps/api/tests/test_spend_guard.py`、`apps/web/e2e/spend-guard.spec.ts`。
-- **提交：** 分支 `claude/dazzling-goodall-c04d15`，等 owner 确认后提交。
+- **提交：** e659cfd（分支 `claude/dazzling-goodall-c04d15`）。
 
 ---
 
