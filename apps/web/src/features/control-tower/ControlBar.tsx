@@ -35,6 +35,7 @@ export function ControlBar({ board, theme, onTheme, onChanged }: {
   const job = board?.job?.status === "running" ? board.job : null;
   const control = board?.can_control ?? false;
   const ended = Boolean(clock?.stopped);
+  const held = Boolean(clock?.running && clock.idle?.paused); // running, but the server holds it while nobody is active
 
   const act = async (name: string, fn: () => Promise<unknown>, done?: string) => {
     setBusy(name);
@@ -73,15 +74,19 @@ export function ControlBar({ board, theme, onTheme, onChanged }: {
 
       <div className="flex items-center gap-2 border-l border-ct-border pl-4">
         <span
-          className={clsx("size-2 rounded-full", clock?.running || job ? "ct-live bg-ct-ok" : "bg-ct-muted")}
+          className={clsx("size-2 rounded-full", held ? "bg-ct-warning" : clock?.running || job ? "ct-live bg-ct-ok" : "bg-ct-muted")}
           aria-hidden
         />
         <div className="leading-tight">
           <p className="tabular text-sm font-semibold text-ct-text" data-testid="hospital-time">
             {clock ? dayTime(clock.now) : "–"}
           </p>
-          <p className="text-[11px] text-ct-muted" data-testid="clock-state">
-            {job ? "fast-forwarding" : clock?.running ? `running · ${RATES.find((r) => r.value === clock.rate)?.label ?? `${clock.rate}×`}` : ended ? "end of the planned day" : "paused"} · hospital time
+          <p
+            className="text-[11px] text-ct-muted"
+            data-testid="clock-state"
+            title={held ? `Nobody has used the demo for ${clock?.idle.pause_minutes} minutes, so the server holds the clock and its AI work to save model costs. It moves again on the next click or key press.` : undefined}
+          >
+            {job ? "fast-forwarding" : held ? "on hold while idle · resumes on your next click" : clock?.running ? `running · ${RATES.find((r) => r.value === clock.rate)?.label ?? `${clock.rate}×`}` : ended ? "end of the planned day" : "paused"} · hospital time
           </p>
         </div>
       </div>

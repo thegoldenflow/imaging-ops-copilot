@@ -8,6 +8,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
+from app.core import activity
 from app.core.audit import EVENT_TYPES as AUDIT_EVENT_TYPES
 from app.core.audit import mrn_hash
 from app.core.auth import CLINICAL_STAFF, client_ip, current_user, issue_token, require_roles
@@ -16,6 +17,7 @@ from app.core.models import Role, StaffUser
 from app.core.store import get_store, reset_store
 from app.integrations.contract import dead_letters
 from app.integrations.mocks import ADAPTERS, MOCK_CONFIG, MockServiceConfig, adapter
+from app.llm import budget
 from app.llm.gateway import get_gateway
 
 router = APIRouter(prefix="/api")
@@ -24,7 +26,11 @@ router = APIRouter(prefix="/api")
 @router.get("/health")
 def health():
     store = get_store()
-    return {"status": "ok", "llm_mode": get_gateway().mode, "appointments": len(store.appointments)}
+    spend = budget.status()
+    return {"status": "ok", "llm_mode": get_gateway().mode, "appointments": len(store.appointments),
+            "background": {"workers": settings.background_workers, "idle_paused": activity.idle(),
+                           "idle_pause_minutes": settings.idle_pause_minutes},
+            "ai_budget": {"capped": spend["limit_usd"] is not None, "reached": spend["reached"]}}
 
 
 @router.get("/auth/users")
@@ -165,6 +171,7 @@ def ai_usage(user: StaffUser = Depends(require_roles(Role.ADMIN, Role.OPERATIONS
     ]
     return {
         "mode": get_gateway().mode,
+        "budget": budget.status(get_store()),
         "tasks": tasks,
         "recent": [c.model_dump() for c in reversed(calls[-50:])],
     }

@@ -216,6 +216,15 @@ export interface SimJob {
   error: string | null;
 }
 
+export interface IdleStatus {
+  pause_minutes: number;
+  paused: boolean;
+  /** Server wall-clock time (not hospital time). */
+  paused_since: string | null;
+  last_activity: string | null;
+  last_pause: { from: string | null; to: string } | null;
+}
+
 export interface Board {
   now: string;
   built_at: string;
@@ -230,7 +239,16 @@ export interface Board {
   or_cases: OrCase[];
   or_rooms: OrRoom[];
   exceptions: ExceptionItem[];
-  clock: { now: string; rate: number; running: boolean; day_start: string; horizon: string; stopped: string | null };
+  clock: {
+    now: string;
+    rate: number;
+    running: boolean;
+    day_start: string;
+    horizon: string;
+    stopped: string | null;
+    /** Idle pause (IDLE_PAUSE_MINUTES): the server holds the clock and its AI work while nobody uses the demo. */
+    idle: IdleStatus;
+  };
   job: SimJob | null;
   scenarios: Record<string, string>;
   events: { seq: number; type: string; at: string; encounter: string | null; attrs: Record<string, unknown> }[];

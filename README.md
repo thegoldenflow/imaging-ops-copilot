@@ -215,6 +215,8 @@ The variables that matter:
 | `DEMO_PASSCODE` | none | Passcode on the login page (set it on a public server) |
 | `DEMO_DAILY_RESET_HOUR` | none | Regenerate the demo data once a day at this hour |
 | `BACKGROUND_WORKERS` | 1 | 0 turns off the background loops (message dispatch, intake, simulator ticks) |
+| `IDLE_PAUSE_MINUTES` | 15 | After this many minutes without a signed-in person using the app, the background work that calls the model (the simulator clock, AI intake, narration, order-review commentary) pauses until the next request; rule-based work goes on. 0: never pause |
+| `LLM_DAILY_BUDGET_USD` | none (no cap) | Daily cap on model spend (server's day); past it every model call is refused as "AI temporarily unavailable" and the non-AI features keep working. AI Ops shows the spend |
 | `SEED`, `LLM_TIMEOUT_S`, `CORS_ORIGINS` | 42, 30, `http://localhost:5173` | Generator seed, model timeout, browser origins |
 
 Web: `VITE_API_PROXY_TARGET` (Vite's `/api` proxy, default `http://127.0.0.1:8000`). Tests: `TEST_DATABASE_URL`,

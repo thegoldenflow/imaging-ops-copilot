@@ -9,6 +9,7 @@ import secrets
 
 from fastapi import Depends, HTTPException, Request
 
+from app.core import activity
 from app.core.context import request_context
 from app.core.models import IMAGING_ROLES, Role, StaffUser
 from app.core.store import get_store
@@ -40,6 +41,7 @@ def current_user(request: Request) -> StaffUser:
     user = store.staff.get(user_id) if user_id else None
     if user is None:
         raise HTTPException(status_code=401, detail="Not signed in")
+    activity.touch_from_header(request.headers.get(activity.IDLE_HEADER))  # wakes the paused background work
     ctx = request_context()
     if ctx is not None:
         ctx.user = user  # for layers without the request, e.g. the LLM gateway's ai_call audit event

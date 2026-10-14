@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.agents import approvals
+from app.core import activity
 from app.core.auth import client_ip, require_roles
 from app.core.models import Role, StaffUser
 from app.core.store import get_store
@@ -45,7 +46,8 @@ def board(user: StaffUser = Depends(require_roles(*VIEWERS))):
     clock = simulator.status(store, upcoming=0)
     events = bus.events(store, limit=6)
     return {**service.board_view(store, user, snap),
-            "clock": {k: clock[k] for k in ("now", "rate", "running", "day_start", "horizon", "stopped")},
+            "clock": {**{k: clock[k] for k in ("now", "rate", "running", "day_start", "horizon", "stopped")},
+                      "idle": activity.status()},
             "job": simjobs.current(), "can_control": str(user.role) in CONTROLLERS,
             "scenarios": scenarios.SCENARIOS,
             "events": [{"seq": e.seq, "type": e.type, "at": e.occurred_at, "encounter": e.encounter,

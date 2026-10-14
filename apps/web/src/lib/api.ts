@@ -30,10 +30,22 @@ export function setToken(token: string | null) {
   }
 }
 
+// When the person last touched the page. Sent as X-Idle-Seconds, so a tab left open on a polling page does not keep
+// the server's background AI work awake (IDLE_PAUSE_MINUTES, apps/api/app/core/activity.py).
+let lastInput = Date.now();
+if (typeof window !== "undefined") {
+  const seen = () => { lastInput = Date.now(); };
+  for (const type of ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"]) {
+    window.addEventListener(type, seen, { passive: true, capture: true });
+  }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") seen(); });
+}
+
 export async function api<T = unknown>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const headers = new Headers(init.headers);
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  headers.set("X-Idle-Seconds", String(Math.floor((Date.now() - lastInput) / 1000)));
   let body = init.body;
   if (init.json !== undefined) {
     headers.set("Content-Type", "application/json");

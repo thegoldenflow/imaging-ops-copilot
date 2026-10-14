@@ -100,6 +100,7 @@
 | 3.18 | 换个说法的"已转接"、只给比值的双语闸门、被丢掉的医嘱子指标 | 平台 | 评测口径 |
 | 3.19 | 申请单抽取的三个假错误：CXR、标签漏了 urgent、"None known" | imaging | 评测口径 · 标签 |
 | 3.20 | 交班 SBAR 的"未记录"无处可引，代理指标重复计分 | hospital | 真实模型 · 契约 · 评测口径 |
+| 3.21 | 空闲花钱的续篇：空闲暂停 + 每日预算；"重置会清零预算"、开着的标签页、时钟回来跳半小时 | 平台 / hospital | 真实模型 · 成本 · 设计 |
 | 4.1 | 来电者口述的出生日期没被去标识化 | imaging | 隐私 |
 | 4.2 | 两个字母的姓（Hu、Li）泄露 | hospital | 隐私 |
 | 4.3 | 去标识化评测满分，说明评测集太简单 | hospital | 隐私 · 评测可信度 |
@@ -761,7 +762,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **现象：** 只是把 API 开着、什么都不操作，日志里 Gemini 调用不断增加：12 分钟 19 次。
 - **怎么查的：** 查 API 自己的调用日志表（`llm_calls`），按任务分组：`order_review` 12 分钟 18 次、$0.77；`medication_reconciliation` 失败后约每分钟重试一次。
 - **根因：** 医院模拟会持续产生新的医嘱，每条都由 AI 审核；失败的核对会被后台循环反复重试。用 mock 时这不花钱，换成真实 key 就是每小时约 $4。
-- **怎么修：** 测试时不用就关掉 API。规格要求公开部署要有访问口令和 AI 调用限额，限额目前还没做。
+- **怎么修：** 测试时不用就关掉 API。规格要求公开部署要有访问口令和 AI 调用限额；空闲暂停和每日限额后来做了，见 3.21。
 - **经验：** 从 mock 换到真实服务时，要盘点所有**自动**触发的调用（定时任务、后台循环、重试），它们才是成本的大头。
   另一个悄悄花钱的入口是测试本身：Playwright 和本地容器读了开发者 `.env` 里的真实 key（10.6）。
 - **范围：** hospital（医嘱审核、用药核对的后台循环）。
@@ -1030,6 +1031,64 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **来源：** `run-2026-10-12T225622` 失败分析；复现脚本和两轮真实调用（2026-10-13）。
 - **代码：** `apps/api/prompts/nursing_handoff/2.md`、`apps/api/app/modules/documentation/models.py`（`Handoff.not_recorded`）、`validator.py`（`HandoffValidator.check_document`）、`handoff_agent.py`（化验来源的时间、`render_text`）、`mocks.py`、`evals.py`（`_handoff_proxies`）、`apps/web/src/features/documentation/HandoffPanel.tsx`、`apps/api/config/agents/nursing_handoff.yaml`。
 - **提交：** f5e59f3（分支 `claude/vibrant-neumann-40593c`）。
+
+### 3.21 空闲花钱的续篇：空闲暂停和每日预算，以及设计时差点踩的三个坑
+
+- **现象：** 3.7 记下了"API 开着没人用，每小时约 $4"。owner 想让服务器对访客用真 key，但不能每小时都在花钱；规格对公开部署的要求是"访问口令 + Claude 调用限额"，
+  当时只有口令（`DEMO_PASSCODE`）。现有的开关不合用：`BACKGROUND_WORKERS=0` 把消息发送、医院时钟、申请单摄入全停了，太粗；Google Cloud 的预算只发提醒、不会停。
+- **怎么查的：**
+  1. **先盘点：后台循环里哪些步骤会调用模型。** `app/main.py` 有 5 个循环（dispatch、intake、hospital、narrator、aiops，开 Temporal 再加 2 个）。逐个读步骤函数，grep
+     `get_gateway` / `runtime.start` / `structured(`：会调模型的是 intake 循环里的申请单摄入（`requisitions.process_pending`）和反馈分类（`feedback.process_pending`），
+     narrator 循环的全部三步（控制塔旁白、医嘱点评 + 用药重整 `med_safety.ai_step`、出院指导 `documentation.intake_step`），以及 hospital 循环的模拟器 tick——它自己不调模型，
+     但它写的每条医嘱、每次入院都会排进上面的 AI 队列。其余步骤（旧片调取、危急结果升级、同行评审抽样、迎检提醒、每日重置、事件投递、看板刷新、用药安全摄入、随访排程、AI Ops 告警）只跑规则。
+     这张表直接决定了"空闲时停什么"：只停会调模型的和会制造 AI 工作的，规则步骤照跑，否则提醒、升级、每日重置都会错过时间。
+  2. **假设 A：失败的 AI 步骤被反复重试，形成无限花钱的循环**（3.7 里记过"用药重整失败后约每分钟重试一次"）。读 `med_safety/service.py` 的 `comment()` 和 `settle()`：
+     模型没答上来时状态改成 `unavailable` / `refused`，不会回到 `pending`，`pending_commentary()` 只取 `pending`。**按现在的代码否定。** 3.7 那次的重试，推测是当时用药重整的步骤在调用之后抛了异常：
+     `_step` 回滚整个事务，状态留在 `pending`，下一轮再调一次、再付一次钱（live-run 报告写的是 "medication reconciliation, once fixed"）。这个推测没有复现。
+  3. **假设 B：时钟一直在走，持续产生新医嘱。** 种子数据里 `hospital_clock` 是 `running: False`（`ehr/seed/__init__.py`），只有人点 Run 才会走。做实验：新建库
+     `ioc_e2e_spendguard`，mock 模式起 API，时钟确认是 `2026-10-13T07:00:00|false`；登录发一个请求后，每 30 秒按任务数 `llm_calls`：2.5 分钟内 `order_review` 42 次、
+     `medication_reconciliation` 31 次、控制塔旁白 7 次，而时钟一直没动。查 `order_reviews` 表：需要点评的 183 条（done 46 + pending 131 + refused 6，另有 42 条 `on_demand`），
+     用药重整约 62 次。**所以新生成的数据自带一个积压**：用药安全摄入会把"医院时间过去 24 小时内"的所有医嘱都建成审核，每条等一次点评。时钟不走也会花钱，只是会花完；
+     每次"Reset demo"或每日重置都重新生成一份。按真实运行里每例的成本估（`run-2026-10-12T225622`：order_review $0.0104、用药重整 $0.0067，LOW 思考），一份积压约 $2.5；
+     3.7 那次每次点评 $0.043（还是默认思考），同样的积压要 $8 左右。时钟再一走，新医嘱源源不断。
+  4. **设计预算时差点踩的坑一：从 `llm_calls` 求和。** 任务说明里建议"从调用日志汇总今天的 cost_usd"。动手前追了一下重置的代码路径：`reset_store()` → `persist()` →
+     `TRUNCATE {schema.data_tables()}`，而 `data_tables()` = 所有实体表 + `FIXED_DATA_TABLES`，`llm_calls` 是实体表（`EntitySpec("llm_calls", ...)`）。
+     也就是说**访客点一下"Reset demo"，当天的花费就清零了**，上限形同虚设。`app_meta` 不在这个列表里（`store.version` 的计数器就是用 `app_meta` 加 `ON CONFLICT ... value::bigint + 1` 做的），
+     于是把当天花费记成 `app_meta` 的一行 `llm_spend:<日期>`，每次调用用一条原子 upsert 累加，`RETURNING` 拿回新的总数。
+     第二个理由：这条 upsert 放在**独立事务**里（`get_engine().begin()`）。如果跟着调用方的事务写，评测这种最后回滚的事务里的花费会被回滚掉，可钱已经花出去了。
+  5. **坑二：开着不动的标签页。** "已登录的请求 = 有人在用"有个漏洞：页面用 TanStack Query 的 `refetchInterval` 轮询，标签页隐藏时会停（`refetchIntervalInBackground` 默认 false），
+     但**可见的**标签页会一直轮询。访客把 Control Tower 开着去吃饭，服务器就一直醒着。服务器分不出"人点的"和"轮询的"，只有浏览器知道人上次动是什么时候：
+     前端每个请求带 `X-Idle-Seconds`（距离上次 pointer / key / wheel / touch 或切回标签页的秒数），服务器把这次请求记成"那个时刻有人在用"。
+  6. **坑三：时钟回来时跳半小时。** `simulator.tick()` 按"距上次 tick 的墙钟时间 × 倍率"推进，封顶 `MAX_TICK`（30 分钟医院时间）。空闲时 tick 被跳过，`last_wall` 停在
+     暂停前；恢复后第一个 tick 算出的步长是整段空闲时间，被封顶成一次跳 30 分钟、把这段的事件一次放出来。加了 `awake_since`：恢复后只从恢复那一刻算。
+- **根因：** 后台循环按"随时有人在看"设计：它们把 AI 工作做在人打开之前，用 mock 时这是免费的。换成真 key 后，这些工作（积压 + 时钟产生的新工作）没人看也照付钱，而且没有总闸。
+- **怎么修：**
+  1. 空闲暂停 `IDLE_PAUSE_MINUTES`（默认 15，0 = 不暂停）：`app/core/activity.py` 记最后一次已登录请求（`current_user` 里 `touch`），循环里会调模型的步骤在空闲时跳过；
+     进程启动时就是暂停状态，重启后没人来就不花钱；正在跑的那一步做完。控制条在时钟"在跑但被挂起"时显示 "on hold while idle · resumes on your next click"，`/api/health` 有 `background.idle_paused`。
+  2. 每日预算 `LLM_DAILY_BUDGET_USD`（不设 = 不限）：`app/llm/budget.py`，网关 `structured` 和 `tool_turn` 调用前问 `budget.refusal()`，到了上限按"AI 暂不可用"降级，记一条
+     `refused`（错误以 `Daily AI budget reached` 开头），每天第一次拒绝打一条 warning；缓存总数，本进程的调用后精确，其它进程的最多 30 秒后看到。AI Ops 首页顶部显示花费和上限。
+- **怎么证明：**
+  - `apps/api/tests/test_spend_guard.py` 12 个（mock 模型，假时钟）：启动即暂停、请求唤醒、窗口过后暂停；`X-Idle-Seconds` 1800 不唤醒、2 唤醒；看板 `clock.idle.paused`；
+    每个循环空闲时和唤醒后各跑一轮，断言开始了哪些步骤；时钟恢复不补空闲那段（+10 秒走 10 分钟，空闲 50 分钟后再 +5 秒只走 5 分钟）；
+    带价格的 mock 调用记进账本、清缓存后从库里读回；超限后两种调用都被拒并记录，反馈分类降级而规则告警照常；不设上限不拒；换一天从 0 开始；`data_tables()` 含 `llm_calls`、不含 `app_meta`。
+    第一次跑（`-x`）前 6 个过、第 7 个挂：`process_pending` 顺带分类了种子里其它待分类的反馈，测试拿"最后一条调用的成本"去比当天总数不对，改成比这次调用之后所有调用的成本之和。
+  - **真进程实验**（`ioc_e2e_spendguard`，mock，`IDLE_PAUSE_MINUTES=1`）：启动后 30 秒 `llm_calls` 一直是 112（上一轮留下的）、`idle_paused=True`；登录发一个请求后 20 秒 126、40 秒 136、
+    60 秒 144，之后 2 分钟一直是 144、`idle_paused=True`；带 `X-Idle-Seconds: 600` 的轮询不唤醒（20 秒后还是 144）；带 `X-Idle-Seconds: 1` 唤醒，20 秒后 152。API 日志依次是
+    "waits for the first signed-in request"、"resumed (idle since start-up)"、"paused: no activity for 1 minutes"、"resumed (idle since 2026-10-13T22:01:10)"。
+  - 后端全量 861 过、1 挂：`test_module_readmes.py::test_four_fixed_sections_in_order[evals/live-runs/README.md]`，`AssertionError: evals/live-runs/README.md: []`。
+    这个 README 是 main 上 e5c59da 加的，只有标题，没有四个固定小节；测试按 `evals/*/README.md` 自动收集，所以新目录一加 README 就多一个用例。
+    在干净的 e5c59da 检出上同样失败；它的父提交 7e23569 收集 849 个测试、e5c59da 收集 850 个，多出的正是这一个，所以"main 上 849/849 全过"是在 7e23569 上跑的。与本次改动无关。`npx tsc -b` 通过。
+- **经验：**
+  1. **从 mock 换真 key，先列一张"谁会自己调用模型"的表**，再决定每一项是该按需、该暂停还是该限额。只看"每小时多少钱"分不出是持续的（时钟）还是一次性的（积压），处理方法不一样。
+  2. **"按某张表求和"之前，先问这张表会不会被清空。** 演示系统的重置、日志轮转、TTL 都会让"今天的总数"悄悄归零；花钱的账要记在不随业务数据重置的地方，并且在独立事务里写——钱不会跟着事务回滚。
+  3. **"有人在用"只有浏览器知道。** 服务器看到的请求里混着轮询；让客户端报"多久没人动"，比服务器猜要准，而且代价只是一个请求头。
+  4. **暂停一个按墙钟推进的东西，要想好恢复时怎么算时间。** 只跳过 tick 而不处理"上次 tick 的时间"，恢复时就会补跑整段空闲。
+  5. **预算和积压要一起看。** 一份新数据的积压约 $2.5（估算），$5 的上限有一半会花在没人打开的点评上。把后台 AI 改成按需可以省下这部分；owner 2026-10-14 决定暂不做：积压排空后空闲的 API 不再调用模型，空闲暂停又挡住了新工作。
+- **范围：** 平台（LLM 网关、后台循环、Web API 客户端）/ hospital（模拟器时钟、医嘱审核和用药重整的积压）。
+- **代码：** `apps/api/app/core/activity.py`、`apps/api/app/llm/budget.py`、`apps/api/app/llm/gateway.py`、`apps/api/app/main.py`、`apps/api/app/ehr/simulator.py`（`tick` 的 `awake_since`）、
+  `apps/api/app/core/auth.py`、`apps/api/app/core/config.py`、`apps/web/src/lib/api.ts`、`apps/web/src/features/control-tower/ControlBar.tsx`、`apps/web/src/features/ai-ops/BudgetStrip.tsx`、
+  `apps/api/tests/test_spend_guard.py`、`apps/web/e2e/spend-guard.spec.ts`。
+- **提交：** e659cfd（分支 `claude/dazzling-goodall-c04d15`）。
 
 ---
 

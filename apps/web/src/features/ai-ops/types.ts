@@ -89,6 +89,24 @@ export interface AlertTask {
   notes: string[];
 }
 
+export interface BudgetStatus {
+  limit_usd: number | null;
+  spent_usd: number;
+  remaining_usd: number | null;
+  reached: boolean;
+  day: string;
+  resets_at: string;
+  refused_today: number | null;
+}
+
+export interface IdleStatus {
+  pause_minutes: number;
+  paused: boolean;
+  paused_since: string | null;
+  last_activity: string | null;
+  last_pause: { from: string | null; to: string } | null;
+}
+
 export interface Overview {
   window: { days: number; from: string; to: string };
   totals: Totals;
@@ -102,6 +120,8 @@ export interface Overview {
   failure_count: number;
   mode: string;
   alerts: { open: AlertTask[] };
+  budget: BudgetStatus;
+  idle: IdleStatus;
 }
 
 export interface ToolCall {
