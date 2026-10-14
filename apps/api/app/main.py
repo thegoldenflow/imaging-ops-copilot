@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.agents.router import router as agents_router
+from app.core import activity
 from app.core.config import settings
 from app.core.context import RequestContextMiddleware
 from app.core.db.migrate import init_db
@@ -101,19 +102,23 @@ async def _intake_loop() -> None:
     nightly peer-review sampling run, classifies new patient feedback and sends
     inspection reminders as items come due. Each step claims its due rows with
     SELECT ... FOR UPDATE SKIP LOCKED, so a second API process would not repeat it.
-    Runs in a thread so slow LLM or mock-archive calls never block requests."""
+    Runs in a thread so slow LLM or mock-archive calls never block requests.
+    The steps that call the model (third item True) wait while nobody uses the app (app/core/activity.py); the
+    rule-based ones go on, so retrievals, escalations, reminders and the daily reset keep their times."""
     steps = [
-        ("requisition intake", requisitions.process_pending),
-        ("prior retrieval", lambda store: priors.process_due(store)),
-        ("critical escalation", critical.process_due),
-        ("peer review sampling", peer_review.maybe_run_scheduled),
-        ("feedback classification", feedback.process_pending),
-        ("inspection reminders", lambda store: inspection.process_reminders(store, datetime.now())),
-        ("daily demo reset", admin.maybe_daily_reset),
+        ("requisition intake", requisitions.process_pending, True),
+        ("prior retrieval", lambda store: priors.process_due(store), False),
+        ("critical escalation", critical.process_due, False),
+        ("peer review sampling", peer_review.maybe_run_scheduled, False),
+        ("feedback classification", feedback.process_pending, True),
+        ("inspection reminders", lambda store: inspection.process_reminders(store, datetime.now()), False),
+        ("daily demo reset", admin.maybe_daily_reset, False),
     ]
     while True:
         await asyncio.sleep(2)
-        for name, fn in steps:
+        for name, fn, calls_model in steps:
+            if calls_model and activity.idle():
+                continue
             await asyncio.to_thread(_step, name, fn)
 
 
@@ -128,11 +133,15 @@ async def _hospital_loop() -> None:
     """Moves the hospital clock while the day simulator runs, delivers the domain events it published to the
     subscribers, then refreshes the Control Tower (boards and exception stream) and sweeps new orders and stays into
     the medication-safety queue (each a no-op when nothing changed).
-    Every second (the time the steps took counts towards it), so a running simulation reaches the screens quickly."""
+    Every second (the time the steps took counts towards it), so a running simulation reaches the screens quickly.
+    While nobody uses the app the clock stands still (every order it writes means model calls) and resumes where it
+    stopped; the rest goes on, so events already published still reach their subscribers."""
     loop = asyncio.get_running_loop()
     while True:
         started = loop.time()
-        await asyncio.to_thread(_step, "day simulator", simulator.tick)
+        if not activity.idle():
+            await asyncio.to_thread(_step, "day simulator",
+                                    lambda store: simulator.tick(store, awake_since=activity.awake_since()))
         await asyncio.to_thread(_drain_events)
         await asyncio.to_thread(_step, "control tower", control_tower.refresh_step)
         await asyncio.to_thread(_step, "medication safety intake", med_safety.intake_step)
@@ -167,9 +176,11 @@ async def _narrator_loop() -> None:
     """Writes the narrative and recommended actions of new Control Tower exceptions, then the AI commentary of
     order reviews and the indication judgements of medication reconciliations, and the patient instructions of
     newly signed discharge summaries (a model call each), apart from the hospital loop so a slow model never delays
-    the boards."""
+    the boards. Waits while nobody uses the app: what is pending is written when someone is back."""
     while True:
         await asyncio.sleep(2)
+        if activity.idle():
+            continue
         await asyncio.to_thread(_step, "control tower narration", control_tower.narrate_step)
         await asyncio.to_thread(_step, "medication safety AI", med_safety.ai_step)
         await asyncio.to_thread(_step, "documentation intake", documentation.intake_step)

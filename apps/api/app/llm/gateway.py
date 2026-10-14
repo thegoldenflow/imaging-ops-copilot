@@ -11,7 +11,9 @@ entry is refused (`UnregisteredAgent`); the entry's model_policy picks the model
 tier, max_tokens and the call's timeout; its prompt_version must be the prompt sent; in
 APP_MODE=prod an agent that has not passed its evaluation (or is not prod_ready)
 is refused, which the modules handle like an unavailable model. The outcome says
-whether the agent is evaluated, so the UI can flag output that is not. Inside an
+whether the agent is evaluated, so the UI can flag output that is not. Past the
+daily AI budget (LLM_DAILY_BUDGET_USD, app/llm/budget.py) every call is refused the
+same way, and each priced call adds its cost to the day's spend. Inside an
 agent run the call joins the run's trace; otherwise (the imaging modules' calls)
 it gets a one-call trace of its own.
 """
@@ -30,6 +32,7 @@ from app.core.config import settings
 from app.core.context import request_context
 from app.core.models import LlmCall, Patient
 from app.core.store import get_store
+from app.llm import budget
 from app.llm.deid import Pseudonymizer
 from app.llm.prompts import Prompt
 from app.llm.providers import (
@@ -174,6 +177,7 @@ class LlmGateway:
         )
         store.llm_calls.append(call)
         self._audit(store, call)
+        budget.record(call.cost_usd)
         return call
 
     @staticmethod
@@ -219,6 +223,10 @@ class LlmGateway:
             call = self._log(task=task, model=model, prompt=prompt, text="", started=time.monotonic(),
                              outcome="refused", error=refusal)
             return done(call, status="unavailable", error=refusal)
+        if (over := budget.refusal()) is not None:
+            call = self._log(task=task, model=model, prompt=prompt, text="", started=time.monotonic(),
+                             outcome="refused", error=over)
+            return done(call, status="unavailable", error=budget.USER_MESSAGE)
         if pseudonymizer is not None:
             pseudo = pseudonymizer
             text = pseudo.redact_known(prompt.render(**variables))
@@ -294,6 +302,11 @@ class LlmGateway:
                              error=refusal)
             self._trace(spec, call, [])
             raise ProviderUnavailable(refusal)
+        if (over := budget.refusal()) is not None:
+            call = self._log(task=task, model=model, prompt=prompt, text="", started=started, outcome="refused",
+                             error=over)
+            self._trace(spec, call, [])
+            raise ProviderUnavailable(budget.USER_MESSAGE)
         try:
             result = self.provider.tool_turn(task=task, model=model, system=prompt.system, messages=messages,
                                              tools=tools, max_tokens=spec.model_policy.max_tokens, tier=model_tier,

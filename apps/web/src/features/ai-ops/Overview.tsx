@@ -10,6 +10,7 @@ import { Badge, Card, EmptyState, ErrorState, Loading, Tabs } from "../../compon
 import { api } from "../../lib/api";
 import { dateTime } from "../../lib/format";
 import { count, metric, ms, NONE, rate, STATUS_TONE, usd } from "./fmt";
+import { BudgetStrip } from "./BudgetStrip";
 import { LiveTrace } from "./TracePanel";
 import type { Card as CardT, DimensionRow, Overview as OverviewT } from "./types";
 
@@ -50,6 +51,7 @@ export function Overview({ trace, onTrace }: { trace: string | null; onTrace: (r
         </div>
         <p className="text-xs text-slate-500">Hospital-wide, {dateTime(d.window.from)} to now · model mode {d.mode}{t.cost_estimated ? " · ≈ cost: mock calls priced at the model's list price (nothing billed)" : ""}</p>
       </div>
+      {d.budget && <BudgetStrip budget={d.budget} idle={d.idle} />}
       {d.alerts.open.length > 0 && (
         <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800" data-testid="aiops-open-alerts">
           <AlertTriangle className="size-4" /> {d.alerts.open.length} open AI Ops alert{d.alerts.open.length === 1 ? "" : "s"} for the admin (Alerts tab).

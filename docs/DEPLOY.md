@@ -84,6 +84,12 @@ ANTHROPIC_API_KEY=<key>
 # LLM_PROVIDER=gemini
 # GOOGLE_AGENT_PLATFORM_API_KEY=<key>
 
+# 用真 key 时务必设：每天（服务器日期）AI 花费上限，美元。到了就拒绝所有模型调用，
+# AI 字段显示“暂不可用”，非 AI 功能照常；午夜清零。见下文“AI 费用控制”。
+LLM_DAILY_BUDGET_USD=5
+# 没人用多少分钟后暂停会调用模型的后台工作（模拟时钟、AI 摄入、旁白、医嘱点评），下一个请求恢复。0 = 不暂停
+# IDLE_PAUSE_MINUTES=15
+
 # 发布门（规格 6.4 / 6.6）：demo（默认）下未通过评测的 agent 照常运行，输出带 "Not evaluated" 标记；
 # prod 下这些 agent 被拒绝，模块退回规则层或人工。目前提交的评测全是 mock 基线，prod 等于关掉 AI 步骤。
 # APP_MODE=demo
@@ -154,6 +160,44 @@ cd /opt/smart_medical && docker compose -f docker-compose.prod.yml start
 # Caddyfile 里上游改回 127.0.0.1:8000（加回 flush_interval -1），然后
 sudo systemctl reload caddy
 ```
+
+## AI 费用控制
+
+用真 key 时，后台循环会自己调用模型：模拟医院的时钟一走，模拟器就写医嘱、入院和出院，每条都触发医嘱审核点评、
+用药重整和 Control Tower 旁白。2026-10-12 实测 Gemini 下 API 空跑约 $4/小时。两道闸：
+
+**1. 空闲暂停（`IDLE_PAUSE_MINUTES`，默认 15）。** 连续这么多分钟没有已登录的人使用，API 暂停会调用模型的后台工作，
+下一个已登录请求立即恢复：
+
+| 空闲时暂停 | 空闲时照常 |
+|---|---|
+| 模拟医院时钟（恢复后从停下的地方接着走，不补空闲那段） | 消息发送（提醒、短信 / 邮件 mock） |
+| 申请单 AI 摄入、患者反馈分类 | 旧片调取、危急结果升级、同行评审抽样、迎检提醒 |
+| Control Tower 旁白、医嘱审核点评、用药重整、出院指导 | 每日演示重置（`DEMO_DAILY_RESET_HOUR`） |
+| | 事件投递、看板刷新、用药安全摄入、随访排程（只跑规则，没有新事件时什么也不做） |
+| | 持久化工作流（Temporal 的计时器按墙钟走，已开始的流程照常做完） |
+
+- 正在跑的那一步会做完；暂停只是不再开始新的一步。积压的 AI 工作在有人回来后补上。
+- “使用”= 带登录令牌的请求。前端每个请求带 `X-Idle-Seconds`（距离这个人上次动鼠标、按键、滚动或切回这个标签页的秒数），
+  所以开着不动、只在轮询的标签页不会让服务器一直醒着；没有这个头的请求（脚本、curl 带令牌）按“现在有人用”算。
+  患者端的公开页面（预登记、问卷）不带登录，不会唤醒。
+- API 刚启动时处于暂停状态，第一个人登录后才开始跑，所以重启或发版后没人访问就不花钱。
+- Control Tower 的时钟在暂停时显示 “on hold while idle”；`curl -s https://<域名>/api/health` 里的
+  `background.idle_paused` 也能看到。
+- `BACKGROUND_WORKERS=0` 仍然是全部关掉（包括消息发送和医院时钟），只在不需要后台时用。
+
+**2. 每日 AI 花费上限（`LLM_DAILY_BUDGET_USD`，不设 = 不限）。** 网关每次调用模型前比较当天已花的钱和上限：
+
+- 到了上限，所有模型调用被拒绝，模块按“AI 暂不可用”降级（规则层或交给人），非 AI 功能照常；调用日志里记一条
+  `refused`，错误以 `Daily AI budget reached` 开头；API 日志里每天第一次拒绝时打一条 warning。
+- 按服务器本地日期算，午夜清零（容器默认 UTC，要按本地时间就给 API 容器设 `TZ`）。
+- 当天花费记在 `app_meta` 表的 `llm_spend:<日期>` 行，不是从 `llm_calls` 现算：“Reset demo” 会清空 `llm_calls`，
+  如果从调用日志算，访客点一下重置就又有一整天的额度。每次调用的花费用一条原子 upsert 在独立事务里累加，
+  API、Temporal worker 和评测脚本都记到同一行。
+- 已经发出去的调用会做完，所以当天最多超出上限几美分。
+- AI Ops 首页顶部显示“今天已花 / 上限”，到了上限变黄并显示被拒绝的调用数；`/api/health` 的 `ai_budget.reached` 也能看到。
+- 参考：2026-10-12 实测 API 开着没人用时约 $4/小时（Gemini 3.5 Flash），有了空闲暂停后没人用时接近 0。
+  Google Cloud 的预算只发提醒、不会停，这个上限才是真正的闸。
 
 ## 访问记录：几点、哪个 IP
 
@@ -241,6 +285,8 @@ Windows 开发机常有被 Hyper-V 保留的端口段（`netsh interface ipv4 sh
 | 日志里有 `InvalidTag` / 患者页面 500 | 当前 PHI 密钥和库里数据加密时用的不一致：换回原来的密钥，或按“备份与恢复”清空重建 |
 | `up` 报 `set POSTGRES_PASSWORD` | `.env` 缺 `POSTGRES_PASSWORD`；改这个口令要在建库之前，建库后改需要进容器 `ALTER USER` |
 | 页面右上角显示 AI: mock | `.env` 里没有可用的 API key，或 `LLM_PROVIDER` 指向的提供方没有 key |
+| 所有 AI 字段都显示“暂不可用”，模型调用日志里是 `refused` / `Daily AI budget reached` | 当天花费到了 `LLM_DAILY_BUDGET_USD`，午夜（服务器时间）清零；急用就调高后 `up -d` 重建 API |
+| Control Tower 时钟显示 “on hold while idle” | 超过 `IDLE_PAUSE_MINUTES` 没人用，后台 AI 工作暂停；点一下页面就恢复 |
 | AI 调用超时 | 服务器出网访问 api.anthropic.com / Google 受限；可调 `LLM_TIMEOUT_S` |
 | 上传胸片报 413 | 超过 nginx 的 25MB 限制（`apps/web/nginx.conf`） |
 | 工作流页面显示 "unreachable" | 设了 `TEMPORAL_ADDRESS` 但 `ioc_temporal` 没起来，或没加 `--profile workflows` |

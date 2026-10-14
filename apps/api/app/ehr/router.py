@@ -16,6 +16,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
+from app.core import activity
 from app.core.auth import client_ip, require_roles
 from app.core.models import Role, StaffUser
 from app.core.store import get_store
@@ -39,7 +40,8 @@ def _busy(e: simulator.SimulatorBusy):
 
 @router.get("/simulator")
 def get_simulator(user: StaffUser = Depends(require_roles(*CONTROL))):
-    return {**simulator.status(get_store()), "scenarios": scenarios.SCENARIOS, "job": simjobs.current()}
+    return {**simulator.status(get_store()), "scenarios": scenarios.SCENARIOS, "job": simjobs.current(),
+            "idle": activity.status()}
 
 
 class AdvanceRequest(BaseModel):

@@ -34,6 +34,7 @@ const OUTCOME_TONE: Record<string, "green" | "amber" | "red"> = {
   retried_ok: "amber",
   needs_human: "amber",
   unavailable: "red",
+  refused: "red",
 };
 
 /** The LLM call log by feature (the AI usage page before WP10b), now the "Model calls" tab of AI Ops. */

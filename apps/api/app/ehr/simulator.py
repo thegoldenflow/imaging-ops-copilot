@@ -224,8 +224,10 @@ def pause(store: Store) -> dict:
     return c
 
 
-def tick(store: Store, wall_now: datetime | None = None) -> AdvanceResult | None:
-    """Background step: when the clock runs, move it by the wall time elapsed × rate."""
+def tick(store: Store, wall_now: datetime | None = None, *, awake_since: datetime | None = None) -> AdvanceResult | None:
+    """Background step: when the clock runs, move it by the wall time elapsed × rate. The API skips the tick while
+    nobody uses the app (app/core/activity.py); `awake_since`, when it resumed, keeps the idle time from counting,
+    so the clock carries on from where it stopped."""
     if not store.try_lock(SIM_LOCK):
         return None
     c = clock(store)
@@ -233,6 +235,8 @@ def tick(store: Store, wall_now: datetime | None = None) -> AdvanceResult | None
         return None
     wall_now = wall_now or datetime.now()
     last = parse(c.get("last_wall")) or wall_now
+    if awake_since is not None and awake_since > last:
+        last = min(awake_since, wall_now)
     step = timedelta(seconds=max(0.0, (wall_now - last).total_seconds()) * float(c.get("rate") or 0))
     return _advance(store, parse(c["now"]) + min(step, MAX_TICK), last_wall=wall_now)
 

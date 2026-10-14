@@ -59,6 +59,11 @@ class Settings:
     database_url: str
     # Run the background workers (message dispatch, intake pipeline, escalations). Tests turn them off.
     background_workers: bool
+    # Minutes without a person using the app after which the background work that leads to model calls (the
+    # simulator clock, the AI steps) pauses until the next request (app/core/activity.py); 0: never pause.
+    idle_pause_minutes: float
+    # Daily cap on model spend in USD (server's day); past it the gateway refuses model calls. None: no cap.
+    llm_daily_budget_usd: float | None
     # Hour of day (0-23) at which the demo data is regenerated once a day; unset: never.
     demo_daily_reset_hour: int | None
     # Hospital EHR behind FhirGateway: "local" (FHIR store in PostgreSQL) or "hapi" (a FHIR server).
@@ -134,6 +139,8 @@ def load_settings() -> Settings:
         cors_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173").split(","),
         database_url=os.getenv("DATABASE_URL", "postgresql+psycopg://ioc:ioc@127.0.0.1:5433/ioc"),
         background_workers=os.getenv("BACKGROUND_WORKERS", "1") != "0",
+        idle_pause_minutes=float(os.getenv("IDLE_PAUSE_MINUTES", "15")),
+        llm_daily_budget_usd=float(b) if (b := os.getenv("LLM_DAILY_BUDGET_USD", "").strip()) else None,
         demo_daily_reset_hour=int(h) if (h := os.getenv("DEMO_DAILY_RESET_HOUR", "").strip()) else None,
         fhir_backend=fhir_backend,
         fhir_base_url=os.getenv("FHIR_BASE_URL", "http://localhost:8080/fhir").rstrip("/"),
