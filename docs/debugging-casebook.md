@@ -204,6 +204,7 @@
 | 18.6 | Postgres/Docker 卡死时改做不依赖 DB 的因果验证 | 平台 | 换模型续作 |
 | 18.7 | 截断后原样重试等于白花一倍钱 | 平台 | 换模型续作 |
 | 18.8 | thinking_level 只有 Gemini 3.x 认，2.5 要 thinking_budget | 平台 | 换模型续作 |
+| 18.9 | “空闲 API 每小时烧 $4”是从启动后 12 分钟外推的：用 mock 模型空跑 60 分钟证伪 | 平台 | 换模型续作 |
 | A.1 | 删除的历史被 checkpoint 复活 | kg-qa | 并发 |
 | A.2 | 流式输出里的标记跨块 | kg-qa | 流式输出 |
 | A.3 | 聊天界面的一组前端 bug | kg-qa | 前端 |
@@ -3228,6 +3229,30 @@ WP9 开工前的只读审计、读端到端截图、核对 README 里的一句�
 - **怎么证明**：新增 `test_thinking_is_a_level_for_gemini_3_and_a_budget_for_gemini_2_5`——gemini-3.5-flash 得 `thinking_level=LOW`（budget 为 None），gemini-2.5-flash 得 `thinking_budget=512`（level 为 None）。44 passed。
 - **局限**：2.5 的 budget 档位是合理映射、**未经真实 2.5 live 调用校准**（本机默认用 3.5）；真要用 2.5 建议 live 核一次。
 - **代码与提交**：`app/llm/providers.py` 的 `_thinking_config`；提交 0be9140。
+
+### 18.9 “空闲 API 每小时烧 $4”：从启动后 12 分钟外推的数字，用 mock 空跑 60 分钟检验
+
+- **现象**：2026-10-12 真实密钥测试时，一个没人用的 API 在启动后前 12 分钟发了 19 次模型调用（$0.77，多数是 `order_review`，还有当时因 400 在重试的 `medication_reconciliation`、Control Tower 叙述、反馈分类），被外推成"空闲约 $4/小时"，据此在做"空闲暂停 + 日预算"（分支 `claude/dazzling-goodall-c04d15`）。但从代码看，医院时钟只在有人点 Run（`POST /api/ehr/simulator/run`）或故事线快进时才前进。
+- **怎么查的**：
+  1. 先读代码列假设。**H1（持续）**：某个后台循环不断产生新工作。**H2（一次性积压）**：种子数据里本来就有一批待处理项（07:00 快照前写入的医嘱、planted 病例、未处理异常），`apps/api/app/main.py` 的 `_intake_loop`/`_hospital_loop`/`_narrator_loop` 启动后把它们消化完就停。H1 会让"调用数随时间线性增长"，H2 会让它"先涨后平"——两者在"前 12 分钟"内无法区分，所以必须看更长的时间。
+  2. 实验：全新库 `ioc_idle_probe`，`LLM_PROVIDER=mock`、默认后台 worker，不登录、不开 UI、不点 Run/快进；每 2 分钟 `select task, count(*), max(ts) from llm_calls group by task`，并读 `module_state` 里的 `hospital_clock`。mock 调用不花钱，但和真实调用一样写进 `llm_calls`，所以能数。
+  3. 结果（见下表）：总数 79 → 153 → 217 → 231（00:40）后**保持 231 不变，直到 01:31，共 53 分钟 0 次新调用**；最后一条调用在 00:38:43。时钟全程停在 `{"now":"2026-10-14T07:00:00","rate":0,"running":false}`；API 日志 0 条 ERROR。
+- **根因**：H2 成立，H1 被证伪。每个新库/每次重置后有一个固定大小的启动积压：231 次调用 = `order_review` 162、`medication_reconciliation` 49、`control_tower` 9、`requisition_extract/triage` 各 3、`protocol_suggest` 3、`feedback_classify` 2。之后没有访客、时钟不动，就没有新工作。"$4/小时"把一次性积压当成了速率。
+- **为什么 mock 下只用了 6 分钟、真机上看起来像"持续"**：mock 调用是毫秒级；真实 Gemini 一次几十秒、各循环里串行，19 次/12 分钟≈1.6 次/分钟，231 次要 2 小时以上才排空。**这一段是按速率推算，没有实测。**
+- **怎么证明（时间序列，00:32 启动完成）**：
+
+| 时刻 | 总调用 | order_review | medication_reconciliation | control_tower | 其余 |
+| --- | --- | --- | --- | --- | --- |
+| 00:34 | 79 | 34 | 25 | 9 | 11 |
+| 00:36 | 153 | — | — | — | — |
+| 00:38 | 217 | — | — | — | — |
+| 00:40 | 231 | 162 | 49 | 9 | 11 |
+| 00:42 … 01:31（每 2 分钟，共 26 次采样） | 231 | 162 | 49 | 9 | 11 |
+
+  按本仓库 live-run 归档里的真实单价（`evals/live-runs/run-*.json`，`cost_per_case_usd × cases / model_calls`）估算，一个积压的一次性成本：`order_review` 162 次 × $0.010–0.023（观测到的 $0.04 则 $6.5）、`medication_reconciliation` 49 × $0.007–0.013、`control_tower` 9 × $0.030、其余约 $0.10；合计约 **$2.4（低）– $4.8（中）– $7.5（用 $0.04/次的 order_review 时）**，每个新库或重置一次，之后空闲为 $0。若是"$4/小时"持续，则一天 $96。
+- **局限**：(1) 只测了 mock，没复现真实模型的 400 重试，重试会让积压的实际成本更高；(2) 我没读 owner 的 `.env`，探针里 `DEMO_DAILY_RESET_HOUR` 为默认（不设）；若 owner 设了每日重置，每天会重新产生一次积压（$2.4–7.5/天）；(3) 没测"同库重启 API 是否再发调用"——这次用了一次性的随机 `PHI_ENCRYPTION_KEY`，重启后读不了库里加密数据；从 `_step` 都是"取到期行"的写法推断不会，但未实测；(4) 积压大小随生成的数据而变（同伴会话记过 183/62/7）。
+- **经验**：从启动后头几分钟外推速率会把"清积压"误读成"持续消耗"。要区分速率和存量，必须看计数曲线是否走平，且要在**没有任何输入**的条件下观察足够久。用免费的 mock 模型做这种"数调用"的实验，成本为零，同样的日志表也能照用。顺带：新 worktree 没有 `.venv` 和 `.env`，`uv run --no-sync` 会建出空 venv（`Failed to spawn: uvicorn`），要先 `uv sync`；缺 `PHI_ENCRYPTION_KEY` 时启动失败（`MissingKeyError`），一次性探针库可以用临时随机密钥，而不是去拷真实 `.env`。
+- **代码与提交**：`apps/api/app/main.py` 的 `_dispatch_loop`/`_intake_loop`/`_hospital_loop`/`_narrator_loop`；`apps/api/app/ehr/simulator.py` 的 `tick`；`apps/api/app/modules/admin/service.py` 的 `maybe_daily_reset`。本分支 `claude/heuristic-noyce-091944`，尚未提交（等 owner 同意）。
 
 ---
 
