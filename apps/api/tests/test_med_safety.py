@@ -100,13 +100,17 @@ def test_the_planted_ai_cases_fit_their_story_whatever_the_day_of_seeding():
     # which stays get the planted cases depends on that day. The 8.2 case and the admission reconciliation need the
     # patient's ai_processing consent, which the newest Medicine A admission lacks on Monday (deny) and Thursday
     # (missing); the 8.2 naproxen is for fracture pain, and on Thursday the newest Orthopedics admission is a spinal
-    # fusion. One seeding per hospital day stands for the others: a Sunday (Monday's day) and a Thursday.
+    # fusion. The renal case's ketorolac must meet the renal rule alone and be the patient's only NSAID: the last
+    # Medicine B stay, picked before, already took ibuprofen or celecoxib on Monday, Tuesday and Thursday, and
+    # warfarin on Wednesday (a major interaction, listed before the renal finding). One seeding per hospital day
+    # stands for the others: a Sunday (Monday's day) and a Thursday.
     from datetime import datetime
 
     from app.core.config import settings
     from app.core.store import Store, use_store
     from app.ehr.seed import generate
     from app.ehr.seed.medsafety import FRACTURES
+    from app.modules.med_safety import facts, rules
 
     for wall in (datetime(2026, 10, 11, 12), datetime(2026, 10, 15, 12)):
         s = Store()
@@ -120,6 +124,12 @@ def test_the_planted_ai_cases_fit_their_story_whatever_the_day_of_seeding():
             assert stay["reasonCode"][0]["coding"][0]["code"] in FRACTURES, wall
             assert ref_id(s.fhir.read("MedicationRequest", "medrx-ms-82-naproxen")["encounter"]) == stay["id"]
             assert ref_id(s.fhir.read("MedicationRequest", QUETIAPINE)["encounter"]) == info["medsafety"]["medrec"]["stay"]
+            pid = info["medsafety"]["renal"]["patient"]
+            known = S.collect(FhirGateway(Actor.system("test"), "order_review", LocalBackend(s)), [pid],
+                              hospital_now(s))[pid]
+            ketorolac = facts.med_from_request(s.fhir.read("MedicationRequest", "medrx-ms-renal-ketorolac"))
+            assert [f.rule for f in rules.evaluate(ketorolac, known)] == ["renal_dosing"], wall
+            assert [m.name for m in known.meds if m.drug_class == "nsaid" and m.ref != ketorolac.ref] == [], wall
 
 
 def test_discharge_keeps_the_discharge_prescriptions_active(fresh_state):
@@ -151,7 +161,9 @@ def test_intake_reviews_new_orders_with_the_rules(fresh_state):
     assert any(f["entry"] == "interactions:warfarin-nsaid" for f in naproxen.findings)
     allergy = table.get(PIPERACILLIN)
     assert allergy.blocking and allergy.findings[0]["rule"] == "allergy"
-    assert table.get(KETOROLAC).findings[0]["rule"] == "renal_dosing"
+    renal = table.get(KETOROLAC)  # the kidneys are the case's only problem, on the planted eGFR
+    assert [(f["rule"], f["evidence_refs"]) for f in renal.findings] == [
+        ("renal_dosing", ["Observation/obs-ms-renal-egfr"])]
     assert any(f["rule"] == "dose_bounds" and "a day is above 300" in f["detail"] for f in table.get(TRAMADOL).findings)
     repeat = table.get(REPEAT_TEST)
     assert repeat.kind == "service" and repeat.reviewer_roles == ["physician"]

@@ -13,7 +13,9 @@
      and continued, a new naproxen order (major interaction), an INR of 3.8, and a
      home antihypertensive that was not ordered on admission (omission);
    - a blocking allergy (penicillin allergy, piperacillin ordered) on Medicine A;
-   - renal dosing (eGFR 24, ketorolac ordered) on Medicine B;
+   - renal dosing (eGFR 24, ketorolac ordered) on Medicine B, for a patient whose
+     ketorolac meets no other rule and who takes no other NSAID (the kidneys are
+     the case's only problem);
    - dose bounds (tramadol 100 mg four times a day for a patient over 75);
    - a duplicate test (a lab test ordered again while its result is a day old) on Medicine A;
    - an admission reconciliation on Medicine A with a dose change, duplicate
@@ -28,17 +30,20 @@ completes inpatient orders at discharge and leaves discharge prescriptions activ
 from __future__ import annotations
 
 import random
+from collections import defaultdict
 from datetime import datetime, timedelta
 
 from app.ehr import codes as C
 from app.ehr.seed.builder import Builder
 from app.ehr.seed.people import PatientInfo
 from app.ehr.seed.simulate import Stay, Timeline
-from app.fhir.dt import parse
+from app.fhir.dt import parse, ref_id
+from app.modules.med_safety import facts as F, rules
 
 HIP_FRACTURE = "5913000"
 FRACTURES = (HIP_FRACTURE, "125605004")  # neck of femur, any bone
 ANTIHYPERTENSIVES = ("17767", "29046", "5487")  # amlodipine, lisinopril, hydrochlorothiazide
+KETOROLAC, KETOROLAC_DOSE, RENAL_EGFR = "35827", (15, 4), 24  # the renal case: mg a dose, doses a day; its eGFR
 # Inpatient-only medications at discharge: (probability it continues, the oral medication it becomes or None).
 DISCHARGE_FATE: dict[str, tuple[float, str | None]] = {
     "67108": (0.6, None), "5224": (0.0, None), "161": (0.8, None), "1191": (0.95, None), "32968": (0.9, None),
@@ -180,11 +185,45 @@ def plant_allergy(b: Builder, stay: Stay, p: PatientInfo, now: datetime) -> dict
     return {"stay": stay.id, "patient": p.id, "order": "medrx-ms-allergy-piperacillin"}
 
 
+def renal_fits(b: Builder, stays: list[Stay], patients: dict[str, PatientInfo]) -> set[str]:
+    """The stays whose patient fits the renal case's story, the kidneys as the ketorolac order's only problem: with
+    the planted eGFR the rules find renal dosing and nothing else (no interaction partner such as warfarin, no NSAID
+    allergy, no dose limit), and no other NSAID is taken (the duplicate therapy the AI commentary would raise). The
+    rules decide on the facts the order review collects; one search per resource type (casebook 10.4, 5.13)."""
+    pids = {s.patient for s in stays}
+    meds: dict[str, list[F.Med]] = defaultdict(list)
+    allergies: dict[str, list[F.AllergyFact]] = defaultdict(list)
+    for r in b.store.fhir.search("MedicationRequest", status="active"):
+        if r.get("intent") == "order" and ref_id(r["subject"]) in pids:
+            meds[ref_id(r["subject"])].append(F.med_from_request(r))
+    for r in b.store.fhir.search("MedicationStatement", status="active"):
+        if ref_id(r["subject"]) in pids:
+            meds[ref_id(r["subject"])].append(F.med_from_statement(r))
+    for r in b.store.fhir.search("AllergyIntolerance"):
+        if ref_id(r["patient"]) in pids and F.allergy_active(r):
+            allergies[ref_id(r["patient"])].append(F.allergy_from(r))
+    name, drug_class, *_ = C.MEDICATIONS[KETOROLAC]
+    dose, per_day = KETOROLAC_DOSE
+    order = F.Med("MedicationRequest/planned", KETOROLAC, name, drug_class, dose, "mg", per_day)
+    out = set()
+    for s in stays:
+        p = patients[s.patient]
+        facts = F.PatientFacts(
+            patient_ref=f"Patient/{p.id}", age=p.age, sex=p.sex, weight=F.Measurement("weight", p.weight, "kg", None),
+            egfr=F.Measurement("egfr", RENAL_EGFR, "mL/min/{1.73_m2}", None), allergies=tuple(allergies[p.id]),
+            meds=tuple(meds[p.id]))
+        if [f.rule for f in rules.evaluate(order, facts)] == ["renal_dosing"] \
+                and not any(m.drug_class == drug_class for m in facts.meds):
+            out.add(s.id)
+    return out
+
+
 def plant_renal(b: Builder, stay: Stay, p: PatientInfo, now: datetime) -> dict:
-    b.observation(p.id, stay.id, ("33914-3", C.LABS["33914-3"][0]), now - timedelta(hours=8), value=24,
+    b.observation(p.id, stay.id, ("33914-3", C.LABS["33914-3"][0]), now - timedelta(hours=8), value=RENAL_EGFR,
                   unit="mL/min/{1.73_m2}", category="laboratory", interpretation="L", rid="obs-ms-renal-egfr")
-    b.medication_request(p.id, stay.id, "35827", now - timedelta(hours=4), requester=stay.attending, dose=15,
-                         per_day=4, rid="medrx-ms-renal-ketorolac")
+    dose, per_day = KETOROLAC_DOSE
+    b.medication_request(p.id, stay.id, KETOROLAC, now - timedelta(hours=4), requester=stay.attending, dose=dose,
+                         per_day=per_day, rid="medrx-ms-renal-ketorolac")
     return {"stay": stay.id, "patient": p.id, "order": "medrx-ms-renal-ketorolac"}
 
 
@@ -258,12 +297,13 @@ def generate(b: Builder, tl: Timeline, patients: dict[str, PatientInfo], now: da
     if s82:
         out["case_82"] = plant_82(b, s82, patients[s82.patient], now)
         used.add(s82.patient)
+    renal = renal_fits(b, [s for s in staying if _unit(s, now) == "MEDB"], patients)
     plants = [
         ("allergy", plant_allergy, dict(unit="MEDA", recent=True)),
         ("medrec", plant_admission_medrec, dict(unit="MEDA", recent=True, eligible=ai_consent, key=lambda s: (
             any(c in patients[s.patient].conditions for c in NO_ANTIPSYCHOTIC_INDICATION), -s.admit.timestamp()))),
         ("duplicate_test", plant_duplicate_test, dict(unit="MEDA")),
-        ("renal", plant_renal, dict(unit="MEDB")),
+        ("renal", plant_renal, dict(unit="MEDB", eligible=lambda s: s.id in renal)),
         ("dose", plant_dose, dict(key=lambda s: (patients[s.patient].age < 76, s.id))),
     ]
     for name, plant, options in plants:
