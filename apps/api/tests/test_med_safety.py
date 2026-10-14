@@ -191,6 +191,32 @@ def test_entry_points_are_idempotent(fresh_state):
         S.review_order(store, "Observation/x")
 
 
+def test_the_intake_reviews_every_order_of_a_new_stay_also_those_older_than_a_day(fresh_state):
+    """A stay admitted in the last 48 hours gets its admission reconciliation from the intake, and every active order
+    of it is reviewed, also those written more than 24 hours ago: a stay admitted before the data was seeded has no
+    journey whose orderReview would review them. Their flags reach the pharmacist's queue and the reconciliation."""
+    store = fresh_state
+    S.intake(store, force=True)
+    now = hospital_now(store)
+    fhir = S.module_fhir()
+    stays = [e["id"] for e in fhir.search("Encounter", cls="IMP", status="in-progress",
+                                           date_from=now - S.ADMISSION_WINDOW)]
+    orders = fhir.search("MedicationRequest", encounter=stays, status="active", category="order")
+    orders += fhir.search("ServiceRequest", encounter=stays, status="active", category=S.SERVICE_CATEGORIES)
+    table = reviews(store)
+    refs = [f"{o['resourceType']}/{o['id']}" for o in orders]
+    assert [r for r in refs if r not in table] == []
+    older = [table[r] for r, o in zip(refs, orders) if parse(o["authoredOn"]) < now - S.REVIEW_WINDOW]
+    flagged = [r for r in older if r.findings and r.kind == "medication"]
+    assert flagged  # on every hospital day (6 to 18 when this was written)
+    pharmacist = user(store, Role.PHARMACIST)
+    assert {r.id for r in flagged} <= {i["id"] for i in S.queue(store, pharmacist)["items"]}
+    review = flagged[0]
+    view = S.session_view(store, pharmacist, sessions(store)[session_key(review.encounter_id, "admission")].id)
+    shown = {line["ref"] for i in view["items"] for line in (i["order"], i["inpatient"]) if line}
+    assert review.order_ref in view["order_flags"] and shown & set(refs) <= set(view["order_flags"])
+
+
 # ---------- the AI commentary ----------
 
 

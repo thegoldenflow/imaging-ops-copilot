@@ -87,5 +87,7 @@ Release gate (6.6): `order_review` eval_threshold 0.8, `medication_reconciliatio
 - Indications: the generator's inpatient medications for a diagnosis name it (rule); home medications and many
   admission orders do not, so the AI judges them; gastroprotection, delirium management and electrolyte
   replacement are reasons, not diagnoses, and come out as "new without indication".
-- The intake sweep reviews orders authored in the last 24 hours and reconciles stays admitted in the last 48 hours
-  or with discharge prescriptions; stays admitted during the simulated day get no discharge prescriptions.
+- The intake sweep reviews orders authored in the last 24 hours and every active order of the stays admitted in the
+  last 48 hours, and reconciles those stays and the stays with discharge prescriptions; stays admitted during the
+  simulated day get no discharge prescriptions. Older orders of earlier stays are reviewed only by a journey's
+  orderReview, and a stay admitted before the data was seeded has a journey only when a controller starts one.

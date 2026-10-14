@@ -12,7 +12,8 @@ journey workflow (6.5, WP4c):
 - `reconcile(store, encounter_id, kind)`: admission or discharge reconciliation
   (reconcile.py), the AI's indication judgements and the draft record (`settle`).
 - `intake(store)`: the sweep the API's hospital loop runs: new orders of the last 24
-  hours (hospital clock), stays admitted in the last 48 hours, stays with discharge
+  hours (hospital clock), stays admitted in the last 48 hours (their admission
+  reconciliation and every active order, older ones too), stays with discharge
   prescriptions. It catches the seeded data and whatever the day simulator adds.
 - Decisions: `decide_review` (accept the order or request a change, with a reason;
   only a pharmacist clears a blocking flag), `handle_item` (accept / modify / reject
@@ -59,7 +60,7 @@ from app.modules.med_safety.reconcile import (RecItem, apply_judgements, compare
 ORDER_REVIEW = "order_review"
 MEDREC = "medication_reconciliation"
 REVIEW_WINDOW = timedelta(hours=24)  # new orders: authored in the last 24 hours (hospital clock)
-ADMISSION_WINDOW = timedelta(hours=48)  # admission reconciliation for stays admitted in the last 48 hours
+ADMISSION_WINDOW = timedelta(hours=48)  # stays admitted in the last 48 hours: reconciliation, all their orders
 RECENT_DISCHARGE = timedelta(hours=72)
 SERVICE_CATEGORIES = ["lab", "imaging"]
 MEDICATION_REVIEWERS = ["pharmacist", "physician"]
@@ -135,7 +136,7 @@ def collect(fhir: FhirGateway, patient_ids: list[str], now: datetime) -> dict[st
     pids = sorted(set(patient_ids))
     if not pids:
         return {}
-    since = now - REVIEW_WINDOW - timedelta(hours=72)
+    since = now - max(REVIEW_WINDOW, ADMISSION_WINDOW) - timedelta(hours=72)  # the intake's oldest orders, 72 h before
     with fhir.batch("medication safety: facts"):
         patients = {p["id"]: p for p in fhir.search("Patient", ids=pids)}
         allergies = [a for a in fhir.search("AllergyIntolerance", patient=pids) if F.allergy_active(a)]
@@ -480,7 +481,15 @@ def intake(store: Store, *, force: bool = False) -> dict[str, int]:
         meds = fhir.search("MedicationRequest", status="active", category="order", date_from=now - REVIEW_WINDOW)
         tests = fhir.search("ServiceRequest", status="active", category=SERVICE_CATEGORIES,
                             date_from=now - REVIEW_WINDOW)
-    created = _review_orders(store, fhir, meds + tests, now)
+        # and every active order of the stays the admission reconciliation covers, older ones too (the journey's
+        # orderReview reviews the same; a stay started before the data was seeded has no journey)
+        stays = [e["id"] for e in fhir.search("Encounter", cls="IMP", status="in-progress",
+                                               date_from=now - ADMISSION_WINDOW)]
+        if stays:
+            meds += fhir.search("MedicationRequest", encounter=stays, status="active", category="order")
+            tests += fhir.search("ServiceRequest", encounter=stays, status="active", category=SERVICE_CATEGORIES)
+    orders = list({(r["resourceType"], r["id"]): r for r in meds + tests}.values())
+    created = _review_orders(store, fhir, orders, now)
     counts = {"reviews": len(created), "admission": 0, "discharge": 0}
     medrec = module_fhir(MEDREC)
     table = sessions(store)
