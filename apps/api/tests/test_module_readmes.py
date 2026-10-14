@@ -32,7 +32,7 @@ MODULE_READMES = [
     "apps/api/app/modules/README.md",  # the imaging centre's agents (phases 1-4)
 ]
 EVAL_READMES = sorted(str(p.relative_to(REPO)).replace("\\", "/") for p in (REPO / "evals").glob("*/README.md")
-                      if p.parent.name not in ("runs", "storyline"))
+                      if p.parent.name not in ("runs", "live-runs", "storyline"))
 NEWCOMER_DOCS = ["README.md", "docs/README.md", "demo/README.md", "evals/README.md", "docs/interview-narrative.md",
                  "docs/safety-tiers.md", "docs/DEPLOY.md"]
 
