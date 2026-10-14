@@ -658,10 +658,12 @@ def test_a_journey_signoff_written_while_the_last_decision_was_saved_is_confirme
     S.intake(store, force=True)
     pharmacist = user(store, Role.PHARMACIST)
     encounter = reviews(store).get(NAPROXEN).encounter_id
+    # The activity reviews every order of the stay, also those older than the intake's 24 hours (on a Thursday the
+    # 8.2 stay was admitted the day before), and the pharmacist decides them all: only then is the decision the last.
+    found = MJ.review_orders(store, encounter, None)  # as the activity read them, before the decision was saved
     for r in [r for r in reviews(store).find_by("encounter_id", encounter)
               if r.status == "pending" and r.kind == "medication"]:
         S.decide_review(store, pharmacist, r.id, "request_change", "Stop it: interaction with warfarin at home")
-    found = MJ.review_orders(store, encounter, None)  # as the activity read them, before the decision was saved
     with runtime.start("order_review", user=None, encounter_id=encounter) as run:
         result = MJ.order_review_signoff(run, found, None)
         run.finish(outcome="completed")
