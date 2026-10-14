@@ -119,6 +119,7 @@
 | 5.11 | 积压看板测试全量失败、单独通过 | imaging | 测试 · 未查明 |
 | 5.12 | 周二的"编造诊断"是真的：预埋病人恰好因肺炎入院 | hospital | 日期依赖 · 测试假设 |
 | 5.13 | 周三的肾功能病例先报了相互作用：预埋病人在吃华法林（顺带查明一个周四失败） | hospital | 日期依赖 · 种子 · 扫描 |
+| 5.14 | 周四的药师签核没被确认：测试的"最后一个决定"不是最后一个 | hospital | 日期依赖 · 测试假设 · 竞态 |
 | 6.1 | `localhost` 建连接要 8 秒，播种像卡住 | 环境 | 环境 · 网络 |
 | 6.2 | `websockets` 反复被删坏 | 环境 | 环境 · 依赖 |
 | 6.3 | Docker 数据盘写满（10-09） | 环境 | 环境 · 磁盘 |
@@ -1602,7 +1603,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
     （在 `pytest_collection_modifyitems` 里才 import app，保证 conftest 先设好 `DATABASE_URL`，同 5.12；插件打印旧模块路径，确认真的换了），只跑新的回归测试：
     `AssertionError: datetime.datetime(2026, 10, 11, 12, 0)`、`assert ['ibuprofen', 'ibuprofen'] == []`，失败在周日播种（旧的周一病人家里和医嘱都有布洛芬）。
   - `npx tsc -b` 干净。全量后端（真实时钟，周三，自己的库 `ioc_test_finish`）的结果在跑完后补在这里。
-  - **扫描顺带发现另一个周四失败（未修，已提议单独会话）：** `test_a_journey_signoff_written_while_the_last_decision_was_saved_is_confirmed_soon_after`
+  - **扫描顺带发现另一个周四失败（这里只诊断，修复见 5.14）：** `test_a_journey_signoff_written_while_the_last_decision_was_saved_is_confirmed_soon_after`
     第 670 行 `assert MJ.recheck_signoffs(store) == [task_id]` 得到 `[]`。单独跑也失败，用旧种子（`-p oldseed`）也失败，所以和这次修改无关。
     探针插件包住 `journey.confirm_signoff`，打印本次住院还在 pending 的用药审查：周四的 8.2 住院（stay-01109）是两天前入院的（5.3：周四过去 24 小时没有髋部骨折入院），
     入院时开的依诺肝素、华法林、舍曲林（10-13 开具）在 intake 的 24 小时窗口（`REVIEW_WINDOW = 1 day`）之外，测试只决定了萘普生；随后 `MJ.review_orders`
@@ -1618,6 +1619,78 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **来源：** finish 会话 10-14（合并 18 章那组会话之后的收尾）；发现于合并后的全量后端（860 passed、1 failed）。
 - **代码：** `apps/api/app/ehr/seed/medsafety.py`（`renal_fits`、`plant_renal`、`generate()`）、`apps/api/tests/test_med_safety.py`；
   相关：`apps/api/app/modules/med_safety/rules.py`（`evaluate`、`MEDICATION_RULES`）、`apps/api/app/ehr/seed/voice.py`（来电人挑法）；提交 1f9375a。
+
+### 5.14 周四的药师签核没被确认：测试的"最后一个决定"不是最后一个
+
+- **现象：** 5.13 的一周扫描里，周四（墙上时间 10-15 10:00，播种的医院日 10-15）
+  `tests/test_med_safety.py::test_a_journey_signoff_written_while_the_last_decision_was_saved_is_confirmed_soon_after` 第 671 行失败：
+  `assert MJ.recheck_signoffs(store) == [task_id]` → `AssertionError: assert [] == ['task-00002']`。周一到周三、周五到周日都通过；单独跑也失败，
+  换成旧种子（`-p oldseed`）也失败，所以和 5.13 的种子修改无关。
+- **怎么查的：**
+  1. **先弄清测试在模拟什么。** 读测试和 `journey.py`：这是 WP9 遇到的竞态。journey 的 orderReview activity 读这次住院的医嘱、写签核 Task，
+     同时药师在工作台保存最后一个决定；决定里的 `confirm_signoff` 找不到还没提交的 Task，activity 也看不到还没提交的决定，谁都没确认。
+     修法是 `confirm_signoff` 在"最后一个决定"时登记 `_RECHECK`，API 后台循环（`intake_step`）在两分钟内每 5 秒调一次 `recheck_signoffs` 再试。
+     测试的步骤：`S.intake` → 决定这次住院所有 pending 的用药审查 → `MJ.review_orders`（注释写着"activity 在决定保存之前读到的"）→
+     写签核 Task → `recheck_signoffs` 应该确认它。
+  2. **读 `confirm_signoff`，列出返回 `[]` 的可能：** (a) 用户不是药师，或审查没有住院号；(b) 这次住院还有 pending 的用药审查；(c) 药师的队列里没有这条签核 Task
+     （或已经被决定）。`recheck_signoffs` 自己也会因为 5 秒节流或 `_RECHECK` 过期返回 `[]`，但测试先把 `_LAST["at"]` 清零了，两分钟也远没到。
+  3. **探针定位**（发起会话做的）：插件包住 `journey.confirm_signoff`，打印这次住院 pending 的用药审查和队列里的签核 Task。recheck 时有 3 条 pending：
+     依诺肝素（`heparin-nsaid`）、华法林（`warfarin-nsaid`、`warfarin-ssri`）、舍曲林（`warfarin-ssri`），都是 10-13 开的；签核 Task 在队列里。是 (b)。
+  4. **这 3 条审查从哪来。** `S.intake` 只审查过去 24 小时开的医嘱（`REVIEW_WINDOW = timedelta(hours=24)`）；`MJ.review_orders` 却先调
+     `service.review_encounter_orders`，审查这次住院**所有**有效医嘱，不看开具时间。周四的 8.2 住院 stay-01109 是 10-13 入院的（5.3：周四过去 24 小时
+     没有髋部骨折入院，`_pick_82` 放宽到 48 小时），入院医嘱都在窗口外。测试决定了萘普生（当时唯一 pending 的），`confirm_signoff` 看到没有 pending，
+     登记了 recheck；接着 `review_orders` 新建了 3 条 pending，recheck 时 (b) 成立。其他几天的 8.2 住院是当天入院的，intake 一开始就审查了全部医嘱，
+     测试决定的就是全部。
+  5. **只是测试的前提错了，还是产品也有缺口？** 可疑的产品缺口是："journey 审查了 intake 窗口外的医嘱，药师队列里从没出现过它们，签核就等不到最后一个决定。"
+     不靠推测，直接看药师看到什么：新探针 `probe_queue.py` 包住 `journey.review_orders`，在调用前后打印这次住院的用药审查、药师工作台队列
+     （`S.queue(store, pharmacist)`，show=open）里这次住院的行，以及 journey 会写的签核文字 `signoff_text(found, as_of)`。周四、未改的测试：
+     - 调用前：`probe before queue(open)=[]`（萘普生已决定，药师那边这次住院没有待办）；
+     - 调用后：`probe after queue(open)=[('medrx-005382', 'pending'), ('medrx-005384', 'pending'), ('medrx-ms-82-warfarin', 'pending')]`（舍曲林、依诺肝素、华法林）；
+     - 签核 Task 的文字：`Pharmacist review of the stay's orders (9): 4 flagged by the rules: enoxaparin: Interaction (major): enoxaparin + naproxen; naproxen: ...;
+       warfarin: ...; sertraline: Interaction (moderate): sertraline + warfarin. Decide them in Medication safety: this Task is confirmed with the last decision ...`。
+
+     journey 审查出来的旧医嘱立刻进了药师队列，签核 Task 也点了它们的名；药师只决定了 4 条里的 1 条，这时确认签核才是错的。`confirm_signoff` 返回 `[]` 正确，
+     药师决定完剩下 3 条时，最后一个决定（这时 Task 已经在了）会照常确认。真实的竞态也一样：`step_activity` 让 activity 在**一个事务**里新建 pending 审查并写 Task；
+     药师同时决定萘普生时看不到这些未提交的 pending，登记了 recheck；activity 提交后 recheck 看到 pending，不确认；药师决定完剩下的，最后一个决定照常确认，不会卡住。
+     **结论：产品没有缺口，错的是测试的前提"测试做的决定就是最后一个"。**
+- **根因：** 测试的顺序和它模拟的 activity 相反：先决定，再让 journey 审查。只有 intake 已经审查过这次住院全部医嘱时，"测试决定的是最后一个"才成立；
+  周四 journey 审查时冒出 3 条新的 pending，药师的决定就不是最后一个了。
+- **怎么修：** 只改测试，把 `found = MJ.review_orders(store, encounter, None)` 挪到决定之前，并加注释说明原因。这正是它要模拟的竞态的顺序：
+  activity 先读（并审查）这次住院的全部医嘱，药师再决定所有 pending 的，最后一个决定保存时 Task 还没写，只能靠 recheck 确认。原注释 "as the activity read them,
+  before the decision was saved" 挪过去后才名副其实。另一个 journey 测试 `test_journey_order_review_step_signs_off_with_the_pharmacists_last_decision`
+  本来就是先 `review_orders` 再决定，所以每天都过。产品代码不改。
+- **怎么证明：**
+  - 周四、同一个库（`ioc_test_signoff`）：未改的测试 `AssertionError: assert [] == ['task-00002']`；改后 `1 passed`。探针显示改后的测试在决定之前队列里
+    有 4 条 pending（萘普生、舍曲林、依诺肝素、华法林），测试把它们都决定了，`assert ... == "requested"` 证明 Task 仍然是在最后一个决定之后写的，竞态路径还在测。
+  - **一周扫描加真实时钟**：整个 `tests/test_med_safety.py`，scratchpad 插件 `-p travel` 把时钟移到当天 10:00 UTC-4，每天一个库
+    （`ioc_test_signoff_<天>`），8 个进程并行；跑完用 SQL `select data->>'generated_for' from module_state where name='hospital_plan'` 确认播种的医院日。
+    8 个库同时播种，每次约 23–25 分钟（单独跑一个测试约 1.5–3 分钟）。
+
+    | 墙上时间 | 播种的医院日 | 结果 |
+    | --- | --- | --- |
+    | 周一 10-12 | 10-12 周一 | 21 passed |
+    | 周二 10-13 | 10-13 周二 | 21 passed |
+    | 周三 10-14 | 10-14 周三 | 21 passed |
+    | 周四 10-15 | 10-15 周四 | 21 passed（修改前这里失败） |
+    | 周五 10-16 | 10-16 周五 | 21 passed |
+    | 周六 10-17 | 10-16 周五 | 21 passed |
+    | 周日 10-18 | 10-19 周一 | 21 passed |
+    | 真实时钟（周三） | 10-14 周三 | 21 passed |
+
+  - 测试库用完已删除（每个库一条 `DROP DATABASE IF EXISTS "ioc_test_signoff_<天>"`）。只改了一个测试，没有跑全量后端。
+- **经验：**
+  - 测试模拟竞态时，步骤顺序要和真实代码一致：activity 先读后写，测试也要先读后写。顺序反了，测试就悄悄依赖了"中间恰好没有新东西冒出来"，而这取决于数据。
+  - "最后一个"这类前提要由测试的步骤保证，不能靠数据恰好如此：先做完所有可能新增待办的步骤（这里是 journey 的全住院审查），再做"最后一个决定"。
+  - 分不清"测试错了还是产品错了"时，用探针直接看用户看到的东西（队列里有什么、Task 上写了什么），一次运行就能把"药师永远看不到这些医嘱"排除掉。
+  - 和 5.12 一样，失败报的是测试的假设，被测代码的行为是对的；不同的是，这次的假设藏在步骤顺序里，而不是在数据里。
+  - **顺带观察（没改，留给 owner 决定）：** intake 审查医嘱的窗口是 24 小时，开入院核对的窗口是 48 小时。刚播种（或 API 停了超过 24 小时）时，24–48 小时前开的医嘱
+    只有 journey 的 orderReview 会审查（`review_encounter_orders` 只有它调用）；不开 Temporal 的演示里，它们永远不进药师队列。例如周四 8.2 住院的华法林 + 舍曲林
+    （`warfarin-ssri`，moderate）。持续运行时每张医嘱在开具后 24 小时内都会被 intake 扫到，所以只影响演示数据的"过去"。
+- **范围：** hospital（WP6 用药安全，WP9 journey 签核的 recheck）。
+- **来源：** 5.13 的一周扫描发现；finish 会话诊断，交给单独的会话修（10-14）。
+- **代码：** `apps/api/tests/test_med_safety.py`（`test_a_journey_signoff_written_while_the_last_decision_was_saved_is_confirmed_soon_after`）；
+  相关：`apps/api/app/modules/med_safety/journey.py`（`review_orders`、`confirm_signoff`、`recheck_signoffs`）、`apps/api/app/modules/med_safety/service.py`
+  （`intake`、`REVIEW_WINDOW`、`review_encounter_orders`、`queue`）、`apps/api/app/workflows/activities.py`（`order_review`、`step_activity`）；提交 7cc2e8c。
 
 > **怎么在另一天测试**（本机做法，见 memory 记录）：
 > - 脱离数据库调用 `generate(Store(), seed, datetime(...))`，几十秒就能扫完一周（5.6）；或者写一个 pytest 插件只冻结播种时刻（`seedat`、`seedtime`：`-p seedtime` 加 `SEED_AT`），
