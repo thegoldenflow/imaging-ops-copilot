@@ -118,6 +118,7 @@
 | 5.10 | 计划 horizon 差一天，时钟原地空转 | hospital | 日期依赖 · 边界 |
 | 5.11 | 积压看板测试全量失败、单独通过 | imaging | 测试 · 未查明 |
 | 5.12 | 周二的"编造诊断"是真的：预埋病人恰好因肺炎入院 | hospital | 日期依赖 · 测试假设 |
+| 5.13 | 周三的肾功能病例先报了相互作用：预埋病人在吃华法林（顺带查明一个周四失败） | hospital | 日期依赖 · 种子 · 扫描 |
 | 6.1 | `localhost` 建连接要 8 秒，播种像卡住 | 环境 | 环境 · 网络 |
 | 6.2 | `websockets` 反复被删坏 | 环境 | 环境 · 依赖 |
 | 6.3 | Docker 数据盘写满（10-09） | 环境 | 环境 · 磁盘 |
@@ -1536,6 +1537,88 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **代码：** `apps/api/tests/test_documentation.py`（`test_template_only_without_ai_consent`）；相关：`apps/api/app/modules/documentation/validator.py`（`check_item`）、
   `apps/api/app/ehr/seed/documentation.py`（`generate()` 的 `hallucination` 病例）；提交 a7a7d55。
 
+### 5.13 周三的肾功能病例先报了相互作用：预埋病人在吃华法林
+
+- **现象：** 10-14（周三）合并后的全量后端 `860 passed, 1 failed`：`tests/test_med_safety.py::test_intake_reviews_new_orders_with_the_rules` 第 154 行
+  `assert table.get(KETOROLAC).findings[0]["rule"] == "renal_dosing"`，实际是 `"interaction"`。
+- **怎么查的：**
+  1. **先分清新老问题**（发起会话已做）：把整个时钟移到周二 10-13（time-machine），当前 main 通过；合并前的 e5c59da 在周三同样失败。所以不是最近几次合并改坏的，
+     而是演示数据按星期几变（本章，尤其 5.3）。
+  2. **读判定逻辑，缩小可能性。** `rules.evaluate` 按 `MEDICATION_RULES = (allergy, interactions, renal_dosing, dose_bounds)` 的顺序收集结果，再
+     `sorted(found, key=lambda f: -SEVERITY_RANK[f.severity])`。Python 的排序是稳定的：严重度相同时保留收集顺序，相互作用排在肾功能前面。
+     `renal_drugs.yaml` 里酮咯酸是 major，所以 `findings[0]` 是 interaction 只有一种可能：这个病人另有一条 major 的酮咯酸相互作用。
+     `interactions.yaml` 里和 NSAID 成对的 major 有华法林、DOAC、肝素、锂。**假设：周三挑中的病人在用其中一种。**
+  3. **不用数据库的探针**（`probe_renal.py`，思路同 5.12、18.6）：脱离数据库按墙上时间 `generate(Store(), seed, wall)`，用服务自己的 `S.collect` 取事实，
+     再 `rules.evaluate` 评 `medrx-ms-renal-ketorolac`，两天约 30 秒。周三：stay-01097 / pat-0853，79 岁，Medicine B，尿路感染，家里吃华法林、入院后继续开；
+     结果是 `interaction major interactions:warfarin-nsaid`，然后才是 `renal_dosing major`。周二：pat-0011，只有 `renal_dosing`。**假设成立。**
+  4. **顺手看其他几天**（`sweep_seed.py`，7 个进程并行，每天约 30 秒，同时记下每个 FHIR 资源的哈希，留作修改后的对照）。结果比失败本身更说明问题：
+
+     | 医院日 | 肾功能病例的病人 | 和酮咯酸有关的其他用药 |
+     | --- | --- | --- |
+     | 周一 | pat-0858，91 岁 | 布洛芬（家里 + 医嘱）：第二个 NSAID |
+     | 周二 | pat-0011，95 岁 | 布洛芬 + 塞来昔布：第二、第三个 NSAID |
+     | 周三 | pat-0853，79 岁 | 华法林：major 相互作用，排在肾功能前面（本次失败） |
+     | 周四 | pat-0917，84 岁 | 塞来昔布：第二个 NSAID |
+     | 周五 | pat-0720，39 岁 | 没有（阿司匹林和 NSAID 不成对） |
+
+     规则层不查重复用药，所以周一、二、四的测试能过；但 mock 的 order_review 评论（`mocks._medication_concerns`：NSAID 在 `medrec.yaml` 的
+     `duplicate_therapy.classes` 里）和真实模型都会提出"重复 NSAID"。也就是说，这个病例的故事（"eGFR 24 的病人开了酮咯酸"）五个医院日里只有周五讲得干净。
+  5. **为什么会挑到这样的病人：** `_pick(staying, used, unit="MEDB")` 没有 `key` 也没有 `eligible`，取池子里最后一个（id 最大的 Medicine B 住院），不看用药。
+     和 5.3 的"最新的一个"是同一个根。
+- **根因：** 预埋的肾功能病例挑病人时，没把故事的前提（"肾功能是这张医嘱唯一的问题"）写成挑选条件。周三挑中的病人在吃华法林，酮咯酸的 major 相互作用和 major 肾功能并列，
+  稳定排序把相互作用排在前面。测试断言 `findings[0]` 本身没错：它守的正是"这个病例的头条是肾功能"，只是数据有一天不满足。
+- **怎么修（为什么改种子，不改测试）：** 两条路：(a) 测试改成"肾功能在 findings 里"；(b) 让预埋病例每天都挑符合故事的病人。选 (b)：
+  - (a) 只让测试变绿，周三的演示数据仍然是错的：药师队列里这条显示成 "Interaction (major): ketorolac + warfarin"（`journey.py` 取最严重的第一条），
+    成了 8.2 故事线"华法林 + NSAID"的翻版，肾功能病例在演示里没有了。放宽断言，等于让测试不再守这个故事。
+  - (b) 的做法：`app/ehr/seed/medsafety.py` 新增 `renal_fits()`，对 Medicine B 的候选，用订单审查收集的同一类事实（有效医嘱、在用的家庭用药、有效过敏）
+    **让规则本身判断**：带上预埋的 eGFR 24，酮咯酸 15 mg 一天四次只触发 `renal_dosing`（没有华法林这类相互作用，没有 NSAID 过敏，不超剂量），
+    并且病人没有在吃别的 NSAID。用规则表判断，而不是手写"不吃华法林"，表改了条件跟着变。每种资源只搜一次再按病人分组（10.4：脱离数据库的 `search` 是全表扫描）。
+    `plant_renal` 和判断共用 `KETOROLAC, KETOROLAC_DOSE, RENAL_EGFR` 常量。
+  - 测试收紧：`test_intake_reviews_new_orders_with_the_rules` 断言酮咯酸的 findings **恰好是** `[("renal_dosing", ["Observation/obs-ms-renal-egfr"])]`：
+    只有肾功能，而且依据是预埋的那条 eGFR（理由对，而不只是规则名对）。回归测试 `test_the_planted_ai_cases_fit_their_story_whatever_the_day_of_seeding`
+    （周日、周四两次播种）加上肾功能病例的前提：服务 `collect` 出来的事实上规则只给 `renal_dosing`，而且没有别的 NSAID。
+  - **数据影响**（新旧代码各扫一周，逐个比较 FHIR 资源哈希）：周五（和周六）完全不变；周一（和周日）、周二、周三、周四只有 `medrx-ms-renal-ketorolac`、
+    `obs-ms-renal-egfr` 换到新病人（周一 pat-0092、周二 pat-0253、周三 pat-0744、周四 pat-0421），其他预埋病例和出院处方都不变。
+    **连带变化**：语音服务呼叫中心的演示来电人（`appt-vc-*`）在这四天有 1–4 个换成相邻的病人。原因是 `voice.generate` 从"没被其他预埋病例用过的病人"池子里按
+    `rng.randrange(len(candidates))` 取下标：池子里换了一个人，同一个下标就落到旁边那位（pat-0388 → pat-0389）。这是 voice 挑法本来就有的脆弱性
+    （任何预埋病例换人，来电人都会跟着换），没有改。只比较测试结果是发现不了这种变化的。
+- **怎么证明：**
+  - 真实时钟（周三）：`tests/test_med_safety.py` `21 passed`。
+  - **一周扫描**：scratchpad 插件 `-p travel`（导入时用 time-machine 把整个时钟移到当天 10:00 UTC-4），顺序跑在自己的库 `ioc_test_finish` 上，
+    范围是 `test_med_safety.py`、`test_voice_services.py`、`test_documentation.py`（后两个是数据连带变化涉及的模块）。`-q` 不显示插件的报告头，所以每次跑完用 SQL
+    `select data->>'generated_for' from module_state where name='hospital_plan'` 确认播种的医院日：
+
+    | 墙上时间 | 播种的医院日 | 结果 |
+    | --- | --- | --- |
+    | 周一 10-12 | 10-12 周一 | 64 passed |
+    | 周二 10-13 | 10-13 周二 | 64 passed |
+    | 周三 10-14 | 10-14 周三 | 64 passed |
+    | 周四 10-15 | 10-15 周四 | 1 failed, 63 passed（另一个测试，见下） |
+    | 周五 10-16 | 10-16 周五 | 64 passed |
+    | 周六 10-17 | 10-16 周五 | 64 passed |
+    | 周日 10-18 | 10-19 周一 | 64 passed |
+
+  - **回归测试确实能抓住旧 bug：** 插件 `-p oldseed` 在 collection 之后把 `app.ehr.seed.medsafety.generate` 换成 `git show HEAD:` 取出的旧文件里的 `generate`
+    （在 `pytest_collection_modifyitems` 里才 import app，保证 conftest 先设好 `DATABASE_URL`，同 5.12；插件打印旧模块路径，确认真的换了），只跑新的回归测试：
+    `AssertionError: datetime.datetime(2026, 10, 11, 12, 0)`、`assert ['ibuprofen', 'ibuprofen'] == []`，失败在周日播种（旧的周一病人家里和医嘱都有布洛芬）。
+  - `npx tsc -b` 干净。全量后端（真实时钟，周三，自己的库 `ioc_test_finish`）的结果在跑完后补在这里。
+  - **扫描顺带发现另一个周四失败（未修，已提议单独会话）：** `test_a_journey_signoff_written_while_the_last_decision_was_saved_is_confirmed_soon_after`
+    第 670 行 `assert MJ.recheck_signoffs(store) == [task_id]` 得到 `[]`。单独跑也失败，用旧种子（`-p oldseed`）也失败，所以和这次修改无关。
+    探针插件包住 `journey.confirm_signoff`，打印本次住院还在 pending 的用药审查：周四的 8.2 住院（stay-01109）是两天前入院的（5.3：周四过去 24 小时没有髋部骨折入院），
+    入院时开的依诺肝素、华法林、舍曲林（10-13 开具）在 intake 的 24 小时窗口（`REVIEW_WINDOW = 1 day`）之外，测试只决定了萘普生；随后 `MJ.review_orders`
+    审查这次住院的**全部**有效医嘱，新建了这三条带相互作用的 pending 审查，`confirm_signoff` 看到还有 pending 的用药审查就返回 `[]`。周三的 8.2 住院是当天早上入院的，
+    所有医嘱都在窗口里，测试先全部决定，所以通过。
+- **经验：**
+  - 同一个教训第三次出现（5.3、5.12）：预埋病例挑病人，要把故事的**每个**前提写成条件。这次的前提是"别的规则都不触发"，最直接的写法是去问规则本身。
+  - 排序结果的"第一个"在并列时由收集顺序决定（稳定排序）。看到 `findings[0]` 的断言要想到并列，但先问它守的是什么：这里断言守的是演示应有的样子，放宽它只会把错误的数据藏起来。
+  - 修失败的那一天时顺便看看其他几天：失败的只有周三，但故事在四天里都不干净。
+  - 改了种子就比较新旧数据的全部差异（每个资源的哈希），不只看测试是否通过，才能看到 voice 来电人这种连带变化。
+  - 局限：条件只按演示规则表判断，表里没有的组合真实模型仍可能提到，例如周三的新病人 pat-0744 在吃西酞普兰和氟西汀（SSRI 加 NSAID 增加出血风险，表里没有这一对）。
+- **范围：** hospital（WP6 用药安全的预埋病例；WP8 语音演示数据连带变化）。
+- **来源：** finish 会话 10-14（合并 18 章那组会话之后的收尾）；发现于合并后的全量后端（860 passed、1 failed）。
+- **代码：** `apps/api/app/ehr/seed/medsafety.py`（`renal_fits`、`plant_renal`、`generate()`）、`apps/api/tests/test_med_safety.py`；
+  相关：`apps/api/app/modules/med_safety/rules.py`（`evaluate`、`MEDICATION_RULES`）、`apps/api/app/ehr/seed/voice.py`（来电人挑法）；提交 1f9375a。
+
 > **怎么在另一天测试**（本机做法，见 memory 记录）：
 > - 脱离数据库调用 `generate(Store(), seed, datetime(...))`，几十秒就能扫完一周（5.6）；或者写一个 pytest 插件只冻结播种时刻（`seedat`、`seedtime`：`-p seedtime` 加 `SEED_AT`），
 >   每个星期几一个测试库并行跑，并先用 SQL 确认真的换了医院日（5.9）。
@@ -1544,7 +1627,10 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 >   `test_expired_lots_are_never_consumed` 的 `StopIteration`）；用 `uv run --with time-machine` 把整个时钟移到周四后，这 9 个全部通过（`9 passed in 108.29s`）。
 > - time-machine 把**不带时区的** `datetime` 当作 UTC（本机是 UTC-4），要传带时区的时间。
 > - 整个 pytest 会话换到另一天：scratchpad 里写一个插件，模块导入时就 `time_machine.travel(<带时区的时间>, tick=True).start()`，
->   用 `PYTHONPATH=<插件目录> uv run --with time-machine pytest -p travel` 运行；`-q` 不显示插件的报告头，用 SQL 确认库里是哪一天的数据（5.12）。
+>   用 `PYTHONPATH=<插件目录> uv run --with time-machine pytest -p travel` 运行；`-q` 不显示插件的报告头，用 SQL 确认库里是哪一天的数据（5.12）：
+>   `select data->>'generated_for' from module_state where name='hospital_plan'`（5.13）。
+> - 让测试跑在旧的种子上（证明回归测试能抓住旧 bug）：`git show HEAD:<文件>` 存一份旧文件，插件在 `pytest_collection_modifyitems` 里把模块的 `generate`
+>   换成旧文件里的，并打印旧模块路径确认换成功（5.13）。
 > - 浏览器端在 Vite 配置里注入一个 `Date` 子类来偏移时间；放在 scratchpad 里的 Vite 配置要用 `.mts` 扩展名（第六章）。改浏览器时钟前先确认前端不拿它比对令牌过期时间（5.2）。
 
 ---
