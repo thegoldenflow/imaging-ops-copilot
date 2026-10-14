@@ -1602,7 +1602,9 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
   - **回归测试确实能抓住旧 bug：** 插件 `-p oldseed` 在 collection 之后把 `app.ehr.seed.medsafety.generate` 换成 `git show HEAD:` 取出的旧文件里的 `generate`
     （在 `pytest_collection_modifyitems` 里才 import app，保证 conftest 先设好 `DATABASE_URL`，同 5.12；插件打印旧模块路径，确认真的换了），只跑新的回归测试：
     `AssertionError: datetime.datetime(2026, 10, 11, 12, 0)`、`assert ['ibuprofen', 'ibuprofen'] == []`，失败在周日播种（旧的周一病人家里和医嘱都有布洛芬）。
-  - `npx tsc -b` 干净。全量后端（真实时钟，周三，自己的库 `ioc_test_finish`）的结果在跑完后补在这里。
+  - `npx tsc -b` 干净。全量后端（真实时钟，周三，自己的库 `ioc_test_finish`）：`1 failed, 860 passed in 3529.51s`，原来的失败消失了；
+    这一次失败的是影像的 5 秒计时测试 `test_flagships.py::test_cancellation_produces_ranked_backfill_within_5_seconds`（`assert (46433.703 - 46428.218) < 5`，5.49 秒），
+    当时 CPU 100%，另一个会话在并行跑 8 个 pytest 进程（7.2 的老问题）。负载降下来后单独跑 3 次都通过，整个 `test_flagships.py` `15 passed`。改动不碰影像排程的代码。
   - **扫描顺带发现另一个周四失败（这里只诊断，修复见 5.14）：** `test_a_journey_signoff_written_while_the_last_decision_was_saved_is_confirmed_soon_after`
     第 670 行 `assert MJ.recheck_signoffs(store) == [task_id]` 得到 `[]`。单独跑也失败，用旧种子（`-p oldseed`）也失败，所以和这次修改无关。
     探针插件包住 `journey.confirm_signoff`，打印本次住院还在 pending 的用药审查：周四的 8.2 住院（stay-01109）是两天前入院的（5.3：周四过去 24 小时没有髋部骨折入院），
