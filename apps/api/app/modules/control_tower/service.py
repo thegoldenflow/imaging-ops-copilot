@@ -31,7 +31,7 @@ from datetime import datetime, timedelta
 from fastapi import Request
 from sqlalchemy import text
 
-from app.agents import approvals, registry
+from app.agents import approvals, ondemand, registry
 from app.agents.runtime import runtime
 from app.core.context import acting_as_system
 from app.core.models import StaffUser
@@ -423,7 +423,8 @@ def exception_view(exc: X.FlowException, *, detail: bool = False) -> dict:
            "detected_at": exc.detected_at, "changed_at": exc.changed_at, "cleared_at": exc.cleared_at,
            "remind_at": exc.remind_at, "reminders": exc.reminders, "narration_status": exc.narration_status,
            "decision": exc.decision, "review_task_id": exc.review_task_id,
-           "narrative": (exc.narration or {}).get("narrative"), "outcome": exc.outcome}
+           "narrative": (exc.narration or {}).get("narrative"), "outcome": exc.outcome,
+           "ai": exception_ai(exc, with_trace=detail)}
     if detail:
         n = exc.narration or {}
         out.update(facts=exc.facts, menu=exc.menu, engine_evidence=exc.evidence_refs, narration={
@@ -534,3 +535,54 @@ def patient_card(user: StaffUser, request: Request | None, encounter_id: str, sn
         vitals_at=parse(panels[-1].to_fhir().get("effectiveDateTime")) if panels else None,
         open_orders=len(orders), discharge=_explained(cell.discharge, True) if cell else None)
     return card
+
+
+# ---------- AI on demand (app/agents/ondemand.py) ----------
+
+
+def _live(exc: X.FlowException) -> bool:
+    return exc.status in X.LIVE and exc.cleared_at is None
+
+
+def exception_ai(exc: X.FlowException, *, with_trace: bool = True) -> dict:
+    """The exception's AI block. A narrative the model did not write (the template: the model unavailable or its
+    answer failed the guards) is `unavailable` and may be asked for again while the exception is live."""
+    n = exc.narration or {}
+    if exc.narration_status == "done":
+        state = "done" if n.get("source") == "model" else "unavailable"
+        error = None if state == "done" else "; ".join(n.get("problems") or []) or "the model was unavailable"
+    else:
+        state, error = ("queued" if exc.narration_status == "pending" else "not_requested"), None
+    return ondemand.view("exception", exc.id, state, auto=_live(exc), run_id=n.get("run_id"), error=error,
+                         with_trace=with_trace)
+
+
+def rearm_exception(store: Store, exception_id: str) -> None:
+    """Ask AI again after the template stood in for the narrative."""
+    exc = X.get(store, exception_id)
+    if exc is not None and _live(exc) and exc.narration_status == "done" and             (exc.narration or {}).get("source") != "model":
+        X.save(store, exc.model_copy(update={"narration_status": "on_open"}))
+
+
+def _exception_check(store: Store, user: StaffUser | None, exception_id: str) -> None:
+    exc = X.get(store, exception_id)
+    if exc is None:
+        raise LookupError(f"No exception {exception_id}")
+    if user is not None and str(user.role) not in ("operations_manager", "nurse", "physician"):
+        raise ondemand.NotAllowed("The Control Tower is for the bed manager, nurses and physicians")
+    if not _live(exc):
+        raise ondemand.NotAllowed(f"{exception_id} is {'cleared' if exc.cleared_at else exc.status}: no narrative")
+
+
+def _exception_label(store: Store, exception_id: str) -> tuple[str, str | None]:
+    exc = X.get(store, exception_id)
+    return f"{exc.title} ({exc.id})", f"/control-tower?exception={exc.id}"
+
+
+ondemand.register(ondemand.Kind(
+    name="exception", noun="exception", running_text="AI is writing the narrative and recommending actions",
+    agents=(agent.AGENT_ID,), calls=1, live_s=8.0,
+    run=lambda store, exception_id: narrate(store, exception_id),
+    needs_ai=lambda store, exception_id: (e := X.get(store, exception_id)) is not None and _live(e) and
+    e.narration_status != "done",
+    check=_exception_check, describe=_exception_label, retry=rearm_exception))

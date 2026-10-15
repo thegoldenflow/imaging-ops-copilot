@@ -2,6 +2,7 @@
 // Times are hospital-clock local times without a zone ("2026-10-09T07:42:00").
 
 import { useQuery } from "@tanstack/react-query";
+import type { AiBlock } from "../../lib/ai";
 import { api, post } from "../../lib/api";
 
 export type Severity = "blocking" | "major" | "moderate" | "minor" | "info" | "none";
@@ -27,6 +28,7 @@ export interface QueueItem {
   wait_minutes: number | null;
   sources: string[];
   commentary_status: string;
+  ai_state?: string; // not_requested, queued, done, unavailable, skipped (lib/ai.ts)
   evaluated: boolean;
 }
 
@@ -34,7 +36,7 @@ export interface Queue {
   now: string;
   role: string;
   items: QueueItem[];
-  counts: { blocking: number; pending: number; cosign: number };
+  counts: { blocking: number; pending: number; cosign: number; ai_not_run: number };
 }
 
 export interface Finding {
@@ -93,6 +95,7 @@ export interface PatientHeader {
 }
 
 export interface ReviewDetail {
+  ai: AiBlock;
   id: string;
   order_ref: string;
   kind: "medication" | "service";
@@ -172,6 +175,7 @@ export interface DischargeLine {
 export type DischargeTable = Record<"new" | "changed" | "stopped" | "continued", DischargeLine[]>;
 
 export interface SessionDetail {
+  ai: AiBlock;
   id: string;
   encounter_id: string;
   patient_id: string;
@@ -222,13 +226,16 @@ export function useReview(id: string | null) {
     queryKey: ["ms-review", id],
     queryFn: () => api<ReviewDetail>(`/api/med-safety/reviews/${id}`),
     enabled: Boolean(id),
-    // the background loop may be writing the commentary (and "Ask the AI now" then leaves it to the loop): follow it
-    refetchInterval: (query) => (query.state.data?.commentary_status === "pending" ? 2000 : false),
+    // another request, the AI job loop or the eager background may be writing the commentary: follow it
+    refetchInterval: (query) => (["queued", "running"].includes(query.state.data?.ai?.state ?? "") ? 1500 : false),
   });
 }
 
 export function useSession(id: string | null) {
-  return useQuery({ queryKey: ["ms-session", id], queryFn: () => api<SessionDetail>(`/api/med-safety/medrec/${id}`), enabled: Boolean(id) });
+  return useQuery({
+    queryKey: ["ms-session", id], queryFn: () => api<SessionDetail>(`/api/med-safety/medrec/${id}`), enabled: Boolean(id),
+    refetchInterval: (query) => (["queued", "running"].includes(query.state.data?.ai?.state ?? "") ? 1500 : false),
+  });
 }
 
 export function useEncounter(id: string | null) {
@@ -244,7 +251,10 @@ export function useEvidence(refs: string[] | null) {
   });
 }
 
-export const runCommentary = (id: string) => post<ReviewDetail>(`/api/med-safety/reviews/${id}/commentary`);
+export const runCommentary = (id: string, trigger: "opened" | "asked" = "asked") =>
+  post<ReviewDetail>(`/api/med-safety/reviews/${id}/commentary?trigger=${trigger}`);
+export const runMedrecAi = (id: string, trigger: "opened" | "asked" = "asked") =>
+  post<SessionDetail>(`/api/med-safety/medrec/${id}/ai?trigger=${trigger}`);
 export const decideReview = (id: string, decision: "accept_order" | "request_change", reason: string) =>
   post<ReviewDetail>(`/api/med-safety/reviews/${id}/decision`, { decision, reason });
 export const handleItem = (session: string, item: string, action: "accept" | "modify" | "reject", reason: string, change?: string) =>

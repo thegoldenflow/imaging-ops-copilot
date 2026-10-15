@@ -51,7 +51,7 @@ export function Overview({ trace, onTrace }: { trace: string | null; onTrace: (r
         </div>
         <p className="text-xs text-slate-500">Hospital-wide, {dateTime(d.window.from)} to now · model mode {d.mode}{t.cost_estimated ? " · ≈ cost: mock calls priced at the model's list price (nothing billed)" : ""}</p>
       </div>
-      {d.budget && <BudgetStrip budget={d.budget} idle={d.idle} />}
+      {d.budget && <BudgetStrip budget={d.budget} idle={d.idle} backgroundAi={d.background_ai} />}
       {d.alerts.open.length > 0 && (
         <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800" data-testid="aiops-open-alerts">
           <AlertTriangle className="size-4" /> {d.alerts.open.length} open AI Ops alert{d.alerts.open.length === 1 ? "" : "s"} for the admin (Alerts tab).

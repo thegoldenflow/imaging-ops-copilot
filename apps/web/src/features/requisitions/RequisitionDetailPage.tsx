@@ -3,7 +3,9 @@ import clsx from "clsx";
 import { ArrowLeft, CalendarPlus, Check, ExternalLink, ListPlus, Pencil, ShieldCheck } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
+import { AiMeta, AiStatus } from "../../components/ai";
 import { AiBadge, Badge, Button, Card, ErrorState, Loading, UrgencyBadge } from "../../components/ui";
+import { useAiRun } from "../../lib/ai";
 import { api, patch, post } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { dateTime, LANGUAGE_LABEL, pct } from "../../lib/format";
@@ -228,6 +230,26 @@ function SchedulingCard({ d }: { d: RequisitionDetail }) {
   );
 }
 
+/** The AI pipeline (extraction, triage, protocol): asked for as a waiting requisition opens; its steps while it runs. */
+function RequisitionAi({ d }: { d: RequisitionDetail }) {
+  const queryClient = useQueryClient();
+  const ai = d.summary.ai;
+  const run = useAiRun(ai, async (trigger) => {
+    queryClient.setQueryData(["requisition", d.summary.id],
+      await post<RequisitionDetail>(`/api/requisitions/${d.summary.id}/ai?trigger=${trigger}`));
+    await queryClient.invalidateQueries({ queryKey: ["requisitions"] });
+  });
+  if (!ai) return null;
+  if (ai.state === "done" && !run.busy) return <AiMeta ai={ai} className="mb-3" />;
+  return (
+    <div className="mb-4" data-testid="requisition-ai">
+      <AiStatus ai={ai} busy={run.busy} startedAt={run.startedAt} error={run.error} onAsk={run.ask}
+        what="extraction, triage and a protocol suggestion"
+        rulesNote={ai.state === "unavailable" ? "What the AI could not do falls back to a person (manual triage, the protocol library's ranking)." : "Nothing is extracted until the AI runs; below is the requisition as received."} />
+    </div>
+  );
+}
+
 export function RequisitionDetailPage() {
   const { reqId } = useParams();
   const { user } = useAuth();
@@ -251,7 +273,10 @@ export function RequisitionDetailPage() {
         </div>
         <div className="flex items-center gap-2"><ContrastBadge status={d.summary.contrast_status} /><RequisitionStatus status={d.summary.status} /></div>
       </div>
-      {processing ? <Card><Loading label="AI is extracting, triaging and suggesting a protocol…" /></Card> : (
+      <RequisitionAi d={d} />
+      {processing ? (
+        <Card title="Requisition as received"><pre className="font-mono text-xs leading-6 whitespace-pre-wrap text-slate-700" data-testid="requisition-text">{d.text}</pre></Card>
+      ) : (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
           <div className="space-y-4">
             <Card title="Requisition as received" actions={<span className="flex items-center gap-2 text-xs"><mark className="rounded bg-brand-100 px-1 text-brand-700">extracted</mark><mark className="rounded bg-amber-200 px-1">low confidence</mark></span>}>

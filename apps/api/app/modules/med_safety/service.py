@@ -6,11 +6,13 @@ Tool Gateway with its idempotency key), for the API, the background loop and the
 journey workflow (6.5, WP4c):
 
 - `review_order(store, order_ref)`: rules first (rules.py), the result in the review
-  queue; the AI commentary follows in the background (`comment`). The order's status
+  queue; the AI commentary follows in the background (`comment`), or, with
+  BACKGROUND_AI=on_demand, when a person opens the review. The order's status
   never changes: the order belongs to the EHR, which the AI layer cannot write.
 - `review_encounter_orders(store, encounter_id)`: every active order of an encounter.
 - `reconcile(store, encounter_id, kind)`: admission or discharge reconciliation
-  (reconcile.py), the AI's indication judgements and the draft record (`settle`).
+  (reconcile.py), the AI's indication judgements and the draft record (`settle`: in
+  the background, or when a person opens the reconciliation).
 - `intake(store)`: the sweep the API's hospital loop runs: new orders of the last 24
   hours (hospital clock), stays admitted in the last 48 hours (their admission
   reconciliation and every active order, older ones too), stays with discharge
@@ -34,9 +36,10 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import text
 
-from app.agents import approvals, registry
+from app.agents import approvals, ondemand, registry
 from app.agents.gateway import agent_actor
 from app.agents.runtime import runtime
+from app.core import config
 from app.core.audit import mrn_hash
 from app.core.context import acting_as_system
 from app.core.models import StaffUser
@@ -52,8 +55,8 @@ from app.modules.med_safety import facts as F
 from app.modules.med_safety import knowledge, medrec_agent, review_agent, rules
 from app.modules.med_safety import tools as T
 from app.modules.med_safety.document import render
-from app.modules.med_safety.models import (MedRecSession, OrderReview, get_review, get_session, review_key, reviews,
-                                           session_key, sessions)
+from app.modules.med_safety.models import (WAITING, MedRecSession, OrderReview, get_review, get_session, review_key,
+                                           reviews, session_key, sessions)
 from app.modules.med_safety.reconcile import (RecItem, apply_judgements, compare_admission, compare_discharge,
                                               discharge_table, severity_of)
 
@@ -103,6 +106,20 @@ def _wait_lock(store: Store, name: str) -> None:
     sweeping waits for it and then sees its reviews."""
     if not store.detached:
         store.conn().execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _lock_key(name)})
+
+
+def _ai_waits() -> str:
+    """The AI step of a new review or reconciliation: the background's (`pending`), or the first person to open it
+    (`on_open`, BACKGROUND_AI=on_demand, so a deployment with a real model pays only for what someone looks at)."""
+    return "on_open" if config.ai_on_open() else "pending"
+
+
+def _fresh_review(store: Store, review: OrderReview) -> OrderReview:
+    """The review as committed now: read it again after taking its lock (another transaction may have commented or
+    decided it since this one read it)."""
+    if not store.detached:
+        reviews(store).forget(review_key(review.order_ref))
+    return reviews(store).get(review_key(review.order_ref)) or review
 
 
 # ---------- facts from the EHR ----------
@@ -210,7 +227,7 @@ def _new_review(store: Store, resource: dict, facts: F.PatientFacts, encounter: 
         authored_at=parse(resource.get("authoredOn")), reviewed_at=now,
         reviewer_roles=MEDICATION_REVIEWERS if medication else SERVICE_REVIEWERS, findings=findings,
         blocking=any(f["blocking"] for f in findings),
-        commentary_status="pending" if medication or findings else "on_demand")
+        commentary_status=_ai_waits() if medication or findings else "on_demand")
     return review.model_copy(update={"severity": _severity(review), "status": _status(review)})
 
 
@@ -261,14 +278,21 @@ def review_encounter_orders(store: Store, encounter_id: str) -> list[OrderReview
 # ---------- the AI commentary ----------
 
 
-def comment(store: Store, review_id: str) -> OrderReview:
-    """The order_review agent's commentary for one review, as the agent itself; evidence resolved before display."""
+def comment(store: Store, review_id: str, *, wait: bool = False) -> OrderReview:
+    """The order_review agent's commentary for one review, as the agent itself; evidence resolved before display.
+    The background leaves a review another transaction is commenting or deciding; a person (`wait`) waits for that
+    one and gets its result."""
     review = get_review(store, review_id)
     if review is None:
         raise LookupError(f"No order review {review_id}")
-    if review.commentary_status not in ("pending", "on_demand") or review.encounter_id is None:
+    if review.commentary_status not in (*WAITING, "on_demand") or review.encounter_id is None:
         return review
-    if not _try_lock(store, review.id):  # being commented elsewhere
+    if wait:
+        _wait_lock(store, review.id)
+    elif not _try_lock(store, review.id):  # being commented or decided elsewhere
+        return review
+    review = _fresh_review(store, review)  # what the other transaction wrote while this one waited or read
+    if review.commentary_status not in (*WAITING, "on_demand"):
         return review
     payload = review.model_dump(mode="json")
     try:
@@ -300,8 +324,17 @@ def comment(store: Store, review_id: str) -> OrderReview:
     return review
 
 
+def rearm_review(store: Store, review_id: str) -> None:
+    """Ask AI again after the commentary failed (the model unavailable, the guards): the review waits for a person's
+    request again. A decided review keeps what it had."""
+    review = get_review(store, review_id)
+    if review is not None and review.commentary_status in ("unavailable", "guard") and not review.decision:
+        reviews(store)[review_key(review.order_ref)] = review.model_copy(update={"commentary_status": "on_demand"})
+
+
 def pending_commentary(store: Store) -> list[OrderReview]:
-    """Reviews waiting for their commentary: blocking and most severe first, then the oldest order."""
+    """Reviews waiting for the background to write their commentary (not those waiting for a person to open them):
+    blocking and most severe first, then the oldest order."""
     found = reviews(store).find_by("commentary_status", "pending")
     return sorted(found, key=lambda r: (not r.blocking, -rules.SEVERITY_RANK[r.severity],
                                         r.authored_at or datetime.min))
@@ -360,7 +393,7 @@ def _new_session(store: Store, fhir: FhirGateway, encounter_id: str, kind: str, 
     return MedRecSession(id=store.next_id("MR"), encounter_id=encounter_id, patient_id=inputs["patient_id"],
                          kind=kind, unit_id=inputs["unit_id"], created_at=now, updated_at=now,
                          severity=severity_of(items), items=[i.model_dump(mode="json") for i in items],
-                         document_id=_existing_draft(fhir, encounter_id, kind))
+                         ai_status=_ai_waits(), document_id=_existing_draft(fhir, encounter_id, kind))
 
 
 def reconcile(store: Store, encounter_id: str, kind: str = "admission", *, settle_now: bool = False,
@@ -410,14 +443,25 @@ def _save_session(store: Store, session: MedRecSession, items: list[RecItem] | N
     return session
 
 
-def settle(store: Store, session_id: str) -> MedRecSession:
+def settle(store: Store, session_id: str, *, wait: bool = False) -> MedRecSession:
     """The AI step of a reconciliation: the indication judgements and the draft record (agent
     medication_reconciliation, as itself). Without the AI (no consent, prod mode before its eval passed, the model
-    down) new medications without a named indication stay discrepancies and the module writes the draft itself."""
+    down) new medications without a named indication stay discrepancies and the module writes the draft itself.
+    The background leaves a reconciliation another transaction is settling; a person (`wait`) waits for it and gets
+    its result, so a decision on an item is not made on (and saved over) the items as they were before."""
     session = get_session(store, session_id)
     if session is None:
         raise LookupError(f"No reconciliation {session_id}")
-    if session.ai_status != "pending" or not _try_lock(store, session.id):
+    if session.ai_status not in WAITING:
+        return session
+    if wait:
+        _wait_lock(store, session.id)
+    elif not _try_lock(store, session.id):
+        return session
+    if not store.detached:  # what the other transaction wrote while this one waited or read
+        sessions(store).forget(session_key(session.encounter_id, session.kind))
+        session = sessions(store).get(session_key(session.encounter_id, session.kind)) or session
+    if session.ai_status not in WAITING:
         return session
     items = _items(session)
     result = None
@@ -461,6 +505,7 @@ def _write_document(store: Store, session: MedRecSession, items: list[RecItem], 
 
 
 def pending_settlement(store: Store) -> list[MedRecSession]:
+    """Reconciliations waiting for the background's AI step (not those waiting for a person to open them)."""
     return sorted(sessions(store).find_by("ai_status", "pending"), key=lambda s: s.created_at)
 
 
@@ -599,6 +644,10 @@ def decide_review(store: Store, user: StaffUser, review_id: str, decision: str, 
         raise LookupError(f"No order review {review_id}")
     if decision not in ("accept_order", "request_change"):
         raise DecisionProblem("Decide accept_order or request_change")
+    # the commentary may be being written right now (the person opened the review a moment ago): wait for it, so the
+    # decision completes its review Task and the commentary does not save its copy of the review over the decision
+    _wait_lock(store, review.id)
+    review = _fresh_review(store, review)
     if why := can_decide(user, review):
         raise DecisionDenied(why)
     if review.decision:
@@ -623,7 +672,7 @@ def decide_review(store: Store, user: StaffUser, review_id: str, decision: str, 
                                f"{str(user.role).capitalize()} {user.name}: {reason}",
                                SEVERITY_TO_PRIORITY.get(review.severity, "routine"), review.id)
     now = hospital_now(store)
-    commentary_status = "skipped" if review.commentary_status in ("pending", "on_demand") else review.commentary_status
+    commentary_status = "skipped" if review.commentary_status in (*WAITING, "on_demand") else review.commentary_status
     review = review.model_copy(update={
         "decision": {"decision": decision, "reason": reason, "by": user.id, "name": user.name, "role": str(user.role),
                      "at": now.isoformat(), "change_task_id": task_id},
@@ -651,8 +700,8 @@ def handle_item(store: Store, user: StaffUser, session_id: str, item_id: str, ac
         raise DecisionDenied("Discrepancies are handled by the pharmacist")
     if session.status != "open":
         raise DecisionProblem(f"{session_id} is already signed")
-    if session.ai_status == "pending":
-        session = settle(store, session_id)
+    if session.ai_status in WAITING:
+        session = settle(store, session_id, wait=True)
     if action not in ("accept", "modify", "reject"):
         raise DecisionProblem("The action is accept, modify or reject")
     reason = " ".join((reason or "").split())
@@ -703,8 +752,8 @@ def sign(store: Store, user: StaffUser, session_id: str, request=None) -> MedRec
     if role == "pharmacist":
         if session.status != "open":
             raise DecisionProblem(f"{session_id} is already signed by the pharmacist")
-        if session.ai_status == "pending":
-            session = settle(store, session_id)
+        if session.ai_status in WAITING:
+            session = settle(store, session_id, wait=True)
         if open_items := unhandled(session):
             raise DecisionProblem(f"Handle every discrepancy first ({len(open_items)} left: {', '.join(open_items)})")
         items = _items(session)
@@ -767,7 +816,7 @@ def _review_item(r: OrderReview, now: datetime) -> dict:
             "title": title, "detail": r.order.get("text") or r.order.get("category"), "patient_id": r.patient_id,
             "encounter_id": r.encounter_id, "unit_id": r.unit_id, "order_ref": r.order_ref, "order_kind": r.kind,
             "since": r.authored_at, "wait_minutes": _wait_minutes(r.authored_at, now), "sources": sources,
-            "commentary_status": r.commentary_status,
+            "commentary_status": r.commentary_status, "ai_state": review_ai_state(r),
             "evaluated": (r.commentary or {}).get("evaluated", True)}
 
 
@@ -775,8 +824,9 @@ def _session_item(s: MedRecSession, now: datetime) -> dict:
     items = _items(s)
     left = [i for i in items if i.discrepancy and i.action is None]
     pending = [i for i in items if i.indication == "pending"]
+    judging = " (AI not run: it judges new medications when opened)" if s.ai_status == "on_open"         else " (AI judging new medications)"
     state = {"open": f"{len(left)} of {sum(i.discrepancy for i in items)} discrepancies to handle"
-             + (" (AI judging new medications)" if pending else ""),
+             + (judging if pending else ""),
              "pharmacist_signed": "signed by the pharmacist; physician co-signature due",
              "final": "signed and co-signed"}[s.status]
     sources = sorted({"ai" if i.source == "ai" else f"rule:{i.type}" for i in items if i.discrepancy})
@@ -785,7 +835,8 @@ def _session_item(s: MedRecSession, now: datetime) -> dict:
             "title": f"{s.kind.capitalize()} reconciliation: {state}", "detail": None, "patient_id": s.patient_id,
             "encounter_id": s.encounter_id, "unit_id": s.unit_id, "since": s.created_at,
             "wait_minutes": _wait_minutes(s.created_at, now), "sources": sources, "medrec_status": s.status,
-            "commentary_status": s.ai_status, "evaluated": (s.ai_detail or {}).get("evaluated", True)}
+            "commentary_status": s.ai_status, "ai_state": _AI_STATE[s.ai_status],
+            "evaluated": (s.ai_detail or {}).get("evaluated", True)}
 
 
 QUEUE_ORDER = {"pending": 0, "cosign": 1, "clear": 2, "resolved": 3}
@@ -820,7 +871,9 @@ def queue(store: Store, user: StaffUser, *, show: str = "open") -> dict:
     for r in rows:
         r.update(names.get(r["patient_id"], {}))
     counts = {"blocking": sum(r["blocking"] for r in rows), "pending": sum(r["status"] == "pending" for r in rows),
-              "cosign": sum(r["status"] == "cosign" for r in rows)}
+              "cosign": sum(r["status"] == "cosign" for r in rows),
+              "ai_not_run": sum(r["ai_state"] == "not_requested" and r["commentary_status"] != "on_demand"
+                                for r in rows)}
     return {"now": now, "role": role, "items": rows, "counts": counts}
 
 
@@ -925,6 +978,7 @@ def review_view(store: Store, user: StaffUser, review_id: str, request=None) -> 
                                                       "unresolved_refs", "dropped_refs", "problems", "reason",
                                                       "model_status", "run_id", "evaluated", "attempts")}
         if commentary else None,
+        "ai": review_ai(review),
         "can_decide": can_decide(user, review) is None and not review.decision,
         "why_not": None if review.decision else can_decide(user, review),
         "patient": patient_header(user, review.patient_id, review.encounter_id, request),
@@ -939,8 +993,6 @@ def session_view(store: Store, user: StaffUser, session_id: str, request=None) -
     if role not in ("pharmacist", "physician"):
         raise DecisionDenied("Reconciliations are for pharmacists and physicians")
     header = patient_header(user, session.patient_id, session.encounter_id, request)  # 6.3 scope applies
-    if session.ai_status == "pending":
-        session = settle(store, session_id)
     items = _items(session)
     table = reviews(store)
     order_flags = {}
@@ -963,7 +1015,8 @@ def session_view(store: Store, user: StaffUser, session_id: str, request=None) -
         {**i.model_dump(mode="json"), "discrepancy": i.discrepancy, "handled": i.handled} for i in items],
             "order_flags": order_flags, "unhandled": left, "can_sign": can_sign,
             "can_handle": role == "pharmacist" and session.status == "open", "document": doc, "patient": header,
-            "discharge_preview": discharge_table(items) if session.kind == "discharge" else None}
+            "discharge_preview": discharge_table(items) if session.kind == "discharge" else None,
+            "ai": session_ai(session)}
 
 
 def encounter_view(store: Store, user: StaffUser, encounter_id: str, request=None) -> dict:
@@ -996,3 +1049,74 @@ def rules_view() -> dict:
             "duplicate_test": t.medrec.duplicate_test.model_dump(),
             "note": "Demo simplifications, not clinical guidance; production uses a commercial drug knowledge base."}
 
+
+# ---------- AI on demand (app/agents/ondemand.py) ----------
+
+_AI_STATE = {"on_open": "not_requested", "on_demand": "not_requested", "pending": "queued", "done": "done",
+             "unavailable": "unavailable", "refused": "unavailable", "guard": "unavailable", "skipped": "skipped"}
+
+
+def review_ai_state(review: OrderReview) -> str:
+    return _AI_STATE[review.commentary_status]
+
+
+def review_ai(review: OrderReview) -> dict:
+    """The review's AI block: opening a review whose commentary waits runs it; a test order without a rule flag
+    (`on_demand`) gets it only from Ask AI."""
+    c = review.commentary or {}
+    state = review_ai_state(review)
+    return ondemand.view("order_review", review.id, state, run_id=c.get("run_id"),
+                         auto=review.commentary_status in WAITING and review.encounter_id is not None,
+                         error=c.get("reason") if state == "unavailable" else None)
+
+
+def session_ai(session: MedRecSession) -> dict:
+    detail = session.ai_detail or {}
+    state = _AI_STATE[session.ai_status]
+    return ondemand.view("medrec", session.id, state, run_id=detail.get("run_id"),
+                         error=detail.get("reason") if state == "unavailable" else None)
+
+
+def _review_check(store: Store, user: StaffUser | None, review_id: str) -> None:
+    review = get_review(store, review_id)
+    if review is None:
+        raise LookupError(f"No order review {review_id}")
+    if review.encounter_id is None:
+        raise ondemand.NotAllowed("This order has no encounter: the AI has nothing to read")
+    if user is not None and str(user.role) not in review.reviewer_roles:
+        raise ondemand.NotAllowed("Not your review")
+
+
+def _review_label(store: Store, review_id: str) -> tuple[str, str | None]:
+    review = get_review(store, review_id)
+    what = str(review.order.get("name") or review.order.get("display") or review.order_ref)
+    return f"{what[:1].upper()}{what[1:]} ({review.id})", f"/med-safety?review={review.id}"
+
+
+def _session_check(store: Store, user: StaffUser | None, session_id: str) -> None:
+    _medrec_session(store, session_id)
+    if user is not None and str(user.role) not in ("pharmacist", "physician"):
+        raise ondemand.NotAllowed("Reconciliations are for pharmacists and physicians")
+
+
+def _session_label(store: Store, session_id: str) -> tuple[str, str | None]:
+    session = _medrec_session(store, session_id)
+    return (f"{session.kind.capitalize()} reconciliation ({session.id})",
+            f"/med-safety?medrec={session.id}&encounter={session.encounter_id}")
+
+
+ondemand.register(ondemand.Kind(
+    name="order_review", noun="order review", running_text="AI is reviewing this order",
+    agents=(review_agent.AGENT_ID,), calls=1, live_s=8.0,
+    run=lambda store, review_id: comment(store, review_id, wait=True),
+    needs_ai=lambda store, review_id: (r := get_review(store, review_id)) is not None and
+    r.commentary_status in WAITING,
+    check=_review_check, describe=_review_label, retry=rearm_review))
+
+ondemand.register(ondemand.Kind(
+    name="medrec", noun="reconciliation", running_text="AI is judging the new medications' indications",
+    agents=(medrec_agent.AGENT_ID,), calls=1, live_s=10.0,
+    run=lambda store, session_id: settle(store, session_id, wait=True),
+    needs_ai=lambda store, session_id: (s := get_session(store, session_id)) is not None and
+    s.ai_status in WAITING,
+    check=_session_check, describe=_session_label))

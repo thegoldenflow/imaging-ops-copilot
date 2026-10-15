@@ -8,10 +8,10 @@ endpoints (/api/hospital/simulator/...), which the operations manager drives.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from app.agents import approvals
+from app.agents import approvals, ondemand
 from app.core import activity
 from app.core.auth import client_ip, require_roles
 from app.core.models import Role, StaffUser
@@ -84,19 +84,38 @@ def exception_list(user: StaffUser = Depends(require_roles(*VIEWERS))):
 
 @router.get("/exceptions/{exception_id}")
 def exception_detail(exception_id: str, user: StaffUser = Depends(require_roles(*VIEWERS))):
-    """One exception with its facts, menu and narrative (narrated now when the background has not yet)."""
+    """One exception with its facts, menu and narrative. Reading it never calls the model: the web app asks for
+    the narrative (POST .../narrate) when a person opens an exception whose narrative has not been written."""
     store = get_store()
     exc = X.get(store, exception_id)
     if exc is None:
         raise HTTPException(status_code=404, detail=f"No exception {exception_id}")
-    if exc.narration_status == "pending" and exc.status in X.LIVE and exc.cleared_at is None:
-        exc = service.narrate(store, exception_id)
+    return _detail(exc, user)
+
+
+def _detail(exc: X.FlowException, user: StaffUser) -> dict:
     from app.workflows import model as workflow_model
     from app.workflows import progress
 
-    run = progress.get(workflow_model.capacity_id(exception_id))
+    run = progress.get(workflow_model.capacity_id(exc.id))
     return {**service.exception_view(exc, detail=True), "can_decide": service.can_decide(user, exc),
             "workflow": progress.summary(run) if run is not None else None}
+
+
+@router.post("/exceptions/{exception_id}/narrate")
+def narrate_exception(exception_id: str, trigger: str = Query("asked", pattern="^(opened|asked)$"),
+                      user: StaffUser = Depends(require_roles(*VIEWERS))):
+    """Write the narrative and recommended actions now (app/agents/ondemand.py): when a person opens the exception
+    (`trigger=opened`) or presses Ask AI / Retry (`asked`). A narration under way is waited for, not repeated."""
+    store = get_store()
+    try:
+        service._exception_check(store, user, exception_id)
+        ondemand.run_now(store, "exception", exception_id, trigger=trigger)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ondemand.NotAllowed as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    return _detail(X.get(store, exception_id), user)
 
 
 class ApproveBody(BaseModel):

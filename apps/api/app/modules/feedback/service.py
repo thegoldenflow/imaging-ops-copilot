@@ -9,11 +9,14 @@ manager right away. Ratings and themes are shown by site and week."""
 import random
 import secrets
 import statistics
+import zlib
 from datetime import datetime, timedelta
 from typing import Literal
 
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 
+from app.agents import ondemand
 from app.core.models import Appointment, AppointmentStatus, ImagingStudy, MessageOutbox
 from app.core.store import Store
 from app.llm.gateway import get_gateway
@@ -184,12 +187,75 @@ def classify(store: Store, resp: FeedbackResponse) -> None:
 
 
 def process_pending(store: Store) -> int:
-    pending = [r for r in list(responses(store).values()) if r.ai_status is None]
-    for resp in pending:
-        classify(store, resp)
-    if pending:
-        store.touch()
+    """The intake loop's step: with BACKGROUND_AI=eager every unclassified response; on demand none (a patient's
+    new answer is queued by its request, a waiting one runs when staff ask)."""
+    if ondemand.on_demand():
+        return 0
+    pending = [r.id for r in list(responses(store).values()) if r.ai_status is None]
+    for response_id in pending:
+        classify_one(store, response_id)
     return len(pending)
+
+
+def classify_one(store: Store, response_id: str) -> FeedbackResponse:
+    """Classify one response whose AI has not run; a second caller waits for the first and finds it done."""
+    if not store.detached:
+        store.conn().execute(text("SELECT pg_advisory_xact_lock(:k)"),
+                             {"k": zlib.crc32(f"feedback:{response_id}".encode())})
+        responses(store).forget(response_id)
+    resp = responses(store).get(response_id)
+    if resp is None:
+        raise LookupError(f"No feedback response {response_id}")
+    if resp.ai_status is None:
+        classify(store, resp)
+        responses(store)[resp.id] = resp
+        store.touch()
+    return resp
+
+
+def rearm(store: Store, response_id: str) -> None:
+    """Ask AI again after the classification was unavailable or failed validation."""
+    resp = responses(store).get(response_id)
+    if resp is not None and resp.ai_status in ("unavailable", "needs_human"):
+        resp.ai_status = None
+        responses(store)[resp.id] = resp
+
+
+def response_ai(resp: FeedbackResponse, trace=None) -> dict | None:
+    """The response's AI block (None for a seeded one: labelled by the rule baseline when the data was made)."""
+    if resp.ai_status == "seeded":
+        return None
+    facts = {"generated_at": trace.finished_at, "duration_ms": int((trace.finished_at - trace.started_at)
+                                                                     .total_seconds() * 1000),
+             "cause": trace.cause} if trace is not None and trace.finished_at else {}
+    if resp.ai_status is None:
+        return ondemand.view("feedback", resp.id, "not_requested", auto=False)
+    state = "done" if resp.ai_status == "ok" else "unavailable"
+    return ondemand.view("feedback", resp.id, state, **facts,
+                         error=None if state == "done" else f"AI classification {resp.ai_status}")
+
+
+def _check(store: Store, user, response_id: str) -> None:
+    resp = responses(store).get(response_id)
+    if resp is None:
+        raise LookupError(f"No feedback response {response_id}")
+    if user is not None:
+        if str(user.role) not in ("front_desk", "operations_manager", "medical_director", "admin"):
+            raise ondemand.NotAllowed("Patient feedback is for the front desk and managers")
+        if user.site_ids and resp.site_id not in user.site_ids:
+            raise ondemand.NotAllowed("Not your site's feedback")
+
+
+def _label(store: Store, response_id: str) -> tuple[str, str | None]:
+    resp = responses(store).get(response_id)
+    return f"Feedback {resp.id} ({resp.rating}-star)", "/feedback"
+
+
+ondemand.register(ondemand.Kind(
+    name="feedback", noun="feedback comment", running_text="AI is labelling the comment's sentiment and themes",
+    agents=("feedback_classify",), calls=1, live_s=4.0,
+    run=classify_one, needs_ai=lambda store, rid: (r := responses(store).get(rid)) is not None and r.ai_status is None,
+    check=_check, describe=_label, retry=rearm))
 
 
 def confirm(resp: FeedbackResponse, sentiment: str, themes: list[str], by: str, now: datetime) -> None:

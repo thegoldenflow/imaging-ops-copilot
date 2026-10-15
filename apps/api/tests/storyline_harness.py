@@ -16,7 +16,9 @@ def pump() -> None:
     from app.modules.control_tower import service as control_tower
     from app.modules.documentation import service as documentation
     from app.modules.med_safety import service as med_safety
+    from app.agents import ondemand
     from app.modules.requisitions import service as requisitions
+    from app.modules.storyline import service as storyline
     from app.modules.voice_services import followup
 
     store = get_store()
@@ -29,6 +31,8 @@ def pump() -> None:
     med_safety.ai_step(store)
     documentation.intake_step(store)
     requisitions.process_pending(store)
+    storyline.ai_step(store)  # the AI a pressed step's button asked for (BACKGROUND_AI=on_demand)
+    ondemand.drain(store)  # the API's AI job loop
     bus.drain()
 
 

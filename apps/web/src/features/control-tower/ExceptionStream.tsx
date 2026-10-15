@@ -1,7 +1,8 @@
 // The exception stream (spec 7.1): what the rule engine found, newest and most severe first, and what was decided.
 
 import clsx from "clsx";
-import { AlarmClock, BellRing, CheckCircle2, CircleSlash, Radar, Sparkles, XCircle } from "lucide-react";
+import { AlarmClock, BellRing, CheckCircle2, CircleSlash, Loader2, Radar, Sparkles, XCircle } from "lucide-react";
+import { AiBatchBar } from "../../components/AiActivity";
 import { hhmm, RULE_LABEL, type ExceptionItem } from "./api";
 import { EmptyPanel, Panel, SeverityPill, SkeletonRows, StatusPill } from "./kit";
 
@@ -12,6 +13,8 @@ export function ExceptionStream({ items, loading, selected, onSelect }: {
   onSelect: (id: string) => void;
 }) {
   const live = items?.filter((e) => e.status === "open" || e.status === "deferred") ?? [];
+  // the rule engine's exceptions whose narrative nobody asked for yet: the stream never runs the AI by itself
+  const unnarrated = live.filter((e) => e.ai?.state === "not_requested").map((e) => ({ kind: "exception", id: e.id }));
   return (
     <Panel title="Exceptions" icon={<Radar className="size-4 text-ct-accent" />} testId="exception-stream"
       actions={items && <span className="text-[11px] text-ct-muted">{live.length} open · rules: occupancy ≥ 95%, ≥ 3 boarders over 2 h, OR +30 min, pre-op gap &lt; 4 h</span>}>
@@ -20,9 +23,14 @@ export function ExceptionStream({ items, loading, selected, onSelect }: {
       ) : !items || items.length === 0 ? (
         <EmptyPanel title="No exceptions" hint="The rule engine checks the boards after every event." />
       ) : (
-        <div className="flex gap-2 overflow-x-auto p-2.5">
-          {items.map((e) => <ExceptionCard key={e.id} e={e} active={selected === e.id} onClick={() => onSelect(e.id)} />)}
-        </div>
+        <>
+          {unnarrated.length > 0 && (
+            <div className="px-2.5 pt-2.5"><AiBatchBar items={unnarrated} noun={unnarrated.length === 1 ? "exception" : "exceptions"} checked="found by the rule engine" theme="ct" /></div>
+          )}
+          <div className="flex gap-2 overflow-x-auto p-2.5">
+            {items.map((e) => <ExceptionCard key={e.id} e={e} active={selected === e.id} onClick={() => onSelect(e.id)} />)}
+          </div>
+        </>
       )}
     </Panel>
   );
@@ -58,7 +66,19 @@ function ExceptionCard({ e, active, onClick }: { e: ExceptionItem; active: boole
       <p className="line-clamp-2 text-[11px] text-ct-muted">
         {e.narrative ? <><Sparkles className="mr-1 inline size-3 text-ct-ai" />{e.narrative}</> : e.summary}
       </p>
-      <div className="mt-auto"><StatusLine e={e} /></div>
+      <div className="mt-auto flex items-center gap-2">
+        <StatusLine e={e} />
+        {!done && e.ai?.state === "not_requested" && (
+          <span className="inline-flex items-center gap-1 text-[11px] text-ct-muted" data-testid="narrative-on-open">
+            <Sparkles className="size-3 text-ct-ai" />AI not run · narrative when opened
+          </span>
+        )}
+        {!done && (e.ai?.state === "running" || e.ai?.state === "queued") && (
+          <span className="inline-flex items-center gap-1 text-[11px] text-ct-ai" data-testid="narrative-running">
+            <Loader2 className="size-3 animate-spin" />AI {e.ai.state === "running" ? "writing the narrative" : "queued"}
+          </span>
+        )}
+      </div>
     </button>
   );
 }

@@ -3,9 +3,12 @@
 import statistics
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from app.agents import cause as ai_cause
+from app.agents import ondemand
+from app.agents import trace as traces
 from app.core.auth import audit_phi, require_roles
 from app.core.models import Role, StaffUser
 from app.core.store import Store, get_store
@@ -19,9 +22,15 @@ MANAGERS = require_roles(Role.OPERATIONS_MANAGER, Role.MEDICAL_DIRECTOR, Role.AD
 WEEKS = 12
 
 
-def response_view(store: Store, r: service.FeedbackResponse) -> dict:
+def response_view(store: Store, r: service.FeedbackResponse, runs: dict | None = None) -> dict:
     return {**r.model_dump(mode="json"), "patient_name": store.patients[r.patient_id].full_name,
-            "site_name": store.sites[r.site_id].name, "exam_name": store.exams[r.exam_code].name}
+            "site_name": store.sites[r.site_id].name, "exam_name": store.exams[r.exam_code].name,
+            "ai": service.response_ai(r, (runs or {}).get(r.llm_call_id or ""))}
+
+
+def _runs(items: list[service.FeedbackResponse]) -> dict:
+    """The traces of the shown responses' classifications (when and how fast the AI labelled them)."""
+    return traces.by_llm_calls([r.llm_call_id for r in items if r.ai_status not in (None, "seeded")])
 
 
 def _sites(user: StaffUser, site_id: str | None) -> list[str] | None:
@@ -74,6 +83,7 @@ def overview(request: Request, site_id: str | None = None, sentiment: str | None
     open_alerts = sorted((a for a in service.alerts(store).values() if not sites or a.site_id in sites),
                          key=lambda a: (a.status != "open", -a.created_at.timestamp()))
     audit_phi(request, user, action="read", resource_type="patient_feedback", resource_id=None)
+    runs = _runs(listed[:80] + [service.responses(store)[a.response_id] for a in open_alerts[:40]])
     return {
         "kpis": {
             "responses_30d": sum(r.submitted_at >= now - timedelta(days=30) for r in rows),
@@ -87,9 +97,11 @@ def overview(request: Request, site_id: str | None = None, sentiment: str | None
         "rating_trend": [{"name": s["site_id"], "values": week_avg([r for r in rows if r.site_id == s["site_id"]])} for s in by_site],
         "theme_trend": [{"name": THEMES[t], "values": v} for t, v in theme_weeks.items() if sum(v)],
         "theme_counts": [{"theme": t, "label": THEMES[t], **c} for t, c in theme_counts.items()],
-        "responses": [response_view(store, r) for r in listed[:80]],
-        "alerts": [{**a.model_dump(mode="json"), "response": response_view(store, service.responses(store)[a.response_id])}
+        "responses": [response_view(store, r, runs) for r in listed[:80]],
+        "alerts": [{**a.model_dump(mode="json"),
+                    "response": response_view(store, service.responses(store)[a.response_id], runs)}
                    for a in open_alerts[:40]],
+        "ai_not_run": [r.id for r in rows if r.ai_status is None],
         "themes": THEMES,
         "sites": [{"id": s.id, "name": s.name} for s in store.sites.values() if not user.site_ids or s.id in user.site_ids],
     }
@@ -171,5 +183,26 @@ def public_submit(token: str, body: Answer):
         raise HTTPException(409, "Thank you, we already have your answer")
     resp = service.submit(store, survey, body.rating, body.comment, datetime.now())
     store.touch()
-    # Classification runs in the background worker within a few seconds.
+    # the patient's answer is new work: the AI labels it at once (the AI job loop), the rating alert is a rule
+    cause = (ai_cause.from_request("action") or ai_cause.AiCause()).model_copy(update={
+        "kind": "feedback", "item_id": resp.id, "label": f"Feedback {resp.id} ({resp.rating}-star)",
+        "link": "/feedback", "note": "a patient answered the survey"})
+    ondemand.request("feedback", resp.id, cause)
     return {"ok": True, "id": resp.id}
+
+
+@router.post("/api/feedback/responses/{response_id}/ai")
+def run_ai(response_id: str, request: Request, trigger: str = Query("asked", pattern="^(opened|asked)$"),
+           user: StaffUser = Depends(VIEWERS)):
+    """Label one comment's sentiment and themes now (Ask AI / Retry on a comment the AI has not labelled)."""
+    store = get_store()
+    try:
+        service._check(store, user, response_id)
+        ondemand.run_now(store, "feedback", response_id, trigger=trigger)
+    except LookupError as e:
+        raise HTTPException(404, str(e)) from e
+    except ondemand.NotAllowed as e:
+        raise HTTPException(403, str(e)) from e
+    audit_phi(request, user, action="update", resource_type="patient_feedback", resource_id=response_id)
+    r = service.responses(store)[response_id]
+    return response_view(store, r, _runs([r]))

@@ -166,4 +166,13 @@ def sign(fhir: FhirGateway, document_id: str, *, at: datetime | None = None, flo
     bus.publish(platform_event("document.signed", at=at, actor=f"user:{fhir.actor.id}", refs=refs,
                                key=f"document-signed|{document_id}|{role}",
                                attrs={"role": role, "final": not missing, "module": module}))
+    if not missing and document_id.startswith("dsum-") and encounter:
+        from app.agents import cause as ai_cause
+        from app.agents import ondemand
+
+        # the background drafts the patient instructions from the signed summary: as this person's action
+        cause = ai_cause.from_request("action")
+        ondemand.remember(f"instructions:{encounter}", cause and cause.model_copy(update={
+            "label": f"Patient instructions ({encounter})", "link": "/documentation",
+            "note": "drafted after the discharge summary was signed"}))
     return SignResult(document_id, doc["docStatus"], signed, missing)

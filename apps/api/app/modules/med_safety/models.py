@@ -19,7 +19,10 @@ from app.core.store import Store
 REVIEWS = "order_reviews"
 SESSIONS = "medrec_sessions"
 ReviewStatus = Literal["pending", "clear", "resolved"]
-CommentaryStatus = Literal["pending", "on_demand", "done", "unavailable", "refused", "guard", "skipped"]
+# pending: the background writes it; on_open: written when a person opens the item (BACKGROUND_AI=on_demand);
+# on_demand: only when a person asks ("Ask the AI now": test orders without a rule flag); then the outcome.
+CommentaryStatus = Literal["pending", "on_open", "on_demand", "done", "unavailable", "refused", "guard", "skipped"]
+WAITING = ("pending", "on_open")  # the AI step has not run and runs without being asked (background or opening)
 
 
 class OrderReview(BaseModel):

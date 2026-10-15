@@ -12,13 +12,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from app.agents import approvals
+from app.agents import approvals, ondemand
 from app.core.auth import client_ip, require_roles
 from app.core.models import Role, StaffUser
 from app.core.store import get_store
 from app.ehr.gateway import Actor, FhirGateway
 from app.modules.med_safety import discharge, service
-from app.modules.med_safety.models import get_review
 
 router = APIRouter(prefix="/api/med-safety")
 WORKBENCH = (Role.PHARMACIST, Role.PHYSICIAN)
@@ -30,7 +29,7 @@ def _errors(fn):
         return fn()
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
-    except (service.DecisionDenied, approvals.DecisionDenied) as e:
+    except (service.DecisionDenied, approvals.DecisionDenied, ondemand.NotAllowed) as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
     except (service.DecisionProblem, approvals.DecisionError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
@@ -68,17 +67,17 @@ def review(review_id: str, request: Request, user: StaffUser = Depends(require_r
 
 
 @router.post("/reviews/{review_id}/commentary")
-def commentary(review_id: str, user: StaffUser = Depends(require_roles(*WORKBENCH))):
-    """Run the AI commentary now (it normally runs in the background; on demand for unflagged tests)."""
+def commentary(review_id: str, trigger: str = Query("asked", pattern="^(opened|asked)$"),
+               user: StaffUser = Depends(require_roles(*WORKBENCH))):
+    """Run the AI commentary now (app/agents/ondemand.py): the web app asks for it when a person opens a review
+    whose commentary has not been written (`trigger=opened`; BACKGROUND_AI=on_demand, or still in the eager
+    background's queue), and Ask AI or Retry (`asked`; test orders without a rule flag get it only then). When
+    another request or the background is writing it, waits for that one instead of calling the model again."""
     store = get_store()
 
     def run():
-        found = get_review(store, review_id)
-        if found is None:
-            raise LookupError(f"No order review {review_id}")
-        if str(user.role) not in found.reviewer_roles:
-            raise service.DecisionDenied("Not your review")
-        service.comment(store, review_id)
+        service._review_check(store, user, review_id)
+        ondemand.run_now(store, "order_review", review_id, trigger=trigger)
         return service.review_view(store, user, review_id)
     return _errors(run)
 
@@ -125,6 +124,20 @@ def discharge_medications(encounter_id: str, request: Request, final_only: bool 
 @router.get("/medrec/{session_id}")
 def medrec(session_id: str, request: Request, user: StaffUser = Depends(require_roles(*WORKBENCH))):
     return _errors(lambda: service.session_view(get_store(), user, session_id, request))
+
+
+@router.post("/medrec/{session_id}/ai")
+def medrec_ai(session_id: str, request: Request, trigger: str = Query("asked", pattern="^(opened|asked)$"),
+              user: StaffUser = Depends(require_roles(*WORKBENCH))):
+    """Run the reconciliation's AI step (the indication judgements and the draft record) now: the web app asks
+    when a person opens a reconciliation whose AI has not run, and Ask AI / Retry. Waits for a run under way."""
+    store = get_store()
+
+    def run():
+        service._session_check(store, user, session_id)
+        ondemand.run_now(store, "medrec", session_id, trigger=trigger)
+        return service.session_view(store, user, session_id, request)
+    return _errors(run)
 
 
 @router.post("/medrec/{session_id}/items/{item_id}")

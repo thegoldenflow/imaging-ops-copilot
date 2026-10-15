@@ -89,6 +89,9 @@ ANTHROPIC_API_KEY=<key>
 LLM_DAILY_BUDGET_USD=5
 # 没人用多少分钟后暂停会调用模型的后台工作（模拟时钟、AI 摄入、旁白、医嘱点评），下一个请求恢复。0 = 不暂停
 # IDLE_PAUSE_MINUTES=15
+# on_demand（默认）= 没人要的 AI 不跑：后台只跑规则；某一项的 AI 在有人打开它、点 Ask AI、或自己的操作产生新工作
+# （提交申请单、患者答问卷、故事线按钮）时才跑。eager = 后台提前把每一项写好（每次重置约 311 次模型调用，没人看也照付）
+# BACKGROUND_AI=on_demand
 
 # 发布门（规格 6.4 / 6.6）：demo（默认）下未通过评测的 agent 照常运行，输出带 "Not evaluated" 标记；
 # prod 下这些 agent 被拒绝，模块退回规则层或人工。目前提交的评测全是 mock 基线，prod 等于关掉 AI 步骤。
@@ -164,7 +167,7 @@ sudo systemctl reload caddy
 ## AI 费用控制
 
 用真 key 时，后台循环会自己调用模型：模拟医院的时钟一走，模拟器就写医嘱、入院和出院，每条都触发医嘱审核点评、
-用药重整和 Control Tower 旁白。2026-10-12 实测 Gemini 下 API 空跑约 $4/小时。两道闸：
+用药重整和 Control Tower 旁白。2026-10-12 实测 Gemini 下 API 空跑约 $4/小时。三道闸（第三道让 AI 只在用户操作时运行）：
 
 **1. 空闲暂停（`IDLE_PAUSE_MINUTES`，默认 15）。** 连续这么多分钟没有已登录的人使用，API 暂停会调用模型的后台工作，
 下一个已登录请求立即恢复：
@@ -198,6 +201,31 @@ sudo systemctl reload caddy
 - AI Ops 首页顶部显示“今天已花 / 上限”，到了上限变黄并显示被拒绝的调用数；`/api/health` 的 `ai_budget.reached` 也能看到。
 - 参考：2026-10-12 实测 API 开着没人用时约 $4/小时（Gemini 3.5 Flash），有了空闲暂停后没人用时接近 0。
   Google Cloud 的预算只发提醒、不会停，这个上限才是真正的闸。
+
+**3. AI 只在用户操作时运行（`BACKGROUND_AI`，默认 `on_demand`）。** 空闲暂停只管“没人在”的时候；只要有人在，`eager` 模式下后台
+会把每份新数据自带的积压写完：每次 “Reset demo” 或每日重置后约 311 次模型调用（mock 实测：医嘱审核 243、用药重整 48、
+Control Tower 9、申请单 9、反馈 2），访客通常只打开其中几条，而且这阵调用和访客自己的调用抢 Vertex 配额（并发下测到过 429 和卡顿）。
+`on_demand` 下没人要的 AI 一次都不跑：
+
+| | 后台只做什么 | AI 什么时候跑 |
+|---|---|---|
+| 医嘱审核 | 规则检查（过敏、相互作用、肾功能剂量、剂量范围、重复检查），照常进队列 | 有人打开这一条：先显示规则结果，同时显示“AI is reviewing this order…”和进度，几秒后出现点评 |
+| 用药重整 | 比对出的差异和草稿 | 有人打开这一次重整（在医嘱旁边顺带显示的不算：那里显示 Ask AI） |
+| Control Tower 例外 | 规则引擎的标题、事实和动作菜单；卡片上标 “AI not run · narrative when opened” | 打开抽屉时写旁白和推荐动作 |
+| 申请单 | 收到即入队，标 “Waiting for the AI” | 有人提交（门户、受理表单、重新处理）时立刻跑；种子数据里的三份传真在有人打开时跑 |
+| 患者反馈 | 低分评价按规则立即通知站点经理 | 患者答完问卷时立刻跑；种子里的两条在员工点 Ask AI 时跑 |
+| 故事线 | — | 按某一步的 Advance，这一步的 AI（例外旁白；萘普生医嘱点评和入院用药重整）在条目出现时立刻跑 |
+
+- 列表页从不自己跑 AI：显示“N 条已过规则、AI 未运行”，可点 “Ask AI for these N”（先说明调用次数和预计时间，最多 50 条，两条并行）。
+- 页眉的 “AI activity” 列出这个浏览器每一次 AI 动作：做了什么、哪一条、谁的哪一步操作引起的、何时、多久、几次调用、花费（mock 为标价估算）；
+  可切到 “Everyone since the reset”。
+- 每条 AI 结果写明生成时间和耗时；失败时显示原因和 Retry，规则结果照常显示。同一条重复打开或连点不会重复调用（同进程等前一次，跨进程靠数据库锁）。
+- 没有规则标记的检验 / 影像医嘱只有点 Ask AI 才写点评（两种模式都一样）。
+- 代价：规则没标记、只有 AI 会提出疑虑的医嘱，不会自己出现在 “Needs action” 里；有人打开它，AI 的意见才出现。
+- 开着 Temporal 时，例外工作流的 explainAndRecommend 步骤也不调用模型（步骤里写明“有人打开时写”）；审批前照样先写旁白。
+- 改这个设置要重启 API。已经生成的数据保持原来的状态，“Reset demo” 或每日重置后按新设置生成。
+- 仍在后台调用模型、但都是某个人的操作引起的：出院指导（有人签了出院小结）、Temporal 的旅程步骤（有人签了上一步）。空闲暂停和每日上限照样管着它们。
+- 实测见 docs/PROGRESS.md “AI only on the user's click”。
 
 ## 访问记录：几点、哪个 IP
 
@@ -287,6 +315,7 @@ Windows 开发机常有被 Hyper-V 保留的端口段（`netsh interface ipv4 sh
 | 页面右上角显示 AI: mock | `.env` 里没有可用的 API key，或 `LLM_PROVIDER` 指向的提供方没有 key |
 | 所有 AI 字段都显示“暂不可用”，模型调用日志里是 `refused` / `Daily AI budget reached` | 当天花费到了 `LLM_DAILY_BUDGET_USD`，午夜（服务器时间）清零；急用就调高后 `up -d` 重建 API |
 | Control Tower 时钟显示 “on hold while idle” | 超过 `IDLE_PAUSE_MINUTES` 没人用，后台 AI 工作暂停；点一下页面就恢复 |
+| 打开医嘱审核、例外、申请单要等几秒才有 AI 结果 | `BACKGROUND_AI=on_demand`（默认）：AI 在有人打开时才写，页面显示进度和通常耗时。要提前写好就设 `eager`，代价是每次重置约 311 次模型调用 |
 | AI 调用超时 | 服务器出网访问 api.anthropic.com / Google 受限；可调 `LLM_TIMEOUT_S` |
 | 上传胸片报 413 | 超过 nginx 的 25MB 限制（`apps/web/nginx.conf`） |
 | 工作流页面显示 "unreachable" | 设了 `TEMPORAL_ADDRESS` 但 `ioc_temporal` 没起来，或没加 `--profile workflows` |

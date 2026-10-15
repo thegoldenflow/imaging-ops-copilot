@@ -409,7 +409,7 @@ def test_a_low_confidence_review_is_corrected_by_the_agents_signer(fresh_state, 
     assert bus.events(store, types=["task.decided"], limit=1)[0].refs["task"] == f"Task/{task.output['task_id']}"
 
 
-def test_an_exception_is_read_fresh_after_its_lock_so_it_is_narrated_once(fresh_state):
+def test_an_exception_is_read_fresh_after_its_lock_so_it_is_narrated_once(fresh_state, eager_background_ai):
     """The narrator loop, a request and the workflow's activity may all narrate the same exception. Each takes the
     exception's lock, then reads it again: a copy loaded earlier in the transaction (the loop's list) may be stale."""
     from sqlalchemy import text

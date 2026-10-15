@@ -101,6 +101,8 @@
 | 3.19 | 申请单抽取的三个假错误：CXR、标签漏了 urgent、"None known" | imaging | 评测口径 · 标签 |
 | 3.20 | 交班 SBAR 的"未记录"无处可引，代理指标重复计分 | hospital | 真实模型 · 契约 · 评测口径 |
 | 3.21 | 空闲花钱的续篇：空闲暂停 + 每日预算；"重置会清零预算"、开着的标签页、时钟回来跳半小时 | 平台 / hospital | 真实模型 · 成本 · 设计 |
+| 3.22 | 后台 AI 按需：只为打开的东西付钱；顺带抓到"决定和点评同时写"的竞态，以及一个只会卡住、不会失败的测试 | hospital / 平台 | 成本 · 并发 · 测试 |
+| 3.23 | AI 只在用户点击时运行：读取不调模型、"谁点的"被 `acting_as_system` 抹掉、一次点击跑了两项 | 平台 / hospital / imaging | 成本 · 设计 · 可追溯 · 端到端 |
 | 4.1 | 来电者口述的出生日期没被去标识化 | imaging | 隐私 |
 | 4.2 | 两个字母的姓（Hu、Li）泄露 | hospital | 隐私 |
 | 4.3 | 去标识化评测满分，说明评测集太简单 | hospital | 隐私 · 评测可信度 |
@@ -129,6 +131,7 @@
 | 6.6 | Windows、shell 和进程 | 环境 | 速查表 |
 | 6.7 | Docker、数据库、测试工具 | 环境 | 速查表 |
 | 6.8 | 脚本输出重定向到文件时崩在 GBK 编码（SpO₂） | 环境 | 环境 · 编码 |
+| 6.9 | 在 worktree 里起 mock API：空 venv、没有 PHI 密钥、停掉的任务还占着端口 | 环境 | 环境 · 进程 |
 | 7.1 | 重置写入 INSERT 换 COPY | 平台 | 性能 |
 | 7.2 | 计时测试在机器忙时失败 | 平台 | 性能 · 负载 |
 | 7.3 | 迁到 PostgreSQL 后变慢：五步优化 | imaging | 性能 |
@@ -1087,12 +1090,140 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
   2. **"按某张表求和"之前，先问这张表会不会被清空。** 演示系统的重置、日志轮转、TTL 都会让"今天的总数"悄悄归零；花钱的账要记在不随业务数据重置的地方，并且在独立事务里写——钱不会跟着事务回滚。
   3. **"有人在用"只有浏览器知道。** 服务器看到的请求里混着轮询；让客户端报"多久没人动"，比服务器猜要准，而且代价只是一个请求头。
   4. **暂停一个按墙钟推进的东西，要想好恢复时怎么算时间。** 只跳过 tick 而不处理"上次 tick 的时间"，恢复时就会补跑整段空闲。
-  5. **预算和积压要一起看。** 一份新数据的积压约 $2.5（估算），$5 的上限有一半会花在没人打开的点评上。把后台 AI 改成按需可以省下这部分；owner 2026-10-14 决定暂不做：积压排空后空闲的 API 不再调用模型，空闲暂停又挡住了新工作。
+  5. **预算和积压要一起看。** 一份新数据的积压约 $2.5（估算），$5 的上限有一半会花在没人打开的点评上；要让钱花在访客真正看的东西上，得把后台 AI 改成按需（owner 先决定不做，后来要求“AI 只在用户点击时运行”，见 3.22）。
 - **范围：** 平台（LLM 网关、后台循环、Web API 客户端）/ hospital（模拟器时钟、医嘱审核和用药重整的积压）。
 - **代码：** `apps/api/app/core/activity.py`、`apps/api/app/llm/budget.py`、`apps/api/app/llm/gateway.py`、`apps/api/app/main.py`、`apps/api/app/ehr/simulator.py`（`tick` 的 `awake_since`）、
   `apps/api/app/core/auth.py`、`apps/api/app/core/config.py`、`apps/web/src/lib/api.ts`、`apps/web/src/features/control-tower/ControlBar.tsx`、`apps/web/src/features/ai-ops/BudgetStrip.tsx`、
   `apps/api/tests/test_spend_guard.py`、`apps/web/e2e/spend-guard.spec.ts`。
 - **提交：** e659cfd（分支 `claude/dazzling-goodall-c04d15`）。
+
+### 3.22 后台 AI 按需：只为打开的东西付钱；顺带抓到"决定和点评同时写"的竞态
+
+- **现象：** 3.21 的空闲暂停只管"没人在"。只要有人登录，后台就把新数据自带的积压全写完。重新量了一次（mock，新库，eager，登录一次后每 30 秒数 `llm_calls`）：
+  3 分钟时 `order_review=54 medication_reconciliation=44 control_tower=7`，还在涨，`order_reviews` 里还剩 121 条 `pending`。按真实单价每次重置约 $2.5，访客实际打开的只有几条。
+  另外有 `requisition_extract/triage/protocol_suggest` 各 3 次、`feedback_classify` 2 次，登录后立刻发生，之后不再增加（影像侧种子数据的积压，见"范围"）。
+- **怎么查的：**
+  1. **"按需"放在哪个状态上？** 任务说明建议直接用已有的 `commentary_status="on_demand"`。先读它现在的含义：`_new_review` 里是 `"pending" if medication or findings else "on_demand"`，
+     即"没有规则标记的检验单，只在有人点 Ask the AI now 时才点评"。如果"打开就跑 AI"也挂在 `on_demand` 上，eager 模式下打开这些检验单也会开始花钱，改了原有行为。
+     所以加一个新值 `on_open`（"有人打开时写"），三张表（医嘱审核、用药重整、例外）共用；`on_demand` 保持"只在被要求时"。
+  2. **"打开"的路径各自已经做了什么？** 逐个读：例外详情 `GET /exceptions/{id}` 在 `narration_status == "pending"` 时就在请求里 `narrate`；用药重整 `session_view` 在 `ai_status == "pending"` 时就在请求里 `settle`；
+     只有医嘱审核详情 `review_view` 不跑 AI——它先显示规则结果，前端每 2 秒轮询等后台写点评。所以前两个只需要也接受 `on_open`，医嘱审核要新的触发。
+     考虑过三种：(a) GET 里同步跑 AI——规则结果要等模型才显示，违背"规则自己成立"；(b) GET 把 `on_open` 改成 `pending` 交给后台——依赖 narrator 循环（`BACKGROUND_WORKERS=0` 时永远等），还多 2 秒以上延迟；
+     (c) 前端打开时调用已有的 `POST /commentary`（Ask the AI now 用的同一个接口）。选 (c)：GET 保持快且没有副作用，AI 走现有的 `comment()` 和它的锁。
+  3. **还有没有别的后台入口？** grep `narrate(` 发现 `app/workflows/activities.py` 的 `capacity_explain`：开着 Temporal 时，每个 `exception.opened` 都启动 CapacityExceptionWorkflow，它的 explainAndRecommend 步骤直接 `narrate`。
+     只关 narrator 循环的话，开着 Temporal 的部署照样把 7 条旁白全写了。这一步对 `on_open` 的例外改成不调模型、只记一句说明。
+  4. **假设 A：按需会让"决定"和"点评"撞车。** 按需之后最常见的操作就是"打开 → 看规则 → 马上决定"，而点评正在写（真模型要几秒）。读 `comment()`：它先读 review，用 `_try_lock` 只防别的点评，跑完模型再把自己那份 review 存回去；
+     `decide_review` 不拿这把锁。推测：决定先提交，点评后提交，会把决定盖掉。
+     **读 `repo.py` 的 `flush` 修正了这个推测：** 它只写和快照相比改了的字段（`changed = {f for f, v in plain.items() if old.get(f) != v}`），点评那份没改 `decision`，所以决定本身不会丢。那到底坏了什么？做实验。
+  5. **实验：两个真提交的事务。** 脚本（scratchpad `race_demo.py`）：线程 A 在 `unit_of_work` 里 `S.comment`，mock 模型延迟 3 秒；1 秒后主线程在另一个事务里 `decide_review(accept_order)` 并提交。
+     - main 上的代码：决定用了 0.16 秒（没等），结束时 `status=resolved commentary_status=done`（决定写的 `skipped` 被点评盖成 `done`），点评创建的 AI 审核 Task `task-00120` 状态 `requested`，`approvals.is_open` 为 True——
+       决定当时还没有 Task，走了普通审计那条路，于是这个 Task 永远挂在审核队列里没人处理。
+     - 修好后：决定等了 3.8 秒，`task-00121 completed`。
+     - 第三种后果没复现：如果规则没标记、AI 提出了疑虑，点评那份算出的 `status` 是 `pending`（和它的快照 `clear` 不同），会把 `resolved` 改回 `pending`，已决定的医嘱回到待办。这是按 `flush` 的规则推出来的；这次 mock 对那条医嘱没给疑虑，所以没看到。
+  6. **回归测试一开始只会卡住。** 测试里用第二个真事务模拟"正在写点评"：拿锁、改行、1 秒后由 `threading.Timer` 提交。把修复去掉跑一次，600 秒超时被杀，没有任何输出。
+     原因：没修复时决定立刻返回，测试事务已经 UPDATE 了那一行、持有行锁；Timer 线程里的提交要更新同一行，等测试事务；测试线程在 `finally` 里 `timer.join()` 等 Timer 线程。
+     一圈等待里有一条边是 Python 的线程 join，PostgreSQL 的死锁检测看不到。修法：第二个事务 `SET LOCAL lock_timeout = '5s'`。再去掉修复跑：两个用例分别 0.16 秒、0.015 秒就返回，断言 `>= 0.8` 失败，
+     日志里是 `psycopg.errors.LockNotAvailable: canceling statement due to lock timeout`（正是它要更新决定已经写过的那一行）；带修复全部通过。清理已提交的测试数据前先 `store.rollback()`（测试的事务是外层事务里的 savepoint，回滚到 savepoint 会放掉之后拿的行锁和 advisory 锁），否则清理的 DELETE 又会等测试事务。
+  7. **故事线和评测依赖 eager 吗？** 整个后端测试集用 `BACKGROUND_AI=on_demand` 跑：857 过、5 挂。4 个是描述 eager 行为的（intake 后是 `pending`、narrator 循环的步骤列表、`pending_narration`、容量工作流写了旁白），1 个是 main 上已有的 README 失败。
+     进程内故事线走查（`tests/test_storyline.py`）和评测测试都过——故事线打开例外和用药重整走的就是"打开时写"的路径，评测直接调用 `comment`/`settle`/`narrate`。
+     Playwright 按需跑又挑出一个：`ai-ops.spec.ts` 的成本告警用例 120 秒内等不到 "AI Ops alert"。假设：它靠后台点评把当天成本推过演示阈值。用例里的注释证实了（"run in the background after the reset ... passes the demo threshold shortly"）；
+     再查阈值和单价：`config/alerts.yaml` 的 `agent_daily_cost` 是 $0.01，AI Ops 按标价估的 `order_review` 一次约 $0.017。所以改成用例自己打开一条医嘱（POST 点评），一次就过阈值，两种模式都成立。
+- **根因：** 后台循环是按"总有人在看"设计的：AI 输出在有人打开之前就写好。用 mock 免费，用真 key 时为没人看的东西付钱。竞态则是原来就有的：点评只防别的点评、不防决定，eager 下窗口小（后台恰好在写那一条时有人决定），按需把它变成了常态。
+- **怎么修：**
+  1. `BACKGROUND_AI`（默认 `on_demand`，可设 `eager`）。新的医嘱审核、用药重整、例外在按需模式下是 `on_open`；narrator 循环不跑旁白和用药安全 AI 两步；容量工作流的 explain 步骤对 `on_open` 不调模型。
+  2. 打开时写：例外详情和用药重整的 GET 也接受 `on_open`；医嘱审核面板打开时对 `on_open` 和 `pending` 自动请求点评（eager 下打开的医嘱也不用排后台的队），失败时显示原因和 Ask the AI now。
+  3. 竞态：`decide_review` 先等这条 review 的锁并重新读；`comment(wait=True)`（人发起的请求）等别人写完并拿到结果；后台拿到锁后也重新读。`settle` 同样处理，开页面、处理条目、签名、journey 的用药重整步骤都等。
+- **怎么证明：**
+  - `apps/api/tests/test_background_ai.py` 8 个：按需时 intake 和刷新只写规则结果、AI 步骤不调模型；eager 不变；narrator 循环按需只剩出院指导；通过 API 打开一条医嘱 / 一次用药重整 / 一个例外，各只多一种调用，其余仍是 `on_open`；
+    决定等正在写的点评（≥0.8 秒，`commentary_status` 保持 `done`）；人请求点评时等别人写完、不重复调用；用药重整同理。`tests/test_workflows.py` 加一个按需的容量工作流用例。去掉修复时两个点评用例失败（见上）。
+  - 真进程验收（mock，新库，`ioc_ondemand_e2e`）：Reset demo → 药师和床位经理各发一个请求 → 5 分钟每 30 秒数一次：始终只有影像侧的 11 次，`order_reviews` 是 `on_open=183 on_demand=42`，用药重整 `on_open=62`，例外 `on_open=7`；
+    然后打开一条医嘱（GET 0.15 秒 + POST 点评 1.08 秒）、一次用药重整（GET 1.84 秒）、一个例外（GET 0.94 秒），调用正好多了 `order_review=1 medication_reconciliation=1 control_tower=1`，三条都是 `done`。
+  - Playwright `background-ai.spec.ts`：后台跑着、有人在用，6 秒后萘普生那条仍是 `on_open`；药师打开后规则结果先出现、AI 点评随后出现；例外卡片显示 "AI narrative when opened"，打开后写旁白、标记消失；AI Ops 显示当前模式。
+    按需下 `med-safety`、`control-tower`、`spend-guard`、`ai-ops`（改后）和 `hospital-storyline` 也都过；故事线 4.5 分钟（以前 15～30 分钟，那时后台同时在写约 250 条积压）。
+  - 后端全量（默认按需）870 过、1 挂（main 上已有的 README 用例）；eager 下受影响的 6 个测试文件 90/90。
+- **经验：**
+  1. **"按需"先问"按谁的需"。** 已有的 `on_demand` 是"有人要才做"，新需求是"有人看就做"，两者在 eager 模式下的花费不同。复用一个名字省一个枚举值，却会悄悄改掉原来的行为。
+  2. **关掉一个后台入口之前，grep 所有调用点。** narrator 循环之外，Temporal 工作流也会调 `narrate`；只看循环会以为已经关干净了。
+  3. **"按需"会改变并发的形状。** 以前少见的交错（人和后台同时碰同一条）变成主路径，原来"概率很小"的竞态要重新审视。修之前先用两个真提交的事务复现，结论（Task 悬空、状态被盖）比读代码猜的（决定丢失）更准，也更具体。
+  4. **跨线程的测试要给锁等待设上限。** 数据库能检测数据库里的死锁，看不到"线程 join + 行锁"组成的环；没有 `lock_timeout`，一个本该失败的测试会变成卡住，而卡住比失败难查得多。
+- **范围：** hospital（医嘱审核、用药重整、Control Tower、容量工作流）/ 平台（设置、narrator 循环、AI Ops、health）。影像侧的申请单摄入和反馈分类不在本案：每次重置约 11 次调用，之后只在有新申请单 / 新反馈时调用。
+- **代码：** `apps/api/app/core/config.py`（`background_ai`、`ai_on_open`）、`apps/api/app/main.py`（`_narrator_loop`）、`apps/api/app/modules/med_safety/models.py`（`on_open`、`WAITING`）、
+  `apps/api/app/modules/med_safety/service.py`（`_ai_waits`、`_fresh_review`、`comment(wait=)`、`settle(wait=)`、`decide_review`）、`apps/api/app/modules/med_safety/router.py`、`apps/api/app/modules/med_safety/journey.py`、
+  `apps/api/app/modules/control_tower/exceptions.py`、`apps/api/app/modules/control_tower/router.py`、`apps/api/app/workflows/activities.py`（`capacity_explain`）、`apps/api/app/modules/storyline/walk.py`、
+  `apps/web/src/features/med-safety/ReviewPanel.tsx`、`apps/web/src/features/control-tower/ExceptionStream.tsx`、`apps/web/src/features/ai-ops/BudgetStrip.tsx`、`apps/api/tests/test_background_ai.py`、
+  `apps/api/tests/conftest.py`（`eager_background_ai`）、`apps/web/e2e/background-ai.spec.ts`、`apps/web/e2e/ai-ops.spec.ts`。
+- **提交：** 分支 `claude/focused-knuth-841a88` 的 b2ae814（当时留着没合并）；2026-10-14 移植到 main 上，和 3.23 一起提交（分支 `claude/adoring-kirch-14355b`）。
+
+### 3.23 AI 只在用户点击时运行：读取不调模型、"谁点的"被 `acting_as_system` 抹掉、一次点击跑了两项
+
+- **现象：** owner 2026-10-14 的要求：没人要的 AI 一次都不跑。观众只打开几条，后台每次重置后的 311 次调用（医嘱审核 243、用药重整 48、Control Tower 9、申请单 9、反馈 2）他们看不到，
+  AI 结果看起来像预存的数据；这阵调用还和观众自己的调用抢 Vertex 配额（并发下测到过 429 和卡顿）。3.22 的分支只管了医院侧三类，影像侧的 11 次、"谁的点击引起了哪次调用"、各种状态的界面都没有。
+- **怎么查的：**
+  1. **先盘点"谁还会自己调用模型"。** 把移植后的代码交给一个只读的检索 agent，按触发方式（后台循环 / 事件订阅 / Temporal 活动 / HTTP 接口 / 重置）列出所有能走到 `LlmGateway.structured` 或 `tool_turn` 的路径。
+     按需模式下还剩：intake 循环的申请单（种子里 `REQ-NEW1..3`，9 次）和反馈分类（2 次）；故事线订阅者在护士接受分诊卡后跑两张影像申请单（6 次）、出院时跑出院用药重整；Temporal 的旅程步骤；
+     narrator 循环的出院指导（有人签了出院小结才触发）。另外两个 **GET** 也会调模型：`GET /medrec/{id}` 和 `GET /exceptions/{id}`，打开时在请求里同步跑 AI。后两类是人引起的，前两类不是。
+  2. **假设 A："打开时在 GET 里跑 AI"就够了。** 3.22 在这两个 GET 上沿用了这个做法。可是新的界面要"规则结果先显示 → AI 运行中（进度、通常耗时）→ 完成"，GET 同步跑模型时，前端在模型答完前拿不到任何数据，
+     只能显示整页的 Loading，规则结果被模型挡住；失败时也没法"规则照常显示 + Retry"。**否定。** 改成所有 GET 都不调模型、返回统一的 AI 状态块，网页在打开时用 POST 请求 AI（和 Ask AI、Retry 同一个接口，带 `trigger=opened|asked`）。
+     代价：两个原来靠 GET 拿到 AI 结果的后端测试（`test_workbench_flow_over_http`、`test_exception_approve_task_audit`）和故事线 walk 要改成"先 GET 再 POST"，和网页的做法一致。
+  3. **"谁点的"：先试最省事的来源——trace 的 `actor_id`。** 每次 agent 运行都有一条 trace，有 `actor_id`。但医嘱点评、用药重整、例外旁白这三个最常见的 AI 动作，读代码发现都在 `with acting_as_system(), runtime.start(..., user=None)` 里跑：
+     agent 按设计以自己的身份写（规格 6.4），`acting_as_system()` 把 `_context` 置成 None。做实验：通过 API 打开一个例外，再查那次运行的 trace：`actor_id == "system"`，看不出是谁打开的。**否定这个来源。**
+     不能改 `acting_as_system`（它保证 agent 的写入不借用个人权限），于是加了第二个 context 变量 `_origin`：中间件同时设置 `_context` 和 `_origin`，`acting_as_system` 只清 `_context`，`request_origin()` 读 `_origin`。
+     回归测试 `test_a_run_inside_a_request_is_the_persons_even_when_the_agent_writes_as_itself` 同时断言 `run.actor_id == "system"` 和 `run.cause` 里的会话、用户、`trigger == "opened"`——两件事都要成立。
+  4. **会话从哪里来。** 服务器分不出"同一个浏览器换了角色"：换角色就是换 token。和 3.21 的 `X-Idle-Seconds` 一样，只有浏览器知道：网页生成一个随机 id 存在 localStorage，每个请求带 `X-Demo-Session`，中间件放进请求上下文。
+     context.py 开头的注释提醒过：FastAPI 的依赖和接口在不同线程、各自拷贝 context 变量，依赖里 `set` 的值到不了接口。所以会话在中间件（所有线程之前）读，用户则沿用 `current_user` 写进**共享的** `RequestContext` 对象的做法。
+  5. **同一项会不会跑两次？** 申请单的 `process()` 没有任何锁。三个调用方可能同时碰同一张：任务循环（提交后排队）、eager 下的 intake 循环、有人打开详情。按 3.22 的经验，先给 `process_one` 加一把按申请单 id 的 advisory 锁，拿到锁后 `forget` 再读，
+     状态已不是 `received` 就直接返回；反馈分类同样处理。进程内再加一层"同一项同时只跑一次"：第二个调用方等第一个的 Event。验证：`test_a_seeded_requisition_runs_its_pipeline_when_opened_and_once_only` 打开 → 再打开 → Ask AI，调用数始终是 3；
+     `test_the_same_item_asked_for_twice_at_once_runs_once` 用一个睡 0.4 秒的假 run 并发调两次，run 只被调用一次、第二个调用方等了 ≥0.2 秒。
+     顺手查了 `forget` 的语义：它会把 `_complete` 复位，所以整表加载过之后再 `forget` 也能读到别的事务提交的那一行（否则 `get` 会直接返回 None）。但它返回的是**新对象**：旧代码和测试里"改原对象、再看原对象"的写法（`first = submit(...); process_pending(); assert first.ai_status == "ok"`）
+     会读到旧值，所以相关测试改成用 `classify_one` 的返回值。
+  6. **故事线：AI 归到哪一步。** 想法是"按下哪一步的 Advance，就跑哪一步的 AI"。先按 `status()` 算出的当前步（`view["current"]`）记录，读代码发现不对：床位经理批准提前出院后，第 5 步还没完成（她还没有床），
+     `status()` 把第 5 步的 beat 改写成 `admitted`；这时按的 Advance 是为第 6 步（用药重整）推时间。所以按 **beat** 映射（`decision` → 第 5 步的例外旁白，`admitted` → 第 6 步的萘普生点评和入院用药重整）。
+     第二个坑：剧本里骨科后来又满了一次，会开新的例外；如果"第 5 步的 AI = 当前最新的骨科例外"，那次没人按按钮的例外也会被跑。所以每一步的条目在第一次出现时固定下来（`ai_steps[key]["items"]`）。
+  7. **Playwright 抓到"一次点击两个动作"。** 新用例"打开一条医嘱审核 → 活动面板正好 1 个动作"失败：`Expected: 1, Received: 2`。假设一：双击或 StrictMode 下 effect 跑两次、POST 了两次——但服务器那边同一项只会跑一次，而面板里两个动作的标题不同。
+     查 API 日志：`GET /api/med-safety/reviews/ORV-00422` 之后紧跟着 `POST /api/med-safety/medrec/MR-00115/ai?trigger=opened`。原来药物安全页右栏在选中医嘱时会顺带显示这次住院的用药重整（`ReviewSide` → `MedRecPanel`），面板一挂载就按"打开即运行"请求了 AI。
+     按 owner 的规则"只跑打开的那一项"，侧栏的重整改成不自动运行（显示 "AI not run yet" 和 Ask AI）；直接打开重整时照旧自动运行。重跑：1 个动作。
+  8. **面板显示 "when Rosa Pemberton opened it" 而不是 "when you opened it"。** 同一个 Playwright 用例的下一步失败。`causeText` 靠比较 `cause.user_id` 和当前用户判断"你"，而活动接口的 `by` 只有姓名和角色。把用户 id 加进 `by`。
+  9. **mock 模式下面板的成本是 $0，AI Ops 却显示有成本。** 假设：面板读错了字段。查 `gateway._log`：mock 调用记 `cost_usd = 0.0`（真的没花钱）；AI Ops 在读的时候用 `app/aiops/cost.call_cost(mode, model, cost, tokens_in, tokens_out)` 按标价估算，并标 "≈ cost"。
+     两处算法不一样，面板改用同一个函数，并显示 "≈"。
+  10. **量一遍。** mock 模型（每次 0.6 秒）、新库：四个角色登录后每 10 秒轮询所有列表页，持续 144 秒：**0 次调用**；同时有 299 条医嘱 / 重整、9 个例外、3 张申请单、2 条反馈在等。
+      逐个打开一条医嘱、一次重整、一个例外、一张申请单：正好 6 次调用（1+1+1+3），再打开不增加。完整走一遍故事线（12 步全过）：**20 次调用**，其中 6 次（护士接受分诊后两张影像申请单）在 trace 上没有原因——
+      重置时还没有"驱动者"（没人按过 Advance），而事件是后台投递的。把按"重置到开头"的人记成初始驱动者。
+  11. **受影响的 9 个 Playwright 文件一起跑：29 个里 19 过、3 挂、7 没跑。**
+      - `business-compliance` 的 `beforeAll` 重置超过 60 秒——同一时间全量后端测试在跑，共用一个 PostgreSQL；6.x 记过负载下重置要 1–3 分钟。没有后续 6 个用例就是这一个钩子拖下的（"7 did not run" 含它自己）。负载撤掉后单独重跑。
+      - `med-safety.spec`：期望 403，得到 404。测试从 `GET /medrec/{id}` 拿 `document_id` 去签名接口；以前 GET 顺带跑 AI 步骤，步骤里写草稿记录，所以总有 id。按需后没人打开就没有草稿记录，请求变成 `/documents/null/sign`。
+        产品行为是对的（草稿在有人打开时才写），测试改成像网页一样先 `POST .../ai?trigger=opened` 再取 id。
+      - `pipeline.spec`：期望 "your action"，界面写 "in the background"。申请单详情的 AI 块不经过 `run_id`（时间取自抽取和方案记录的时间戳），所以也没取到原因。用抽取调用的 call id 找到它所在的 trace
+        （`traces.by_llm_calls`，`output_refs ?| array[...]`），只在详情里查，轮询的列表不查。
+      - 修完重跑 `pipeline.spec`，这次界面写 "when you opened it"——又不是 "your action"。看时间线：提交后页面立刻跳到新申请单，详情面板发现状态是 `queued` 就按"打开即运行"POST；
+        任务循环每 0.3 秒取一次任务，网页的 POST 先到，于是这次运行记成了"打开"。两边都只跑了一次（单次运行生效了），错的只是归因。修法放在服务器：`run_now` 发现这一项在队列里，就把那个任务取出来立刻跑，用它原来的原因。
+        回归测试 `test_opening_an_item_already_queued_runs_it_now_as_what_it_was_asked_for`：提交后马上 POST `trigger=opened`，结果的原因是 `action / received from the intake queue`，队列清空、`drain` 不再跑任何任务。
+- **根因：** 后台循环和两个 GET 都是按"AI 输出应该提前备好"设计的；在这个前提下，"谁的点击引起了这次调用"不需要记录，"打开"和"读取"也不必分开。按需之后这两个前提都不成立：
+  读取要立刻返回规则结果，AI 要由一个明确的动作触发并记下原因，而原因要穿过 agent 以自己身份运行的那一层。
+- **怎么修：**
+  1. `app/agents/ondemand.py`：五类条目（医嘱审核、用药重整、例外、申请单、反馈）由各自模块注册；统一的 AI 状态块；进程内单次运行 + 各模块的数据库锁；任务队列和 `_ai_jobs_loop`（两个并行，空闲时不暂停）；批量（最多 50 条，先说明调用次数和时间）；失败后的 Retry。
+  2. `app/agents/cause.py` + `agent_traces.cause`（迁移 0011，可空、只增不改）：会话、用户、触发方式、条目；`request_origin()` 穿过 `acting_as_system`；后台替人做的后续工作带上那个人的原因（签了出院小结 → 出院指导；故事线的驱动者）。
+  3. 所有 GET 不调模型；网页打开时 POST。影像侧的种子申请单和反馈只在 eager 下由后台处理，提交的申请单、患者的问卷答复立刻排队。
+  4. 网页：`components/ai.tsx` 的四种状态，`AiBatchBar`，页眉的 "AI activity" 面板（`/api/ai/activity`）；故事线每一步显示它的 AI 在做什么。
+- **怎么证明：**
+  - 后端：`tests/test_ai_on_demand.py` 10 个（新数据在所有后台步骤各跑两轮后 0 次调用、eager 下同样步骤跑出申请单 3 组和反馈 2 次；打开申请单跑一次且只一次；门户提交立刻排队、作为本人的操作运行；并发请求同一项只跑一次；患者答复立刻分类、种子反馈不动；批量说明时间、跳过不该跑的；Retry；agent 以自己身份运行时原因仍是那个人；"所有人"范围包括后台自己的运行）；
+    `tests/test_background_ai.py` 改为"GET 无调用、POST 才调用"。受影响的 13 个测试文件：第一轮 189 过 2 挂（就是第 2 步说的两个靠 GET 拿 AI 的测试），修完后按需 192/192、`BACKGROUND_AI=eager` 192/192；
+    全量后端（按需）880 过、0 挂。
+  - Playwright `ai-on-demand.spec.ts` 6/6：列表不跑 AI、面板为空；打开医嘱 → "AI is reviewing this order" 和 "typically" → 结果带 "generated … took … when you opened it" → 重新打开不再运行 → 面板 1 个动作、"when you opened it"、"≈ $"；
+    模拟一次不可用 → 原因、规则结果、Retry → "you pressed Ask AI"；申请单批量先说 "About 9 model calls, roughly …"，跑完列表上不再有 "AI not run"；例外抽屉里旁白在写时先显示规则事实；门户提交后确认页显示 AI 读完并分诊。
+    其余受影响的 Playwright 文件（流水线、业务合规、医院故事线、Control Tower、background-ai、AI Ops、空闲暂停、影像故事线、药物安全）最后一轮全过；医院故事线 12 步 3.6 分钟，第 5 步按 Advance 后第 6 步的 AI 框马上是 "done,done"。
+  - 真进程测量见第 10 步。
+- **经验：**
+  1. **"读取"和"触发"分开。** GET 里顺手跑一下 AI 很方便，但它让"看一眼"变成"花钱"，也让界面无法在 AI 运行时先给出别的东西。触发 AI 的动作应该是显式的、可重复的（同一个 POST 用于打开、Ask AI、Retry），并且幂等。
+  2. **身份和原因是两件事。** "以谁的权限写"（agent 自己）和"因为谁的动作而运行"（打开它的人）在审计上要分开；把后者塞进前者，要么泄露权限、要么丢失原因。两个 context 变量各管一件。
+  3. **"只跑那一项"要在界面层也检查。** 服务器保证了每一项只跑一次，却保证不了"打开 A 时没有顺带打开 B"。这种问题单元测试看不出来，要在真实页面上数"一次点击产生了几个动作"。
+     同理，"跑了几次"对了不等于"记在谁头上"对了：两个触发方式抢同一项时，要决定以哪一个的原因为准，并为这个决定写测试。
+  4. **同一个量在两处计算，迟早不一致。** 成本、"谁"、时间，统一从 trace 读、用同一个函数算。
+- **范围：** 平台（`app/agents`、上下文、迁移、AI 任务循环）/ hospital（医嘱审核、用药重整、Control Tower、故事线）/ imaging（申请单、门户、反馈）/ 网页（状态组件、活动面板、各页面）。
+- **代码：** `apps/api/app/agents/ondemand.py`、`cause.py`、`activity.py`、`ondemand_router.py`（新）、`apps/api/app/core/context.py`（`_origin`、`X-Demo-Session`）、`apps/api/app/agents/trace.py`、`runtime.py`、`apps/api/app/llm/gateway.py`、
+  `apps/api/app/core/db/migrations/versions/0011_agent_trace_cause.py`、`apps/api/app/core/db/repo.py`（`where`）、`apps/api/app/main.py`（`_ai_jobs_loop`）、`apps/api/app/modules/med_safety/service.py`、`router.py`、`apps/api/app/modules/control_tower/service.py`、`router.py`、
+  `apps/api/app/modules/requisitions/service.py`、`router.py`、`apps/api/app/modules/portal/*`、`apps/api/app/modules/feedback/*`、`apps/api/app/modules/storyline/service.py`、`router.py`、`stubs.py`、`walk.py`、`apps/api/app/ehr/signing.py`、
+  `apps/api/app/modules/documentation/service.py`、`apps/web/src/lib/ai.ts`、`session.ts`、`api.ts`、`apps/web/src/components/ai.tsx`、`AiActivity.tsx`、`Layout.tsx`、各 feature 页面、`apps/api/tests/test_ai_on_demand.py`、`apps/web/e2e/ai-on-demand.spec.ts`。
+- **提交：** 分支 `claude/adoring-kirch-14355b` 的提交 "api, web: AI only on the user's click"（owner 2026-10-14 同意提交，并确认种子积压按需运行这一偏差）。
 
 ---
 
@@ -1947,6 +2078,28 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **经验：** 不要依赖“运行时记得设某个环境变量”来保证脚本能把输出写进文件；让脚本在入口处自己把 stdout 配好。配置位置选 `__main__` 入口，不要放在 import 时——有的脚本会被别的进程当模块导入，import 时改全局状态会误伤宿主。这条是本章“输出重定向 GBK”速查表行的落地修复。
 - **范围：** 环境（开发机）/ 平台（脚本）。
 - **代码与提交：** `apps/api/scripts/_stdio.py`（新）、31 个 `scripts/*.py`（各加 3 行）、`apps/api/tests/test_script_stdio.py`（新）。worktree 分支 `claude/dazzling-northcutt-41fb23`，提交 `6be8255`。
+
+### 6.9 在 worktree 里起一个 mock API：空 venv、没有 PHI 密钥、停掉的任务还占着端口
+
+- **现象：** 2026-10-14 在新 worktree（`.claude/worktrees/adoring-kirch-14355b`）里给 3.23 做真进程测量，连续三次起不来或停不掉：
+  1. `uv run --no-sync python -c "import app.main"` → `ModuleNotFoundError: No module named 'fastapi'`；
+  2. 装好依赖后 uvicorn 启动失败：`app.core.db.crypto.MissingKeyError: PHI_ENCRYPTION_KEY is not set. Generate one with ...`，`Application startup failed. Exiting.`；
+  3. 用后台任务的停止功能停掉 API 后，`curl /api/health` 照样返回 `{"status":"ok",...}`，新起的 API 绑不上 9437。
+- **怎么查的：**
+  1. 第一次：`ls .venv/Lib/site-packages | wc -l` → 2。worktree 带着一个空的 `.venv`（git 不管它，创建 worktree 时只建了壳），`--no-sync` 正好跳过了安装。`uv sync` 装了约 90 个包后正常。
+     不是 6.2 那种"半删的包"：那里是 sync 被占用的 venv 打断，这里是从没装过。
+  2. 第二次：读报错指向的 `crypto.py`：启动时先 `cipher()`，故意在缺密钥时直接失败（"不要等到第一次读病人才失败"）。主 checkout 的 `apps/api/.env` 里有密钥，worktree 没有 `.env`（它不进 git）。
+     不想复制主 checkout 的 `.env`：里面可能有真模型 key，这次测量必须是 mock。看 `tests/conftest.py`：测试用固定的 `test-only-phi-...` 两个密钥。于是写了一个启动脚本：导出这两个测试密钥、`unset` 掉所有模型 key、指定自己的库和端口，再 `exec uvicorn`。
+     启动日志第一行确认 `llm_mode: mock`。
+  3. 第三次：停后台任务后 `Get-NetTCPConnection -LocalPort 9437 -State Listen` 还有一个 OwningProcess；`Win32_Process` 看它的命令行是 `python.exe ...\.venv\Scripts\uvicorn.exe app.main:app --port 9437`。
+     假设：停止只结束了 bash 那一层（脚本里 `exec uv run ...`，uv 再起 python），Windows 上子进程不会跟着父进程退出。按端口找到 PID 再 `Stop-Process` 后端口释放，新 API 正常启动；之后每次都按端口停。
+- **根因：** worktree 只带 git 管的文件：`.venv` 是空的、`.env` 不存在；Windows 上结束父进程不会结束它启动的 python 子进程。
+- **怎么修：** 新 worktree 先 `uv sync`（web 侧 `npm install`）；mock 的真进程用测试密钥和显式 `unset` 模型 key 的启动脚本（不复制别处的 `.env`）；停 API 按端口找 PID：
+  `Get-NetTCPConnection -LocalPort <port> -State Listen | % { Stop-Process -Id $_.OwningProcess }`。
+- **怎么证明：** 三步之后 API 在 9437 正常起、`/api/health` 显示 `llm_mode: mock`、`background.ai: on_demand`；重启三次都能先停后起。
+- **经验：** 换一个 worktree 等于换一台新机器：依赖、密钥、`.env` 都要重新确认。需要密钥又必须是 mock 的场合，用测试密钥并显式清掉模型 key，比"复制一份配置"安全。在 Windows 上停服务看端口，不看任务状态。
+- **范围：** 环境（开发机、worktree）。
+- **代码与提交：** 无代码改动（启动脚本在会话的 scratchpad）。
 
 ---
 

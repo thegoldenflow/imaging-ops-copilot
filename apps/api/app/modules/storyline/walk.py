@@ -119,6 +119,16 @@ class Walk:
     def advance(self, beat: str) -> None:
         self._advance(self, beat)
 
+    def open_ai(self, path: str, action: str, user: str) -> dict:
+        """Open an item as the web app does: when its AI has not run (BACKGROUND_AI=on_demand, or still queued),
+        opening asks for it (`POST <path>/<action>?trigger=opened`; a run the step's button started is waited
+        for, not repeated)."""
+        view = self.get(path, user)
+        ai = view.get("ai") or {}
+        if ai.get("auto") and ai.get("state") in ("not_requested", "queued"):
+            view = self.post(f"{path}/{action}?trigger=opened", user)
+        return view
+
     # ----- the steps -----
 
     def run(self, keys: list[str] | None = None) -> list[StepRun]:
@@ -181,6 +191,7 @@ class Walk:
         exc = self.wait("the Orthopedics exception (high, she is boarding)", lambda: next(
             (e for e in self.get("/api/control-tower/exceptions", user)["exceptions"]
              if e["key"] == "unit_occupancy:ORTH" and e["status"] == "open" and e["severity"] == "high"), None))
+        self.open_ai(f"/api/control-tower/exceptions/{exc['id']}", "narrate", user)
         detail = self.wait("the narrated exception", lambda: (d := self.get(
             f"/api/control-tower/exceptions/{exc['id']}", user)).get("narration") and d)
         if not any(m["action_id"] == "overflow_discharge_rounds" for m in detail.get("menu") or []):
@@ -198,7 +209,7 @@ class Walk:
         review = self.wait("the naproxen order review", lambda: next(
             (i for i in self.get("/api/med-safety/queue?show=all", user)["items"]
              if i.get("order_ref") == f"MedicationRequest/medrx-{S.STAY}-03"), None))
-        view = self.get(f"/api/med-safety/reviews/{review['id']}", user)
+        view = self.open_ai(f"/api/med-safety/reviews/{review['id']}", "commentary", user)
         if not any("warfarin" in str(f).lower() for f in view.get("findings") or []):
             raise WalkFailed("no warfarin interaction finding on the naproxen order")
         if view.get("can_decide"):
@@ -208,8 +219,9 @@ class Walk:
             (m for m in self.get(f"/api/med-safety/encounters/{S.STAY}", user).get("medrec") or []
              if m.get("kind") == "admission"), None))
         sid = session.get("id") or session.get("session_id")
+        self.open_ai(f"/api/med-safety/medrec/{sid}", "ai", user)
         view = self.wait("the reconciliation's AI step", lambda: (v := self.get(f"/api/med-safety/medrec/{sid}", user))
-                         ["ai_status"] != "pending" and v)
+                         ["ai_status"] not in ("pending", "on_open") and v)
         def name(item: dict) -> str:
             return ((item.get("home") or item.get("order") or {}).get("name") or "").lower()
 

@@ -14,6 +14,11 @@ and the event subscriber that plays the story.
   reconciliation, and, with Temporal configured, the start of her InpatientJourneyWorkflow at the registration
   (journey-stay-j0001 from the ED, `JourneyInput.ed_visit`).
 
+- `ai_step(store)`: with BACKGROUND_AI=on_demand, the AI of a step whose button a person pressed (Advance to the
+  admission decision: the exception's narrative; Advance until she has a bed: the naproxen order's review and the
+  admission reconciliation) is queued as soon as its item appears, as that person's action ("Storyline step N").
+  Items nobody's step asked for keep waiting for someone to open them.
+
 The page works without Temporal: every card and module step is there either way (the offline mode of 6.5); with
 Temporal the journey also strings the sign-offs together, escalates them when they wait and shows the timeline.
 """
@@ -27,7 +32,8 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import func, select
 
-from app.agents import approvals
+from app.agents import approvals, ondemand
+from app.agents import cause as causes
 from app.agents import trace as traces
 from app.core.audit import mrn_hash
 from app.core.db.schema import audit_events
@@ -64,7 +70,14 @@ def reset(user: StaffUser) -> dict:
                        resource_type="demo_data", resource_id="storyline", reason="storyline reset (demo reset + "
                        "preset)", event_type="simulator_event", module="storyline")
     st = preset.plant(store, user.id)
+    # until a step's button is pressed, the story's AI (the imaging requisitions after triage) is the presenter's
+    st["driver"] = (causes.from_request("storyline") or causes.AiCause(trigger="storyline")).model_copy(
+        update={"trigger": "storyline", "note": "Storyline"}).model_dump(exclude_none=True)
+    store.modules[preset.STATE] = st
     bridge.on_reset()
+    from app.agents import ondemand
+
+    ondemand.reset()  # queued AI jobs refer to the old data
     return st
 
 
@@ -87,6 +100,11 @@ def handle(event: DomainEvent) -> None:
     st = state(store)
     if st is None:
         return
+    with causes.using(_driver(store, event)):
+        _handle(store, st, event)
+
+
+def _handle(store: Store, st: dict, event: DomainEvent) -> None:
     t, enc, a = event.type, event.encounter, event.attrs
     if t == "patient.admitted" and enc == S.VISIT:
         stubs.ensure_triage_card(store)
@@ -225,11 +243,140 @@ def advance(store: Store, user: StaffUser) -> dict:
     if target_t > parse(view["horizon"]):
         raise ValueError("Past the hospital plan's horizon: reset the storyline")
     job = simjobs.start(store, operator=user.id, until=target_t)
+    _remember_driver(store, step["n"], step["beat"])
     store.audit.record(user_id=user.id, user_name=user.name, role=str(user.role), action="fast-forward",
                        resource_type="hospital_clock", resource_id=None, outcome="allowed",
                        reason=f"storyline step {step['n']}: to {target}", event_type="simulator_event",
                        module="storyline")
     return {"job": job, "beat": step["beat"], "target": target}
+
+
+# ---------- the steps' AI (app/agents/ondemand.py) ----------
+
+# The beats whose Advance button runs a step's AI: the step key and what its AI writes
+AI_BY_BEAT = {"decision": "bed", "admitted": "medrec"}
+AI_TEXT = {"bed": "the AI writes the exception's narrative and recommended actions",
+           "medrec": "the AI reviews her naproxen order and judges the admission reconciliation's new medications"}
+
+
+def _remember_driver(store: Store, n: int, beat: str | None) -> None:
+    """The person who pressed a step's button causes what the story does next (the cards, the scripted discharge
+    reconciliation, and the AI of that step's items)."""
+    st = state(store)
+    base = causes.from_request("storyline") or causes.AiCause(trigger="storyline")
+    driver = base.model_copy(update={"trigger": "storyline", "note": f"Storyline step {n}"}).model_dump(
+        exclude_none=True)
+    st["driver"] = driver
+    if (key := AI_BY_BEAT.get(beat or "")) is not None:
+        st.setdefault("ai_steps", {})[key] = {"cause": driver, "items": [], "at": datetime.now().isoformat()}
+    store.modules[preset.STATE] = st
+
+
+def _driver(store: Store, event: DomainEvent | None = None) -> causes.AiCause | None:
+    st = state(store) or {}
+    if not st.get("driver"):
+        return None
+    cause = causes.AiCause.model_validate(st["driver"])
+    actor = (event.actor or "") if event is not None else ""
+    if actor.startswith("user:") and (user := store.staff.get(actor.removeprefix("user:"))) is not None:
+        cause = cause.model_copy(update={"user_id": user.id, "user_name": user.name, "role": str(user.role)})
+    return cause
+
+
+def _step_items(store: Store, key: str) -> list[tuple[str, str]]:
+    """The items whose AI a step shows, as (kind, id), once they exist."""
+    from app.modules.control_tower import exceptions as X
+    from app.modules.med_safety import service as MS
+
+    if key == "bed":
+        live = sorted((e for e in X.all_exceptions(store) if e.key == "unit_occupancy:ORTH" and e.status in X.LIVE
+                       and e.cleared_at is None), key=lambda e: e.detected_at)
+        return [("exception", live[-1].id)] if live else []
+    if key == "medrec":
+        out = []
+        if (rev := MS.reviews(store).get(f"MedicationRequest/medrx-{S.STAY}-03")) is not None:
+            out.append(("order_review", rev.id))
+        if (ses := MS.sessions(store).get(f"{S.STAY}:admission")) is not None:
+            out.append(("medrec", ses.id))
+        return out
+    return []
+
+
+STEP_ITEMS = {"bed": 1, "medrec": 2}
+
+
+def ai_step(store: Store) -> None:
+    """The hospital loop's step: queue the AI of the items a pressed step's button brought, once they exist. A
+    step's items are fixed when first seen (Orthopedics fills up again later in the story, and nobody pressed a
+    button for that exception)."""
+    st = state(store)
+    wanted = (st or {}).get("ai_steps") or {}
+    open_steps = {k: v for k, v in wanted.items() if len(v.get("items") or []) < STEP_ITEMS[k]}
+    if not open_steps:
+        return
+    changed = False
+    for key, entry in open_steps.items():
+        known = [tuple(i) for i in entry.get("items") or []]
+        for item in _step_items(store, key):
+            if item in known or any(k == item[0] for k, _ in known):
+                continue
+            known.append(item)
+            changed = True
+            kind_name, item_id = item
+            k = ondemand.KINDS[kind_name]
+            if k.needs_ai(store, item_id):
+                label, link = ondemand._describe(k, store, item_id)
+                cause = causes.AiCause.model_validate(entry["cause"]).model_copy(
+                    update={"kind": kind_name, "item_id": item_id, "label": label, "link": link})
+                ondemand.request(kind_name, item_id, cause)
+        entry["items"] = [list(i) for i in known]
+    if changed:
+        store.modules[preset.STATE] = st
+
+
+def ask_step_ai(store: Store, key: str) -> dict:
+    """The step's Ask AI (the page's AI box): queue the AI of the step's items that exist now, as this person's
+    storyline step, when its Advance was not pressed (the clock moved by itself) or the AI was unavailable."""
+    step = S.BY_KEY.get(key)
+    if step is None or key not in AI_TEXT:
+        raise ValueError("This step's AI runs from its own screen")
+    st = state(store)
+    if st is None:
+        raise ValueError("Reset the storyline first")
+    for kind_name, item_id in _step_items(store, key):  # a failed run is asked for again
+        k = ondemand.KINDS[kind_name]
+        if k.retry is not None:
+            k.retry(store, item_id)
+    base = causes.from_request("storyline") or causes.AiCause(trigger="storyline")
+    cause = base.model_copy(update={"trigger": "storyline", "note": f"Storyline step {step.n}"}).model_dump(
+        exclude_none=True)
+    st.setdefault("ai_steps", {})[key] = {"cause": cause, "items": [], "at": datetime.now().isoformat()}
+    store.modules[preset.STATE] = st
+    ai_step(store)
+    return {"step": step.n, "items": [list(i) for i in (st["ai_steps"][key].get("items") or [])]}
+
+
+def _step_ai(store: Store, key: str, st: dict | None) -> dict:
+    """What the AI does for one step: its items' AI blocks, and whether the step's button asked for it."""
+    from app.modules.control_tower import exceptions as X
+    from app.modules.control_tower import service as CT
+    from app.modules.med_safety import service as MS
+    from app.modules.med_safety.models import get_review, get_session
+
+    asked = ((st or {}).get("ai_steps") or {}).get(key)
+    pinned = [tuple(i) for i in (asked or {}).get("items") or []]
+    items = []
+    for kind_name, item_id in pinned or _step_items(store, key):
+        if kind_name == "exception" and (exc := X.get(store, item_id)) is not None:
+            items.append({"kind": kind_name, "id": item_id, "label": exc.title, "ai": CT.exception_ai(exc)})
+        elif kind_name == "order_review" and (rev := get_review(store, item_id)) is not None:
+            items.append({"kind": kind_name, "id": item_id, "label": "Her naproxen order's review",
+                          "ai": MS.review_ai(rev)})
+        elif kind_name == "medrec" and (ses := get_session(store, item_id)) is not None:
+            items.append({"kind": kind_name, "id": item_id, "label": "Admission reconciliation",
+                          "ai": MS.session_ai(ses)})
+    return {"items": items, "text": AI_TEXT.get(key), "requested": asked is not None,
+            "requested_by": ((asked or {}).get("cause") or {}).get("user_name")}
 
 
 # ---------- status ----------
@@ -258,10 +405,12 @@ def _proposal(task: dict | None, label: str) -> dict | None:
         return None
     run_id = traces.run_of(task)
     trace = traces.get(run_id) if run_id else None
+    facts = ondemand.trace_facts(run_id) if trace and trace.llm_calls else {}
     return {"label": label, "ref": f"Task/{task['id']}", "at": task.get("authoredOn"),
             "agent": approvals._agent_of(task), "run_id": run_id, "summary": task.get("description"),
             "recommendation": approvals.inputs(task).get("recommendation"),
-            "model": trace.model if trace else None, "mode": trace.mode if trace else None}
+            "model": trace.model if trace else None, "mode": trace.mode if trace else None,
+            "generated_at": facts.get("generated_at"), "duration_ms": facts.get("duration_ms")}
 
 
 def _signature(doc: dict | None) -> dict | None:
@@ -541,6 +690,8 @@ def status(store: Store, user: StaffUser) -> dict:
                 "cast": _user(store, S.CAST[step.cast]), "cast_key": step.cast}
         if facts is not None:
             item.update(_step_state(step, facts, store))
+            if step.key in AI_TEXT:
+                item["step_ai"] = _step_ai(store, step.key, st)
         else:
             item.update(proposal=None, signed=None, written=[], audit=[], detail=None, done=False)
         if not item["done"] and not current_found:
@@ -551,6 +702,7 @@ def status(store: Store, user: StaffUser) -> dict:
                 beat = "admitted"
                 item.update(beat=beat, beat_hint=BEAT_HINT[beat])
             beat_at = view["beats"].get(beat) if beat else None
+            item["advance_ai"] = AI_TEXT.get(AI_BY_BEAT.get(beat or "", ""))
             item["status"] = "waiting" if beat and (beat_at is None or parse(beat_at) > now) and \
                 (not item["proposal"] or beat != step.beat) else "active"
             item["beat_at"] = beat_at

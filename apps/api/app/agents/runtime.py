@@ -35,6 +35,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.agents import cause as ai_cause
 from app.agents import registry, untrusted as untrusted_text
 from app.agents import trace as traces
 from app.agents.gateway import ToolResult, agent_actor, runtime_fhir, tool_gateway
@@ -218,7 +219,7 @@ class AgentRuntime:
             mode=get_gateway().mode, eval_status=spec.eval_status.status, evaluated=spec.evaluated,
             actor_id=user.id if user else "system", actor_role=str(user.role) if user else "system",
             encounter_id=encounter_id, context_id=context_id, input_refs=list(input_refs),
-            started_at=datetime.now())
+            started_at=datetime.now(), cause=ai_cause.stamp())
         traces.save(trace)
         return AgentRun(spec, trace, user=user, encounter_id=encounter_id, patient_id=patient_id,
                         context_id=context_id, attachments=attachments)

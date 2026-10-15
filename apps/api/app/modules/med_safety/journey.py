@@ -32,7 +32,7 @@ from app.core.models import StaffUser
 from app.core.store import Store
 from app.fhir.dt import parse
 from app.modules.med_safety import medrec_agent, rules, service
-from app.modules.med_safety.models import OrderReview, reviews
+from app.modules.med_safety.models import WAITING, OrderReview, reviews
 
 PRIORITY = {"blocking": "stat", "major": "urgent", "moderate": "asap"}
 SHOWN = 6  # flagged orders named in the sign-off Task
@@ -182,8 +182,8 @@ def medrec_admission(store: Store, encounter_id: str, orders_as_of: str | None) 
     the AI (no consent, not deployable, the model down) the module writes the draft itself and the step still
     waits for the signed record."""
     session = service.reconcile(store, encounter_id, "admission", orders_as_of=parse(orders_as_of))
-    if session.ai_status == "pending":
-        session = service.settle(store, session.id)
+    if session.ai_status in WAITING:  # the background has not run it, or leaves it to whoever opens it
+        session = service.settle(store, session.id, wait=True)
     elif session.ai_status == "done" and session.status == "open":
         document_id = _redraft(session)
         if document_id != session.document_id:

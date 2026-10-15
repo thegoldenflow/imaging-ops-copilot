@@ -122,6 +122,7 @@ export interface Overview {
   alerts: { open: AlertTask[] };
   budget: BudgetStatus;
   idle: IdleStatus;
+  background_ai: "on_demand" | "eager";
 }
 
 export interface ToolCall {

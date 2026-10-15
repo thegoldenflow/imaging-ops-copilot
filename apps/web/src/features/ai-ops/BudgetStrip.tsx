@@ -1,17 +1,21 @@
-// The daily AI budget (LLM_DAILY_BUDGET_USD) and the idle pause (IDLE_PAUSE_MINUTES) of the server: today's model
-// spend against the cap, and what happens when it is reached. Numbers come from /api/aiops/overview.
+// The daily AI budget (LLM_DAILY_BUDGET_USD), the idle pause (IDLE_PAUSE_MINUTES) and the background AI mode
+// (BACKGROUND_AI) of the server: today's model spend against the cap, and what happens when it is reached. Numbers
+// come from /api/aiops/overview.
 
 import clsx from "clsx";
 import { PiggyBank } from "lucide-react";
 import { dateTime } from "../../lib/format";
 import type { BudgetStatus, IdleStatus } from "./types";
 
-export function BudgetStrip({ budget, idle }: { budget: BudgetStatus; idle: IdleStatus }) {
+export function BudgetStrip({ budget, idle, backgroundAi }: { budget: BudgetStatus; idle: IdleStatus; backgroundAi: "on_demand" | "eager" }) {
   const cap = budget.limit_usd;
   const share = cap ? Math.min(1, budget.spent_usd / cap) : 0;
   const pause = idle.pause_minutes > 0
     ? `Background AI work pauses after ${idle.pause_minutes} min without anyone using the demo.`
     : "Background AI work never pauses (IDLE_PAUSE_MINUTES=0).";
+  const onOpen = backgroundAi === "on_demand"
+    ? "AI on demand: an item's AI output is written when someone opens the item, asks for it or creates new work (the header's AI activity lists each run)."
+    : "Eager: every new item's AI output is written in the background, before anyone looks.";
   return (
     <div
       className={clsx("flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border px-3 py-2 text-sm",
@@ -37,7 +41,7 @@ export function BudgetStrip({ budget, idle }: { budget: BudgetStatus; idle: Idle
           )}
         </>
       )}
-      <span className="text-xs text-slate-500">{pause}</span>
+      <span className="text-xs text-slate-500" data-testid="aiops-background-ai">{pause} {onOpen}</span>
     </div>
   );
 }

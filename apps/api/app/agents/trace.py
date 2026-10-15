@@ -10,6 +10,8 @@ LLM gateway. 6.5 workflows and the 6.6 AI Ops page read traces; there is no othe
 Traces hold references and hashes only (resource ids, args hashes), never
 arguments or text; a model call that failed keeps the error it failed with (the
 provider's message, the refusal or the validation error, as on its LlmCall).
+Each trace also says why the run happened (`cause`: the browser session and person whose click caused it, the
+trigger and the item; app/agents/cause.py), for the "What the AI did in this demo" panel.
 When a run writes FHIR resources, a Provenance `prov-<run_id>` records them as
 targets with the agent (Device: agent_id and version) as author, the
 on-behalf-of user, the input resources as entities and the prompt version,
@@ -93,6 +95,8 @@ class AgentTrace(BaseModel):
     provenance_id: str | None = None
     started_at: datetime
     finished_at: datetime | None = None
+    # who caused the run, by doing what, for which item (app/agents/cause.py); None: the background's own run
+    cause: dict | None = None
 
     @property
     def output_ref(self) -> str | None:  # the spec's singular name: the run's main output
@@ -170,6 +174,22 @@ def save(trace: AgentTrace, store=None) -> None:
 
 def get(run_id: str, store=None) -> AgentTrace | None:
     return table(store).get(run_id)
+
+
+def by_llm_calls(call_ids: list[str | None], store=None) -> dict[str, AgentTrace]:
+    """The traces holding these model calls (an embedded agent's one-call trace: the imaging modules), by call id."""
+    from sqlalchemy.dialects.postgresql import array
+
+    refs = [f"LlmCall/{c}" for c in dict.fromkeys(call_ids) if c]
+    if not refs:
+        return {}
+    t = table(store)
+    out = {}
+    for trace in t.where(t.c.output_refs.has_any(array(refs))):
+        for ref in trace.output_refs:
+            if ref in refs:
+                out[ref.removeprefix("LlmCall/")] = trace
+    return out
 
 
 def run_of(resource: dict | None) -> str | None:

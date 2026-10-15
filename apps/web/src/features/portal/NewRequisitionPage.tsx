@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Sparkles } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { AiStatus } from "../../components/ai";
 import { Button, Card, ErrorState, Loading, PageHeader } from "../../components/ui";
+import { clockTime, seconds } from "../../lib/ai";
 import { api, post } from "../../lib/api";
 import type { PortalPatientRow, PortalRequisition } from "../../lib/types";
 
@@ -16,6 +18,35 @@ function Field({ label, children, hint }: { label: string; children: ReactNode; 
       <div className="mt-1">{children}</div>
       {hint && <span className="text-xs text-slate-500">{hint}</span>}
     </label>
+  );
+}
+
+/** What happens to the requisition just submitted: the AI reads, triages and protocols it at once (your action), and
+ * this page follows it. The referrer sees that and when, never the AI's suggestion itself. */
+function SubmittedAi({ id }: { id: string }) {
+  const reqs = useQuery({
+    queryKey: ["portal-reqs"], queryFn: () => api<{ requisitions: PortalRequisition[] }>("/api/portal/requisitions"),
+    refetchInterval: (q) => {
+      const ai = q.state.data?.requisitions.find((r) => r.id === id)?.ai;
+      return ai && ai.state !== "done" && ai.state !== "unavailable" ? 1000 : false;
+    },
+  });
+  const ai = reqs.data?.requisitions.find((r) => r.id === id)?.ai;
+  if (!ai) return null;
+  if (ai.state === "done") {
+    return (
+      <p className="flex items-center gap-1.5 text-sm text-ai-700" data-testid="submitted-ai-done">
+        <Sparkles className="size-4" />AI read, triaged and protocolled it at {clockTime(ai.generated_at)}{ai.duration_ms != null ? ` in ${seconds(ai.duration_ms / 1000)}` : ""}.
+      </p>
+    );
+  }
+  if (ai.state === "unavailable") return <p className="text-sm text-amber-800">The AI could not process it; our staff triage it by hand.</p>;
+  return (
+    <div className="w-full text-left" data-testid="submitted-ai">
+      <AiStatus ai={{ kind: "requisition", item_id: id, auto: false, error: null, run_id: null, cause: null, ...ai,
+        state: ai.state === "not_requested" ? "queued" : ai.state, generated_at: null, duration_ms: null }}
+        onAsk={() => undefined} rulesNote="It is in the queue already; nothing else to do." />
+    </div>
   );
 }
 
@@ -43,7 +74,8 @@ export function NewRequisitionPage() {
           <div className="flex flex-col items-center gap-2 py-6 text-center" data-testid="requisition-sent">
             <CheckCircle2 className="size-8 text-emerald-600" />
             <p className="font-semibold text-slate-900">Requisition {submit.data.id} received</p>
-            <p className="text-sm text-slate-600">Our team triages it and assigns a protocol; you can follow its status under My patients. Urgent requests are reviewed first.</p>
+            <SubmittedAi id={submit.data.id} />
+            <p className="text-sm text-slate-600">A radiologist confirms the priority and the protocol before booking; you see the priority once confirmed. Follow it under My patients.</p>
             <div className="mt-2 flex gap-2">
               <Link to="/portal"><Button variant="primary">My patients</Button></Link>
               <Button onClick={() => submit.reset()}>Submit another</Button>

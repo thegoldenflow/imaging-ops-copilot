@@ -102,7 +102,7 @@ def _one_pass(monkeypatch, loop, sleeps_before_stop: int) -> list[str]:
     return ran
 
 
-def test_while_idle_only_the_steps_that_call_the_model_wait(monkeypatch):
+def test_while_idle_only_the_steps_that_call_the_model_wait(monkeypatch, eager_background_ai):
     _settings(monkeypatch, idle_pause_minutes=15)
     assert activity.idle()
     intake = _one_pass(monkeypatch, main._intake_loop, 1)
@@ -164,7 +164,7 @@ def test_priced_calls_add_up_in_the_ledger_and_reach_the_cap(monkeypatch, ledger
     survey = next(s for s in feedback.surveys(store).values() if s.status == "sent")
     first = feedback.submit(store, survey, 5, "Quick and friendly staff", datetime.now())
     before = len(store.llm_calls)
-    feedback.process_pending(store)  # this response and any other waiting for classification
+    first = feedback.classify_one(store, first.id)
     assert first.ai_status == "ok"
     spent = budget.spent_today()
     assert spent > 0 and sum(c.cost_usd for c in store.llm_calls[before:]) == pytest.approx(spent)
@@ -175,7 +175,7 @@ def test_priced_calls_add_up_in_the_ledger_and_reach_the_cap(monkeypatch, ledger
     assert budget.refusal().startswith(budget.REFUSAL_PREFIX)
     second = next(s for s in feedback.surveys(store).values() if s.status == "sent" and s.id != survey.id)
     resp = feedback.submit(store, second, 1, "Waited two hours", datetime.now())
-    feedback.process_pending(store)
+    resp = feedback.classify_one(store, resp.id)
     assert resp.ai_status == "unavailable" and resp.sentiment is None  # degraded like a provider outage
     assert any(a.response_id == resp.id for a in feedback.alerts(store).values())  # the rule still fired
     call = store.llm_calls[-1]

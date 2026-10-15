@@ -54,6 +54,9 @@ def fresh_state(database):
     set_ambient_store(store)
     set_gateway(LlmGateway(MockProvider(latency_s=0)))
     reset_adapters()  # circuit breakers are per process; each test starts with closed circuits
+    from app.agents import ondemand
+
+    ondemand.reset(everything=True)  # the AI jobs queued by an earlier test refer to its rolled-back data
     yield store
     set_gateway(None)
     set_ambient_store(None)
@@ -64,6 +67,17 @@ def fresh_state(database):
         outer.rollback()
         conn.close()
     clear_process_cache()
+
+
+@pytest.fixture
+def eager_background_ai(monkeypatch):
+    """BACKGROUND_AI=eager, for a test about the background writing the AI output of order reviews, reconciliations
+    and Control Tower exceptions before anyone opens them (the default, on_demand, leaves it to whoever opens one)."""
+    import dataclasses
+
+    from app.core import config
+
+    monkeypatch.setattr(config, "settings", dataclasses.replace(config.settings, background_ai="eager"))
 
 
 @pytest.fixture

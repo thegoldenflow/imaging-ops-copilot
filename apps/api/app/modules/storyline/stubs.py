@@ -160,9 +160,10 @@ def imaging_requests(store: Store) -> list[dict]:
     protocol suggestion: the imaging systems 5 and 6, their own agents and audit)."""
     from datetime import datetime
 
+    from app.agents import cause as causes
+    from app.agents import ondemand
     from app.core.models import Requisition
     from app.modules.protocols import service as protocols
-    from app.modules.requisitions import service as requisitions
     from app.modules.triage import service as triage
 
     out = []
@@ -172,8 +173,8 @@ def imaging_requests(store: Store) -> list[dict]:
             req = Requisition(id=rid, patient_id=S.IMAGING_PATIENT, referrer_id=S.IMAGING_REFERRER,
                               received_at=datetime.now(), channel="online_form", text=_requisition_text(store, code, exam))
             store.requisitions[rid] = req
-        if req.status == "received":
-            requisitions.process(store, req)
+        if req.status == "received":  # a person accepted her triage: this is their action's work
+            ondemand.run_now(store, "requisition", rid, trigger="action", cause=causes.current())
         tri = triage.records(store).get(rid)
         pro = protocols.records(store).get(rid)
         out.append({"requisition": rid, "code": code, "exam": exam, "priority": tri.ai_priority if tri else None,

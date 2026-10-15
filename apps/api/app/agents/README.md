@@ -16,6 +16,14 @@ review queue (`/reviews`). API: `/api/agents/...` (`router.py`).
 | `trace.py` | `AgentTrace` (table `agent_traces`), idempotency records |
 | `library/patient_message_triage.py` | The runtime's reference agent; `library/journey_stubs.py` the journey's remaining placeholders |
 | `injection_eval.py`, `evalsets.py` | The prompt-injection harness; per-agent eval sets and regression for the low-confidence loop |
+| `ondemand.py`, `cause.py`, `activity.py`, `ondemand_router.py` | AI on demand (`BACKGROUND_AI`): the kinds of item that get AI output, their shared AI state, the job loop's queue and batches, who caused each run (`cause` on the trace), and "What the AI did in this demo" (`/api/ai/...`) |
+
+AI on demand: with `BACKGROUND_AI=on_demand` (the demo's default) no model call is made for work nobody asked for.
+An item's AI runs when a person opens it or presses Ask AI (in the request, `ondemand.run_now`), or at once for new
+work their action created and for a batch they asked for (`ondemand.request`, run by the API's AI job loop, two at a
+time). One run per item at a time: a second caller waits for the first in this process, and the kinds' own locks
+cover other processes. Each run's trace records its cause: the browser's demo session (`X-Demo-Session`), the person,
+the trigger (opened, asked, action, batch, storyline) and the item, also when the agent writes as itself.
 
 ## Input resources
 
@@ -42,6 +50,11 @@ review queue (`/reviews`). API: `/api/agents/...` (`router.py`).
   signers added as verifiers. `GET /api/agents/lineage?ref=` goes from any output back to inputs, model and prompt.
 - The reference agent's model output: `TriageOutput` in `library/patient_message_triage.py` (summary, category,
   urgency, reply draft, confidence, tool requests); the red flags come from the rule layer before the model.
+- An item's AI block (`ondemand.view`), the same for every kind: `state` not_requested / queued / running / done /
+  unavailable / skipped, `auto` (opening runs it), `typical_s`, the running `step` of `steps`, `generated_at`,
+  `duration_ms`, `cause`, `error`. `GET /api/ai/activity?scope=session|all`: the AI actions (runs grouped by the
+  cause's action id) with what, item, trigger, person, time, duration, calls and cost (mock: the list-price estimate),
+  what is running and queued, totals. `POST /api/ai/batch`, `GET /api/ai/kinds`.
 
 ## Eval set and threshold
 
@@ -52,6 +65,10 @@ review queue (`/reviews`). API: `/api/agents/...` (`router.py`).
   low-confidence loop), judged on category and urgency.
 - Gateway behaviour: `tests/test_tool_gateway.py` (one positive and one refusal per side-effect level, idempotency,
   privileged approvals, retries, fallback), `tests/test_agent_runtime.py`, `tests/test_agent_registry.py`.
+- AI on demand: `tests/test_ai_on_demand.py` (no call until something is opened, one run per item, a submitted
+  requisition and a survey answer run at once as the person's action, batches, retry, the cause through
+  `acting_as_system`, the activity of a session and of everyone) and `tests/test_background_ai.py`; Playwright
+  `ai-on-demand.spec.ts`. Bar: a fresh data set makes 0 model calls while people only browse lists.
 
 Release gate (6.6): `patient_message_triage` eval_threshold 0.9 in the agent registry (`apps/api/config/agents/`);
 the runner `uv run python -m app.aiops.evalrun` judges every agent against it, and the latest results of every agent
@@ -73,3 +90,7 @@ are in [evals/README.md](../../../../evals/README.md).
   the refusals are visible in the demo.
 - The low-confidence loop learns for `patient_message_triage` only (the only agent with a confidence and a
   threshold); its regression judges category and urgency.
+- AI on demand keeps its running and queued jobs, its measured typical times and the causes of follow-up work (a
+  signed summary's instructions) in process memory: a restart drops queued jobs (the items then wait for someone to
+  open them) and the API must run one worker (docs/DEPLOY.md). A reconciliation whose AI was unavailable keeps the
+  rules' fallback; Ask AI does not run it again.

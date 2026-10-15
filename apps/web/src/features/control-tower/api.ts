@@ -2,6 +2,7 @@
 // Times are hospital-clock local times without a zone ("2026-10-09T07:42:00").
 
 import { useQuery } from "@tanstack/react-query";
+import type { AiBlock } from "../../lib/ai";
 import { api, post } from "../../lib/api";
 
 export type Severity = "low" | "med" | "high";
@@ -158,7 +159,8 @@ export interface ExceptionItem {
   cleared_at: string | null;
   remind_at: string | null;
   reminders: number;
-  narration_status: "pending" | "done";
+  narration_status: "pending" | "on_open" | "done"; // on_open: narrated when someone opens it (BACKGROUND_AI=on_demand)
+  ai: AiBlock; // the narrative's AI state (lib/ai.ts)
   decision: Decision | null;
   review_task_id: string | null;
   narrative: string | null;
@@ -313,9 +315,11 @@ export const useException = (id: string | null) =>
     queryKey: ["ct-exception", id],
     queryFn: () => api<ExceptionDetail>(`/api/control-tower/exceptions/${id}`),
     enabled: Boolean(id),
-    // while the exception's workflow executes the approved actions, follow it until the Tasks exist
+    // while the exception's workflow executes the approved actions, follow it until the Tasks exist; and while a
+    // narrative another request or the AI job loop is writing is under way
     refetchInterval: (query) =>
-      query.state.data?.decision?.actions?.some((a) => a.status === "queued" && !a.task_id) ? 1000 : false,
+      query.state.data?.decision?.actions?.some((a) => a.status === "queued" && !a.task_id) ||
+      ["queued", "running"].includes(query.state.data?.ai?.state ?? "") ? 1000 : false,
   });
 
 export const useUnit = (id: string | null, fast: boolean) =>
@@ -334,6 +338,8 @@ export const usePatientCard = (encounterId: string | null) =>
     retry: false,
   });
 
+export const narrateException = (id: string, trigger: "opened" | "asked" = "asked") =>
+  post<ExceptionDetail>(`/api/control-tower/exceptions/${id}/narrate?trigger=${trigger}`);
 export const approveException = (id: string, action_ids: string[], note: string) =>
   post<ExceptionDetail>(`/api/control-tower/exceptions/${id}/approve`, { action_ids, note });
 export const rejectException = (id: string, reason: string) =>

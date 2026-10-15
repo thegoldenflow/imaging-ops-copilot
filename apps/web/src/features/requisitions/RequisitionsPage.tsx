@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FilePlus2, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { AiChip } from "../../components/ai";
+import { AiBatchBar } from "../../components/AiActivity";
 import { Badge, Button, Card, EmptyState, ErrorState, Loading, PageHeader, Stat, Tabs, UrgencyBadge } from "../../components/ui";
 import { api, post, put } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -36,7 +38,7 @@ function NewRequisition({ onDone }: { onDone: (id: string) => void }) {
       <textarea value={text ?? sample?.text ?? ""} onChange={(e) => setText(e.target.value)} rows={9}
         className="w-full rounded-lg border border-slate-300 p-3 font-mono text-xs" aria-label="Requisition text" />
       <div className="mt-2 flex items-center justify-between gap-2">
-        <p className="text-xs text-slate-500">After submitting, the intake worker extracts, triages and suggests a protocol within seconds.</p>
+        <p className="text-xs text-slate-500">Submitting is your action: the AI extracts, triages and suggests a protocol at once, and the requisition opens so you can watch it.</p>
         <Button variant="primary" loading={submit.isPending} onClick={() => submit.mutate()} data-testid="submit-requisition">Submit requisition</Button>
       </div>
       {submit.error && <p className="mt-2 text-sm text-rose-600">{(submit.error as Error).message}</p>}
@@ -54,10 +56,13 @@ function Queue() {
   if (q.error) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const { requisitions, counts, targets } = q.data!;
   const overdue = requisitions.filter((r) => (r.days_left ?? 0) < 0).length;
+  // the list never runs the AI by itself: received requisitions wait for someone to open them or ask for a batch
+  const notRun = requisitions.filter((r) => r.ai?.state === "not_requested").map((r) => ({ kind: "requisition", id: r.id }));
+  const aiBusy = requisitions.filter((r) => r.ai?.state === "running" || r.ai?.state === "queued").length;
   return (
     <>
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Stat label="Being processed by AI" value={(counts.received ?? 0) + (counts.processing ?? 0)} />
+        <Stat label="Waiting for the AI" value={notRun.length} hint={aiBusy ? `${aiBusy} with the AI now` : "runs when opened"} />
         <Stat label="Awaiting radiologist" value={counts.ready ?? 0} tone={counts.ready ? "amber" : undefined} />
         <Stat label="Ready to book" value={counts.approved ?? 0} />
         <Stat label="Past target wait" value={overdue} tone={overdue ? "red" : undefined} />
@@ -70,7 +75,8 @@ function Queue() {
           </Button>
         </div>
       )}
-      {showNew && <NewRequisition onDone={() => setShowNew(false)} />}
+      {showNew && <NewRequisition onDone={(id) => { setShowNew(false); navigate(`/requisitions/${id}`); }} />}
+      {notRun.length > 0 && <div className="mb-3"><AiBatchBar items={notRun} noun={notRun.length === 1 ? "requisition" : "requisitions"} checked="received" /></div>}
       <Card padded={false}>
         {requisitions.length === 0 ? <EmptyState title="No open requisitions" /> : (
           <div className="overflow-x-auto">
@@ -87,7 +93,7 @@ function Queue() {
                           <UrgencyBadge urgency={r.priority} />
                           {!r.triage_reviewed && <Sparkles className="size-3 text-ai-600" aria-label="AI priority, not yet reviewed" />}
                         </span>
-                      ) : <span className="text-xs text-slate-400">pending</span>}
+                      ) : <AiChip state={r.ai?.state} />}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap"><DaysLeft days={r.days_left} /></td>
                     <td className="px-3 py-2"><p className="font-medium">{r.patient_name}</p><p className="text-xs text-slate-500">{r.referrer_name}{r.channel === "portal" && <Badge tone="blue" className="ml-1">Portal</Badge>}</p></td>

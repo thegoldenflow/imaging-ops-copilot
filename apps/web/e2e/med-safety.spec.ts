@@ -41,7 +41,9 @@ test.beforeAll(async ({ request }, testInfo) => {
   for (const item of items.filter((i) => i.kind === "medrec" && i.unit_id === "MEDA")) {
     const session = await (await request.get(`/api/med-safety/medrec/${item.id}`, { headers: auth })).json();
     if (session.kind === "admission" && session.items.some((x: { id: string }) => x.id === "new-51272")) {
-      medrec = { id: item.id, mrn: session.patient.mrn, doc: session.document_id };
+      // its draft record is written by its AI step: on demand, when someone opens it (as the web app asks here)
+      const opened = await (await request.post(`/api/med-safety/medrec/${item.id}/ai?trigger=opened`, { headers: auth })).json();
+      medrec = { id: item.id, mrn: session.patient.mrn, doc: opened.document_id };
       break;
     }
   }
@@ -93,10 +95,9 @@ test("pharmacist: queue, rule and AI flags, every item handled, sign; physician 
   const warfarin = review.getByTestId("finding").filter({ hasText: "Interaction (major): naproxen + warfarin" });
   await expect(warfarin).toBeVisible();
   await expect(warfarin.getByTestId("source-rule")).toContainText("Rule: Drug interaction");
-  if (await review.getByRole("button", { name: "Ask the AI now" }).isVisible()) {
-    await review.getByRole("button", { name: "Ask the AI now" }).click();
-  }
-  // the background loop may hold this commentary while it writes it with others: the panel follows it
+  // opening the review asks the AI for its commentary (BACKGROUND_AI=on_demand); the panel shows it running, then the
+  // result with when it was generated (or follows the eager background's run)
+  await expect(review.getByTestId("ai-meta")).toContainText("generated", { timeout: 30_000 });
   await expect(review.getByTestId("ai-concern").first()).toBeVisible({ timeout: 30_000 });
   await expect(review.getByTestId("source-ai").first()).toContainText("confidence");
   await review.getByTestId("ai-concern").first().getByTestId("view-evidence").click();

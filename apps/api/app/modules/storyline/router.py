@@ -29,6 +29,16 @@ def reset(user: StaffUser = Depends(current_user)):
     return {"ok": True, "prepared_at": state["prepared_at"], "capacity": state.get("capacity")}
 
 
+@router.post("/steps/{key}/ai")
+def step_ai(key: str, user: StaffUser = Depends(current_user)):
+    """A step's Ask AI on the storyline page: its items' AI (the exception's narrative; the naproxen review and the
+    admission reconciliation) runs now, as this person's storyline step."""
+    try:
+        return service.ask_step_ai(get_store(), key)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+
+
 @router.post("/advance")
 def advance(user: StaffUser = Depends(current_user)):
     """Fast-forward the hospital clock to the current step's beat (a background job; GET shows its progress)."""

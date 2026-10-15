@@ -9,8 +9,9 @@ change can't merge without an eval run attached."
   `cd apps/api && LLM_PROVIDER=mock uv run uvicorn app.main:app --port 9437` and the web app.
 - Optional: `cd apps/api && uv run python scripts/ai_ops_demo.py --commit` adds three patient messages (one with a
   prompt injection the gateway refuses) and checks the alerts once, so the page has failures and an alert Task
-  right away. Without it, wait a minute after a demo reset: the order-review commentary and the Control Tower's
-  narratives run in the background.
+  right away. Without it, open an order review or a Control Tower exception first: with `BACKGROUND_AI=on_demand`
+  (the default) the AI runs only when someone opens an item or asks (`BACKGROUND_AI=eager` runs the backlog in the
+  background after each reset, as before). The header's **AI activity** lists each run with what caused it.
 - The eval runs are committed (`evals/runs/`): the full mock baseline and the candidate
   `patient_message_triage@2`. To run them again: `cd apps/api && uv run python -m app.aiops.evalrun` (about 5
   minutes, every agent) and `uv run python -m app.aiops.evalrun --prompt patient_message_triage@2`.

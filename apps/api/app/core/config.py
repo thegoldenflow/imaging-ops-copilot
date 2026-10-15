@@ -64,6 +64,10 @@ class Settings:
     idle_pause_minutes: float
     # Daily cap on model spend in USD (server's day); past it the gateway refuses model calls. None: no cap.
     llm_daily_budget_usd: float | None
+    # BACKGROUND_AI: "on_demand" (the background writes the rule results of order reviews, reconciliations and
+    # Control Tower exceptions; their AI runs when a person opens one) or "eager" (the background writes the AI
+    # output too, before anyone looks).
+    background_ai: str
     # Hour of day (0-23) at which the demo data is regenerated once a day; unset: never.
     demo_daily_reset_hour: int | None
     # Hospital EHR behind FhirGateway: "local" (FHIR store in PostgreSQL) or "hapi" (a FHIR server).
@@ -120,6 +124,9 @@ def load_settings() -> Settings:
             raise ValueError(f"{name} must be one of {', '.join(GEMINI_THINKING_LEVELS)}, not {thinking[tier]!r}")
     if app_mode not in ("demo", "prod"):
         raise ValueError(f"APP_MODE must be demo or prod, not {app_mode!r}")
+    background_ai = os.getenv("BACKGROUND_AI", "on_demand").strip().lower()
+    if background_ai not in ("on_demand", "eager"):
+        raise ValueError(f"BACKGROUND_AI must be on_demand or eager, not {background_ai!r}")
     return Settings(
         anthropic_api_key=key,
         google_agent_platform_api_key=os.getenv("GOOGLE_AGENT_PLATFORM_API_KEY") or None,
@@ -141,6 +148,7 @@ def load_settings() -> Settings:
         background_workers=os.getenv("BACKGROUND_WORKERS", "1") != "0",
         idle_pause_minutes=float(os.getenv("IDLE_PAUSE_MINUTES", "15")),
         llm_daily_budget_usd=float(b) if (b := os.getenv("LLM_DAILY_BUDGET_USD", "").strip()) else None,
+        background_ai=background_ai,
         demo_daily_reset_hour=int(h) if (h := os.getenv("DEMO_DAILY_RESET_HOUR", "").strip()) else None,
         fhir_backend=fhir_backend,
         fhir_base_url=os.getenv("FHIR_BASE_URL", "http://localhost:8080/fhir").rstrip("/"),
@@ -163,3 +171,9 @@ def load_settings() -> Settings:
 
 
 settings = load_settings()
+
+
+def ai_on_open() -> bool:
+    """BACKGROUND_AI=on_demand: new order reviews, reconciliations and Control Tower exceptions wait in the state
+    `on_open` for a person to open them, and the background does not call the model for them."""
+    return settings.background_ai == "on_demand"

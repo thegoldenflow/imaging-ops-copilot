@@ -48,8 +48,8 @@ const STORY: Step[] = [
 
 const PIPELINE: Step[] = [
   {
-    title: "Requisitions arrive and the AI pipeline runs",
-    detail: "Three faxed requisitions were just received. Each is extracted once, triaged and given a protocol suggestion within seconds. Submit another from the queue.",
+    title: "Requisitions arrive; the AI runs when you open one",
+    detail: "Three faxed requisitions wait in the queue and no AI has touched them. Open one: the AI extracts it once, triages it and suggests a protocol while you watch, and says how long it took. Submit another from the queue: your action, so it runs at once. The AI activity button in the header lists every call your clicks caused.",
     role: "front_desk", userId: "U-FD", to: "/requisitions", system: "Requisition intake",
   },
   {
@@ -165,7 +165,7 @@ const HOSPITAL: Step[] = [
   },
   {
     title: "The pharmacist works the medication safety queue",
-    detail: "Rules flag every new order first (allergies block; interactions, renal dosing, dose bounds, repeat tests), the AI comments with its confidence and evidence. A hip-fracture patient on warfarin got naproxen: a major interaction; reconcile the admission, handle every discrepancy, sign. A physician co-signs.",
+    detail: "Rules flag every new order first (allergies block; interactions, renal dosing, dose bounds, repeat tests); opening an order asks the AI for its commentary, with its confidence and evidence. A hip-fracture patient on warfarin got naproxen: a major interaction; reconcile the admission, handle every discrepancy, sign. A physician co-signs.",
     role: "pharmacist", userId: "U-PHAR-01", to: "/med-safety", system: "Medication safety",
   },
   {
@@ -204,7 +204,7 @@ const FLOW: Step[] = [
   },
   {
     title: "Approve what the AI recommends",
-    detail: "Open an exception: the narrative and the actions come from the rule engine's facts and action menu, the evidence is checked in the EHR. Approve: a Task goes to each action's owner role and the approval is audited. Or reject with a reason, or defer.",
+    detail: "Open an exception: the AI writes its narrative and recommends actions from the rule engine's facts and action menu while you watch, and the evidence is checked in the EHR. Approve: a Task goes to each action's owner role and the approval is audited. Or reject with a reason, or defer.",
     role: "operations_manager", userId: "U-OPS", to: "/control-tower", system: "Action drawer",
   },
   {
