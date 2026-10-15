@@ -124,6 +124,7 @@
 | 5.14 | 周四的药师签核没被确认：测试的"最后一个决定"不是最后一个 | hospital | 日期依赖 · 测试假设 · 竞态 |
 | 5.15 | 新入院住院的旧医嘱没人审：24 小时和 48 小时两个窗口之间有缝 | hospital | 日期依赖 · 产品缺口 · 扫描 |
 | 5.16 | 检查准备的提醒测试只在 21 点挂：种子随钟点变，"最新 30 条"只剩一位余量 | imaging | 日期依赖 · 种子 · 测试假设 |
+| 5.17 | 周四的故事线停在第 5 步：空出来的床在她入院前一分钟被别人拿走（首选不是保留） | hospital | 日期依赖 · 竞态 · 探针 |
 | 6.1 | `localhost` 建连接要 8 秒，播种像卡住 | 环境 | 环境 · 网络 |
 | 6.2 | `websockets` 反复被删坏 | 环境 | 环境 · 依赖 |
 | 6.3 | Docker 数据盘写满（10-09） | 环境 | 环境 · 磁盘 |
@@ -2066,6 +2067,112 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
   诊断随提交 cfdae75 "api, web: AI on demand, pre-merge review fixes"（分支 `claude/adoring-kirch-14355b`）；修复随提交
   "fix(tests): the inspection reminders test looks for the seeded reminder before sending its own"（分支 `claude/lucid-blackburn-3681f2`）。
 
+### 5.17 周四的故事线停在第 5 步：空出来的床，在她入院前的一分钟里被别人拿走
+
+- **现象：** 10-15（周四）凌晨，验证 AI-on-demand 修复的一次后端运行跨过午夜，播种了周四的数据，
+  `tests/test_storyline.py::test_the_whole_story_offline` 失败：`app.modules.storyline.walk.WalkFailed: timed out waiting for step bed done`
+  （`walk.py:106`，`Walk.wait`）。周三的数据上通过。未改的 main 93cc53d 和 AI-on-demand 分支 `claude/adoring-kirch-14355b` 上都失败，所以和那个分支无关。
+- **怎么查的：**
+  1. **先读判定逻辑，看超时的是哪一个等待。** `Walk._bed` 依次等四件事：Orthopedics 的 high 异常、异常的叙述、（检查菜单里有 `overflow_discharge_rounds`，批准）、
+     `advance("admitted")` 之后的 `done("bed")`。超时的是最后一个，前面三个都等到了。`service._step_state` 里第 5 步的 done 是 `bool(stay and out["signed"])`：
+     她的住院 Encounter `stay-j0001` 存在，而且异常已经批准。批准请求返回了 200，所以只剩一种可能：**她一直没有被收进来**。
+  2. **发起会话给的线索是一个假设："周四有的病人没有 `ai_processing` 同意，第 5 步又要等异常的叙述。"** 第 1 步已经让它站不住：超时的不是
+     "the narrated exception"，叙述已经有了；done 的条件里也没有任何和同意有关的东西。后面的探针也看到批准带着 `overflow_discharge_rounds`。**推翻**，没花一次实验。
+  3. **列出"她没被收进来"的可能**（读 `app/ehr/storyline.py`）：(a) `early_rounds` 一个病人也没动（`surgery_ready` 的病人已经不在院），没有床空出来；
+     (b) 床空出来了，`admit_after_cleaning` 没把床给她（例如找不到那张床的 `bed_clean` 事件）；(c) 床给了她，可到她入院那一刻床已经不空。
+  4. **第一个探针** `-p probebed`（scratchpad 里的 pytest 插件，在 `pytest_collection_modifyitems` 里才 import app，同 5.12）：包住 `early_rounds`、
+     `admit_after_cleaning`、`service._approved`，在 `Walk._bed` 失败时打印 marks、beats、她在计划里的住院、两位出院病人和两个科的床。
+     `-p travel` 把时钟移到周四 10:00。第一次跑在打印时崩了：`UnicodeEncodeError: 'gbk' codec can't encode character '\u2082' in position 535: illegal multibyte sequence`（marks 里有 "SpO₂"，6.8 的老问题），
+     加 `PYTHONUTF8=1` 重跑。结果：08:37 批准，`early_rounds` 把 stay-01095、stay-01141 的出院提前到 08:57、09:12；09:07 `admit_after_cleaning` 把 SURG-11-B 给她，
+     入院定在 10:10（床 10:09 打扫完，再加 1 分钟）。失败时时钟停在 10:11，`beats()["admitted"]` 也是 10:11，她的住院不存在，SURG-11-B 是 O（有人）。
+     **(a)、(b) 排除，像是 (c)，但床被谁占了？**
+  5. **第二个探针加在模拟器上**（`_Run._on_admit`、`_set_bed`、`_defer_stay`，每行带模拟时刻和"当时在处理的计划事件"）。时间线：
+     - 08:50、09:20、09:50 她的入院重试：没有空床，推迟；
+     - 08:57 stay-01095 出院，SURG-11-B O→K；09:12 stay-01141 出院，SURG-01-B O→K；
+     - 10:09:00 SURG-11-B 打扫完，K→U；
+     - **10:09:25.008543 `stay-01160` 入院，SURG-11-B U→O**；
+     - 10:10:00 她的固定入院：`offered SURG-11-B status O`，推迟到 10:40。
+
+     **(c) 成立。**
+  6. **`stay-01160` 是谁。** 测试在一个回滚的事务里跑，库里留着播种时的计划，用 SQL 取出来：生成器自己的病人，阑尾炎，从急诊（ed-03240）收入 Surgery，
+     计划床位 SURG-14-B，入院时刻 `2026-10-15T10:09:25.008543` 是计划里原本的时刻，不是重试。SURG-14-B 有人（预设把 Surgery 填满了），
+     `_free_bed` 先试计划的床，不空就拿本科第一张空床，正好是 25 秒前打扫好的 SURG-11-B。`admit_after_cleaning` 的 docstring 写的是"把第一张空出的床给等得最久的她"，
+     代码却只把那张床设成她的**首选**（`prefer`）；模拟器对所有住院一视同仁，空床先到先得。
+  7. **为什么会卡死，而不是晚半小时收进来。** storyline README 的已知失败模式写着：别人的入院占了这张床，她就在 30 分钟后的重试里进下一张空的 Surgery 床。
+     可是 `beats()` 在有 `bed_offered` 时把 admitted 固定为给床的时刻加 1 分钟（10:11）：测试的 `H.advance` 走到 10:11 就停，`done("bed")` 只 pump、不推进时钟；
+     页面上的 Advance（`service.advance`）因为 `target_t <= now` 返回 "Already there: the step is ready"。**README 写的兜底，在测试和演示页上都走不到，演示会停在第 5 步。**
+  8. **只有周四吗？** 旧代码按星期扫一遍（`-p travel` 到当天 10:00，每天一个库，5 个进程并行，每个约 8 分钟）：周一、二、三、五、六（播种周五）、日（播种下周一）都通过，
+     只有周四失败。探针记下每天给她的床和入院时刻（周一 SURG-04-B 10:15，周二 SURG-16-B 10:33，周三 SURG-14-A 10:19，周五 SURG-10-B 10:28），
+     这些天的那一分钟里都没有别人的入院或转科到期。打扫时长是 45–100 分钟的随机数，生成器的入院时刻也是随机的，一分钟的空档里撞上一个入院要看当天的数据。
+     所以不是周四的数据"错了"，而是那一分钟从来没有保护，周四只是第一次撞上。
+- **根因：** `admit_after_cleaning` 把空出来的第一张床"给她"，只是设成首选，没有保留。从打扫完到她入院有 1 分钟，周四生成器计划内的一个急诊入院
+  （`stay-01160`，计划的床有人）正好落在这 1 分钟里，模拟器把这张空床给了它。`beats()` 又不跟着她的重试走，测试和演示页都停在一个已经过去的节拍上。
+- **怎么修（四个选项）：**
+  - (A) 只改测试或走查：一直推进时钟，直到她入院。演示页的 Advance 仍然是 "Already there"，讲解词里"空出来的第一张床是她的"也不成立。不选。
+  - (B) 让 README 的兜底成真：她没被收进来时，admitted 节拍跟着她的下一次重试。能走完，但她拿到的是第二张床，第二张也可能再被拿走，讲解词仍然不成立。
+  - (C) 把她的入院放在打扫完的同一时刻（`plan_order` 让 `bed_clean` 排在 `admit` 前面）：空档缩到 0，但同一时间戳的其他入院仍然按插入顺序竞争，不是真正的保留。
+  - (D) **保留这张床**（选这个）：计划新增 `bed_holds`（床 → `{stay, until}`）。`admit_after_cleaning` 给她床时写一条 hold，`until` 是她的入院时刻；
+    模拟器的 `_free_bed` 多一个 `stay` 参数，`_on_admit`、`_on_transfer` 传入自己的住院号；新方法 `_held()` 让一张被别人保留的床对其他住院不算空，
+    直到保留它的住院已经入院，或者过了 `until`。它和 docstring、讲解词的意图一致，结果是确定的；只有故事线写 hold，所以默认演示数据和其他测试不受影响；
+    两个结束条件都由 `_held()` 当场判断，不用写释放逻辑。（"已经入院"这个条件是第一版没有的，是下面的一周扫描在周五的数据上发现的。）
+  - 文档：storyline README 的失败模式改写（现在只剩"床管员在那一分钟里手动把别人挪进这张床"一种情况，`FhirGateway.append_encounter_location` 只看床是不是 U）、
+    `docs/data-model.md` 的计划新增字段、模拟器和 `app/ehr/storyline.py` 的 docstring、PROGRESS.md 的 WP9。
+  - 测试：新回归测试 `test_the_bed_the_early_rounds_free_is_hers_though_someone_elses_admission_comes_due_first`：先走前 4 步，再包住 `admit_after_cleaning`，
+    给她床之后种一个对手住院（Surgery，入院在打扫完后 25 秒，和周四一样），然后走第 5 步。断言：这一步通过；她在早出院空出的某一张床上；
+    如果她是在给床的时刻或之后才入院（真的在等这张床），那就必须是这张床，而且对手不在这张床上。对手的首选床就设成她的床，
+    测试才不依赖当天哪张床先打扫完（见下面周三的结果）。整条走查测试的断言不变（`startswith("bed SURG-")`），理由见下面周五的结果。
+- **怎么证明：**
+  - 周四（`-p travel` 10-15 10:00，自己的库）：整条走查和新测试 `2 passed`。探针多打印一行 hold 拒绝了谁：
+    `sim HELD 2026-10-15 10:09:25.008543 SURG-11-B for {'stay': 'stay-j0001', 'until': '2026-10-15T10:10:00'} refused to stay-01160`，
+    10:10 她入院时 SURG-11-B 是 U。
+  - **新测试能抓住旧行为：** 插件 `-p nohold` 把 `simulator._Run._held` 换成永远返回 False（就是旧的 `_free_bed`），只跑新测试，两天都失败，而且是两种失败：
+    - 周四：对手 10:09:25 拿走 SURG-11-B，`WalkFailed: timed out waiting for step bed done`，和原来的失败一样；
+    - 周三：对手 10:18:25 拿走 SURG-14-A，第 5 步**却通过了**：第二张床 SURG-15-A 那时已经打扫完，她 10:19 被收进了 SURG-15-A。
+      是断言抓住的：`AssertionError: assert 'Location/SURG-15-A' == 'Location/SURG-14-A'`。
+
+    这也说明旧代码的失败有两种样子：第二张床已经干净时，她悄悄进了第二张床（故事照常走完，只是讲解词不对）；第二张床还没干净时，走查停住。
+  - **第一次一周扫描抓到了我自己的两处错误**（第一版：hold 只看 `until`，两个测试都断言"她在给她的那张床上"）：周五、周六（都播种周五）`2 failed`，
+    `AssertionError: assert 'bed SURG-02-B' == 'bed SURG-10-B'`。旧代码周五是通过的，所以先怀疑是 hold 改坏了什么。对照旧代码周五的探针时间线：
+    给她的是 SURG-10-B（第一位出院的床），10:28 入院；可第二位 09:12 出院的 SURG-02-B 打扫得更快，她 10:20 的普通重试就进了 SURG-02-B，
+    10:27 SURG-10-B 才打扫完，10:28 的固定入院见她已在院直接跳过。**旧代码周五也是这样**，只是旧断言 `startswith("bed SURG-")` 不在乎是哪一张。
+    所以错的是我收紧的断言："第一张空出来的床"指的是第一张能用的床，周五那就是 SURG-02-B。同一份探针还显示，新代码在 10:27:25 仍以 hold 拒绝对手，
+    而她 10:20 就已经在床上了：hold 比它要保护的等待活得更久。于是 hold 加上"保留它的住院已入院就失效"，整条走查的断言恢复原样，新测试改成上面的条件断言。
+  - **一周扫描**（最终代码，两个测试，`-p travel` 到当天 10:00，每天一个库，7 个进程并行）：
+
+    | 墙上时间 | 播种的医院日 | 旧代码（只跑整条走查） | 新代码（两个测试） | hold 拦下了谁 |
+    | --- | --- | --- | --- | --- |
+    | 周一 10-12 | 10-12 周一 | 1 passed | 2 passed | 种下的对手（SURG-04-B） |
+    | 周二 10-13 | 10-13 周二 | 1 passed | 2 passed | 种下的对手（SURG-16-B） |
+    | 周三 10-14 | 10-14 周三 | 1 passed | 2 passed | 种下的对手（SURG-14-A） |
+    | 周四 10-15 | 10-15 周四 | **1 failed**（本案） | 2 passed | 种下的对手和生成器的 `stay-01160`（SURG-11-B） |
+    | 周五 10-16 | 10-16 周五 | 1 passed | 2 passed | 没有：她 10:20 先进了 SURG-02-B |
+    | 周六 10-17 | 10-16 周五 | 1 passed | 2 passed | 没有（同周五） |
+    | 周日 10-18 | 10-19 周一 | 1 passed | 2 passed | 种下的对手（SURG-04-B） |
+
+    跑完用 `select data->>'generated_for' from module_state where name='hospital_plan'` 确认了每个库播种的医院日。7 个进程并行，每个约 9 分钟。
+    hold 关掉（`-p nohold`）后用最终的新测试再跑周三、周四：周三 `AssertionError: assert 'Location/SURG-15-A' == 'Location/SURG-14-A'`，
+    周四 `WalkFailed: timed out waiting for step bed done`。周五的数据上新测试不经过 hold（她不等那张床），这一天它只检查"她在一张空出的床上"。
+
+  - 真实时钟（周四 03:17，播种的医院日 10-15）：`tests/test_storyline.py`、`test_day_simulator.py`、`test_workflows.py`、`test_workflow_replay.py`
+    `47 passed in 543.02s`（模拟器改了，所以把用到它的模拟器、工作流和回放测试一起跑；工作流里从急诊开始的 journey 也走第 5 步）。没有跑全量后端。
+  - 测试库用完已删除（每个库一条 `DROP DATABASE IF EXISTS`）。
+- **经验：**
+  - "留给某人"要写成保留，不能只写成首选。首选只在床空着的那一刻起作用，而从床空出来到她用上之间，任何其他请求都可以先到。
+    两件事之间有空档，就要问空档里还会发生什么（和 2.15 一样是时间窗口里的竞争，只是这次两边都是模拟器自己）。
+  - 文档写了兜底，要去验证兜底真的走得到：README 说"30 分钟后重试"，可是节拍不跟着重试走，演示页的 Advance 会拒绝。和 5.15 的"另一条路径会补上"是同一个教训。
+  - 先读判定逻辑、看清超时的是哪一个等待，就能在跑实验之前排除"同意"这条线索：超时的不是叙述那一步，done 的条件里也没有同意。
+  - 探针一层一层加：第一层（故事线脚本）只说明床给了、到时却不空；第二层（模拟器里床状态的每次变化）才看到是谁拿走的。打印带上模拟时刻和当时在处理的事件，时间线一眼就排出来。
+  - 回归测试要在任何一天都能复现：自己种一个和周四一样的对手，并让它首选那张床。只种"在那一分钟入院的人"不够：周三它会去拿已经干净的第二张床，测试在旧代码上也能过。
+  - 收紧一条断言之前，先在一周的数据上跑一遍。"她在给她的那张床上"看起来就是故事的意思，周五的数据说明不是：另一张空出的床先打扫好时，她进那一张才对。
+    原来宽松的 `startswith("bed SURG-")` 有它的道理。
+  - 保留要有两个结束条件：用上了，或者时间过了。只写时间，保留会比它要保护的等待活得更久，周五她已经在床上了，对手还被挡在门外。
+  - 用插件把一个方法换回旧行为（`-p nohold`），比切到旧提交更省事，也能证明新测试抓得住旧 bug；前提是新旧的差别正好集中在这一个方法里。
+- **范围：** hospital（WP9 故事线、WP3 日程模拟器）。
+- **来源：** 验证 AI-on-demand 修复的后端运行跨过午夜、播种了周四的数据时发现；单独的会话 10-15 凌晨诊断和修复。编号跳过了 5.16，它在两个还没合并的分支上已经用了。
+- **代码：** `apps/api/app/ehr/simulator.py`（`_free_bed`、`_held`、`_on_admit`、`_on_transfer`）、`apps/api/app/ehr/storyline.py`（`admit_after_cleaning`）、
+  `apps/api/tests/test_storyline.py`（新测试）；相关：`apps/api/app/modules/storyline/service.py`（`beats`、`advance`、`_step_state`）、
+  `apps/api/app/modules/storyline/walk.py`（`_bed`）、`apps/api/tests/storyline_harness.py`（`advance`）；提交：本案所在的提交 `fix(storyline): hold the bed the early discharges free for her`。
+
 > **怎么在另一天测试**（本机做法，见 memory 记录）：
 > - 脱离数据库调用 `generate(Store(), seed, datetime(...))`，几十秒就能扫完一周（5.6）；或者写一个 pytest 插件只冻结播种时刻（`seedat`、`seedtime`：`-p seedtime` 加 `SEED_AT`），
 >   每个星期几一个测试库并行跑，并先用 SQL 确认真的换了医院日（5.9）。
@@ -2077,7 +2184,8 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 >   用 `PYTHONPATH=<插件目录> uv run --with time-machine pytest -p travel` 运行；`-q` 不显示插件的报告头，用 SQL 确认库里是哪一天的数据（5.12）：
 >   `select data->>'generated_for' from module_state where name='hospital_plan'`（5.13）。
 > - 让测试跑在旧的种子上（证明回归测试能抓住旧 bug）：`git show HEAD:<文件>` 存一份旧文件，插件在 `pytest_collection_modifyitems` 里把模块的 `generate`
->   换成旧文件里的，并打印旧模块路径确认换成功（5.13）。
+>   换成旧文件里的，并打印旧模块路径确认换成功（5.13）。旧行为只差一个方法时，插件直接把那个方法换成旧行为更省事（`-p nohold`，5.17）。
+> - 用 `-s` 看探针打印时加 `PYTHONUTF8=1`：故事线的 marks 里有 "SpO₂"，GBK 控制台会崩在 `UnicodeEncodeError`（6.8、5.17）。
 > - 浏览器端在 Vite 配置里注入一个 `Date` 子类来偏移时间；放在 scratchpad 里的 Vite 配置要用 `.mts` 扩展名（第六章）。改浏览器时钟前先确认前端不拿它比对令牌过期时间（5.2）。
 
 ---

@@ -20,9 +20,11 @@ The plan is the intent, the FHIR store is the truth. Injected scenarios
 change the hospital in ways the plan did not foresee, so before using a bed the
 simulator checks it: a taken bed means another free bed in the unit or its
 overflow units, and if there is none the patient keeps boarding in the ED and
-the admission (with the rest of that stay) is retried 30 minutes later. Beds
-left for housekeeping without a planned cleaning get one. Ward vital signs are
-recorded every six hours, as the generator does.
+the admission (with the rest of that stay) is retried 30 minutes later. A bed
+held for a stay (`bed_holds`: bed -> stay and until when) is free only for
+that stay until it is admitted or the time has passed. Beds left for
+housekeeping without a planned cleaning get one. Ward vital signs are recorded
+every six hours, as the generator does.
 
 In a real deployment this module disappears: the interface engine's HL7 feed
 goes into the same adapter, and the EventBus and its subscribers do not change.
@@ -468,14 +470,21 @@ class _Run:
         loc["operationalStatus"] = C.coding(C.BED_STATUS, status, BED_DISPLAY[status])
         self._save(loc)
 
-    def _free_bed(self, units: list[str], prefer: str | None = None) -> str | None:
-        if prefer and self._bed_status(prefer) == "U":
+    def _free_bed(self, units: list[str], prefer: str | None = None, stay: str | None = None) -> str | None:
+        if prefer and self._bed_status(prefer) == "U" and not self._held(prefer, stay):
             return prefer
         for unit in units:
-            free = self.fhir.ids("Location", unit=unit, code="bd", status="U")
+            free = [b for b in self.fhir.ids("Location", unit=unit, code="bd", status="U") if not self._held(b, stay)]
             if free:
                 return free[0]
         return None
+
+    def _held(self, bed: str, stay: str | None) -> bool:
+        """A bed held for another stay's admission (`bed_holds`: the bed the storyline's early discharges free, held
+        for her) is not free for anyone else until that stay is admitted or the hold's time has passed."""
+        hold = (self.plan.get("bed_holds") or {}).get(bed)
+        return (hold is not None and hold["stay"] != stay and self.t <= parse(hold["until"])
+                and self.fhir.read("Encounter", hold["stay"]) is None)
 
     def _free_bay(self, prefer: str | None) -> str | None:
         taken = {_current(enc) for enc in self.fhir.search("Encounter", unit="ED", status=list(ACTIVE))}
@@ -610,7 +619,8 @@ class _Run:
         unit = self._first_unit(sdict)
         planned = sdict["beds"][0][0] if sdict["beds"] else None
         # a plan entry may name the units it is admitted to (the storyline: Orthopedics, then its overflow Surgery)
-        bed = self._free_bed(sdict.get("bed_units") or [unit, *OVERFLOW.get(unit, [])], prefer=planned)
+        bed = self._free_bed(sdict.get("bed_units") or [unit, *OVERFLOW.get(unit, [])], prefer=planned,
+                             stay=sdict["id"])
         if bed is None:
             self._defer_stay(sdict["id"])
             return False
@@ -688,7 +698,7 @@ class _Run:
             return False
         target = e.get("bed")
         unit = unit_of(target) if target else e["unit"]
-        bed = self._free_bed([unit, *OVERFLOW.get(unit, [])], prefer=target)
+        bed = self._free_bed([unit, *OVERFLOW.get(unit, [])], prefer=target, stay=sdict["id"])
         if bed is None:
             retry_at = self.t + RETRY
             if retry_at < datetime.fromisoformat(sdict["discharge"]):

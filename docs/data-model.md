@@ -291,6 +291,7 @@ One synthetic patient through the hospital: preset `app/ehr/seed/journey.py` (th
   - Visits carry `expected` (planned, not arrived: the ambulance pre-notification), `story` and `manual_triage`.
   - Stays carry `bed_units` (the units the admission may use, in order) and `med_plan` (explicit admission orders; the random home and inpatient medicines are skipped).
   - Events carry `fixed` (a stay's deferral does not move them).
+  - `bed_holds` (bed → `{stay, until}`): a bed held for a stay's admission. Until that stay is admitted or `until` has passed, the simulator gives it to no other admission or transfer. The storyline holds the bed the early discharges free for her, from its cleaning to her admission a minute later.
   - New event kinds: `vitals` (a spot panel with a NEWS2 score: Observations and ORU^R01) and `prescriptions` (discharge prescriptions, intent plan, no HL7).
   - The horizon is extended to 07:00 + 5 days 6 hours, which covers the discharge at 11:00 on day 3 and the call 48 hours later. Beyond the generated 36 hours only the storyline's events, the ward rounds and housekeeping are planned.
 - The simulator's `apply_now(store, event, operator=…)` applies one event at the current time (the person's EHR action).

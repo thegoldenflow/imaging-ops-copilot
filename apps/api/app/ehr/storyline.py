@@ -10,7 +10,7 @@ triage, imaging orders) are app/ehr/accepted.py; this is everything around them:
 | --- | --- | --- |
 | the triage is recorded (ADT^A08) | the ED physician sees her now (bay); INR and blood count ordered at +4 min (INR 3.8 at +45 min); the decision to admit at +95 min (bed request for Orthopedics); the stay: admission when a bed is free, admission orders as planned (naproxen new, warfarin held, home amlodipine left out), the OR case booked 10 min after the decision for 14:30 in a free room (90 min booked, 115 min in fact), spot vital signs at 02:00 with NEWS2 7, discharge prescriptions the next afternoon but one, discharge at 11:00 on post-operative day 3 | 3-11 |
 | the bed manager approves the early rounds on Surgery (exception.decided) | the Surgery team discharges its two discharge-ready patients now + 20 and + 35 min | 5 |
-| one of them leaves (ADT^A03) | her admission is retried one minute after that bed's housekeeping, with that bed preferred | 5 |
+| one of them leaves (ADT^A03) | her admission is retried one minute after that bed's housekeeping, with that bed held for her | 5 |
 | she is admitted (ADT^A01 IMP) | the admitting note on her hypertension (the planted source of step 9's untraceable medicine) | 9 |
 
 Everything is idempotent (marks in the storyline's state, plan entries keyed by id), since bus handlers may run
@@ -203,8 +203,9 @@ def early_rounds(store: Store, approved_at: datetime) -> list[str]:
 
 
 def admit_after_cleaning(store: Store, stay_id: str, bed: str | None) -> str | None:
-    """One of the two left: her admission is retried a minute after that bed is cleaned, with the bed preferred
-    (the bed manager gives the first freed overflow bed to the patient who has waited longest)."""
+    """One of the two left: her admission is retried a minute after that bed is cleaned, with the bed held for her
+    (the bed manager gives the first freed overflow bed to the patient who has waited longest): an admission or
+    transfer of someone else that comes due in that minute takes another bed or waits (casebook 5.17)."""
     st = state(store)
     marks = (st or {}).get("marks", {})
     if st is None or stay_id not in (marks.get("early_rounds") or {}).get("stays", []) or marks.get("bed_offered"):
@@ -222,6 +223,7 @@ def admit_after_cleaning(store: Store, stay_id: str, bed: str | None) -> str | N
     if entry is None:
         return None
     entry["beds"] = [[bed, at.isoformat(), entry["discharge"]]]
+    plan.setdefault("bed_holds", {})[bed] = {"stay": S.STAY, "until": at.isoformat()}
     _event(plan, at, "admit", stay=S.STAY, fixed=True)  # not moved by the retries still waiting for a bed
     plan["events"].sort(key=plan_order)
     store.modules["hospital_plan"] = plan

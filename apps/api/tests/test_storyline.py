@@ -189,6 +189,55 @@ def test_the_whole_story_offline(story, client):
     assert reported and store.fhir.search("Task", patient=S.PATIENT, code="followup-escalation")
 
 
+def test_the_bed_the_early_rounds_free_is_hers_though_someone_elses_admission_comes_due_first(story, client,
+                                                                                              monkeypatch):
+    """Her admission comes a minute after the freed bed is cleaned. On Thursday 10-15's data a Surgery patient's
+    admission from the ED came due in that minute and took the bed, and the walk waited at a beat already past
+    (casebook 5.17): the bed is held for her. Here such an admission, preferring her bed, is planted on any day.
+    (On Friday's data her own retry finds the other freed bed clean first and she never waits for this one.)"""
+    from app.ehr import storyline as ehr_story
+    from app.ehr.seed import materialize as M
+    from app.ehr.seed import plan_order
+    from app.ehr.seed.simulate import Stay
+
+    store, rival = story, "stay-jt001"
+    walk = Walk(client, pump=H.pump, advance=H.advance, timeout_s=60)
+    walk.run(["call", "triage", "imaging", "inr"])
+    plan = store.modules["hospital_plan"]
+    busy = {r["patient"] for t in ("visits", "stays", "surgeries") for r in plan[t].values()}
+    patient = next(p for p in store.fhir.ids("Patient") if p not in busy and not store.fhir.search(
+        "Encounter", patient=p, status=list(simulator.ACTIVE)))
+    offer = ehr_story.admit_after_cleaning
+
+    def offer_and_plant_a_rival(store, stay_id, bed):
+        offered = offer(store, stay_id, bed)
+        if offered:
+            plan = store.modules["hospital_plan"]
+            at = parse(store.modules["storyline"]["marks"]["bed_offered"]["at"]) - timedelta(seconds=35)
+            stay = Stay(id=rival, patient=patient, admit=at, discharge=at + timedelta(days=2), dx="74400008",
+                        service_unit="SURG", beds=[(offered, at, at + timedelta(days=2))], source="ed",
+                        expected_los=2.0)
+            plan["stays"][rival] = M.plan_dict(stay)
+            plan["events"].append({"at": at.isoformat(), "kind": "admit", "stay": rival})
+            plan["events"].sort(key=plan_order)
+            store.modules["hospital_plan"] = plan
+        return offered
+
+    monkeypatch.setattr(ehr_story, "admit_after_cleaning", offer_and_plant_a_rival)
+    runs = walk.run(["bed"])
+    assert runs[-1].key == "bed" and runs[-1].ok
+    marks = store.modules["storyline"]["marks"]
+    offer_at, offered = parse(marks["bed_offered"]["at"]), f"Location/{marks['bed_offered']['bed']}"
+    freed = {store.fhir.read("Encounter", sid)["location"][-1]["location"]["reference"]
+             for sid in marks["early_rounds"]["stays"]}
+    stay = store.fhir.read("Encounter", S.STAY)
+    assert stay["location"][-1]["location"]["reference"] in freed
+    if parse(stay["period"]["start"]) >= offer_at:  # she waited for the bed offered to her: it is hers
+        assert stay["location"][-1]["location"]["reference"] == offered
+        other = store.fhir.read("Encounter", rival)  # admitted to another free bed, or still waiting for one
+        assert other is None or other["location"][-1]["location"]["reference"] != offered
+
+
 def test_the_summary_step_can_wait_for_a_whole_draft_against_a_live_model():
     """A stalled call uses its whole 60 s budget (casebook 3.15), so a draft of five calls can take 300 s: the live
     walk waits that on top of its usual wait for step 9 only."""

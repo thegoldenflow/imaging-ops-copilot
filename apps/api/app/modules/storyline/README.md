@@ -44,8 +44,12 @@ and off. The backend test `tests/test_storyline.py` runs the same walk in proces
 - The preset balances Surgery to two discharge-ready patients with the Control Tower's model at 07:00 and two hours
   later; a story walked much more slowly than the script (the clock run for hours between steps) can drift from it.
   The preset's warnings are on the page.
-- The story's patient boards while Orthopedics and Surgery are full; if someone else's admission takes the bed the
-  early discharges freed, she is admitted at the next retry (30 minutes later) to the next free Surgery bed.
+- The story's patient boards while Orthopedics and Surgery are full. The bed the first early discharge frees is held
+  for her from its cleaning until her admission a minute later (the plan's `bed_holds`), so someone else's admission
+  or transfer that comes due in that minute takes another bed or waits. Before the hold such an admission took her
+  bed (Thursday 10-15's data), and the walk and the page's Advance stopped at a beat already past (casebook 5.17). A
+  bed manager who moves another patient into that bed by hand in that minute still could. When the second freed bed
+  is cleaned first, her own retry takes it (Friday's data) and the hold lapses.
 - Past the generated 36-hour plan only the storyline's events, the ward rounds and housekeeping happen: the rest of
   the hospital stands still on day 2 to day 5 (nothing else is planned there).
 - With Temporal on, the follow-up call waits for the journey's timer (`WORKFLOW_FOLLOWUP_DELAY_S`): set it to a few
