@@ -170,6 +170,7 @@ class Store:
         self._counters: dict[str, int] = {}  # detached only; the database uses sequences
         self._local_version = 0
         self._sessions: dict[str, str] = {}  # detached only
+        self._after_commit: list = []  # callables run once this unit of work's changes are committed
         for name, spec in schema.STORE_ENTITIES.items():
             setattr(self, name, (ListTable if spec.kind == "list" else EntityTable)(self, name))
         self.images = ImageTable(self)
@@ -212,17 +213,33 @@ class Store:
             self._bump_version()
         self._touched = False
 
+    def after_commit(self, fn) -> None:
+        """Run `fn` once this unit of work's changes are visible to other transactions (e.g. queue work another
+        transaction will pick up); dropped on rollback. A detached store has no transaction: now."""
+        if self.detached:
+            fn()
+        else:
+            self._after_commit.append(fn)
+
+    def fire_after_commit(self, *, discard: bool = False) -> None:
+        """The hooks of a committed unit of work (and of a test's shared store once a request is saved); `discard`:
+        the request failed, drop them."""
+        hooks, self._after_commit = self._after_commit, []
+        for fn in [] if discard else hooks:
+            fn()
+
     def commit(self) -> None:
         if self.detached:
             raise RuntimeError("A detached store cannot be committed; use persist()")
         self.save()
-        if self._tx is None:
-            return
-        tx, self._tx, self.rewritten = self._tx, None, False
-        tx.commit()
+        if self._tx is not None:
+            tx, self._tx, self.rewritten = self._tx, None, False
+            tx.commit()
+        self.fire_after_commit()
 
     def rollback(self) -> None:
         tx, self._tx, self._touched, self.rewritten = self._tx, None, False, False
+        self._after_commit = []
         self.expunge()
         if tx is not None:
             tx.rollback()
@@ -341,6 +358,7 @@ def unit_of_work() -> Iterator[Store]:
         with use_store(_ambient):
             yield _ambient
         _ambient.save()
+        _ambient.fire_after_commit()
         return
     store = Store(EngineSource(get_engine()))
     with use_store(store):

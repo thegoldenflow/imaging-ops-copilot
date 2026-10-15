@@ -37,6 +37,7 @@ class UnitOfWorkMiddleware:
             if shared is not None:
                 store.save()
                 store.expunge()
+                store.fire_after_commit(discard=status >= 500)
             elif status < 500:
                 store.commit()
             else:

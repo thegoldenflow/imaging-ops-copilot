@@ -722,7 +722,11 @@ def intake(store: Store, *, limit: int = 2) -> list[str]:
         if not _try_lock(store, encounter_id):
             continue
         try:
-            out = draft_instructions(store, None, encounter_id)
+            from app.agents import cause as ai_cause
+            from app.agents import ondemand
+
+            with ai_cause.using(ondemand.recall(f"instructions:{encounter_id}")):  # whoever signed the summary
+                out = draft_instructions(store, None, encounter_id)
         except (LookupError, DocProblem, DocDenied, registry.AgentNotDeployable):
             continue
         if out.get("id"):

@@ -3,7 +3,10 @@ import clsx from "clsx";
 import { BellRing, ExternalLink, Star } from "lucide-react";
 import { useState } from "react";
 import { LineChart } from "../../components/charts";
+import { AiChip, AiMeta, AiStatus } from "../../components/ai";
+import { AiBatchBar } from "../../components/AiActivity";
 import { AiBadge, Badge, Button, Card, EmptyState, ErrorState, Loading, PageHeader, Stat, Tabs } from "../../components/ui";
+import { useAiRun } from "../../lib/ai";
 import { api, post } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { dateTime, LANGUAGE_LABEL, pct } from "../../lib/format";
@@ -31,6 +34,12 @@ function ResponseRow({ r, themes }: { r: FeedbackResponse; themes: Record<string
     onSuccess: () => { setEditing(false); queryClient.invalidateQueries({ queryKey: ["feedback"] }); },
   });
   const canConfirm = user && MANAGERS.includes(user.role);
+  // a list never runs the AI by itself: an unlabelled comment waits for Ask AI (a patient's new answer runs at once)
+  const ai = useAiRun(r.ai, async (trigger) => {
+    await post(`/api/feedback/responses/${r.id}/ai?trigger=${trigger}`);
+    await queryClient.invalidateQueries({ queryKey: ["feedback"] });
+  }, { auto: false });
+  const showAi = r.ai && (r.ai.state !== "done" || ai.busy || ai.error);
   return (
     <li className="px-4 py-3 text-sm" data-testid={`fb-${r.id}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -42,13 +51,20 @@ function ResponseRow({ r, themes }: { r: FeedbackResponse; themes: Record<string
         <div className="flex flex-wrap items-center gap-1">
           {r.sentiment && <Badge tone={SENT_TONE[r.sentiment as keyof typeof SENT_TONE]}>{r.sentiment}</Badge>}
           {r.themes.map((t) => <Badge key={t} tone="blue">{themes[t]}</Badge>)}
-          {r.ai_status === null && <Badge tone="ai">AI labelling…</Badge>}
+          {r.ai_status === null && <AiChip state={r.ai?.state} />}
           {r.ai_status === "unavailable" && <Badge tone="amber">AI unavailable, label by hand</Badge>}
           {r.confirmed_by ? <Badge tone="green">Confirmed by {r.confirmed_by}</Badge> : r.ai_status && ["ok", "seeded"].includes(r.ai_status) && <AiBadge label={r.ai_status === "seeded" ? "Baseline label" : "AI label"} agent={r.ai_status === "seeded" ? undefined : "feedback_classify"} />}
         </div>
       </div>
       {r.comment && <p className="mt-1 text-slate-700">“{r.comment}”</p>}
       {r.ai_summary && r.language !== "en" && <p className="mt-0.5 text-xs text-ai-700">AI summary in English: {r.ai_summary}</p>}
+      {r.ai?.state === "done" && !ai.busy && <AiMeta ai={r.ai} className="mt-0.5" />}
+      {showAi && (
+        <div className="mt-1.5 max-w-xl">
+          <AiStatus ai={r.ai!} busy={ai.busy} startedAt={ai.startedAt} error={ai.error} onAsk={ai.ask}
+            what="sentiment and theme labels" rulesNote={r.rating <= 2 ? "The low rating already alerted the site manager (a rule)." : "The star rating stands on its own."} />
+        </div>
+      )}
       {canConfirm && !editing && r.ai_status !== null && (
         <div className="mt-1.5 flex gap-2">
           {!r.confirmed_by && r.sentiment && <Button size="sm" variant="ghost" loading={confirm.isPending} onClick={() => confirm.mutate({ sentiment: r.sentiment!, themes: r.themes })} data-testid={`confirm-${r.id}`}>Confirm labels</Button>}
@@ -201,6 +217,10 @@ export function FeedbackPage() {
                 <select value={theme} onChange={(e) => setTheme(e.target.value)} className={select} aria-label="Theme"><option value="">Any theme</option>{Object.entries(d.themes).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
               </div>
             }>
+              {d.ai_not_run.length > 0 && (
+                <div className="px-4 pt-3"><AiBatchBar items={d.ai_not_run.map((id) => ({ kind: "feedback", id }))}
+                  noun={d.ai_not_run.length === 1 ? "comment" : "comments"} checked="rated by patients" /></div>
+              )}
               {d.responses.length === 0 ? <EmptyState title="No responses match" /> : (
                 <ul className="divide-y divide-slate-100">{d.responses.map((r) => <ResponseRow key={r.id + (r.confirmed_by ?? "") + r.ai_status} r={r} themes={d.themes} />)}</ul>
               )}

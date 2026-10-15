@@ -9,6 +9,7 @@
   --color-brand-700: #0c585b;
   --color-ai-50: #f4f1fe;
   --color-ai-100: #e6defd;
+  --color-ai-200: #cfc1fb; /* used by dashed AI borders; was referenced before it was defined */
   --color-ai-600: #6941c6;
   --color-ai-700: #53389e;
 }

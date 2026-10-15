@@ -29,7 +29,7 @@ def health():
     spend = budget.status()
     return {"status": "ok", "llm_mode": get_gateway().mode, "appointments": len(store.appointments),
             "background": {"workers": settings.background_workers, "idle_paused": activity.idle(),
-                           "idle_pause_minutes": settings.idle_pause_minutes},
+                           "idle_pause_minutes": settings.idle_pause_minutes, "ai": settings.background_ai},
             "ai_budget": {"capped": spend["limit_usd"] is not None, "reached": spend["reached"]}}
 
 
@@ -92,6 +92,9 @@ def reset_demo(user: StaffUser = Depends(current_user)):
     from app.workflows import bridge
 
     bridge.on_reset()  # the running workflows refer to data that is gone (6.5); best effort, after the reset
+    from app.agents import ondemand
+
+    ondemand.reset()  # queued AI jobs refer to the old data
     return {"ok": True, "version": store.version}
 
 

@@ -403,6 +403,18 @@ class EntityTable(Generic[T]):
             condition = m.table.c[field] == value
         return [o for o in self._adopt(self._select(condition).all()) if match(o)]
 
+    def where(self, *conditions, limit: int | None = None, newest_first: bool = False) -> list[T]:
+        """Rows matching SQL conditions on this table's columns (`self.c`), e.g. a JSONB test the dict interface
+        cannot express (the traces of a browser session, of some model calls). A detached store has no SQL: []."""
+        if self._store.detached:
+            return []
+        self.flush()
+        table = self._codec.m.table
+        query = select(table, _XMIN).where(*conditions).order_by(table.c.seq.desc() if newest_first else table.c.seq)
+        if limit is not None:
+            query = query.limit(limit)
+        return self._adopt(self._store.conn().execute(query).mappings().all())
+
     def since(self, column: str, start: Any) -> list[T]:
         """Rows whose (indexed) column is at or after `start`, without loading the whole table (AI Ops windows)."""
         def keep(obj: T) -> bool:

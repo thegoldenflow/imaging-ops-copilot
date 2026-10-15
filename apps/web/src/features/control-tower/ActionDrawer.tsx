@@ -7,10 +7,12 @@ import clsx from "clsx";
 import { AlarmClock, Check, CheckCircle2, FileSearch, FlaskConical, Loader2, ShieldCheck, Sparkles, Workflow, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { AiMeta, AiStatus } from "../../components/ai";
+import { useAiRun } from "../../lib/ai";
 import { ApiError } from "../../lib/api";
 import { useAgent } from "../../lib/agents";
 import {
-  approveException, deferException, hhmm, rejectException, ROLE_SHORT, RULE_LABEL, useException,
+  approveException, deferException, hhmm, narrateException, rejectException, ROLE_SHORT, RULE_LABEL, useException,
   type ExceptionDetail, type MenuItem, type RecommendedAction,
 } from "./api";
 import { Drawer, ErrorPanel, SeverityPill, SkeletonRows, StatusPill } from "./kit";
@@ -43,7 +45,7 @@ export function ActionDrawer({ id, onClose }: { id: string | null; onClose: () =
         ) : "Exception"
       }
     >
-      {detail.isLoading && <><p className="px-4 pt-3 text-xs text-ct-muted">Writing the narrative…</p><SkeletonRows rows={6} /></>}
+      {detail.isLoading && <><p className="px-4 pt-3 text-xs text-ct-muted">Loading the exception…</p><SkeletonRows rows={6} /></>}
       {detail.error && <ErrorPanel error={detail.error} onRetry={() => detail.refetch()} />}
       {d && <Body key={`${d.id}:${d.status}`} d={d} />}
     </Drawer>
@@ -70,6 +72,11 @@ function AiLabel({ source }: { source: "model" | "template" }) {
 
 function Body({ d }: { d: ExceptionDetail }) {
   const queryClient = useQueryClient();
+  // opening a live exception whose narrative has not been written asks for it (BACKGROUND_AI=on_demand)
+  const ai = useAiRun(d.ai, async (trigger) => {
+    queryClient.setQueryData(["ct-exception", d.id], await narrateException(d.id, trigger));
+    await queryClient.invalidateQueries({ queryKey: ["ct-board"] });
+  });
   const n = d.narration;
   const recommended = n?.recommended_actions ?? [];
   const recommendedIds = useMemo(() => new Set(recommended.map((a) => a.action_id)), [recommended]);
@@ -112,10 +119,18 @@ function Body({ d }: { d: ExceptionDetail }) {
     <div className="space-y-4 px-4 py-3 text-sm text-ct-text">
       <section aria-label="Narrative">
         <div className="mb-1.5 flex items-center justify-between gap-2">
-          {n ? <AiLabel source={n.source} /> : <StatusPill tone="muted">narrative pending</StatusPill>}
+          {n ? <AiLabel source={n.source} /> : <StatusPill tone="muted" icon={ShieldCheck}>rule engine</StatusPill>}
           {n && <span className="text-[11px] text-ct-muted">facts as of {hhmm(n.facts_as_of)}</span>}
         </div>
         <p className="leading-relaxed" data-testid="narrative">{n?.narrative ?? d.summary}</p>
+        {n?.source === "model" && !ai.busy && <AiMeta ai={d.ai} theme="ct" className="mt-1" />}
+        {(d.ai.state !== "done" || ai.busy || ai.error) && live && (
+          <div className="mt-2">
+            <AiStatus ai={d.ai} busy={ai.busy} startedAt={ai.startedAt} error={ai.error} onAsk={ai.ask} theme="ct"
+              what="the narrative and recommended actions"
+              rulesNote="The rule engine's facts and its action menu below stand on their own." />
+          </div>
+        )}
         {n?.source === "template" && n.problems.length > 0 && (
           <details className="mt-1 text-[11px] text-ct-muted"><summary>Why the template ({n.problems.length})</summary>
             <ul className="mt-1 list-disc pl-4">{n.problems.map((p) => <li key={p}>{p}</li>)}</ul>

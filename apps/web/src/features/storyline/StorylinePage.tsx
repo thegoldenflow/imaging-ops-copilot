@@ -6,15 +6,18 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
-  ArrowRight, CheckCircle2, ChevronDown, ChevronRight, Clock3, Copy, FastForward, Map, Quote, RotateCcw, ShieldCheck,
-  Sparkles, UserRound, Workflow,
+  AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, Clock3, Copy, FastForward, Loader2, Map, Quote,
+  RotateCcw, ShieldCheck, Sparkles, UserRound, Wand2, Workflow,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AiBadge, Badge, Button, Card, EmptyState, ErrorState, Loading, PageHeader } from "../../components/ui";
+import { causeText, clockTime, seconds, useElapsed, type AiBlock } from "../../lib/ai";
 import { useAuth } from "../../lib/auth";
 import { ROLE_LABEL } from "../../lib/types";
-import { advanceStoryline, clock, hhmm, resetStoryline, storylineKey, useStoryline, type Storyline, type StoryStep } from "./api";
+import {
+  advanceStoryline, askStepAi, clock, hhmm, resetStoryline, storylineKey, useStoryline, type Storyline, type StoryStep,
+} from "./api";
 
 const STATUS = {
   done: { label: "Done", tone: "green" as const },
@@ -151,6 +154,9 @@ function StepCard({ step, data }: { step: StoryStep; data: Storyline }) {
             {step.stub && <Badge tone="slate"><Map className="size-3" />Roadmap (8.1): preset data</Badge>}
             {step.cast && <span><UserRound className="mr-0.5 inline size-3" />{step.cast.name} · {ROLE_LABEL[step.cast.role] ?? step.cast.role}</span>}
             <span><Clock3 className="mr-0.5 inline size-3" />{step.seconds} s</span>
+            {step.step_ai?.items.some((i) => i.ai.state === "running" || i.ai.state === "queued") && (
+              <Badge tone="ai"><Loader2 className="size-3 animate-spin" />AI working</Badge>
+            )}
           </span>
         </span>
         <Badge tone={status.tone}>{status.label}</Badge>
@@ -186,6 +192,11 @@ function StepBody({ step, data, current }: { step: StoryStep; data: Storyline; c
             data-testid="advance" title={step.beat_hint ?? undefined}>
             <FastForward className="size-3.5" />Advance the clock: {step.beat_hint}
           </Button>
+        )}
+        {current && step.status === "waiting" && step.advance_ai && (
+          <span className="inline-flex items-center gap-1 text-xs text-ai-700" data-testid="advance-ai">
+            <Wand2 className="size-3.5" />Then {step.advance_ai}, as soon as the clock gets there.
+          </span>
         )}
         {advance.error && <span className="text-xs text-rose-600" role="alert">{(advance.error as Error).message}</span>}
       </div>
@@ -249,6 +260,11 @@ function Trail({ step }: { step: StoryStep }) {
               {p.agent && <AiBadge label={p.agent} agent={p.agent} />}
               <span>{p.ref}</span>{p.at && <span>· {hhmm(p.at)}</span>}
             </p>
+            {p.generated_at && (
+              <p className="mt-0.5 text-[11px] text-slate-500" data-testid={`story-proposal-time-${step.n}`}>
+                AI wrote it at {clockTime(p.generated_at)}{p.duration_ms != null ? ` in ${seconds(p.duration_ms / 1000)}` : ""}
+              </p>
+            )}
             {(p.recommendation || p.summary) && (
               <details className="mt-1 text-[11px] text-slate-600">
                 <summary className="cursor-pointer text-brand-700">What it said</summary>
@@ -257,6 +273,7 @@ function Trail({ step }: { step: StoryStep }) {
             )}
           </>
         ) : <p className="mt-1 text-xs text-slate-500">{step.ai}: not yet</p>}
+        {step.step_ai && <StepAiBox step={step} />}
       </div>
       <div className="rounded-lg border border-slate-200 p-2" data-testid={`story-signed-${step.n}`}>
         <p className="flex items-center gap-1 text-xs font-semibold text-slate-700"><UserRound className="size-3.5" />2 · A person signs</p>
@@ -281,6 +298,55 @@ function Trail({ step }: { step: StoryStep }) {
           </ul>
         ) : <p className="mt-1 text-xs text-slate-500">{step.done ? "Recorded by the EHR" : "Nothing yet"}</p>}
       </div>
+    </div>
+  );
+}
+
+/** What the AI is doing for this step: each item's state, live (the step's Advance asked for it, or Ask AI here). */
+function StepAiBox({ step }: { step: StoryStep }) {
+  const queryClient = useQueryClient();
+  const ask = useMutation({ mutationFn: () => askStepAi(step.key), onSuccess: () => queryClient.invalidateQueries({ queryKey: storylineKey }) });
+  const sa = step.step_ai!;
+  // what this button can still do: an item whose AI has not run, or a failed one that may run again
+  const waiting = sa.items.filter((i) => i.ai.state === "not_requested" || (i.ai.state === "unavailable" && i.ai.retryable));
+  return (
+    <div className="mt-2 space-y-1 border-t border-ai-100 pt-1.5" data-testid={`story-ai-${step.n}`}>
+      {sa.items.length === 0 ? (
+        <p className="text-[11px] text-slate-500">
+          {sa.requested ? `Asked for${sa.requested_by ? ` by ${sa.requested_by}` : ""}: ${sa.text}, as soon as the clock gets there.` : `Pressing this step's Advance: ${sa.text}.`}
+        </p>
+      ) : sa.items.map((i) => <StepAiLine key={`${i.kind}:${i.id}`} label={i.label} ai={i.ai} />)}
+      {waiting.length > 0 && (
+        <button type="button" onClick={() => ask.mutate()} disabled={ask.isPending} data-testid={`story-ask-ai-${step.n}`}
+          className="mt-1 inline-flex h-6 items-center gap-1 rounded-md bg-ai-600 px-2 text-[11px] font-medium text-white hover:bg-ai-700 disabled:opacity-50">
+          {ask.isPending ? <Loader2 className="size-3 animate-spin" /> : <Wand2 className="size-3" />}Ask AI for this step
+        </button>
+      )}
+      {ask.error && <p className="text-[11px] text-rose-600" role="alert">{(ask.error as Error).message}</p>}
+    </div>
+  );
+}
+
+function StepAiLine({ label, ai }: { label: string; ai: AiBlock }) {
+  const { user } = useAuth();
+  const running = ai.state === "running";
+  const elapsed = useElapsed(ai.started_at ?? null, running);
+  return (
+    <div className="text-[11px]" data-testid="story-ai-item" data-state={ai.state}>
+      <p className="flex items-center gap-1 font-medium text-slate-700">
+        {running ? <Loader2 className="size-3 animate-spin text-ai-600" />
+          : ai.state === "done" ? <CheckCircle2 className="size-3 text-emerald-600" />
+            : ai.state === "unavailable" ? <AlertTriangle className="size-3 text-amber-600" />
+              : ai.state === "queued" ? <Clock3 className="size-3 text-ai-600" /> : <Sparkles className="size-3 text-slate-400" />}
+        {label}
+      </p>
+      <p className="pl-4 text-slate-500">
+        {running ? `${ai.running_text}… ${seconds(elapsed)} (typically ~${seconds(ai.typical_s)})`
+          : ai.state === "queued" ? "queued for the AI"
+            : ai.state === "done" ? `generated ${clockTime(ai.generated_at)}${ai.duration_ms != null ? ` · took ${seconds(ai.duration_ms / 1000)}` : ""} · ${causeText(ai.cause, user?.id)}`
+              : ai.state === "unavailable" ? `AI unavailable: ${ai.error ?? "no answer"} (the rules stand)`
+                : ai.state === "skipped" ? "decided before the AI wrote it" : "AI not run: runs when it is opened or asked for"}
+      </p>
     </div>
   );
 }

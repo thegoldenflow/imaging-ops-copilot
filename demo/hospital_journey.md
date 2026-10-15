@@ -68,7 +68,7 @@ as the step is done, and the step's badge turns **Done**.
    - **Acknowledge.** Say: "This is a roadmap item: the routing runs on a preset rule, and the architecture for the real one is in the data model."
 
 5. **3:10 — No orthopaedic bed (7.1 Control Tower, bed manager).** **Advance the clock** to the admission decision, then **Switch to Jordan Lee**, then **Control Tower**.
-   - The exception card reads **Orthopedics at 100% occupancy** (high). Its narrative is written by the AI from the rule engine's facts, and its actions include **Early discharge rounds on Surgery (2 ready)**.
+   - The exception card reads **Orthopedics at 100% occupancy** (high). Its narrative is written by the AI from the rule engine's facts as soon as the step's **Advance** brought the exception (the storyline page's step shows "AI working", then when it was generated), and its actions include **Early discharge rounds on Surgery (2 ready)**.
    - Choose that action and press **Approve**. Tasks go to the owner roles, and the Surgery team discharges the two ready patients early (scripted).
    - **Advance the clock** until she has a bed: the first Surgery bed the discharges free, after housekeeping, is hers.
    - Permissions: the bed manager decides for the whole hospital but sees MRN and bed only ("Hidden for your role"). The Surgery nurse sees the clinical card for the same bed.

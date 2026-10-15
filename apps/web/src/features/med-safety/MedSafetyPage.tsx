@@ -31,7 +31,8 @@ function ReviewSide({ reviewId }: { reviewId: string }) {
   if (!pick) {
     return <EmptyState icon={<ClipboardCheck className="size-8" />} title="No reconciliation for this encounter" hint="Admission reconciliations open for stays admitted in the last 48 hours; discharge ones when discharge prescriptions exist." />;
   }
-  return <MedRecPanel id={pick.id} />;
+  // shown beside the review the person opened: its AI waits for Ask AI (opening runs the AI of that item only)
+  return <MedRecPanel id={pick.id} autoAi={false} />;
 }
 
 /** A chart's MedRec record that no reconciliation holds yet: the pharmacist opens one, which adopts the record. */
@@ -76,7 +77,8 @@ export function MedSafetyPage() {
   const [params] = useSearchParams();
   const linkEncounter = params.get("encounter");
   const linkDocument = params.get("document");
-  const [sel, setSel] = useState<Selection>({ reviewId: null, sessionId: null, encounterId: linkEncounter });
+  // ?review=ORV-… and ?medrec=MR-… (the AI activity panel links here) open that item
+  const [sel, setSel] = useState<Selection>({ reviewId: params.get("review"), sessionId: params.get("medrec"), encounterId: linkEncounter });
   const linked = useEncounter(linkEncounter);
   const linkedSession = linked.data?.medrec.find((m) => m.document_id === linkDocument)?.id ?? null;
   const onLinkedEncounter = Boolean(linkEncounter) && sel.encounterId === linkEncounter && !sel.reviewId;

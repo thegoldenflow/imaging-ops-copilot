@@ -79,5 +79,8 @@ def submit(body: service.PortalRequisition, request: Request, user: StaffUser = 
     store.requisitions[req.id] = req
     store.touch()
     audit_phi(request, user, action="create", resource_type="requisition", resource_id=req.id)
-    # The intake worker runs extraction, triage and protocol suggestion within seconds.
+    # your action created it: extraction, triage and protocol suggestion run at once (the AI job loop)
+    from app.modules.requisitions.router import request_ai
+
+    request_ai(req, "submitted in the portal")
     return service.requisition_view(store, req)

@@ -45,6 +45,14 @@ def patient_ids(store: Store, referrer_id: str) -> set[str]:
     return ids
 
 
+def _ai_progress(store: Store, req: Requisition) -> dict | None:
+    ai = requisitions.requisition_ai(store, req)
+    if ai is None:
+        return None
+    return {k: ai.get(k) for k in ("state", "typical_s", "steps", "step", "running_text", "started_at", "queued_at",
+                                   "generated_at", "duration_ms")}
+
+
 def requisition_view(store: Store, req: Requisition) -> dict:
     ext = requisitions.extractions(store).get(req.id)
     tri = triage.records(store).get(req.id)
@@ -58,6 +66,8 @@ def requisition_view(store: Store, req: Requisition) -> dict:
         "status_text": status, "requested_exam": ext.fields["requested_exam"]["value"] if ext else None,
         # Only a priority a radiologist has confirmed is shown to the referrer, never the AI suggestion.
         "confirmed_priority": tri.final_priority if tri and tri.review_action else None,
+        # ... but the referrer sees that the AI is working on it, and when it finished (not what it said)
+        "ai": _ai_progress(store, req),
     }
 
 

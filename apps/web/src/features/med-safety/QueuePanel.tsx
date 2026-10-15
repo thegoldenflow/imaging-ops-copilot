@@ -4,6 +4,8 @@
 import clsx from "clsx";
 import { ClipboardCheck, Clock, Inbox, Pill, Search, Sparkles, TestTube } from "lucide-react";
 import { useMemo, useState } from "react";
+import { AiChip } from "../../components/ai";
+import { AiBatchBar } from "../../components/AiActivity";
 import { EmptyState, ErrorState, Loading } from "../../components/ui";
 import { useQueue, waitText, type QueueItem, type QueueShow } from "./api";
 import { SeverityPill } from "./kit";
@@ -17,6 +19,10 @@ export function QueuePanel({ selected, onSelect }: { selected: string | null; on
     const all = queue.data?.items ?? [];
     return t ? all.filter((i) => [i.mrn, i.name, i.title, i.detail, i.unit_id].some((v) => v?.toLowerCase().includes(t))) : all;
   }, [queue.data, term]);
+  // the queue never runs the AI by itself: what the rules flagged waits for someone to open it or ask for a batch
+  // (test orders without a rule flag get AI only from Ask AI on the item)
+  const notRun = items.filter((i) => i.ai_state === "not_requested" && i.commentary_status !== "on_demand")
+    .map((i) => ({ kind: i.kind === "medrec" ? "medrec" : "order_review", id: i.id }));
   return (
     <section className="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white shadow-sm" data-testid="ms-queue">
       <header className="space-y-2 border-b border-slate-100 px-3 py-2.5">
@@ -53,6 +59,9 @@ export function QueuePanel({ selected, onSelect }: { selected: string | null; on
           />
         </label>
       </header>
+      {notRun.length > 0 && (
+        <div className="border-b border-slate-100 p-2"><AiBatchBar items={notRun} noun={notRun.length === 1 ? "item" : "items"} checked="checked by the rules" /></div>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {queue.isLoading && <Loading label="Reviewing new orders…" />}
         {queue.error && <ErrorState error={queue.error} onRetry={() => queue.refetch()} />}
@@ -72,6 +81,7 @@ export function QueuePanel({ selected, onSelect }: { selected: string | null; on
                     : item.order_kind === "service" ? <TestTube className="size-3.5 text-slate-500" aria-label="Test order" />
                       : <Pill className="size-3.5 text-slate-500" aria-label="Medication order" />}
                   {item.sources.includes("ai") && <Sparkles className="size-3 text-ai-600" aria-label="AI flag" />}
+                  {item.commentary_status !== "on_demand" && <AiChip state={item.ai_state} />}
                   <span className="ml-auto inline-flex items-center gap-0.5 text-[11px] text-slate-500"><Clock className="size-3" />{waitText(item.wait_minutes)}</span>
                 </div>
                 <p className="mt-1 line-clamp-2 text-xs font-medium text-slate-900">{item.title}</p>

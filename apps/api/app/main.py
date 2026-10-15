@@ -11,8 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from app.agents import ondemand
+from app.agents.ondemand_router import router as ai_router
 from app.agents.router import router as agents_router
-from app.core import activity
+from app.core import activity, config
 from app.core.config import settings
 from app.core.context import RequestContextMiddleware
 from app.core.db.migrate import init_db
@@ -145,6 +147,7 @@ async def _hospital_loop() -> None:
         await asyncio.to_thread(_drain_events)
         await asyncio.to_thread(_step, "control tower", control_tower.refresh_step)
         await asyncio.to_thread(_step, "medication safety intake", med_safety.intake_step)
+        await asyncio.to_thread(_step, "storyline AI", storyline.ai_step)
         await asyncio.to_thread(_step, "voice follow-up sweep", voice_followup.sweep_step)
         await asyncio.sleep(max(0.1, 1 - (loop.time() - started)))
 
@@ -176,14 +179,52 @@ async def _narrator_loop() -> None:
     """Writes the narrative and recommended actions of new Control Tower exceptions, then the AI commentary of
     order reviews and the indication judgements of medication reconciliations, and the patient instructions of
     newly signed discharge summaries (a model call each), apart from the hospital loop so a slow model never delays
-    the boards. Waits while nobody uses the app: what is pending is written when someone is back."""
+    the boards. Waits while nobody uses the app: what is pending is written when someone is back.
+    With BACKGROUND_AI=on_demand the narration, commentary and judgements are written when a person opens the
+    exception, review or reconciliation, so only the discharge instructions (a person signed the summary) stay here."""
     while True:
         await asyncio.sleep(2)
         if activity.idle():
             continue
-        await asyncio.to_thread(_step, "control tower narration", control_tower.narrate_step)
-        await asyncio.to_thread(_step, "medication safety AI", med_safety.ai_step)
+        if not config.ai_on_open():  # one item per transaction: its lock is held until the commit
+            for _ in range(2):
+                await asyncio.to_thread(_step, "control tower narration", control_tower.narrate_step, 1)
+            for _ in range(2):
+                await asyncio.to_thread(_step, "medication safety commentary", med_safety.commentary_step)
+            for _ in range(2):
+                await asyncio.to_thread(_step, "medication safety reconciliation", med_safety.settle_step)
         await asyncio.to_thread(_step, "documentation intake", documentation.intake_step)
+
+
+def _ai_job(job: ondemand.Job) -> None:
+    """One queued AI job in its own transaction; put back while a demo reset rewrites the data."""
+    try:
+        with unit_of_work() as store:
+            if not store.conn().execute(text("SELECT pg_try_advisory_xact_lock_shared(:key)"),
+                                        {"key": REWRITE_LOCK}).scalar():
+                ondemand.requeue(job)
+                return
+            ondemand.run_job(store, job)
+    except Exception:  # the item's own outcome is on its record; keep the loop alive (no payloads: PHI)
+        log.exception("AI job %s failed", job.kind)
+    finally:
+        ondemand.release(job)  # also when it failed before its run
+
+
+async def _ai_jobs_loop() -> None:
+    """Runs the AI a person asked for without waiting on the page (app/agents/ondemand.py): the new work their own
+    action created (a requisition they submitted, a patient's survey answer, a storyline step) and the batches
+    they asked for on a list page. Two at a time, so a batch never starves the people opening items. Not paused
+    while idle: someone asked for each of these."""
+    async def worker() -> None:
+        while True:
+            job = ondemand.next_job()
+            if job is None:
+                await asyncio.sleep(0.3)
+                continue
+            await asyncio.to_thread(_ai_job, job)
+
+    await asyncio.gather(*(worker() for _ in range(ondemand.CONCURRENCY)))
 
 
 async def _aiops_loop() -> None:
@@ -203,7 +244,7 @@ async def lifespan(_: FastAPI):
     workflow_bridge.install()  # domain events -> Temporal (only with TEMPORAL_ADDRESS)
     accepted_suggestions.install()  # accepted suggestion cards -> the EHR records them (WP9)
     storyline.install()  # the hospital storyline's cards and EHR script (WP9; a no-op until its reset)
-    loops = [_dispatch_loop, _intake_loop, _hospital_loop, _narrator_loop, _aiops_loop]
+    loops = [_dispatch_loop, _intake_loop, _hospital_loop, _narrator_loop, _ai_jobs_loop, _aiops_loop]
     if settings.temporal_address:
         loops.append(_workflow_loop)
         if settings.temporal_worker_in_api:
@@ -249,6 +290,7 @@ app.include_router(clinical_kg_router)
 app.include_router(hospital_router)
 app.include_router(platform_router)
 app.include_router(agents_router)
+app.include_router(ai_router)
 app.include_router(control_tower_router)
 app.include_router(workflows_router)
 app.include_router(med_safety_router)

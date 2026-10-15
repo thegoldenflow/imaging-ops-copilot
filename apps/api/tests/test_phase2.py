@@ -3,6 +3,7 @@
 import time
 from datetime import datetime, timedelta
 
+from app.agents import ondemand
 from app.core.store import get_store
 from app.integrations.mocks import MOCK_CONFIG
 from app.modules.mri_safety import service as mri
@@ -11,7 +12,12 @@ from app.modules.requisitions import service as requisitions
 
 
 def _process_all():
-    requisitions.process_pending(get_store())
+    """What the AI job loop does for submitted requisitions, and opening each seeded one that waits
+    (BACKGROUND_AI=on_demand: the background itself processes none)."""
+    store = get_store()
+    ondemand.drain(store)
+    for req_id in [r.id for r in store.requisitions.values() if r.status == "received"]:
+        requisitions.process_one(store, req_id)
 
 
 def _approve_and_book(client, login, req_id, protocol_id):

@@ -474,7 +474,8 @@ def _flow_tasks(store, exception_id: str) -> list[dict]:
             if any(i.get("valueString") == exception_id for i in t.get("input") or [])]
 
 
-def test_capacity_workflow_executes_the_approval_and_checks_the_occupancy_an_hour_later(fresh_state, monkeypatch):
+def test_capacity_workflow_executes_the_approval_and_checks_the_occupancy_an_hour_later(fresh_state, monkeypatch,
+                                                                                         eager_background_ai):
     """detect -> explain (narrator) -> approved -> execute (createFlowTask; a failure after the Tasks were written
     is retried and replays them) -> 1 h -> verify -> outcome on the exception."""
     from app.modules.control_tower import exceptions as X
@@ -509,6 +510,34 @@ def test_capacity_workflow_executes_the_approval_and_checks_the_occupancy_an_hou
             assert exc.outcome["decision"] == "approved" and exc.outcome["verified"]["tasks"]
             assert exc.outcome["resolved"] is not None
             assert {s["key"]: s["status"] for s in progress.get(wf).steps}["verify"] == "done"
+
+
+def test_on_demand_the_capacity_workflow_leaves_the_narrative_to_whoever_opens_the_exception(fresh_state, monkeypatch):
+    """BACKGROUND_AI=on_demand: the explain step makes no model call (the workflow starts for every exception the
+    engine opens, seen or not); the bed manager's decision narrates it first, and the workflow executes it."""
+    import dataclasses
+
+    from app.core import config
+    from app.modules.control_tower import exceptions as X
+    from app.modules.control_tower import service
+
+    monkeypatch.setattr(config, "settings", dataclasses.replace(config.settings, background_ai="on_demand"))
+    store = fresh_state
+    with harness(monkeypatch) as h:
+        exc = _open_exceptions(h, store)[0]
+        wf = M.capacity_id(exc.id)
+        with DB:
+            calls = len(store.llm_calls)
+            assert X.get(store, exc.id).narration_status == "on_open"
+            step = h.step(wf, "explainAndRecommend")
+            assert step["status"] == "done" and "opens the exception" in step["detail"]
+            assert len(store.llm_calls) == calls
+            narrated = service.narrate(store, exc.id)  # the drawer opens
+            actions = [a["action_id"] for a in narrated.narration["recommended_actions"]]
+            decided = service.approve(store, _user(OPS), exc.id, actions, "approved in the test")
+            assert decided.decision["executed_by"] == "workflow"
+        h.wait(lambda: all(a["task_id"] for a in X.get(store, exc.id).decision["actions"]),
+               what="the workflow to execute the approved actions")
 
 
 def test_rejected_and_cleared_exceptions_record_their_outcome_too(fresh_state, monkeypatch):

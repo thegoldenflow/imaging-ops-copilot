@@ -25,6 +25,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
+from app.agents import cause as ai_cause
 from app.agents import models as agent_models
 from app.agents import registry as agent_registry
 from app.agents import trace as agent_trace
@@ -156,7 +157,8 @@ class LlmGateway:
             mode=call.mode, eval_status=spec.eval_status.status, evaluated=spec.evaluated,
             actor_id=(ctx.user.id if (ctx := request_context()) and ctx.user else "system"),
             actor_role=(str(ctx.user.role) if ctx and ctx.user else "system"), input_refs=input_refs,
-            output_refs=[f"LlmCall/{call.id}"], outcome=outcome, started_at=call.ts, finished_at=datetime.now())
+            output_refs=[f"LlmCall/{call.id}"], outcome=outcome, started_at=call.ts, finished_at=datetime.now(),
+            cause=ai_cause.stamp())
         trace.add_llm_call(record)
         agent_trace.save(trace)
         return trace.run_id
@@ -178,6 +180,7 @@ class LlmGateway:
         store.llm_calls.append(call)
         self._audit(store, call)
         budget.record(call.cost_usd)
+        ai_cause.note_call(call.outcome)
         return call
 
     @staticmethod

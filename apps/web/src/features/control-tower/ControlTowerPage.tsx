@@ -6,6 +6,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { hhmm, useBoard, type Board, type Severity } from "./api";
 import { ActionDrawer } from "./ActionDrawer";
 import { BedsColumn } from "./BedsColumn";
@@ -49,7 +50,9 @@ export function ControlTowerPage() {
   const [fast, setFast] = useState(false);
   const board = useBoard(fast);
   const queryClient = useQueryClient();
-  const [selected, setSelected] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  // /control-tower?exception=EXC-… (the AI activity panel links here): open that exception's drawer
+  const [selected, setSelected] = useState<string | null>(() => params.get("exception"));
   const [unit, setUnit] = useState<string | null>(null);
   const data = board.data;
   const running = Boolean(data?.clock.running || data?.job?.status === "running");

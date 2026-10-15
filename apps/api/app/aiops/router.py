@@ -70,11 +70,12 @@ def overview(days: int = Query(1, ge=1, le=90), user: StaffUser = Depends(requir
         {"key": "adoption_rate", "label": "Adoption", "value": t["adoption_rate"], "format": "pct",
          "detail": {"decided": t["decided"]}},
     ]
-    from app.core import activity
+    from app.core import activity, config
     from app.llm import budget
 
     return {**view, "cards": cards, "agents": _agents_table(view), "mode": get_gateway().mode,
             "budget": budget.status(get_store()), "idle": activity.status(),
+            "background_ai": config.settings.background_ai,
             "alerts": {"open": [a for a in alerts.open_tasks() if a["status"] not in ("completed", "cancelled")]}}
 
 

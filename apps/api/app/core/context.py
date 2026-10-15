@@ -25,17 +25,29 @@ if TYPE_CHECKING:
     from app.core.models import StaffUser
 
 
+SESSION_HEADER = "x-demo-session"  # the browser's demo session (apps/web/src/lib/api.ts), for "What the AI did"
+
+
 @dataclass
 class RequestContext:
     user: StaffUser | None = None
     source_ip: str | None = None
+    session: str | None = None  # the browser's demo session id (X-Demo-Session), not an identity
 
 
 _context: ContextVar[RequestContext | None] = ContextVar("request_context", default=None)
+# The request's context even while it acts as the system: an agent that writes as itself still ran because this
+# person opened something (app/agents/cause.py records that on the run's trace).
+_origin: ContextVar[RequestContext | None] = ContextVar("request_origin", default=None)
 
 
 def request_context() -> RequestContext | None:
     return _context.get()
+
+
+def request_origin() -> RequestContext | None:
+    """The HTTP request this code runs for, also inside `acting_as_system()`; None outside a request."""
+    return _origin.get()
 
 
 @contextmanager
@@ -58,8 +70,12 @@ class RequestContextMiddleware:
             await self.app(scope, receive, send)
             return
         client = scope.get("client")
-        token = _context.set(RequestContext(source_ip=client[0] if client else None))
+        session = next((v.decode("latin-1")[:64] for k, v in scope.get("headers") or [] if k == SESSION_HEADER.encode()),
+                       None)
+        ctx = RequestContext(source_ip=client[0] if client else None, session=session or None)
+        token, origin = _context.set(ctx), _origin.set(ctx)
         try:
             await self.app(scope, receive, send)
         finally:
             _context.reset(token)
+            _origin.reset(origin)

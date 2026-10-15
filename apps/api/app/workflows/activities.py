@@ -519,8 +519,13 @@ def capacity_detect(args: dict) -> dict:
 
 @step_activity("capacity.explainAndRecommend", "explainAndRecommend")
 def capacity_explain(args: dict) -> dict:
+    from app.modules.control_tower import exceptions as X
     from app.modules.control_tower import service
 
+    exc = X.get(get_store(), args["exception_id"])
+    if exc is not None and exc.narration_status == "on_open":  # BACKGROUND_AI=on_demand: no model call yet
+        return {"detail": "Narrative and recommended actions written when a person opens the exception "
+                          "(background AI on demand)", "refs": []}
     exc = service.narrate(get_store(), args["exception_id"])
     n = exc.narration or {}
     actions = len(n.get("recommended_actions") or [])

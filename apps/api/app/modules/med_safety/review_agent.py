@@ -170,11 +170,13 @@ def comment(run: AgentRun, review: dict) -> CommentaryResult:
                  "feedback": ""}
     prompt = load_prompt(run.spec.prompt_version)
     output: Commentary | None = None  # the last valid answer (a failed retry keeps the first)
+    error = None
     for attempt in range(2):
         result.attempts += 1
         outcome = run.model(prompt, variables, Commentary, context=ctx)
         result.model_status = outcome.status
         if outcome.status != "ok":
+            error = outcome.error  # e.g. the daily AI budget's message, not just "unavailable"
             break
         output = Commentary.model_validate(outcome.data)
         found = check(output, allowed_refs, allowed_guidelines)
@@ -185,7 +187,7 @@ def comment(run: AgentRun, review: dict) -> CommentaryResult:
                                  + "\n- ".join(found))
     if output is None:
         run.finish(outcome="needs_human")
-        result.status, result.reason = "unavailable", f"model {result.model_status}"
+        result.status, result.reason = "unavailable", error or f"model {result.model_status}"
         return result
     data, result.dropped_refs = clean(output, allowed_refs, allowed_guidelines)
     result.output = data

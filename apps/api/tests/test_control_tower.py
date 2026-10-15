@@ -262,6 +262,8 @@ def test_exception_approve_task_audit(fresh_state, client, login):
     board = _board(client, login)
     exc = board["exceptions"][0]
     detail = client.get(f"/api/control-tower/exceptions/{exc['id']}", headers=login(OPS)).json()
+    if detail["ai"]["state"] != "done":  # reading never calls the model: the drawer asks for the narrative as it opens
+        detail = client.post(f"/api/control-tower/exceptions/{exc['id']}/narrate?trigger=opened", headers=login(OPS)).json()
     assert detail["narration"]["recommended_actions"] and detail["can_decide"]
     chosen = [a["action_id"] for a in detail["narration"]["recommended_actions"]][:2]
     r = client.post(f"/api/control-tower/exceptions/{exc['id']}/approve",

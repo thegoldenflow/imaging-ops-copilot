@@ -101,15 +101,21 @@ test("comparison view: two prompt versions side by side with per-case difference
   await expect(page.getByText("prompt gate passes")).toBeVisible();
 });
 
-test("alerts: a cost above the demo threshold opens an admin Task the admin resolves", async ({ page }) => {
+test("alerts: a cost above the demo threshold opens an admin Task the admin resolves", async ({ page, request }) => {
   test.setTimeout(150_000);
+  // a pharmacist opens an order review, and its AI commentary is written (BACKGROUND_AI=on_demand writes it only
+  // then; eager, the background writes many after the reset anyway): mock calls are priced at the model's list
+  // price, so one commentary passes the agent's demo threshold
+  const pharmacist = { Authorization: `Bearer ${await token(request, "U-PHAR-01")}` };
+  const queue = await (await request.get("/api/med-safety/queue?show=all", { headers: pharmacist })).json();
+  const review = (queue.items as { id: string; order_ref?: string }[])
+    .find((i) => i.order_ref === "MedicationRequest/medrx-ms-82-naproxen")!;
+  expect((await request.post(`/api/med-safety/reviews/${review.id}/commentary`, { headers: pharmacist })).ok()).toBeTruthy();
   await page.goto("/login");
   await page.getByTestId("login-admin").click();
   await expect(page.getByRole("link", { name: "AI Ops" })).toBeVisible(); // signed in
   await page.goto("/ai-ops?tab=alerts");
   await expect(page.getByTestId("alerts-config")).toContainText("agent_daily_cost");
-  // the API's agents (order review commentary, Control Tower narratives, ...) run in the background after the
-  // reset; mock calls are priced at the model's list price, so today's cost passes the demo threshold shortly
   await expect(async () => {
     await page.getByTestId("alerts-check").click();
     await expect(page.getByTestId("alerts-tasks")).toContainText("AI Ops alert", { timeout: 3_000 });

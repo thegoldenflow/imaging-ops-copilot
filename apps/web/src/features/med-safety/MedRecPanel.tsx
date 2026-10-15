@@ -8,11 +8,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { CheckCircle2, ClipboardCheck, FileSignature, Hospital, Loader2, PenLine, Sparkles } from "lucide-react";
 import { useState } from "react";
+import { AiMeta, AiStatus } from "../../components/ai";
 import { AiBadge, Badge, Button, Card, ErrorState, Loading } from "../../components/ui";
+import { useAiRun } from "../../lib/ai";
 import { ApiError } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import {
-  acceptHospitalUse, handleItem, hhmm, signSession, TYPE_LABEL, useSession, type DischargeTable, type MedLine, type RecItem,
+  acceptHospitalUse, handleItem, hhmm, runMedrecAi, signSession, TYPE_LABEL, useSession, type DischargeTable, type MedLine, type RecItem,
   type SessionDetail,
 } from "./api";
 import { SeverityPill, SourceChip, ViewEvidence } from "./kit";
@@ -204,7 +206,26 @@ function SignBar({ s }: { s: SessionDetail }) {
   );
 }
 
-export function MedRecPanel({ id }: { id: string }) {
+/** The reconciliation's AI step (the new medications' indications): asked for as the reconciliation opens. */
+function MedRecAi({ s, auto }: { s: SessionDetail; auto: boolean }) {
+  const queryClient = useQueryClient();
+  const run = useAiRun(s.ai, async (trigger) => {
+    queryClient.setQueryData(["ms-session", s.id], await runMedrecAi(s.id, trigger));
+    await queryClient.invalidateQueries({ queryKey: ["ms-queue"] });
+  }, { auto: auto && s.status === "open" });
+  if (s.ai.state === "done" && !run.busy) return <AiMeta ai={s.ai} className="px-3 pt-1" />;
+  if (s.status !== "open" && s.ai.state === "not_requested") return null;
+  return (
+    <div className="px-3 pt-2" data-testid="medrec-ai">
+      <AiStatus ai={s.ai} busy={run.busy} startedAt={run.startedAt} error={run.error} onAsk={run.ask}
+        what="the new medications' indications"
+        rulesNote={s.ai.state === "unavailable" ? "The rules marked the new medications without a named indication for you to check." : "The rule comparison below stands on its own."} />
+    </div>
+  );
+}
+
+/** `autoAi` false: the reconciliation is shown beside something else the person opened, so its AI waits for Ask AI. */
+export function MedRecPanel({ id, autoAi = true }: { id: string; autoAi?: boolean }) {
   const session = useSession(id);
   const queryClient = useQueryClient();
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -224,8 +245,8 @@ export function MedRecPanel({ id }: { id: string }) {
         <p className="px-3 pt-2 text-[11px] text-slate-500">
           {s.kind === "admission" ? "Home medications (provincial drug history) against the admission orders." : "Discharge prescriptions against the home medications and the inpatient orders."}
           {" "}{discrepancies} discrepanc{discrepancies === 1 ? "y" : "ies"}; {s.unhandled.length} to handle.
-          {s.ai_status !== "done" && s.ai_detail?.reason ? ` AI: ${s.ai_detail.reason}.` : ""}
         </p>
+        <MedRecAi s={s} auto={autoAi} />
         {hospitalUse.length > 1 && s.can_handle && (
           <div className="px-3 pt-2">
             <Button size="sm" disabled={bulkBusy} loading={bulkBusy} data-testid="accept-hospital-use" onClick={async () => {

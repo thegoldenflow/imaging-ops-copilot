@@ -151,7 +151,7 @@ def test_discharge_keeps_the_discharge_prescriptions_active(fresh_state):
 # ---------- intake and rules ----------
 
 
-def test_intake_reviews_new_orders_with_the_rules(fresh_state):
+def test_intake_reviews_new_orders_with_the_rules(fresh_state, eager_background_ai):
     store = fresh_state
     counts = S.intake(store, force=True)
     assert counts["reviews"] > 50 and counts["admission"] > 5 and counts["discharge"] > 5
@@ -494,6 +494,8 @@ def test_workbench_flow_over_http(client, login, fresh_state):
     encounter = encounter_of(store, QUETIAPINE)
     session = S.reconcile(store, encounter, "admission")
     view = client.get(f"/api/med-safety/medrec/{session.id}", headers=ph).json()
+    assert view["ai"]["state"] in ("not_requested", "queued") and view["items"]  # reading never calls the model
+    view = client.post(f"/api/med-safety/medrec/{session.id}/ai?trigger=opened", headers=ph).json()  # as it opens
     assert view["ai_status"] == "done" and not view["can_sign"] and view["can_handle"]
     for item in view["items"]:
         if item["discrepancy"]:

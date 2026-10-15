@@ -2,6 +2,7 @@
 // POST /api/storyline/reset (demo reset + preset), POST /api/storyline/advance (the clock to the step's beat).
 
 import { useQuery } from "@tanstack/react-query";
+import type { AiBlock } from "../../lib/ai";
 import { api, post } from "../../lib/api";
 import type { Role } from "../../lib/types";
 
@@ -23,6 +24,17 @@ export interface Proposal {
   model?: string | null;
   mode?: string | null;
   decision?: string | null;
+  generated_at?: string | null; // when the AI wrote it (wall clock) and how long it took
+  duration_ms?: number | null;
+}
+
+/** What the AI does for a step whose items get AI output when its button is pressed (the exception's narrative; the
+ * naproxen order's review and the admission reconciliation). */
+export interface StepAi {
+  items: { kind: string; id: string; label: string; ai: AiBlock }[];
+  text: string | null;
+  requested: boolean;
+  requested_by: string | null;
 }
 
 export interface Signed {
@@ -73,6 +85,8 @@ export interface StoryStep {
   written: string[];
   audit: AuditEntry[];
   detail: string | null;
+  step_ai?: StepAi;
+  advance_ai?: string | null; // what pressing this step's Advance makes the AI do
 }
 
 export interface SimJob {
@@ -122,12 +136,17 @@ export function useStoryline() {
   return useQuery({
     queryKey: storylineKey,
     queryFn: () => api<Storyline>("/api/storyline"),
-    refetchInterval: (q) => (q.state.data?.job?.status === "running" ? 1000 : 3000),
+    refetchInterval: (q) => {
+      const d = q.state.data;
+      const aiBusy = d?.steps.some((s) => s.step_ai?.items.some((i) => i.ai.state === "running" || i.ai.state === "queued"));
+      return d?.job?.status === "running" || aiBusy ? 1000 : 3000;
+    },
   });
 }
 
 export const resetStoryline = () => post<{ ok: boolean; prepared_at: string }>("/api/storyline/reset");
 export const advanceStoryline = () => post<{ job: SimJob; beat: string; target: string }>("/api/storyline/advance");
+export const askStepAi = (key: string) => post<{ step: number; items: string[][] }>(`/api/storyline/steps/${key}/ai`);
 
 /** Hospital-clock strings carry their own offset: show them as written (no time-zone conversion). */
 export const clock = (iso: string | null | undefined) => (iso ? `${iso.slice(0, 10)} ${iso.slice(11, 16)}` : "–");

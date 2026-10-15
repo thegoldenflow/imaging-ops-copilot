@@ -1,5 +1,7 @@
 // Response shapes from the FastAPI backend (hand-written for the demo).
 
+import type { AiBlock } from "./ai";
+
 export type Role =
   | "front_desk"
   | "technologist"
@@ -254,6 +256,7 @@ export interface RequisitionSummary {
   mri_status: string | null;
   appointment_id: string | null;
   waitlist_id: string | null;
+  ai: AiBlock | null; // the AI pipeline's state (null: seeded with the rule baseline; lib/ai.ts)
 }
 
 export interface Protocol {
@@ -707,6 +710,7 @@ export interface PortalRequisition {
   status_text: string;
   requested_exam: string | null;
   confirmed_priority: string | null;
+  ai?: Pick<AiBlock, "state" | "typical_s" | "steps" | "step" | "running_text" | "started_at" | "queued_at" | "generated_at" | "duration_ms"> | null;
 }
 
 export interface PortalPatientRow { id: string; name: string; dob: string; next_appointment: string | null; open_requisitions: number }
@@ -785,6 +789,7 @@ export interface FeedbackResponse {
   ai_sentiment: string | null;
   ai_themes: string[];
   ai_summary: string | null;
+  ai: AiBlock | null; // null: labelled by the rule baseline when the data was made
   model: string | null;
   sentiment: string | null;
   themes: string[];
@@ -806,6 +811,7 @@ export interface FeedbackAlert {
 
 export interface FeedbackOverview {
   kpis: { responses_30d: number; avg_rating_30d: number | null; open_alerts: number; to_confirm: number };
+  ai_not_run: string[]; // responses the AI has not labelled (nobody asked yet)
   by_site: { site_id: string; name: string; responses: number; responses_30d: number; avg_rating_30d: number | null; negative_share_30d: number | null; top_complaint: string | null }[];
   labels: string[];
   rating_trend: { name: string; values: (number | null)[] }[];

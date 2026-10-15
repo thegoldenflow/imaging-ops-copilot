@@ -196,7 +196,8 @@ def test_imaging_ai_degrades_in_prod_mode(fresh_state):
     assert pending  # the seed leaves two responses for the AI to classify
     with registry.mode("prod"):
         assert registry.gate(registry.agent("requisition_triage")) is not None
-        assert feedback.process_pending(store) == len(pending)  # refused -> the module's own fallback
+        for response_id in pending:  # refused -> the module's own fallback
+            feedback.classify_one(store, response_id)
     assert {feedback.responses(store)[r].ai_status for r in pending} == {"unavailable"}
     assert store.llm_calls[-1].outcome == "refused"
 

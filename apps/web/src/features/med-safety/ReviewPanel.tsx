@@ -2,11 +2,16 @@
 // name and source, the AI commentary (concerns with confidence and evidence, alternatives, guideline sections) — and
 // the decision (accept the order, or ask the prescriber to change it; a reason either way). Only rules block; a
 // blocking flag is the pharmacist's. For a reconciliation: the encounter's medication orders with their flags.
+// Opening a review whose commentary has not been written asks for it (BACKGROUND_AI=on_demand writes it only then;
+// in the eager mode it may still be in the background's queue), so the AI runs for what a person looks at; the
+// shared AI states (components/ai.tsx) say what it is doing meanwhile, and when and how fast it wrote the result.
 
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Loader2, Pill, ShieldCheck, Sparkles, TestTube, Wand2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Pill, ShieldCheck, TestTube } from "lucide-react";
 import { useState } from "react";
+import { AiMeta, AiStatus } from "../../components/ai";
 import { AiBadge, Badge, Button, Card, EmptyState, ErrorState, Loading } from "../../components/ui";
+import { useAiRun } from "../../lib/ai";
 import { ApiError } from "../../lib/api";
 import {
   decideReview, hhmm, runCommentary, useEncounter, useReview, type Concern, type Finding, type PatientHeader, type ReviewDetail,
@@ -89,40 +94,19 @@ function ConcernRow({ c }: { c: Concern }) {
 
 function Commentary({ r }: { r: ReviewDetail }) {
   const queryClient = useQueryClient();
-  const [busy, setBusy] = useState(false);
+  const run = useAiRun(r.ai, async (trigger) => {
+    queryClient.setQueryData(["ms-review", r.id], await runCommentary(r.id, trigger));
+    await queryClient.invalidateQueries({ queryKey: ["ms-queue"] });
+  });
   const c = r.commentary;
-  const status = r.commentary_status;
-  if (status === "pending" || status === "on_demand") {
+  if (r.ai.state !== "done" || run.busy) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-dashed border-ai-200 p-3 text-xs text-slate-600">
-        {status === "pending" ? <Loader2 className="size-3.5 animate-spin text-ai-600" /> : <Sparkles className="size-3.5 text-ai-600" />}
-        {status === "pending" ? "The AI commentary is being written (the rules above stand on their own)." : "No AI commentary yet for this test order."}
-        <Button
-          size="sm"
-          variant="ai"
-          className="ml-auto"
-          loading={busy}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              await runCommentary(r.id);
-              await queryClient.invalidateQueries({ queryKey: ["ms-review", r.id] });
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          <Wand2 className="size-3.5" />Ask the AI now
-        </Button>
-      </div>
+      <AiStatus ai={r.ai} busy={run.busy} startedAt={run.startedAt} error={run.error} onAsk={run.ask}
+        what="a commentary on this order" rulesNote={r.findings.length ? "The rule findings above stand on their own." : "No rule fired; the AI may still see a concern."} />
     );
   }
-  if (!c || status === "refused" || status === "unavailable" || status === "skipped") {
-    return (
-      <p className="rounded-lg border border-dashed border-slate-200 p-3 text-xs text-slate-500" data-testid="no-commentary">
-        No AI commentary{c?.reason ? `: ${c.reason}` : status === "skipped" ? ": decided before it was written" : ""}. The rule findings stand on their own.
-      </p>
-    );
+  if (!c) {
+    return <p className="rounded-lg border border-dashed border-slate-200 p-3 text-xs text-slate-500" data-testid="no-commentary">No AI commentary. The rule findings stand on their own.</p>;
   }
   return (
     <div className="space-y-2" data-testid="commentary">
@@ -130,6 +114,7 @@ function Commentary({ r }: { r: ReviewDetail }) {
         <AiBadge agent="order_review" label="AI commentary" />
         <span className="text-[11px] text-slate-500">advice only — it never blocks or changes the order</span>
       </div>
+      <AiMeta ai={r.ai} />
       {c.concerns.length ? <ul className="space-y-2">{c.concerns.map((x, i) => <ConcernRow key={i} c={x} />)}</ul>
         : <p className="text-xs text-slate-600">The AI found no further concern.</p>}
       {c.alternatives.length > 0 && (
@@ -236,7 +221,7 @@ export function ReviewPanel({ id }: { id: string }) {
             {r.findings.length ? <ul className="space-y-2">{r.findings.map((f, i) => <FindingRow key={i} f={f} />)}</ul>
               : <p className="text-xs text-slate-600" data-testid="no-findings">No rule fired (allergy, interaction, renal dosing, dose bounds{r.kind === "service" ? ", duplicate test" : ""}).</p>}
           </div>
-          <Commentary r={r} />
+          <Commentary key={r.id} r={r} />
           <Decision r={r} />
         </div>
       </Card>

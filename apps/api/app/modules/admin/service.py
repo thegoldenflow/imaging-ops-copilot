@@ -29,4 +29,7 @@ def maybe_daily_reset(store: Store, now: datetime | None = None) -> bool:
     from app.workflows import bridge
 
     bridge.on_reset()  # the running workflows refer to data that is gone (6.5)
+    from app.agents import ondemand
+
+    ondemand.reset()  # queued AI jobs refer to the old data
     return True

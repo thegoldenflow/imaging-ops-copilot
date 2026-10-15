@@ -18,6 +18,9 @@ async function openRequisition(page: Page, id: string) {
   await page.goto("/requisitions");
   await page.getByTestId(`req-${id}`).click();
   await expect(page.getByTestId("requisition-text")).toBeVisible({ timeout: 20_000 });
+  // a seeded fax nobody opened yet: opening it runs its AI pipeline (BACKGROUND_AI=on_demand); wait for the result
+  await expect(page.getByTestId("ai-meta").or(page.getByTestId("requisition-ai").getByTestId("ai-unavailable"))
+    .or(page.getByText("Baseline").first())).toBeVisible({ timeout: 30_000 });
 }
 
 test.beforeAll(async ({ request }) => {
@@ -28,13 +31,15 @@ test.beforeAll(async ({ request }) => {
 test("requisition pipeline end to end", async ({ page, context }) => {
   test.setTimeout(120_000);
 
-  // 1. Front desk receives a new requisition; the intake worker processes it.
+  // 1. Front desk receives a new requisition: their action, so the AI pipeline runs at once and the requisition opens
+  // to show it. The three seeded faxes wait in the queue with the AI not run (BACKGROUND_AI=on_demand).
   await signInAs(page, "front_desk");
   await page.goto("/requisitions");
-  await expect(page.getByTestId("req-REQ-NEW1")).toContainText("Awaiting radiologist", { timeout: 30_000 });
+  await expect(page.getByTestId("req-REQ-NEW1")).toBeVisible();
   await page.getByTestId("new-requisition").click();
   await page.getByTestId("submit-requisition").click();
-  await expect(page.getByText("AI processing").or(page.getByText("Awaiting radiologist")).first()).toBeVisible();
+  await expect(page).toHaveURL(/\/requisitions\/REQ-/);
+  await expect(page.getByTestId("ai-meta")).toContainText("your action", { timeout: 30_000 });
   await shot(page, "p2-01-queue");
 
   // 2. Radiologist reviews the MRI requisition that mentions a cochlear implant.

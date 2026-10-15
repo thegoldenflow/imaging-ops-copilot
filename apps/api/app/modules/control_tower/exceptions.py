@@ -27,6 +27,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.core import config
 from app.core.store import Store
 from app.ehr.events import bus, platform_event
 from app.modules.control_tower.rules import SEVERITY_RANK, Detected
@@ -52,7 +53,8 @@ class FlowException(BaseModel):
     detected_at: datetime  # hospital clock
     changed_at: datetime  # hospital clock: opened, or the severity changed
     cleared_at: datetime | None = None
-    narration_status: Literal["pending", "done"] = "pending"
+    # pending: the narrator loop writes it; on_open: written when a person opens the exception (BACKGROUND_AI=on_demand)
+    narration_status: Literal["pending", "on_open", "done"] = "pending"
     narration: dict | None = None  # the validated narrator output and how it was made (encrypted at rest)
     review_task_id: str | None = None  # the ai-review Task (explainException) a decision completes
     decision: dict | None = None  # {decision, by, name, role, at, note, actions[], remind_at}
@@ -100,6 +102,12 @@ def publish(exc: FlowException, event_type: str, at: datetime, *, actor: str = "
                                       **(attrs or {})}))
 
 
+def _narration_waits() -> str:
+    """A new or changed exception's narrative: the narrator loop's (`pending`), or the first person to open it
+    (`on_open`, BACKGROUND_AI=on_demand); the board shows the engine's summary until then."""
+    return "on_open" if config.ai_on_open() else "pending"
+
+
 def sync(store: Store, detected: list[Detected], now: datetime) -> dict[str, list[str]]:
     """Bring the stream in line with what the engine sees now; returns the ids opened, changed, cleared, reopened."""
     live = current(store)
@@ -112,7 +120,7 @@ def sync(store: Store, detected: list[Detected], now: datetime) -> dict[str, lis
             exc = FlowException(id=store.next_id("EXC"), key=d.key, rule=d.rule, severity=d.severity, title=d.title,
                                 summary=d.summary, unit_id=d.unit_id, subject_ref=d.subject_ref, facts=d.facts,
                                 evidence_refs=d.evidence_refs, menu=[m.model_dump() for m in d.menu],
-                                detected_at=now, changed_at=now)
+                                detected_at=now, changed_at=now, narration_status=_narration_waits())
             save(store, exc)
             publish(exc, "exception.opened", now)
             changes["opened"].append(exc.id)
@@ -122,7 +130,7 @@ def sync(store: Store, detected: list[Detected], now: datetime) -> dict[str, lis
             exc = exc.model_copy(update=dict(
                 severity=d.severity, title=d.title, summary=d.summary, facts=d.facts, evidence_refs=d.evidence_refs,
                 menu=[m.model_dump() for m in d.menu], changed_at=now,
-                narration_status="pending" if exc.status in LIVE else exc.narration_status))
+                narration_status=_narration_waits() if exc.status in LIVE else exc.narration_status))
             changes["changed"].append(exc.id)
             dirty = True
         elif exc.title != d.title and exc.status in LIVE:  # the headline follows the counts; the narrative waits
@@ -155,5 +163,6 @@ def stream(store: Store, *, limit: int = 60) -> list[FlowException]:
 
 
 def pending_narration(store: Store) -> list[FlowException]:
+    """Live exceptions waiting for the narrator loop (not those waiting for a person to open them)."""
     return sorted((e for e in all_exceptions(store) if e.narration_status == "pending" and e.status in LIVE
                    and e.cleared_at is None), key=lambda e: (-SEVERITY_RANK[e.severity], e.detected_at))

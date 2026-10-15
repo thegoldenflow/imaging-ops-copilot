@@ -26,6 +26,7 @@ interface Step {
   n: number; key: string; status: string; done: boolean; route: string; cast: Cast; permission: string; stub: boolean;
   proposal: { ref: string; label: string } | null; signed: { by?: string } | null; detail: string | null;
   audit: { event_type: string }[];
+  step_ai?: { items: { kind: string; id: string; ai: { state: string } }[] };
 }
 interface View {
   current: number | null; steps: Step[]; job: { status: string } | null;
@@ -215,7 +216,9 @@ test("hospital storyline: twelve steps, each proposed by the AI, signed by a per
   await exception.click();
   const drawer = page.getByTestId("action-drawer");
   await expect(drawer.getByTestId("narrative")).not.toBeEmpty({ timeout: 60_000 });
-  await expect(drawer.getByText("AI-generated").first()).toBeVisible();
+  await expect(drawer.getByText("AI-generated").first()).toBeVisible({ timeout: 60_000 });
+  // the step's Advance asked for this narrative (BACKGROUND_AI=on_demand): written as that person's storyline step
+  await expect(drawer.getByTestId("ai-meta")).toContainText(/Storyline step 5|when you opened it/);
   const rounds = drawer.getByTestId("action-overflow_discharge_rounds");
   if (!(await rounds.isVisible())) await drawer.getByText(/More actions from the engine/).click();
   if (!(await rounds.isChecked())) await rounds.check();
@@ -227,6 +230,10 @@ test("hospital storyline: twelve steps, each proposed by the AI, signed by a per
   step = await expectDone(page, request, 5);
   expect(step.detail).toMatch(/^bed SURG-/);
   log(`5 bed (${step.detail})`);
+  // that Advance (until she has a bed) asked for step 6's AI: the naproxen review and the admission reconciliation,
+  // run as soon as they appeared; the storyline page shows them done
+  await expect.poll(async () => ((await stepOf(request, 6)).step_ai?.items ?? []).map((i) => i.ai.state).join(","),
+    { timeout: 180_000, intervals: [1000, 2000, 3000] }).toBe("done,done");
 
   // ----- 6. admission MedRec: the pharmacist requests a change to naproxen, handles each item, signs; the surgeon co-signs -----
   await play(page, request, 6);
@@ -255,7 +262,7 @@ test("hospital storyline: twelve steps, each proposed by the AI, signed by a per
   await expect.poll(async () => { // and its AI step (the indications) has run
     const r = await request.get(`/api/med-safety/medrec/${session}`, { headers: pharmacist });
     return r.ok() ? (await r.json()).ai_status : "";
-  }, { timeout: 120_000, intervals: [1000, 2000, 3000] }).not.toMatch(/^(pending|)$/);
+  }, { timeout: 120_000, intervals: [1000, 2000, 3000] }).not.toMatch(/^(pending|on_open|)$/);
   await page.goto(`/med-safety?encounter=${STAY}&document=medrec-${STAY}-admission`);
   const medrec = page.getByTestId("medrec-panel");
   await expect(medrec).toBeVisible({ timeout: 60_000 });

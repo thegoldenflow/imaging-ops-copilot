@@ -213,7 +213,9 @@ def test_portal_requisition_enters_the_pipeline(client, login):
     assert r.status_code == 200, r.text
     req = get_store().requisitions[r.json()["id"]]
     assert req.channel == "portal" and req.status == "received" and req.referrer_id == "R-DEMO"
-    requisitions.process_pending(get_store())
+    from app.agents import ondemand
+
+    assert ondemand.drain(get_store()) == 1  # queued by the submission: the AI job loop runs it at once
     staff = client.get(f"/api/requisitions/{req.id}", headers=login("U-RAD")).json()
     assert staff["triage"]["ai_priority"] in ("P1", "P2") and staff["protocol"]["primary_id"] == "CT-AP-CONTRAST"
     mine = client.get("/api/portal/requisitions", headers=ref).json()["requisitions"]
@@ -328,7 +330,9 @@ def test_completion_sends_survey_in_patient_language_and_low_rating_alerts(clien
     assert any(m.kind == "feedback_alert" and resp.id in m.body for m in store.outbox.values())
     assert client.post(f"/api/public/feedback/{survey.token}", json={"rating": 5}).status_code == 409
 
-    feedback.process_pending(store)
+    from app.agents import ondemand
+
+    assert ondemand.drain(store) == 1  # the patient's answer was queued for the AI job loop
     resp = feedback.responses(store)[resp.id]  # loaded before the last request: read it again
     assert resp.ai_status == "ok" and resp.ai_sentiment == "negative"
     assert {"wait_time", "staff_attitude"} <= set(resp.ai_themes)
@@ -342,7 +346,7 @@ def test_negative_comment_with_good_rating_alerts_after_ai(client):
     survey = next(s for s in feedback.surveys(store).values() if s.status == "sent")
     resp = feedback.submit(store, survey, 3, "The waiting room was dirty and the technologist was rude.", datetime.now())
     assert not any(a.response_id == resp.id for a in feedback.alerts(store).values())
-    feedback.process_pending(store)
+    feedback.classify_one(store, resp.id)
     assert any(a.response_id == resp.id and "AI" in a.reason for a in feedback.alerts(store).values())
 
 
@@ -361,7 +365,7 @@ def test_ai_unavailable_keeps_feedback_working(client):
     store = get_store()
     survey = next(s for s in feedback.surveys(store).values() if s.status == "sent")
     resp = feedback.submit(store, survey, 2, "Too long a wait", datetime.now())
-    feedback.process_pending(store)
+    resp = feedback.classify_one(store, resp.id)
     assert resp.ai_status == "unavailable" and resp.sentiment is None
     assert any(a.response_id == resp.id for a in feedback.alerts(store).values())  # rule still fired
 
@@ -370,7 +374,8 @@ def test_feedback_dashboard_confirm_and_follow_up(client, login):
     from app.modules.feedback import service as feedback
 
     ops = login("U-OPS")
-    feedback.process_pending(get_store())
+    for waiting in [r.id for r in feedback.responses(get_store()).values() if r.ai_status is None]:
+        feedback.classify_one(get_store(), waiting)
     data = client.get("/api/feedback/overview", headers=ops).json()
     assert len(data["by_site"]) == 5 and data["kpis"]["open_alerts"] > 0
     wbk = next(s for s in data["by_site"] if s["site_id"] == "WBK")

@@ -1,12 +1,19 @@
 """Requisition intake pipeline: extraction once, then triage and protocol
-suggestion, then (after approval) waitlist or booking."""
+suggestion, then (after approval) waitlist or booking.
+
+The AI pipeline (three model calls) runs for a requisition a person submitted, at once (the portal, the intake
+queue's form, reprocess: app/agents/ondemand.py's job loop), and for one already waiting when a person opens it or
+asks for a batch. With BACKGROUND_AI=eager the intake loop also processes every received requisition by itself."""
 
 import json
+import zlib
 from datetime import datetime, timedelta
 from typing import Callable
 
 from pydantic import BaseModel
+from sqlalchemy import text
 
+from app.agents import ondemand
 from app.core.models import ACTIVE_STATUSES, Requisition, WaitlistEntry
 from app.core.store import Store
 from app.llm.gateway import get_gateway
@@ -71,6 +78,7 @@ def process(store: Store, req: Requisition) -> None:
     gateway = get_gateway()
     now = datetime.now()
 
+    ondemand.progress("requisition", req.id, STEPS[0])
     ext = gateway.structured(task="requisition_extract", prompt=EXTRACT_PROMPT, variables={"text": req.text},
                              schema_cls=Extraction, tier="fast", patients=[patient])
     fields = ext.data if ext.status == "ok" else empty_fields()
@@ -79,6 +87,7 @@ def process(store: Store, req: Requisition) -> None:
         prompt_version=ext.prompt_version, low_confidence=low_confidence_fields(fields), extracted_at=now,
     )
 
+    ondemand.progress("requisition", req.id, STEPS[1])
     tri = gateway.structured(task="requisition_triage", prompt=triage.TRIAGE_PROMPT,
                              variables={"fields": json.dumps(values_only(fields))},
                              schema_cls=triage.TriageOutput, tier="reasoning", patients=[patient])
@@ -93,6 +102,7 @@ def process(store: Store, req: Requisition) -> None:
     candidates = retrieve(exam, clinical_text(fields))
     if not candidates:  # unknown modality: fall back to the whole library ranking
         candidates = retrieve("", f"{exam} {clinical_text(fields)}")
+    ondemand.progress("requisition", req.id, STEPS[2])
     pro = gateway.structured(
         task="protocol_suggest", prompt=protocols.PROTOCOL_PROMPT,
         variables={"exam": exam or "not stated", "clinical": clinical_text(fields) or "not stated",
@@ -120,15 +130,124 @@ def process(store: Store, req: Requisition) -> None:
     store.touch()
 
 
+STEPS = ("Reading the requisition", "Triage", "Protocol")
+
+
+def process_one(store: Store, req_id: str, *, retry: bool = False) -> Requisition:
+    """Run the AI pipeline for one received requisition. One run per requisition at a time: a second caller (the
+    job loop, the eager intake loop, a person opening it) waits for the first, then finds it processed. `retry`
+    (ops' Retry after the AI failed) runs it again only if nobody has worked on it yet (`retryable`), decided here
+    under the requisition's lock: the pipeline rewrites the extraction, the triage and the protocol records."""
+    if not store.detached:
+        store.conn().execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": zlib.crc32(f"requisition:{req_id}".encode())})
+        store.requisitions.forget(req_id)  # what another transaction wrote while this one waited
+        for table in (extractions(store), triage.records(store), protocols.records(store)):
+            table.forget(req_id)
+    req = store.requisitions.get(req_id)
+    if req is None:
+        raise LookupError(f"No requisition {req_id}")
+    if retry and retryable(store, req):
+        req.status = "received"
+        store.touch()
+    if req.status != "received":
+        return req
+    try:
+        process(store, req)
+    except Exception:
+        req.status = "failed"
+        raise
+    return req
+
+
 def process_pending(store: Store) -> int:
-    pending = [r for r in store.requisitions.values() if r.status == "received"]
-    for req in pending:
-        try:
-            process(store, req)
-        except Exception:
-            req.status = "failed"
-            raise
+    """The intake loop's step: with BACKGROUND_AI=eager every received requisition; on demand none (a submitted one
+    is queued by its request, a waiting one runs when someone opens it)."""
+    if ondemand.on_demand():
+        return 0
+    pending = [r.id for r in store.requisitions.values() if r.status == "received"]
+    for req_id in pending:
+        process_one(store, req_id)
     return len(pending)
+
+
+def human_input(store: Store, req_id: str) -> list[str]:
+    """What people have done to a requisition's AI output (a re-run would throw it away)."""
+    ext = extractions(store).get(req_id)
+    tri = triage.records(store).get(req_id)
+    pro = protocols.records(store).get(req_id)
+    found = []
+    if ext is not None and ext.corrections:
+        found.append("corrected fields")
+    if tri is not None and tri.review_action:
+        found.append(f"triage {tri.review_action} by {tri.reviewed_by}")
+    if pro is not None and pro.approved_id:
+        found.append(f"protocol approved by {pro.approved_by}")
+    return found
+
+
+def retryable(store: Store, req: Requisition | None) -> bool:
+    """A failed run may be asked for again only before anyone worked on the requisition: the pipeline rebuilds the
+    extraction, triage and protocol records, which hold the staff's corrections and the radiologist's decisions."""
+    if req is None or human_input(store, req.id):
+        return False
+    return req.status == "failed" or (req.status == "ready" and bool(_ai_failed(store, req.id)))
+
+
+def _ai_failed(store: Store, req_id: str) -> list[str]:
+    records = {"extraction": extractions(store).get(req_id), "triage": triage.records(store).get(req_id),
+               "protocol": protocols.records(store).get(req_id)}
+    return [name for name, rec in records.items() if rec is not None and rec.ai_status in ("unavailable", "needs_human")]
+
+
+def requisition_ai(store: Store, req: Requisition, *, with_trace: bool = False) -> dict | None:
+    """The requisition's AI block (None for a seeded one the rule baseline pre-processed: no AI ran or will).
+    `with_trace` (the detail, not the polled list): also who caused the run, from the extraction call's trace."""
+    ext = extractions(store).get(req.id)
+    pro = protocols.records(store).get(req.id)
+    if ext is not None and ext.ai_status == "seeded":
+        return None
+    if req.status == "received":
+        return ondemand.view("requisition", req.id, "not_requested")
+    if req.status == "failed":
+        return ondemand.view("requisition", req.id, "unavailable", error="The AI pipeline failed",
+                             retryable=retryable(store, req))
+    if ext is None or pro is None:
+        return ondemand.view("requisition", req.id, "not_requested", auto=False)
+    failed = _ai_failed(store, req.id)
+    took = int((pro.suggested_at - ext.extracted_at).total_seconds() * 1000)
+    cause = None
+    if with_trace and ext.llm_call_id:
+        from app.agents import trace as traces
+
+        run = traces.by_llm_calls([ext.llm_call_id], store).get(ext.llm_call_id)
+        cause = run.cause if run is not None else None
+    return ondemand.view("requisition", req.id, "unavailable" if failed else "done", generated_at=pro.suggested_at,
+                         duration_ms=took, error=f"AI unavailable for: {', '.join(failed)}" if failed else None,
+                         cause=cause, retryable=bool(failed) and retryable(store, req))
+
+
+_STAFF = ("front_desk", "technologist", "radiologist", "operations_manager", "medical_director", "admin")
+
+
+def _check(store: Store, user, req_id: str) -> None:
+    if store.requisitions.get(req_id) is None:
+        raise LookupError(f"No requisition {req_id}")
+    if user is not None and str(user.role) not in _STAFF:
+        raise ondemand.NotAllowed("The requisition queue is for imaging-centre staff")
+
+
+def _label(store: Store, req_id: str) -> tuple[str, str | None]:
+    req = store.requisitions.get(req_id)
+    return f"Requisition {req.id} ({req.channel})", f"/requisitions/{req.id}"
+
+
+ondemand.register(ondemand.Kind(
+    name="requisition", noun="requisition", running_text="AI is reading, triaging and protocolling this requisition",
+    agents=("requisition_extract", "requisition_triage", "protocol_suggest"), calls=3, live_s=15.0,
+    run=lambda store, req_id, retry: process_one(store, req_id, retry=retry),
+    needs_ai=lambda store, req_id: (r := store.requisitions.get(req_id)) is not None and r.status == "received",
+    check=_check, describe=_label, steps=STEPS,
+    retryable=lambda store, req_id: retryable(store, store.requisitions.get(req_id))))
 
 
 def seed_processed(store: Store, req: Requisition, labels: dict, reviewed: bool, reviewer: str) -> None:

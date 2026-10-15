@@ -1,5 +1,7 @@
 // Thin fetch wrapper: adds the demo session token and turns errors into ApiError.
 
+import { demoSession } from "./session";
+
 const TOKEN_KEY = "ioc.token";
 
 export class ApiError extends Error {
@@ -46,6 +48,7 @@ export async function api<T = unknown>(path: string, init: RequestInit & { json?
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   headers.set("X-Idle-Seconds", String(Math.floor((Date.now() - lastInput) / 1000)));
+  headers.set("X-Demo-Session", demoSession()); // which browser's clicks caused AI work ("What the AI did")
   let body = init.body;
   if (init.json !== undefined) {
     headers.set("Content-Type", "application/json");

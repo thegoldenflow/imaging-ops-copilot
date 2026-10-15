@@ -51,6 +51,7 @@ import { isLiveLlm, llmVendor } from "../lib/llm";
 import { BreakGlassBanner } from "../features/hospital/BreakGlass";
 import { EscalationCount } from "../features/voice/FollowUpPage";
 import { HOSPITAL_CLINICAL, ROLE_LABEL, type Meta, type Role } from "../lib/types";
+import { AiActivityButton } from "./AiActivity";
 import { Badge, Button } from "./ui";
 
 interface NavItem {
@@ -187,6 +188,7 @@ export function Layout() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <AiActivityButton />
             <div className="text-right leading-tight">
               <p className="text-sm font-medium text-slate-900" data-testid="current-user">{user.name}</p>
               <p className="text-xs text-slate-500">
