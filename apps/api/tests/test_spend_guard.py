@@ -117,8 +117,10 @@ def test_while_idle_only_the_steps_that_call_the_model_wait(monkeypatch, eager_b
     activity.touch()
     assert {"requisition intake", "feedback classification"} <= set(_one_pass(monkeypatch, main._intake_loop, 1))
     assert "day simulator" in _one_pass(monkeypatch, main._hospital_loop, 0)
-    assert _one_pass(monkeypatch, main._narrator_loop, 1) == [
-        "control tower narration", "medication safety AI", "documentation intake"]
+    assert _one_pass(monkeypatch, main._narrator_loop, 1) == [  # one item per transaction (eager)
+        "control tower narration", "control tower narration", "medication safety commentary",
+        "medication safety commentary", "medication safety reconciliation", "medication safety reconciliation",
+        "documentation intake"]
 
 
 def test_the_clock_resumes_where_it_stopped(fresh_state):

@@ -84,7 +84,8 @@ def refresh_step(store: Store) -> None:
 
 
 def narrate_step(store: Store, limit: int = 2) -> None:
-    """Background step: narrate the most severe exceptions still waiting for a narrative."""
+    """Background step: narrate the most severe exceptions still waiting for a narrative (the API's narrator loop
+    narrates one per transaction, so a decision on another exception never waits behind it)."""
     for exc in X.pending_narration(store)[:limit]:
         narrate(store, exc.id)
 
@@ -100,12 +101,17 @@ def _lock_exception(store: Store, exception_id: str) -> None:
                              {"k": zlib.crc32(f"flow-exception:{exception_id}".encode())})
 
 
-def narrate(store: Store, exception_id: str) -> X.FlowException:
+def narrate(store: Store, exception_id: str, *, retry: bool = False) -> X.FlowException:
+    """The narrative and recommended actions of a live exception (none for one that cleared or was decided). With
+    `retry` (Ask AI after the template stood in for the model) the narration runs again; decided here, under the
+    exception's lock, so two requests make one call."""
     _lock_exception(store, exception_id)
     exc = X.fresh(store, exception_id)  # another narrator may have finished while we waited for the lock
     if exc is None:
         raise LookupError(f"No exception {exception_id}")
-    if exc.narration_status == "done":
+    if not _live(exc):
+        return exc
+    if exc.narration_status == "done" and not (retry and (exc.narration or {}).get("source") != "model"):
         return exc
     payload = exc.model_dump(mode="json")
     narration: dict
@@ -554,14 +560,7 @@ def exception_ai(exc: X.FlowException, *, with_trace: bool = True) -> dict:
     else:
         state, error = ("queued" if exc.narration_status == "pending" else "not_requested"), None
     return ondemand.view("exception", exc.id, state, auto=_live(exc), run_id=n.get("run_id"), error=error,
-                         with_trace=with_trace)
-
-
-def rearm_exception(store: Store, exception_id: str) -> None:
-    """Ask AI again after the template stood in for the narrative."""
-    exc = X.get(store, exception_id)
-    if exc is not None and _live(exc) and exc.narration_status == "done" and             (exc.narration or {}).get("source") != "model":
-        X.save(store, exc.model_copy(update={"narration_status": "on_open"}))
+                         with_trace=with_trace, retryable=_live(exc) and state == "unavailable")
 
 
 def _exception_check(store: Store, user: StaffUser | None, exception_id: str) -> None:
@@ -582,7 +581,9 @@ def _exception_label(store: Store, exception_id: str) -> tuple[str, str | None]:
 ondemand.register(ondemand.Kind(
     name="exception", noun="exception", running_text="AI is writing the narrative and recommending actions",
     agents=(agent.AGENT_ID,), calls=1, live_s=8.0,
-    run=lambda store, exception_id: narrate(store, exception_id),
+    run=lambda store, exception_id, retry: narrate(store, exception_id, retry=retry),
     needs_ai=lambda store, exception_id: (e := X.get(store, exception_id)) is not None and _live(e) and
     e.narration_status != "done",
-    check=_exception_check, describe=_exception_label, retry=rearm_exception))
+    check=_exception_check, describe=_exception_label,
+    retryable=lambda store, exception_id: (e := X.get(store, exception_id)) is not None and _live(e)
+    and e.narration_status == "done" and (e.narration or {}).get("source") != "model"))

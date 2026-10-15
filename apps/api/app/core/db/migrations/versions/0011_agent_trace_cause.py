@@ -22,7 +22,10 @@ depends_on = None
 
 def upgrade() -> None:
     op.add_column('agent_traces', sa.Column('cause', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
+    # the activity panel polls one browser's runs
+    op.create_index('ix_agent_traces_cause_session', 'agent_traces', [sa.text("(cause ->> 'session')")])
 
 
 def downgrade() -> None:
+    op.drop_index('ix_agent_traces_cause_session', table_name='agent_traces')
     op.drop_column('agent_traces', 'cause')

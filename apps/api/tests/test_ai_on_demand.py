@@ -175,29 +175,32 @@ def test_opening_an_item_already_queued_runs_it_now_as_what_it_was_asked_for(fre
 
 
 def test_the_same_item_asked_for_twice_at_once_runs_once(fresh_state, monkeypatch):
-    """Two people (or a double click) ask for the same item while its AI runs: the second waits for the first and
-    gets its result; the kind's run is called once."""
+    """Two people (or a double click) press Retry on the same item while its AI runs: only the first may retry; the
+    second waits for it, then reads the item again under its lock (`retry=False`: no second paid run, nothing of
+    the first overwritten), and only then returns."""
     _mode(monkeypatch, "on_demand")
     calls = []
     started = threading.Event()
 
-    def slow_run(store, item_id):
-        calls.append(item_id)
+    def slow_run(store, item_id, retry):
+        calls.append((item_id, retry, time.monotonic()))
         started.set()
         time.sleep(0.4)
 
     kind = ondemand.KINDS["feedback"]
     monkeypatch.setitem(ondemand.KINDS, "feedback", dataclasses.replace(kind, run=slow_run))
-    first = threading.Thread(target=ondemand.run_now, args=(None, "feedback", "FB-X"))
+    first = threading.Thread(target=ondemand.run_now, args=(None, "feedback", "FB-X"),
+                             kwargs={"trigger": "asked", "retry": True})
     first.start()
     started.wait(2)
     assert ondemand.live("feedback", "FB-X")["state"] == "running"
     began = time.monotonic()
-    ondemand.run_now(None, "feedback", "FB-X")
+    ondemand.run_now(None, "feedback", "FB-X", trigger="asked", retry=True)
     first.join()
-    assert calls == ["FB-X"] and time.monotonic() - began >= 0.2
+    assert [(i, r) for i, r, _ in calls] == [("FB-X", True), ("FB-X", False)]
+    assert calls[1][2] - began >= 0.2  # the second read happened after the first run had finished
     assert ondemand.live("feedback", "FB-X") is None
-    assert not ondemand.request("feedback", "FB-X") or ondemand.request("feedback", "FB-X") is False
+    assert ondemand.request("feedback", "FB-X") is True and ondemand.request("feedback", "FB-X") is False
 
 
 # ---------- feedback ----------
@@ -245,6 +248,8 @@ def test_a_batch_states_its_time_queues_what_needs_ai_and_skips_the_rest(fresh_s
             + [{"kind": "requisition", "id": "REQ-NEW1"}]}  # not a pharmacist's: left out
     out = client.post("/api/ai/batch", json=body, headers=pharmacist).json()
     assert out["queued"] == 2 and out["skipped"] == 2 and out["calls"] == 2 and out["expected_s"] > 0
+    assert store.audit.query(resource_type="ai_requisition", resource_id="REQ-NEW1", outcome="denied")  # on record
+    assert out["denied"] == 1
     queued = ondemand.snapshot()["queued"]
     assert [j["cause"]["note"] for j in queued] == ["1 of 2", "2 of 2"]
     assert {j["cause"]["trigger"] for j in queued} == {"batch"}

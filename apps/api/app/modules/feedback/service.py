@@ -197,8 +197,12 @@ def process_pending(store: Store) -> int:
     return len(pending)
 
 
-def classify_one(store: Store, response_id: str) -> FeedbackResponse:
-    """Classify one response whose AI has not run; a second caller waits for the first and finds it done."""
+RETRYABLE = ("unavailable", "needs_human")
+
+
+def classify_one(store: Store, response_id: str, *, retry: bool = False) -> FeedbackResponse:
+    """Classify one response whose AI has not run; a second caller waits for the first and finds it done. `retry`
+    (Ask AI after the classification failed) is decided here, under the response's lock."""
     if not store.detached:
         store.conn().execute(text("SELECT pg_advisory_xact_lock(:k)"),
                              {"k": zlib.crc32(f"feedback:{response_id}".encode())})
@@ -206,19 +210,11 @@ def classify_one(store: Store, response_id: str) -> FeedbackResponse:
     resp = responses(store).get(response_id)
     if resp is None:
         raise LookupError(f"No feedback response {response_id}")
-    if resp.ai_status is None:
+    if resp.ai_status is None or (retry and resp.ai_status in RETRYABLE):
         classify(store, resp)
         responses(store)[resp.id] = resp
         store.touch()
     return resp
-
-
-def rearm(store: Store, response_id: str) -> None:
-    """Ask AI again after the classification was unavailable or failed validation."""
-    resp = responses(store).get(response_id)
-    if resp is not None and resp.ai_status in ("unavailable", "needs_human"):
-        resp.ai_status = None
-        responses(store)[resp.id] = resp
 
 
 def response_ai(resp: FeedbackResponse, trace=None) -> dict | None:
@@ -231,7 +227,7 @@ def response_ai(resp: FeedbackResponse, trace=None) -> dict | None:
     if resp.ai_status is None:
         return ondemand.view("feedback", resp.id, "not_requested", auto=False)
     state = "done" if resp.ai_status == "ok" else "unavailable"
-    return ondemand.view("feedback", resp.id, state, **facts,
+    return ondemand.view("feedback", resp.id, state, **facts, retryable=resp.ai_status in RETRYABLE,
                          error=None if state == "done" else f"AI classification {resp.ai_status}")
 
 
@@ -254,8 +250,10 @@ def _label(store: Store, response_id: str) -> tuple[str, str | None]:
 ondemand.register(ondemand.Kind(
     name="feedback", noun="feedback comment", running_text="AI is labelling the comment's sentiment and themes",
     agents=("feedback_classify",), calls=1, live_s=4.0,
-    run=classify_one, needs_ai=lambda store, rid: (r := responses(store).get(rid)) is not None and r.ai_status is None,
-    check=_check, describe=_label, retry=rearm))
+    run=lambda store, rid, retry: classify_one(store, rid, retry=retry),
+    needs_ai=lambda store, rid: (r := responses(store).get(rid)) is not None and r.ai_status is None,
+    check=_check, describe=_label,
+    retryable=lambda store, rid: (r := responses(store).get(rid)) is not None and r.ai_status in RETRYABLE))
 
 
 def confirm(resp: FeedbackResponse, sentiment: str, themes: list[str], by: str, now: datetime) -> None:

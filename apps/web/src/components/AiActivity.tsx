@@ -39,8 +39,12 @@ export function AiActivityButton() {
   );
 }
 
+const ALL_SCOPE = ["operations_manager", "medical_director", "admin"]; // everyone's actions: the people who run the demo
+
 function AiActivityPanel({ onClose }: { onClose: () => void }) {
+  const { user } = useAuth();
   const [scope, setScope] = useState<"session" | "all">("session");
+  const mayAll = Boolean(user && ALL_SCOPE.includes(user.role));
   const q = useAiActivity(scope, { open: true });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -66,7 +70,7 @@ function AiActivityPanel({ onClose }: { onClose: () => void }) {
             <button onClick={onClose} className="rounded-md p-1 text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="size-4" /></button>
           </div>
           <div className="flex gap-1" role="tablist">
-            {(["session", "all"] as const).map((s) => (
+            {(mayAll ? (["session", "all"] as const) : (["session"] as const)).map((s) => (
               <button key={s} role="tab" aria-selected={scope === s} onClick={() => setScope(s)} data-testid={`ai-scope-${s}`}
                 className={clsx("rounded-md px-2 py-1 text-xs font-medium", scope === s ? "bg-ai-50 text-ai-700" : "text-slate-600 hover:bg-slate-100")}>
                 {s === "session" ? "This browser" : "Everyone since the reset"}

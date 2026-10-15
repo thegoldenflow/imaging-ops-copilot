@@ -9,7 +9,8 @@ the portal received, a batch) runs `using(cause)` with the cause recorded when t
 the background's own (BACKGROUND_AI=eager, the simulator's evals).
 
 The cause holds ids and labels the person already saw, never patient details: the activity panel shows it to
-whoever uses the same browser, whatever role they switch to.
+whoever uses the same browser, whatever role they switch to. The session id is how a browser finds its own actions,
+so nothing shows it back (`public`).
 """
 
 from __future__ import annotations
@@ -96,3 +97,33 @@ def stamp() -> dict | None:
     """What a new trace records (None: the background's own run)."""
     cause = current()
     return cause.model_dump(exclude_none=True) if cause is not None else None
+
+
+def public(cause: AiCause | dict | None) -> dict | None:
+    """A cause as the web app may show it: without the browser's session id."""
+    if cause is None:
+        return None
+    data = cause.model_dump(exclude_none=True) if isinstance(cause, AiCause) else dict(cause)
+    data.pop("session", None)
+    return data
+
+
+# The model calls made while a run is under way (their outcomes), so its time is learned only from real answers
+_calls: ContextVar[list | None] = ContextVar("ai_calls", default=None)
+
+
+@contextlib.contextmanager
+def collecting() -> Iterator[list]:
+    seen: list = []
+    token = _calls.set(seen)
+    try:
+        yield seen
+    finally:
+        _calls.reset(token)
+
+
+def note_call(outcome: str) -> None:
+    """The LLM gateway reports each logged call (ok, retried_ok, refused, unavailable, needs_human)."""
+    seen = _calls.get()
+    if seen is not None:
+        seen.append(outcome)

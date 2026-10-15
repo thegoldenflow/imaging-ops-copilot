@@ -323,37 +323,59 @@ def ai_step(store: Store) -> None:
             known.append(item)
             changed = True
             kind_name, item_id = item
-            k = ondemand.KINDS[kind_name]
+            k = ondemand.kind(kind_name)
             if k.needs_ai(store, item_id):
                 label, link = ondemand._describe(k, store, item_id)
                 cause = causes.AiCause.model_validate(entry["cause"]).model_copy(
                     update={"kind": kind_name, "item_id": item_id, "label": label, "link": link})
-                ondemand.request(kind_name, item_id, cause)
+                ondemand.request_after_commit(store, kind_name, item_id, cause)
         entry["items"] = [list(i) for i in known]
     if changed:
         store.modules[preset.STATE] = st
 
 
-def ask_step_ai(store: Store, key: str) -> dict:
+def ask_step_ai(store: Store, user: StaffUser, key: str) -> dict:
     """The step's Ask AI (the page's AI box): queue the AI of the step's items that exist now, as this person's
-    storyline step, when its Advance was not pressed (the clock moved by itself) or the AI was unavailable."""
+    storyline step: an item whose AI has not run (its Advance was not pressed: the clock moved by itself), or one
+    whose run failed and may run again (the retry itself is decided by the run, under the item's lock). Each item
+    is checked against the person (who may ask for its AI, 6.3 scope): NotAllowed when they may ask for none."""
     step = S.BY_KEY.get(key)
     if step is None or key not in AI_TEXT:
         raise ValueError("This step's AI runs from its own screen")
     st = state(store)
     if st is None:
         raise ValueError("Reset the storyline first")
-    for kind_name, item_id in _step_items(store, key):  # a failed run is asked for again
-        k = ondemand.KINDS[kind_name]
-        if k.retry is not None:
-            k.retry(store, item_id)
-    base = causes.from_request("storyline") or causes.AiCause(trigger="storyline")
-    cause = base.model_copy(update={"trigger": "storyline", "note": f"Storyline step {step.n}"}).model_dump(
-        exclude_none=True)
-    st.setdefault("ai_steps", {})[key] = {"cause": cause, "items": [], "at": datetime.now().isoformat()}
+    items = _step_items(store, key)
+    if not items:
+        raise ValueError("Nothing to ask for yet: the step's items appear when the clock gets there")
+    base = (causes.from_request("storyline") or causes.AiCause(trigger="storyline")).model_copy(
+        update={"trigger": "storyline", "note": f"Storyline step {step.n}"})
+    asked, denied = [], []
+    for kind_name, item_id in items:
+        k = ondemand.kind(kind_name)
+        try:
+            k.check(store, user, item_id)
+        except ondemand.NotAllowed:
+            denied.append(item_id)
+            continue
+        except LookupError:
+            continue
+        if k.needs_ai(store, item_id):
+            retry = False
+        elif ondemand.can_retry(store, kind_name, item_id):
+            retry = True
+        else:
+            continue
+        label, link = ondemand._describe(k, store, item_id)
+        ondemand.request_after_commit(store, kind_name, item_id, base.model_copy(
+            update={"kind": kind_name, "item_id": item_id, "label": label, "link": link}), retry=retry)
+        asked.append([kind_name, item_id])
+    if denied and not asked:
+        raise ondemand.NotAllowed(f"You may not ask for the AI of {', '.join(denied)}")
+    st.setdefault("ai_steps", {})[key] = {"cause": base.model_dump(exclude_none=True),
+                                          "items": [list(i) for i in items], "at": datetime.now().isoformat()}
     store.modules[preset.STATE] = st
-    ai_step(store)
-    return {"step": step.n, "items": [list(i) for i in (st["ai_steps"][key].get("items") or [])]}
+    return {"step": step.n, "items": asked, "denied": denied}
 
 
 def _step_ai(store: Store, key: str, st: dict | None) -> dict:

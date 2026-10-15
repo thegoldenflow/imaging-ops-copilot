@@ -23,16 +23,22 @@ function Field({ label, children, hint }: { label: string; children: ReactNode; 
 
 /** What happens to the requisition just submitted: the AI reads, triages and protocols it at once (your action), and
  * this page follows it. The referrer sees that and when, never the AI's suggestion itself. */
+const FOLLOW_MS = 120_000; // a job lost on a server restart: stop following and say so
+
 function SubmittedAi({ id }: { id: string }) {
+  const [since] = useState(() => Date.now());
   const reqs = useQuery({
     queryKey: ["portal-reqs"], queryFn: () => api<{ requisitions: PortalRequisition[] }>("/api/portal/requisitions"),
     refetchInterval: (q) => {
       const ai = q.state.data?.requisitions.find((r) => r.id === id)?.ai;
-      return ai && ai.state !== "done" && ai.state !== "unavailable" ? 1000 : false;
+      return ai && ai.state !== "done" && ai.state !== "unavailable" && Date.now() - since < FOLLOW_MS ? 1000 : false;
     },
   });
   const ai = reqs.data?.requisitions.find((r) => r.id === id)?.ai;
   if (!ai) return null;
+  if (ai.state !== "done" && ai.state !== "unavailable" && Date.now() - since >= FOLLOW_MS) {
+    return <p className="text-sm text-slate-600" data-testid="submitted-ai-late">It is taking longer than usual; our staff will triage it if the AI does not.</p>;
+  }
   if (ai.state === "done") {
     return (
       <p className="flex items-center gap-1.5 text-sm text-ai-700" data-testid="submitted-ai-done">
@@ -43,7 +49,7 @@ function SubmittedAi({ id }: { id: string }) {
   if (ai.state === "unavailable") return <p className="text-sm text-amber-800">The AI could not process it; our staff triage it by hand.</p>;
   return (
     <div className="w-full text-left" data-testid="submitted-ai">
-      <AiStatus ai={{ kind: "requisition", item_id: id, auto: false, error: null, run_id: null, cause: null, ...ai,
+      <AiStatus ai={{ kind: "requisition", item_id: id, auto: false, retryable: false, error: null, run_id: null, cause: null, ...ai,
         state: ai.state === "not_requested" ? "queued" : ai.state, generated_at: null, duration_ms: null }}
         onAsk={() => undefined} rulesNote="It is in the queue already; nothing else to do." />
     </div>

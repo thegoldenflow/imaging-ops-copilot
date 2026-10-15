@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from app.agents import cause as ai_cause
 from app.agents import ondemand
-from app.core.auth import CLINICAL_STAFF, audit_phi, require_roles
+from app.core.auth import CLINICAL_STAFF, audit_phi, deny, require_roles
 from app.core.models import Requisition, Role, StaffUser
 from app.core.store import Store, get_store
 from app.llm.deid import age_from_dob
@@ -127,14 +127,14 @@ def receive(body: NewRequisition, request: Request, user: StaffUser = Depends(IN
 
 
 def request_ai(req: Requisition, note: str) -> None:
-    """Queue the AI pipeline of a requisition a person just submitted (the job loop runs it within a second or two
-    of the commit; app/agents/ondemand.py)."""
+    """Queue the AI pipeline of a requisition a person just submitted, once their request commits (the job loop
+    runs it within a second; app/agents/ondemand.py): before the commit the job would read the old row."""
     cause = ai_cause.from_request("action")
     if cause is not None:
         cause = cause.model_copy(update={"kind": "requisition", "item_id": req.id, "note": note,
                                          "label": f"Requisition {req.id} ({req.channel})",
                                          "link": f"/requisitions/{req.id}"})
-    ondemand.request("requisition", req.id, cause)
+    ondemand.request_after_commit(get_store(), "requisition", req.id, cause)
 
 
 @router.get("/triage/config")
@@ -350,11 +350,23 @@ def reprocess(req_id: str, request: Request, user: StaffUser = Depends(require_r
 def run_ai(req_id: str, request: Request, trigger: str = Query("asked", pattern="^(opened|asked)$"),
            user: StaffUser = Depends(VIEWERS)):
     """Run the AI pipeline (extraction, triage, protocol) of a requisition waiting for it, now: the web app asks
-    when a person opens one (`trigger=opened`), and Ask AI / Retry (`asked`). A run under way is waited for."""
+    when a person opens one (`trigger=opened`), and Ask AI (`asked`). A run under way is waited for. Retry after the
+    AI failed is the operations manager's or the admin's (as Reprocess), and only before anyone worked on it: the
+    pipeline rebuilds the records that hold the corrections and the radiologist's decisions."""
     store = get_store()
-    _get(store, req_id)
+    req = _get(store, req_id)
+    failed = req.status == "failed" or (req.status == "ready" and bool(service._ai_failed(store, req_id)))
+    retry = trigger == "asked" and failed
+    if retry:
+        if str(user.role) not in ("operations_manager", "admin"):
+            deny(request, user, resource_type="requisition", resource_id=req_id)
+        if not service.retryable(store, req):
+            raise HTTPException(409, "Not retried: " + ("; ".join(service.human_input(store, req_id))
+                                                        or f"the requisition is {req.status}"))
+    elif req.status != "received":  # nothing to run: the page shows what is there
+        return detail(req_id, request, user)
     try:
-        ondemand.run_now(store, "requisition", req_id, trigger=trigger)
+        ondemand.run_now(store, "requisition", req_id, trigger=trigger, retry=retry)
     except LookupError as e:
         raise HTTPException(404, str(e)) from e
     audit_phi(request, user, action="update", resource_type="requisition", resource_id=req_id)

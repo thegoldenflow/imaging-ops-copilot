@@ -21,9 +21,14 @@ review queue (`/reviews`). API: `/api/agents/...` (`router.py`).
 AI on demand: with `BACKGROUND_AI=on_demand` (the demo's default) no model call is made for work nobody asked for.
 An item's AI runs when a person opens it or presses Ask AI (in the request, `ondemand.run_now`), or at once for new
 work their action created and for a batch they asked for (`ondemand.request`, run by the API's AI job loop, two at a
-time). One run per item at a time: a second caller waits for the first in this process, and the kinds' own locks
-cover other processes. Each run's trace records its cause: the browser's demo session (`X-Demo-Session`), the person,
-the trigger (opened, asked, action, batch, storyline) and the item, also when the agent writes as itself.
+time, queued after the request commits). One run per item at a time: a second caller waits for the first in this
+process and then reads the item again under its lock; a kind's `run(store, item_id, retry)` takes the item's
+database lock, reads it again and calls the model only if the AI has not run, or, with `retry`, if it failed and
+may run again (never over a person's work: a requisition someone corrected, reviewed or approved is not re-run).
+Scope is checked before the model runs (role and 6.3), and refusals are audited. Each run's trace records its
+cause: the browser's demo session (`X-Demo-Session`, never returned by the API), the person, the trigger (opened,
+asked, action, batch, storyline) and the item, also when the agent writes as itself. Everyone's activity is for the
+operations roles, and its reads are audited.
 
 ## Input resources
 
@@ -94,3 +99,6 @@ are in [evals/README.md](../../../../evals/README.md).
   signed summary's instructions) in process memory: a restart drops queued jobs (the items then wait for someone to
   open them) and the API must run one worker (docs/DEPLOY.md). A reconciliation whose AI was unavailable keeps the
   rules' fallback; Ask AI does not run it again.
+- A run calls the model inside its unit of work, holding a pooled connection (10 + 10) and the item's lock (an AI
+  job also the shared rewrite lock: a demo reset waits for running jobs). About twenty runs stalled at once on a slow
+  model would use up the pool; a two-phase run (model call outside the transaction) is left for later.

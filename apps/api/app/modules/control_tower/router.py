@@ -110,7 +110,7 @@ def narrate_exception(exception_id: str, trigger: str = Query("asked", pattern="
     store = get_store()
     try:
         service._exception_check(store, user, exception_id)
-        ondemand.run_now(store, "exception", exception_id, trigger=trigger)
+        ondemand.run_now(store, "exception", exception_id, trigger=trigger, retry=trigger == "asked")
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except ondemand.NotAllowed as e:

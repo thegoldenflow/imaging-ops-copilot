@@ -18,6 +18,7 @@ from app.core.models import Role, StaffUser
 from app.core.store import get_store
 from app.ehr.gateway import Actor, FhirGateway
 from app.modules.med_safety import discharge, service
+from app.modules.med_safety.models import get_review, get_session
 
 router = APIRouter(prefix="/api/med-safety")
 WORKBENCH = (Role.PHARMACIST, Role.PHYSICIAN)
@@ -67,18 +68,26 @@ def review(review_id: str, request: Request, user: StaffUser = Depends(require_r
 
 
 @router.post("/reviews/{review_id}/commentary")
-def commentary(review_id: str, trigger: str = Query("asked", pattern="^(opened|asked)$"),
+def commentary(review_id: str, request: Request, trigger: str = Query("asked", pattern="^(opened|asked)$"),
                user: StaffUser = Depends(require_roles(*WORKBENCH))):
     """Run the AI commentary now (app/agents/ondemand.py): the web app asks for it when a person opens a review
     whose commentary has not been written (`trigger=opened`; BACKGROUND_AI=on_demand, or still in the eager
     background's queue), and Ask AI or Retry (`asked`; test orders without a rule flag get it only then). When
-    another request or the background is writing it, waits for that one instead of calling the model again."""
+    another request or the background is writing it, waits for that one instead of calling the model again. The
+    patient is read as the user first (6.3 scope, break-glass; audited), so nobody's request runs the model on a
+    patient they may not see."""
     store = get_store()
 
     def run():
-        service._review_check(store, user, review_id)
-        ondemand.run_now(store, "order_review", review_id, trigger=trigger)
-        return service.review_view(store, user, review_id)
+        found = get_review(store, review_id)
+        if found is None:
+            raise LookupError(f"No order review {review_id}")
+        if str(user.role) not in found.reviewer_roles:
+            raise service.DecisionDenied("Not your review")
+        rtype, _, rid = found.order_ref.partition("/")
+        FhirGateway(Actor.of(user, request), service.ORDER_REVIEW).read(rtype, rid)  # BreakGlassRequired (audited)
+        ondemand.run_now(store, "order_review", review_id, trigger=trigger, retry=trigger == "asked")
+        return service.review_view(store, user, review_id, request)
     return _errors(run)
 
 
@@ -130,11 +139,17 @@ def medrec(session_id: str, request: Request, user: StaffUser = Depends(require_
 def medrec_ai(session_id: str, request: Request, trigger: str = Query("asked", pattern="^(opened|asked)$"),
               user: StaffUser = Depends(require_roles(*WORKBENCH))):
     """Run the reconciliation's AI step (the indication judgements and the draft record) now: the web app asks
-    when a person opens a reconciliation whose AI has not run, and Ask AI / Retry. Waits for a run under way."""
+    when a person opens a reconciliation whose AI has not run, and Ask AI. Waits for a run under way. The stay is
+    read as the user first (6.3 scope; audited): an out-of-scope request writes nothing."""
     store = get_store()
 
     def run():
-        service._session_check(store, user, session_id)
+        session = get_session(store, session_id)
+        if session is None:
+            raise LookupError(f"No reconciliation {session_id}")
+        if str(user.role) not in ("pharmacist", "physician"):
+            raise service.DecisionDenied("Reconciliations are for pharmacists and physicians")
+        FhirGateway(Actor.of(user, request), service.MEDREC).read("Encounter", session.encounter_id)
         ondemand.run_now(store, "medrec", session_id, trigger=trigger)
         return service.session_view(store, user, session_id, request)
     return _errors(run)

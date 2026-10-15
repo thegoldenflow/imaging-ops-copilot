@@ -233,7 +233,10 @@ function SchedulingCard({ d }: { d: RequisitionDetail }) {
 /** The AI pipeline (extraction, triage, protocol): asked for as a waiting requisition opens; its steps while it runs. */
 function RequisitionAi({ d }: { d: RequisitionDetail }) {
   const queryClient = useQueryClient();
-  const ai = d.summary.ai;
+  const { user } = useAuth();
+  // Retry rebuilds the AI's records: the operations manager's or the admin's (as Reprocess), before anyone worked on it
+  const mayRetry = user?.role === "operations_manager" || user?.role === "admin";
+  const ai = d.summary.ai && { ...d.summary.ai, retryable: d.summary.ai.retryable && mayRetry };
   const run = useAiRun(ai, async (trigger) => {
     queryClient.setQueryData(["requisition", d.summary.id],
       await post<RequisitionDetail>(`/api/requisitions/${d.summary.id}/ai?trigger=${trigger}`));

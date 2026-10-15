@@ -93,8 +93,7 @@ test("opening an order review runs its AI: running, then the result with its tim
   await expect(action.getByTestId("ai-action-cost")).toContainText("$");
   await expect(activity.getByTestId("ai-totals")).toContainText("Model calls1");
   await shot(page, "ai-04-activity");
-  await activity.getByTestId("ai-scope-all").click();
-  await expect(activity.getByTestId("ai-action").first()).toBeVisible();
+  await expect(activity.getByTestId("ai-scope-all")).toHaveCount(0); // everyone's actions: the operations roles only
 });
 
 test("the AI unavailable: why, Retry, and the rules still shown", async ({ page, request }) => {
@@ -109,7 +108,7 @@ test("the AI unavailable: why, Retry, and the rules still shown", async ({ page,
     failed = true;
     const response = await route.fetch({ url: route.request().url().replace(/\/commentary.*$/, ""), method: "GET" });
     const body = await response.json();
-    body.ai = { ...body.ai, state: "unavailable", error: "AI is temporarily unavailable" };
+    body.ai = { ...body.ai, state: "unavailable", error: "AI is temporarily unavailable", retryable: true };
     await route.fulfill({ response, json: body });
   });
   await login(page, "pharmacist");
@@ -158,6 +157,15 @@ test("opening a Control Tower exception writes its narrative while the drawer sh
   await expect(drawer.getByTestId("ai-meta")).toContainText("when you opened it", { timeout: 30_000 });
   await expect(drawer.getByText("AI-generated")).toBeVisible();
   await shot(page, "ai-07-exception");
+  await page.keyboard.press("Escape");
+  // the bed manager may see everyone's actions since the reset (the operations roles)
+  await page.getByTestId("ai-activity-button").click();
+  const panel = page.getByTestId("ai-activity-panel");
+  await panel.getByTestId("ai-scope-all").click();
+  await expect(panel.getByTestId("ai-action").first()).toBeVisible();
+  const sid = await page.evaluate(() => localStorage.getItem("ioc.demoSession"));
+  expect(sid).toBeTruthy();
+  await expect(panel).not.toContainText(sid!); // the session id is how a browser finds its actions: never shown
 });
 
 test("a portal requisition runs at once and its progress shows where the referrer is looking", async ({ page }) => {

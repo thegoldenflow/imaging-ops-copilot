@@ -180,6 +180,7 @@ class LlmGateway:
         store.llm_calls.append(call)
         self._audit(store, call)
         budget.record(call.cost_usd)
+        ai_cause.note_call(call.outcome)
         return call
 
     @staticmethod

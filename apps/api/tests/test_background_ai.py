@@ -93,8 +93,11 @@ def test_on_demand_the_narrator_loop_writes_only_the_discharge_instructions(monk
     _mode(monkeypatch, "on_demand")
     assert _one_pass(monkeypatch, main._narrator_loop, 1) == ["documentation intake"]
     _mode(monkeypatch, "eager")
+    # one item per transaction: a person deciding a review never waits behind the others' model calls
     assert _one_pass(monkeypatch, main._narrator_loop, 1) == [
-        "control tower narration", "medication safety AI", "documentation intake"]
+        "control tower narration", "control tower narration", "medication safety commentary",
+        "medication safety commentary", "medication safety reconciliation", "medication safety reconciliation",
+        "documentation intake"]
 
 
 # ---------- opening an item ----------

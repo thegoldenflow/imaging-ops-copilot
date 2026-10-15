@@ -6,9 +6,10 @@ advance are demo controls like the header's Reset demo, audited (`simulator_even
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.core.auth import current_user
+from app.agents import ondemand
+from app.core.auth import current_user, deny
 from app.core.models import StaffUser
 from app.core.store import get_store
 from app.ehr import simulator
@@ -30,13 +31,16 @@ def reset(user: StaffUser = Depends(current_user)):
 
 
 @router.post("/steps/{key}/ai")
-def step_ai(key: str, user: StaffUser = Depends(current_user)):
+def step_ai(key: str, request: Request, user: StaffUser = Depends(current_user)):
     """A step's Ask AI on the storyline page: its items' AI (the exception's narrative; the naproxen review and the
-    admission reconciliation) runs now, as this person's storyline step."""
+    admission reconciliation) is queued now, as this person's storyline step, for the items they may ask for (the
+    items' own checks: the reviewer roles and 6.3 scope); 403 and audited when they may ask for none."""
     try:
-        return service.ask_step_ai(get_store(), key)
+        return service.ask_step_ai(get_store(), user, key)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
+    except ondemand.NotAllowed:
+        deny(request, user, resource_type="storyline_step", resource_id=key)
 
 
 @router.post("/advance")

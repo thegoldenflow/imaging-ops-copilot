@@ -50,7 +50,7 @@ function AskButton({ onClick, busy, theme, children, testId }: { onClick: () => 
  * The AI part of an item in every state but done (done: the caller renders the output under an <AiMeta/> line).
  * `busy`/`startedAt`: this browser's own request in flight; `error`: its failure.
  */
-export function AiStatus({ ai, busy, startedAt, error, onAsk, theme = "app", rulesNote = "The rule results stand on their own.", what, canRetry = true }: {
+export function AiStatus({ ai, busy, startedAt, error, onAsk, theme = "app", rulesNote = "The rule results stand on their own.", what }: {
   ai: AiBlock;
   busy?: boolean;
   startedAt?: number | null;
@@ -60,8 +60,6 @@ export function AiStatus({ ai, busy, startedAt, error, onAsk, theme = "app", rul
   rulesNote?: string;
   /** what the AI writes here, e.g. "a commentary on this order" */
   what?: string;
-  /** false: a failed run is not asked for again (a reconciliation keeps the rules' fallback) */
-  canRetry?: boolean;
 }) {
   const look = LOOK[theme];
   const running = busy || ai.state === "running";
@@ -108,7 +106,7 @@ export function AiStatus({ ai, busy, startedAt, error, onAsk, theme = "app", rul
         <div className="flex items-start gap-2">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
           <p className="min-w-0 flex-1"><span className="font-medium">AI unavailable:</span> {why}. {rulesNote}</p>
-          {canRetry && <button type="button" onClick={onAsk}
+          {(ai.retryable || error) && <button type="button" onClick={onAsk}
             className={clsx("inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium", look.ghost)}
             data-testid="ai-retry">
             <RotateCcw className="size-3.5" />Retry

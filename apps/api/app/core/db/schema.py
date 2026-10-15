@@ -58,6 +58,7 @@ class EntitySpec:
     encrypted: tuple[str, ...] = ()
     blind: tuple[tuple[str, str], ...] = ()  # (index column, source field)
     indexes: tuple[tuple[str, ...], ...] = ()
+    json_indexes: tuple[tuple[str, str], ...] = ()  # (JSONB column, key): an index on column->>'key'
 
 
 CORE = "app.core.models"
@@ -125,7 +126,8 @@ MODULE_ENTITIES = {
         EntitySpec("deid_misses", "app.llm.freetext_deid:DeidMiss", kind="list", encrypted=("text", "context")),
         # Agent runtime (6.4): one trace per run (references and hashes only) and the Tool Gateway's
         # idempotency records (the first result of an action, replayed for 24 hours; encrypted)
-        EntitySpec("agent_traces", "app.agents.trace:AgentTrace", indexes=(("agent_id",), ("started_at",))),
+        EntitySpec("agent_traces", "app.agents.trace:AgentTrace", indexes=(("agent_id",), ("started_at",)),
+                   json_indexes=(("cause", "session"),)),  # the AI activity of one browser (polled)
         EntitySpec("tool_idempotency", "app.agents.trace:IdempotencyRecord", encrypted=("result",),
                    indexes=(("expires_at",),)),
         # Control Tower (7.1): the exception stream (the narrative may quote beds and MRN tokens: encrypted)
@@ -357,6 +359,8 @@ def _build(spec: EntitySpec, model: type[BaseModel]) -> Mapping:
         Index(f"ix_{spec.name}_seq", table.c.seq)
     for cols in spec.indexes:
         Index(f"ix_{spec.name}_{'_'.join(cols)}", *(table.c[c] for c in cols))
+    for col, key in spec.json_indexes:
+        Index(f"ix_{spec.name}_{col}_{key}", table.c[col][key].astext)
     for col, _ in spec.blind:
         Index(f"ix_{spec.name}_{col}", table.c[col])
     return Mapping(spec=spec, model=model, table=table, fields=fields, json_fields=frozenset(json_fields),

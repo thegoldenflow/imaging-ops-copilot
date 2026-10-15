@@ -278,21 +278,32 @@ def review_encounter_orders(store: Store, encounter_id: str) -> list[OrderReview
 # ---------- the AI commentary ----------
 
 
-def comment(store: Store, review_id: str, *, wait: bool = False) -> OrderReview:
+RETRYABLE = ("unavailable", "guard")  # a failed commentary a person may ask for again (refused: the gate refuses again)
+
+
+def _commentable(review: OrderReview, retry: bool) -> bool:
+    """Whether the commentary should be written now: never for a decided review (its Task is closed, and a new one
+    would stay open: casebook 3.22); a failed one only when a person asks again."""
+    if review.decision or review.encounter_id is None:
+        return False
+    return review.commentary_status in (*WAITING, "on_demand") or (retry and review.commentary_status in RETRYABLE)
+
+
+def comment(store: Store, review_id: str, *, wait: bool = False, retry: bool = False) -> OrderReview:
     """The order_review agent's commentary for one review, as the agent itself; evidence resolved before display.
     The background leaves a review another transaction is commenting or deciding; a person (`wait`) waits for that
-    one and gets its result."""
+    one and gets its result. `retry` (Ask AI after a failure) is decided here, under the review's lock."""
     review = get_review(store, review_id)
     if review is None:
         raise LookupError(f"No order review {review_id}")
-    if review.commentary_status not in (*WAITING, "on_demand") or review.encounter_id is None:
+    if not _commentable(review, retry):
         return review
     if wait:
         _wait_lock(store, review.id)
     elif not _try_lock(store, review.id):  # being commented or decided elsewhere
         return review
     review = _fresh_review(store, review)  # what the other transaction wrote while this one waited or read
-    if review.commentary_status not in (*WAITING, "on_demand"):
+    if not _commentable(review, retry):
         return review
     payload = review.model_dump(mode="json")
     try:
@@ -324,12 +335,17 @@ def comment(store: Store, review_id: str, *, wait: bool = False) -> OrderReview:
     return review
 
 
-def rearm_review(store: Store, review_id: str) -> None:
-    """Ask AI again after the commentary failed (the model unavailable, the guards): the review waits for a person's
-    request again. A decided review keeps what it had."""
-    review = get_review(store, review_id)
-    if review is not None and review.commentary_status in ("unavailable", "guard") and not review.decision:
-        reviews(store)[review_key(review.order_ref)] = review.model_copy(update={"commentary_status": "on_demand"})
+def commentary_step(store: Store) -> None:
+    """Background step (BACKGROUND_AI=eager): the most urgent commentary still waiting, one per transaction, so a
+    person deciding another review never waits behind it (the review's lock is held until the commit)."""
+    for review in pending_commentary(store)[:1]:
+        comment(store, review.id)
+
+
+def settle_step(store: Store) -> None:
+    """Background step (eager): one reconciliation's AI step per transaction."""
+    for session in pending_settlement(store)[:1]:
+        settle(store, session.id)
 
 
 def pending_commentary(store: Store) -> list[OrderReview]:
@@ -816,7 +832,8 @@ def _review_item(r: OrderReview, now: datetime) -> dict:
             "title": title, "detail": r.order.get("text") or r.order.get("category"), "patient_id": r.patient_id,
             "encounter_id": r.encounter_id, "unit_id": r.unit_id, "order_ref": r.order_ref, "order_kind": r.kind,
             "since": r.authored_at, "wait_minutes": _wait_minutes(r.authored_at, now), "sources": sources,
-            "commentary_status": r.commentary_status, "ai_state": review_ai_state(r),
+            "commentary_status": r.commentary_status,
+            "ai_state": ondemand.live_state("order_review", r.id, review_ai_state(r)),
             "evaluated": (r.commentary or {}).get("evaluated", True)}
 
 
@@ -835,7 +852,7 @@ def _session_item(s: MedRecSession, now: datetime) -> dict:
             "title": f"{s.kind.capitalize()} reconciliation: {state}", "detail": None, "patient_id": s.patient_id,
             "encounter_id": s.encounter_id, "unit_id": s.unit_id, "since": s.created_at,
             "wait_minutes": _wait_minutes(s.created_at, now), "sources": sources, "medrec_status": s.status,
-            "commentary_status": s.ai_status, "ai_state": _AI_STATE[s.ai_status],
+            "commentary_status": s.ai_status, "ai_state": ondemand.live_state("medrec", s.id, _AI_STATE[s.ai_status]),
             "evaluated": (s.ai_detail or {}).get("evaluated", True)}
 
 
@@ -1067,7 +1084,12 @@ def review_ai(review: OrderReview) -> dict:
     state = review_ai_state(review)
     return ondemand.view("order_review", review.id, state, run_id=c.get("run_id"),
                          auto=review.commentary_status in WAITING and review.encounter_id is not None,
-                         error=c.get("reason") if state == "unavailable" else None)
+                         error=c.get("reason") if state == "unavailable" else None,
+                         retryable=_review_retryable(review))
+
+
+def _review_retryable(review: OrderReview | None) -> bool:
+    return review is not None and review.commentary_status in RETRYABLE and _commentable(review, True)
 
 
 def session_ai(session: MedRecSession) -> dict:
@@ -1078,6 +1100,7 @@ def session_ai(session: MedRecSession) -> dict:
 
 
 def _review_check(store: Store, user: StaffUser | None, review_id: str) -> None:
+    """Who may ask for a review's AI: its reviewer roles, for a patient in their scope (6.3: a physician's units)."""
     review = get_review(store, review_id)
     if review is None:
         raise LookupError(f"No order review {review_id}")
@@ -1085,6 +1108,8 @@ def _review_check(store: Store, user: StaffUser | None, review_id: str) -> None:
         raise ondemand.NotAllowed("This order has no encounter: the AI has nothing to read")
     if user is not None and str(user.role) not in review.reviewer_roles:
         raise ondemand.NotAllowed("Not your review")
+    if user is not None and not _in_scope(user, review.patient_id):
+        raise ondemand.NotAllowed("This patient is outside your units")
 
 
 def _review_label(store: Store, review_id: str) -> tuple[str, str | None]:
@@ -1094,29 +1119,31 @@ def _review_label(store: Store, review_id: str) -> tuple[str, str | None]:
 
 
 def _session_check(store: Store, user: StaffUser | None, session_id: str) -> None:
-    _medrec_session(store, session_id)
+    session = _medrec_session(store, session_id)
     if user is not None and str(user.role) not in ("pharmacist", "physician"):
         raise ondemand.NotAllowed("Reconciliations are for pharmacists and physicians")
+    if user is not None and not _in_scope(user, session.patient_id):
+        raise ondemand.NotAllowed("This patient is outside your units")
 
 
 def _session_label(store: Store, session_id: str) -> tuple[str, str | None]:
     session = _medrec_session(store, session_id)
-    return (f"{session.kind.capitalize()} reconciliation ({session.id})",
-            f"/med-safety?medrec={session.id}&encounter={session.encounter_id}")
+    return f"{session.kind.capitalize()} reconciliation ({session.id})", f"/med-safety?medrec={session.id}"
 
 
 ondemand.register(ondemand.Kind(
     name="order_review", noun="order review", running_text="AI is reviewing this order",
     agents=(review_agent.AGENT_ID,), calls=1, live_s=8.0,
-    run=lambda store, review_id: comment(store, review_id, wait=True),
+    run=lambda store, review_id, retry: comment(store, review_id, wait=True, retry=retry),
     needs_ai=lambda store, review_id: (r := get_review(store, review_id)) is not None and
-    r.commentary_status in WAITING,
-    check=_review_check, describe=_review_label, retry=rearm_review))
+    r.commentary_status in WAITING and _commentable(r, False),
+    check=_review_check, describe=_review_label,
+    retryable=lambda store, review_id: _review_retryable(get_review(store, review_id))))
 
 ondemand.register(ondemand.Kind(
     name="medrec", noun="reconciliation", running_text="AI is judging the new medications' indications",
     agents=(medrec_agent.AGENT_ID,), calls=1, live_s=10.0,
-    run=lambda store, session_id: settle(store, session_id, wait=True),
+    run=lambda store, session_id, retry: settle(store, session_id, wait=True),  # no retry: the rules' fallback stands
     needs_ai=lambda store, session_id: (s := get_session(store, session_id)) is not None and
     s.ai_status in WAITING,
     check=_session_check, describe=_session_label))

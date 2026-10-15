@@ -102,7 +102,7 @@
 | 3.20 | 交班 SBAR 的"未记录"无处可引，代理指标重复计分 | hospital | 真实模型 · 契约 · 评测口径 |
 | 3.21 | 空闲花钱的续篇：空闲暂停 + 每日预算；"重置会清零预算"、开着的标签页、时钟回来跳半小时 | 平台 / hospital | 真实模型 · 成本 · 设计 |
 | 3.22 | 后台 AI 按需：只为打开的东西付钱；顺带抓到"决定和点评同时写"的竞态，以及一个只会卡住、不会失败的测试 | hospital / 平台 | 成本 · 并发 · 测试 |
-| 3.23 | AI 只在用户点击时运行：读取不调模型、"谁点的"被 `acting_as_system` 抹掉、一次点击跑了两项 | 平台 / hospital / imaging | 成本 · 设计 · 可追溯 · 端到端 |
+| 3.23 | AI 只在用户点击时运行：读取不调模型、"谁点的"被 `acting_as_system` 抹掉、一次点击跑了两项；合并前评审的 13 条（重试扔掉人的工作等） | 平台 / hospital / imaging | 成本 · 设计 · 可追溯 · 端到端 · 评审 · 权限 |
 | 4.1 | 来电者口述的出生日期没被去标识化 | imaging | 隐私 |
 | 4.2 | 两个字母的姓（Hu、Li）泄露 | hospital | 隐私 |
 | 4.3 | 去标识化评测满分，说明评测集太简单 | hospital | 隐私 · 评测可信度 |
@@ -123,6 +123,7 @@
 | 5.13 | 周三的肾功能病例先报了相互作用：预埋病人在吃华法林（顺带查明一个周四失败） | hospital | 日期依赖 · 种子 · 扫描 |
 | 5.14 | 周四的药师签核没被确认：测试的"最后一个决定"不是最后一个 | hospital | 日期依赖 · 测试假设 · 竞态 |
 | 5.15 | 新入院住院的旧医嘱没人审：24 小时和 48 小时两个窗口之间有缝 | hospital | 日期依赖 · 产品缺口 · 扫描 |
+| 5.16 | 检查准备的提醒测试只在 21 点挂：种子随钟点变，"最新 30 条"只剩一位余量 | imaging | 日期依赖 · 种子 · 测试假设 |
 | 6.1 | `localhost` 建连接要 8 秒，播种像卡住 | 环境 | 环境 · 网络 |
 | 6.2 | `websockets` 反复被删坏 | 环境 | 环境 · 依赖 |
 | 6.3 | Docker 数据盘写满（10-09） | 环境 | 环境 · 磁盘 |
@@ -1197,6 +1198,29 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
       - 修完重跑 `pipeline.spec`，这次界面写 "when you opened it"——又不是 "your action"。看时间线：提交后页面立刻跳到新申请单，详情面板发现状态是 `queued` 就按"打开即运行"POST；
         任务循环每 0.3 秒取一次任务，网页的 POST 先到，于是这次运行记成了"打开"。两边都只跑了一次（单次运行生效了），错的只是归因。修法放在服务器：`run_now` 发现这一项在队列里，就把那个任务取出来立刻跑，用它原来的原因。
         回归测试 `test_opening_an_item_already_queued_runs_it_now_as_what_it_was_asked_for`：提交后马上 POST `trigger=opened`，结果的原因是 `action / received from the intake queue`，队列清空、`drain` 不再跑任何任务。
+  12. **合并前评审（两位独立评审：后端；隐私 / 界面）又找出 13 条，全部修了。** 每条先写一个在 5c922b9 上失败的测试，再改代码；为了确认测试真的在测那个 bug，把 5c922b9 的 `apps/api` 用
+      `git archive` 解到 scratchpad，用同一个 venv 跑新测试：16 个全挂。第一轮里有 5 个挂在接口形状上（`KeyError: 'retryable'`、`comment() got an unexpected keyword argument 'retry'`、
+      `ask_step_ai() takes 2 positional arguments`），不算证明，于是把行为断言挪到前面、改走 HTTP 接口，再跑：前台的 Retry 返回 200 并重跑了流水线、已决定的医嘱多了一次 `order_review` 调用、
+      面板里出现 `stay-01109`、故事线的 Ask AI 之后 `drain` 是 0——这些才是 bug 本身。只剩两个测试在旧代码上只能挂在形状上（并发重试的假 run、例外重试的行为测试），如实记下。
+      - **重试会扔掉人的工作（高）。** `rearm` 把一张 `ready`、某一步失败的申请单改回 `received`；`process()` 会重建抽取、分诊、方案三条记录，员工的字段改正、放射科医生的确认或改档全没了，
+        之后批准方案时 `approve_protocol` 还会把新的、没人看过的 AI 分级记成这位医生"确认"。而 Retry 任何临床角色都能按（main 上只有运营和管理员能 Reprocess）。
+        修：有任何人工输入（改正、分诊复核、已批准方案）就不重跑，返回 409 说明是谁做了什么；Retry 只给运营和管理员（其他人 403 并审计）。
+      - **Retry 写在抢位之前（中）。** 5c922b9 的 `run_now` 先调 `k.retry`（在锁外改状态），再看有没有人在跑。两次 Retry 隔一次模型调用：第二个把第一个刚写好的"完成"又改回"待写"，
+        于是多付一次钱、旧的 explainException Task 留着没人关、医嘱审核换了 `review_task_id`。修：重试只属于抢到位置的那个调用，由各类自己的 `run(store, id, retry)` 在拿到数据库锁、重新读之后决定；
+        `comment()` 无论状态写什么，都不点评已决定的医嘱。
+      - **活动面板（中）。** `scope=all` 任何登录的人都能看全院的 AI 动作（别人的名字、条目标签、带 encounter id 的链接）；没有标签的运行会退回 `Patient/<id>`、`stay-…` 当条目；
+        返回里还有会话 id，而会话 id 就是 `scope=session` 的钥匙。修：`all` 只给运营角色并审计；去掉退回；任何地方都不返回会话 id（`cause.public`）。
+        自己的活动不再审计：页眉每个页面都在轮询它，条目打开时已经审计过——这是一个取舍，按评审原话应全部审计，这里写明理由。
+      - **先查范围再调模型（中）。** 医嘱和重整的检查只看角色不看病人范围，内科医生的批量能对别的病区的病人跑 AI；`POST /medrec/{id}/ai` 先 `settle`（模型 + 写草稿记录）再在 `session_view` 里撞 403，
+        而 UnitOfWork 对 <500 的响应照样提交，草稿记录留在 403 后面。修：检查加上 6.3 范围；两个 POST 先以用户身份读医嘱或住院（FhirGateway 负责 break-glass 和拒绝审计），再跑模型。
+      - **提交前入队（中低）。** 新申请单、重新处理、患者答卷在请求里就入队，任务循环每 0.3 秒取一次，可能抢在提交前读到旧数据然后什么都不做。加了 `Store.after_commit`，这些都在提交后入队。
+        原来的测试共享一个外层事务，看不到这个问题；新测试不用共享 store，每个请求和任务各自提交，并让任务"一入队就跑"。
+      - 其余：任务执行前重查条目（例外已清除就跳过；`narrate` 本身也不写已清除的）；eager 的 narrator 每一项单独一个事务（以前一个事务里 2 条点评 + 2 次重整，一个决定可能要等 4 次模型调用）；
+        `ondemand.kind()` 会自己 import 已知种类的模块（独立的 Temporal worker 没 import 过申请单模块）；被拒的批量项、反馈、故事线按钮都审计；药物安全队列显示排队 / 运行中；
+        AI 块带 `retryable`，不能重试就不显示 Retry；平均耗时只用得到回答的运行（被预算拒绝的几毫秒不再把"通常 ~N 秒"拉向 0）；预算拒绝的医嘱写出预算的原话；
+        给 `cause->>'session'` 加了表达式索引（alembic 1.20 的 autogenerate 能比对它，迁移检查通过）。
+      - **设计上的已知限制：** 模型调用在请求的事务里进行，占着连接池（10 + 10）和条目的锁；AI 任务还持有共享的重写锁，所以演示重置要等它们。慢模型下约 20 个同时卡住的运行会占满连接池。
+        两阶段（读、在事务外调模型、再加锁写回）要改五类条目的写入路径和 agent 在运行里的工具写入，记在 PROGRESS 的已知限制里。
 - **根因：** 后台循环和两个 GET 都是按"AI 输出应该提前备好"设计的；在这个前提下，"谁的点击引起了这次调用"不需要记录，"打开"和"读取"也不必分开。按需之后这两个前提都不成立：
   读取要立刻返回规则结果，AI 要由一个明确的动作触发并记下原因，而原因要穿过 agent 以自己身份运行的那一层。
 - **怎么修：**
@@ -1217,13 +1241,17 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
   2. **身份和原因是两件事。** "以谁的权限写"（agent 自己）和"因为谁的动作而运行"（打开它的人）在审计上要分开；把后者塞进前者，要么泄露权限、要么丢失原因。两个 context 变量各管一件。
   3. **"只跑那一项"要在界面层也检查。** 服务器保证了每一项只跑一次，却保证不了"打开 A 时没有顺带打开 B"。这种问题单元测试看不出来，要在真实页面上数"一次点击产生了几个动作"。
      同理，"跑了几次"对了不等于"记在谁头上"对了：两个触发方式抢同一项时，要决定以哪一个的原因为准，并为这个决定写测试。
+  5. **"重试"是写操作，要和第一次运行同样小心。** 它要在锁里、读到最新状态后决定，要知道哪些东西是人做的（不能被重建覆盖），要有和原来一样紧的权限。
+     评审找出的最重的一条就在这里：为了"让失败的 AI 能再来一次"写的几行，绕过了锁、权限和人的工作。
+  6. **证明测试测的是 bug，要在旧代码上看它"为什么"挂。** 挂在 `KeyError`、签名不对上的测试只说明接口变了；把行为断言放到前面，看到"前台的重试返回了 200"，才说明测到了。
   4. **同一个量在两处计算，迟早不一致。** 成本、"谁"、时间，统一从 trace 读、用同一个函数算。
-- **范围：** 平台（`app/agents`、上下文、迁移、AI 任务循环）/ hospital（医嘱审核、用药重整、Control Tower、故事线）/ imaging（申请单、门户、反馈）/ 网页（状态组件、活动面板、各页面）。
+- **范围：** 平台（`app/agents`、上下文、迁移、AI 任务循环、`Store.after_commit`）/ hospital（医嘱审核、用药重整、Control Tower、故事线）/ imaging（申请单、门户、反馈）/ 网页（状态组件、活动面板、各页面）。
 - **代码：** `apps/api/app/agents/ondemand.py`、`cause.py`、`activity.py`、`ondemand_router.py`（新）、`apps/api/app/core/context.py`（`_origin`、`X-Demo-Session`）、`apps/api/app/agents/trace.py`、`runtime.py`、`apps/api/app/llm/gateway.py`、
   `apps/api/app/core/db/migrations/versions/0011_agent_trace_cause.py`、`apps/api/app/core/db/repo.py`（`where`）、`apps/api/app/main.py`（`_ai_jobs_loop`）、`apps/api/app/modules/med_safety/service.py`、`router.py`、`apps/api/app/modules/control_tower/service.py`、`router.py`、
   `apps/api/app/modules/requisitions/service.py`、`router.py`、`apps/api/app/modules/portal/*`、`apps/api/app/modules/feedback/*`、`apps/api/app/modules/storyline/service.py`、`router.py`、`stubs.py`、`walk.py`、`apps/api/app/ehr/signing.py`、
   `apps/api/app/modules/documentation/service.py`、`apps/web/src/lib/ai.ts`、`session.ts`、`api.ts`、`apps/web/src/components/ai.tsx`、`AiActivity.tsx`、`Layout.tsx`、各 feature 页面、`apps/api/tests/test_ai_on_demand.py`、`apps/web/e2e/ai-on-demand.spec.ts`。
-- **提交：** 分支 `claude/adoring-kirch-14355b` 的提交 "api, web: AI only on the user's click"（owner 2026-10-14 同意提交，并确认种子积压按需运行这一偏差）。
+- **提交：** 分支 `claude/adoring-kirch-14355b` 的 5c922b9 "api, web: AI only on the user's click"（owner 2026-10-14 同意提交，并确认种子积压按需运行这一偏差）；
+  评审修复（第 12 步）在同一分支的下一个提交 "api, web: AI on demand, pre-merge review fixes"，回归测试 `apps/api/tests/test_ai_on_demand_review.py`。
 
 ---
 
@@ -1910,6 +1938,47 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **代码：** `apps/api/app/modules/med_safety/service.py`（`intake`、`collect`、`ADMISSION_WINDOW`）、`apps/api/tests/test_med_safety.py`
   （`test_the_intake_reviews_every_order_of_a_new_stay_also_those_older_than_a_day`）；相关：`apps/api/app/modules/med_safety/journey.py`（`review_orders`）、
   `apps/api/app/workflows/bridge.py`（journey 只由 `patient.admitted` 启动）；提交 cb05b54。
+
+### 5.16 检查准备的提醒测试只在 21 点挂：种子随钟点变，"最新 30 条"只剩一位余量
+
+- **现象：** 按需 AI 评审修复后的全量后端测试（21:45 开始，`3 failed, 892 passed in 1251.01s`）里，有一个和这次改动无关的失败：
+  `tests/test_phase4.py::test_reminders_fire_at_each_stage_and_once` 挂在最后一行，`assert False` / `+  where False = any(<generator object test_reminders_fire_at_each_stage_and_once.<locals>.<genexpr> ...>)`，
+  即 `/api/inspection/overview` 的 `reminders` 里找不到种子的 `CRED-U-TECH2-REGISTRATION` 30 天提醒（系统 21 检查准备）。同一个文件在 20 点前的全量里是通过的。
+- **怎么查的：**
+  1. **是不是我的改动？** 用 `git archive` 把 5c922b9 的 `apps/api` 解到 scratchpad，同一个 venv、同一个时刻跑这个测试：旧代码一样挂。不是这次的回归（新旧代码对照，5.9）。
+  2. **是不是和时刻有关？** 用 scratchpad 的 time-machine 插件（`-p travel`，`TRAVEL_TO`）把整个 pytest 会话放到 `2026-10-14T21:58`：两份代码都挂；放到 `22:10`：都过。
+     日期没变，只是钟点变了，结果就变了，所以不是偶发，是钟点决定的。
+  3. **钟点从哪里进来？** 读代码：overview（`inspection/router.py`）按 `sent_at` 倒序只取前 30 条（`rems[:30]`）；`populate` 把 `now` 截到整点（`app/seed.py:132`），
+     播种末尾 `process_reminders(s, now - timedelta(minutes=5), notify=False)`，所以种子提醒的 `sent_at` 全是同一个"整点前 5 分钟"。
+     测试自己又在 `now`、`now + 20 天`、`now + 26 天` 各调一次 `process_reminders`，这些调用给**所有**文件发提醒，未来时间的提醒都排在种子提醒前面。
+  4. **量名次。** 脱离数据库重放这个测试（scratchpad `probe_reminders.py`：`Store()` + `set_ambient_store`，`populate(s, now=...)`，再照测试的步骤调 `process_reminders`），数 TECH2 在倒序里的名次：
+
+     | 播种时刻 | 种子提醒 | 测试新增（now / +20 天 / +26 天） | TECH2 名次 |
+     |---|---|---|---|
+     | 10-14 21:58 | 11 | 1 / 17 / 4 | 32（不在前 30） |
+     | 10-14 22:10 | 11 | 1 / 16 / 2 | 29 |
+     | 10-14 23:30 | 11 | 1 / 16 / 2 | 29 |
+     | 10-14 14:05 | 6 | 1 / 7 / 3 | 16 |
+     | 10-15 09:00 | 7 | 1 / 5 / 4 | 16 |
+
+     同一天不同钟点，+20 天和 +26 天新增的条数不一样，说明种子里证书的到期日随钟点变。
+  5. **为什么到期日会随钟点变？** 假设：证书用的是 `populate` 一路传下来的共享 `rng`（`app/seed.py:546` `inspection.seed(s, rng, now)`），前面按钟点生成的数据消耗的随机数个数不同。
+     验证（scratchpad `probe_rng.py`）：在 `inspection.seed` 入口记下 `rng.getstate()` 的哈希，21:00 是 `6cf21b5b66`，22:00 是 `206a9724ee`；24 个证书里 11 个的到期日不同。
+     TECH2 自己的到期日是预埋的（两次都是 `2026-10-26`），变的是把它挤下去的那些。假设成立。
+  6. **余量有多少？** 11 条种子提醒的 `sent_at` 相同，排序是稳定的，TECH2 在并列里的位置由插入顺序决定。22 点时它排第 29 名，只比第 30 名高一位：这个测试本来就只剩一位余量，21 点多出的 3 条提醒就把它挤掉了。
+- **根因：** 测试断言"种子的某条提醒在 overview 的最新 30 条里"，但测试自己先往前面塞了 19 到 22 条未来时间的提醒。塞多少取决于种子证书的到期日，而到期日随播种的钟点变
+  （`now` 截到整点，共享的随机流被前面按钟点生成的数据消耗掉不同的长度）。21 点播种时多塞的 3 条把 TECH2 挤到第 32 名。
+- **怎么修：** 这次没修（不在评审修复范围里，另提后续）。可选的修法：在测试自己发提醒之前先查 overview；或者断言 `inspection.reminders(store)` 本身而不是 overview 的前 30 条；
+  或者 overview 的断言改成测试自己造的 RAD3 提醒（它们一定排在最前面）。
+- **怎么证明：** 复现是确定的：`TRAVEL_TO=2026-10-14T21:58` 挂，`22:10` 过，5c922b9 和本分支结果相同；名次表和随机状态哈希如上。22 点以后跑的全量里这个测试通过。
+- **经验：**
+  1. "今天过、明天挂"之外还有"这个钟点过、那个钟点挂"：种子把 `now` 截到整点，钟点就成了种子的一部分。和时间有关的失败，先在同一天扫几个整点，再扫日期。
+  2. 断言"在前 N 条里"时要算余量：测试自己写进去的数据会占名次，排序键并列（同一个 `sent_at`）时名次还取决于插入顺序。余量只有一位的断言迟早会挂。
+  3. 用新旧代码对照只能说明"不是我造成的"，不等于查清了。和 5.11 停在"偶发"不同，这次用"移动时钟复现、脱离数据库量名次、哈希随机状态"三步把原因落实了。
+- **范围：** imaging（系统 21 检查准备）；测试。
+- **来源：** 会话 adoring-kirch-14355b（10-14），按需 AI 评审修复的全量测试。
+- **代码：** `apps/api/tests/test_phase4.py`（`test_reminders_fire_at_each_stage_and_once`）、`apps/api/app/modules/inspection/router.py`（overview 的 `rems[:30]`）、
+  `apps/api/app/modules/inspection/service.py`（`process_reminders`、`seed`）、`apps/api/app/seed.py`（`populate` 把 `now` 截到整点）。只记录，没有修改代码；随提交 "api, web: AI on demand, pre-merge review fixes"。
 
 > **怎么在另一天测试**（本机做法，见 memory 记录）：
 > - 脱离数据库调用 `generate(Store(), seed, datetime(...))`，几十秒就能扫完一周（5.6）；或者写一个 pytest 插件只冻结播种时刻（`seedat`、`seedtime`：`-p seedtime` 加 `SEED_AT`），

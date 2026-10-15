@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from app.agents import cause as ai_cause
 from app.agents import ondemand
 from app.agents import trace as traces
-from app.core.auth import audit_phi, require_roles
+from app.core.auth import audit_phi, deny, require_roles
 from app.core.models import Role, StaffUser
 from app.core.store import Store, get_store
 from app.modules.feedback import service
@@ -187,7 +187,9 @@ def public_submit(token: str, body: Answer):
     cause = (ai_cause.from_request("action") or ai_cause.AiCause()).model_copy(update={
         "kind": "feedback", "item_id": resp.id, "label": f"Feedback {resp.id} ({resp.rating}-star)",
         "link": "/feedback", "note": "a patient answered the survey"})
-    ondemand.request("feedback", resp.id, cause)
+    # queued once the answer is committed: before that the job would not find it. Not paused while the demo is idle:
+    # the patient's own action asked for it, and a survey link answers once.
+    ondemand.request_after_commit(store, "feedback", resp.id, cause)
     return {"ok": True, "id": resp.id}
 
 
@@ -198,11 +200,11 @@ def run_ai(response_id: str, request: Request, trigger: str = Query("asked", pat
     store = get_store()
     try:
         service._check(store, user, response_id)
-        ondemand.run_now(store, "feedback", response_id, trigger=trigger)
     except LookupError as e:
         raise HTTPException(404, str(e)) from e
-    except ondemand.NotAllowed as e:
-        raise HTTPException(403, str(e)) from e
+    except ondemand.NotAllowed:
+        deny(request, user, resource_type="patient_feedback", resource_id=response_id)  # 403, audited
+    ondemand.run_now(store, "feedback", response_id, trigger=trigger, retry=trigger == "asked")
     audit_phi(request, user, action="update", resource_type="patient_feedback", resource_id=response_id)
     r = service.responses(store)[response_id]
     return response_view(store, r, _runs([r]))

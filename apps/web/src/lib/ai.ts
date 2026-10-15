@@ -28,6 +28,7 @@ export interface AiBlock {
   item_id: string;
   state: AiStateName;
   auto: boolean; // opening the item runs it
+  retryable: boolean; // a failed run may be asked for again (Retry)
   typical_s: number;
   steps: string[];
   running_text: string;
@@ -52,7 +53,6 @@ export interface AiAction {
   trigger_text: string;
   note: string | null;
   by: { id: string; name: string | null; role: string | null } | null;
-  session: string | null;
   started_at: string;
   finished_at: string;
   duration_ms: number;
@@ -78,7 +78,6 @@ export interface AiLive {
 
 export interface AiActivity {
   scope: "session" | "all";
-  session: string | null;
   mode: string;
   background_ai: "on_demand" | "eager";
   since: string | null;

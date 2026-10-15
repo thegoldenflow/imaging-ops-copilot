@@ -133,15 +133,22 @@ def process(store: Store, req: Requisition) -> None:
 STEPS = ("Reading the requisition", "Triage", "Protocol")
 
 
-def process_one(store: Store, req_id: str) -> Requisition:
+def process_one(store: Store, req_id: str, *, retry: bool = False) -> Requisition:
     """Run the AI pipeline for one received requisition. One run per requisition at a time: a second caller (the
-    job loop, the eager intake loop, a person opening it) waits for the first, then finds it processed."""
+    job loop, the eager intake loop, a person opening it) waits for the first, then finds it processed. `retry`
+    (ops' Retry after the AI failed) runs it again only if nobody has worked on it yet (`retryable`), decided here
+    under the requisition's lock: the pipeline rewrites the extraction, the triage and the protocol records."""
     if not store.detached:
         store.conn().execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": zlib.crc32(f"requisition:{req_id}".encode())})
         store.requisitions.forget(req_id)  # what another transaction wrote while this one waited
+        for table in (extractions(store), triage.records(store), protocols.records(store)):
+            table.forget(req_id)
     req = store.requisitions.get(req_id)
     if req is None:
         raise LookupError(f"No requisition {req_id}")
+    if retry and retryable(store, req):
+        req.status = "received"
+        store.touch()
     if req.status != "received":
         return req
     try:
@@ -163,12 +170,27 @@ def process_pending(store: Store) -> int:
     return len(pending)
 
 
-def rearm(store: Store, req_id: str) -> None:
-    """Retry: a requisition whose AI failed or was unavailable, not yet approved, is processed again."""
-    req = store.requisitions.get(req_id)
-    if req is not None and (req.status == "failed" or (req.status == "ready" and _ai_failed(store, req_id))):
-        req.status = "received"
-        store.touch()
+def human_input(store: Store, req_id: str) -> list[str]:
+    """What people have done to a requisition's AI output (a re-run would throw it away)."""
+    ext = extractions(store).get(req_id)
+    tri = triage.records(store).get(req_id)
+    pro = protocols.records(store).get(req_id)
+    found = []
+    if ext is not None and ext.corrections:
+        found.append("corrected fields")
+    if tri is not None and tri.review_action:
+        found.append(f"triage {tri.review_action} by {tri.reviewed_by}")
+    if pro is not None and pro.approved_id:
+        found.append(f"protocol approved by {pro.approved_by}")
+    return found
+
+
+def retryable(store: Store, req: Requisition | None) -> bool:
+    """A failed run may be asked for again only before anyone worked on the requisition: the pipeline rebuilds the
+    extraction, triage and protocol records, which hold the staff's corrections and the radiologist's decisions."""
+    if req is None or human_input(store, req.id):
+        return False
+    return req.status == "failed" or (req.status == "ready" and bool(_ai_failed(store, req.id)))
 
 
 def _ai_failed(store: Store, req_id: str) -> list[str]:
@@ -187,7 +209,8 @@ def requisition_ai(store: Store, req: Requisition, *, with_trace: bool = False) 
     if req.status == "received":
         return ondemand.view("requisition", req.id, "not_requested")
     if req.status == "failed":
-        return ondemand.view("requisition", req.id, "unavailable", error="The AI pipeline failed")
+        return ondemand.view("requisition", req.id, "unavailable", error="The AI pipeline failed",
+                             retryable=retryable(store, req))
     if ext is None or pro is None:
         return ondemand.view("requisition", req.id, "not_requested", auto=False)
     failed = _ai_failed(store, req.id)
@@ -200,7 +223,7 @@ def requisition_ai(store: Store, req: Requisition, *, with_trace: bool = False) 
         cause = run.cause if run is not None else None
     return ondemand.view("requisition", req.id, "unavailable" if failed else "done", generated_at=pro.suggested_at,
                          duration_ms=took, error=f"AI unavailable for: {', '.join(failed)}" if failed else None,
-                         cause=cause)
+                         cause=cause, retryable=bool(failed) and retryable(store, req))
 
 
 _STAFF = ("front_desk", "technologist", "radiologist", "operations_manager", "medical_director", "admin")
@@ -221,9 +244,10 @@ def _label(store: Store, req_id: str) -> tuple[str, str | None]:
 ondemand.register(ondemand.Kind(
     name="requisition", noun="requisition", running_text="AI is reading, triaging and protocolling this requisition",
     agents=("requisition_extract", "requisition_triage", "protocol_suggest"), calls=3, live_s=15.0,
-    run=process_one, needs_ai=lambda store, req_id: (r := store.requisitions.get(req_id)) is not None and
-    r.status == "received",
-    check=_check, describe=_label, steps=STEPS, retry=rearm))
+    run=lambda store, req_id, retry: process_one(store, req_id, retry=retry),
+    needs_ai=lambda store, req_id: (r := store.requisitions.get(req_id)) is not None and r.status == "received",
+    check=_check, describe=_label, steps=STEPS,
+    retryable=lambda store, req_id: retryable(store, store.requisitions.get(req_id))))
 
 
 def seed_processed(store: Store, req: Requisition, labels: dict, reviewed: bool, reviewer: str) -> None:

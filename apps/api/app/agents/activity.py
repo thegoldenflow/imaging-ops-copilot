@@ -4,9 +4,10 @@ An action is one item's AI (the runs that share a cause's `action_id`: a requisi
 when nothing grouped it (a voice turn, a discharge summary draft). For each: what the AI did, for which item, who
 caused it and how (app/agents/cause.py), when, how long it took, its model calls and their cost, and the outcome.
 `scope=session` keeps the actions of one browser's demo session (whatever roles it switched through), `all`
-everyone's since the reset, including the background's own runs (BACKGROUND_AI=eager).
+everyone's since the reset, including the background's own runs (BACKGROUND_AI=eager): the operations roles only.
 
-The panel shows ids and the labels the person saw, never patient details (traces hold references only).
+The panel shows the item labels and links a run's cause recorded (ids and what the person saw), never patient or
+encounter references, and never a session id (it is how a browser finds its own actions).
 """
 
 from __future__ import annotations
@@ -63,12 +64,12 @@ def _what(agent_ids: list[str], kind: str | None) -> str:
     return spec.purpose.rstrip(".") if spec is not None else "AI call"
 
 
-def _item(cause: dict, group: list[traces.AgentTrace]) -> dict | None:
+def _item(cause: dict) -> dict | None:
+    """The item a run's cause named; nothing for a run without one (its encounter and input references point at a
+    patient: not for this panel)."""
     if cause.get("kind") or cause.get("label"):
         return {k: cause.get(k) for k in ("kind", "item_id", "label", "link")}
-    first = group[0]
-    ref = first.context_id or first.encounter_id or next((r for r in first.input_refs if "/" in r), None)
-    return {"kind": None, "item_id": ref, "label": ref, "link": None} if ref else None
+    return None
 
 
 def _action(group: list[traces.AgentTrace]) -> dict:
@@ -87,11 +88,11 @@ def _action(group: list[traces.AgentTrace]) -> dict:
     priced = [_cost(group[0].mode, c) for c in calls]
     return {
         "id": cause.get("action_id") or group[0].run_id, "run_ids": [t.run_id for t in group],
-        "what": _what(agent_ids, cause.get("kind")), "agents": agent_ids, "item": _item(cause, group),
+        "what": _what(agent_ids, cause.get("kind")), "agents": agent_ids, "item": _item(cause),
         "trigger": trigger, "trigger_text": causes.TRIGGER_TEXT.get(trigger, trigger), "note": cause.get("note"),
         "by": {"id": cause.get("user_id"), "name": cause.get("user_name"), "role": cause.get("role")}
         if cause.get("user_id") else None,
-        "session": cause.get("session"), "started_at": started, "finished_at": finished,
+        "started_at": started, "finished_at": finished,
         "duration_ms": int((finished - started).total_seconds() * 1000), "calls": len(calls),
         "cost_usd": round(sum(usd for usd, _ in priced), 6), "cost_estimated": any(est for _, est in priced),
         "tokens": sum(c.tokens_in + c.tokens_out for c in calls),
@@ -152,9 +153,10 @@ def view(store, *, session: str | None, scope: str = "session") -> dict:
     if scope == "session":
         keep = (lambda e: (e.get("cause") or {}).get("session") == session) if session else (lambda e: False)
         live = {k: [e for e in v if keep(e)] for k, v in live.items()}
+    live = {k: [{**e, "cause": causes.public(e.get("cause"))} for e in v] for k, v in live.items()}
     found = _scoped(store, session, scope)
     acts = actions(found, limit=10_000)
-    return {"scope": scope, "session": session, "mode": get_gateway().mode,
+    return {"scope": scope, "mode": get_gateway().mode,
             "background_ai": config.settings.background_ai, "since": store.modules.get("seed_time"),
             "now": datetime.now(), "totals": totals(found, acts),
             "running": live["running"], "queued": live["queued"], "actions": acts[:150],

@@ -186,9 +186,13 @@ async def _narrator_loop() -> None:
         await asyncio.sleep(2)
         if activity.idle():
             continue
-        if not config.ai_on_open():
-            await asyncio.to_thread(_step, "control tower narration", control_tower.narrate_step)
-            await asyncio.to_thread(_step, "medication safety AI", med_safety.ai_step)
+        if not config.ai_on_open():  # one item per transaction: its lock is held until the commit
+            for _ in range(2):
+                await asyncio.to_thread(_step, "control tower narration", control_tower.narrate_step, 1)
+            for _ in range(2):
+                await asyncio.to_thread(_step, "medication safety commentary", med_safety.commentary_step)
+            for _ in range(2):
+                await asyncio.to_thread(_step, "medication safety reconciliation", med_safety.settle_step)
         await asyncio.to_thread(_step, "documentation intake", documentation.intake_step)
 
 

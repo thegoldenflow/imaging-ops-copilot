@@ -307,7 +307,8 @@ function StepAiBox({ step }: { step: StoryStep }) {
   const queryClient = useQueryClient();
   const ask = useMutation({ mutationFn: () => askStepAi(step.key), onSuccess: () => queryClient.invalidateQueries({ queryKey: storylineKey }) });
   const sa = step.step_ai!;
-  const waiting = sa.items.filter((i) => i.ai.state === "not_requested" || i.ai.state === "unavailable");
+  // what this button can still do: an item whose AI has not run, or a failed one that may run again
+  const waiting = sa.items.filter((i) => i.ai.state === "not_requested" || (i.ai.state === "unavailable" && i.ai.retryable));
   return (
     <div className="mt-2 space-y-1 border-t border-ai-100 pt-1.5" data-testid={`story-ai-${step.n}`}>
       {sa.items.length === 0 ? (

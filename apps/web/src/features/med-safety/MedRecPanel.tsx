@@ -217,7 +217,7 @@ function MedRecAi({ s, auto }: { s: SessionDetail; auto: boolean }) {
   if (s.status !== "open" && s.ai.state === "not_requested") return null;
   return (
     <div className="px-3 pt-2" data-testid="medrec-ai">
-      <AiStatus ai={s.ai} busy={run.busy} startedAt={run.startedAt} error={run.error} onAsk={run.ask} canRetry={false}
+      <AiStatus ai={s.ai} busy={run.busy} startedAt={run.startedAt} error={run.error} onAsk={run.ask}
         what="the new medications' indications"
         rulesNote={s.ai.state === "unavailable" ? "The rules marked the new medications without a named indication for you to check." : "The rule comparison below stands on its own."} />
     </div>
