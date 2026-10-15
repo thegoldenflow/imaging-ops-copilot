@@ -22,7 +22,7 @@ from app.core.store import get_store
 from app.modules.control_tower import service as control_tower
 from app.modules.feedback import service as feedback
 from app.modules.med_safety import service as med_safety
-from app.modules.med_safety.models import reviews
+from app.modules.med_safety.models import get_review, reviews
 from app.modules.requisitions import service as requisitions
 from tests.test_spend_guard import _one_pass
 
@@ -51,6 +51,15 @@ def _calls(store) -> Counter:
 
 def _new_calls(store, before: Counter) -> Counter:
     return _calls(store) - before
+
+
+def _consented(patient_id: str) -> bool:
+    """The AI may read this patient's chart (ai_processing consent). Which patients have it changes with the seeded
+    day: on Thursday's the first open order review is a patient without it, and its AI is refused before the model."""
+    from app.agents.gateway import runtime_fhir
+    from app.ehr.consent import permits
+
+    return permits(runtime_fhir(), patient_id, "ai_processing")
 
 
 # ---------- nothing nobody asked for ----------
@@ -238,7 +247,8 @@ def test_a_batch_states_its_time_queues_what_needs_ai_and_skips_the_rest(fresh_s
     pharmacist = {**login("U-PHAR-01"), **SESSION}
     items = client.get("/api/med-safety/queue?show=open", headers=pharmacist).json()
     assert items["counts"]["ai_not_run"] > 3
-    reviews_ = [i for i in items["items"] if i["kind"] == "order_review" and i["ai_state"] == "not_requested"][:3]
+    reviews_ = [i for i in items["items"] if i["kind"] == "order_review" and i["ai_state"] == "not_requested"
+                and _consented(get_review(store, i["id"]).patient_id)][:3]
     first = reviews_[0]["id"]
     client.post(f"/api/med-safety/reviews/{first}/commentary?trigger=opened", headers=pharmacist)
     kinds = client.get("/api/ai/kinds", headers=pharmacist).json()["kinds"]
@@ -274,7 +284,8 @@ def test_ask_ai_again_after_the_model_was_unavailable(fresh_state, client, login
     store = fresh_state
     pharmacist = login("U-PHAR-01")
     med_safety.intake(store, force=True)
-    review = next(r for r in reviews(store).values() if r.commentary_status == "on_open" and r.encounter_id)
+    review = next(r for r in reviews(store).values() if r.commentary_status == "on_open" and r.encounter_id
+                  and _consented(r.patient_id))
     set_gateway(LlmGateway(Down(latency_s=0)))
     view = client.post(f"/api/med-safety/reviews/{review.id}/commentary?trigger=opened", headers=pharmacist).json()
     assert view["ai"]["state"] == "unavailable" and view["findings"] is not None and view["ai"]["error"]

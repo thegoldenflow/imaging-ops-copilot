@@ -48,7 +48,7 @@ STATES = ("not_requested", "queued", "running", "done", "unavailable", "skipped"
 CONCURRENCY = 2  # jobs the loop runs at once: a batch should not starve the people opening items
 BATCH_MAX = 50
 RETRY_UNSEEN = 20  # a job for an item that has not appeared yet waits up to this many half-seconds
-WAIT_S = 180  # a second caller waits at most this long for the run under way
+WAIT_MARGIN_S = 30.0  # a second caller's wait beyond the model calls' budgets (the run's reads, writes and lock)
 
 
 class NotAllowed(PermissionError):
@@ -120,6 +120,9 @@ class Job:
 _lock = threading.Lock()
 _running: dict[tuple[str, str], dict] = {}
 _queue: deque[Job] = deque()
+# Jobs the loop has taken but whose run has not taken the item's slot yet (its transaction is starting): still
+# queued for everyone else, so a person opening the item meanwhile runs it as what it was queued for
+_taken: dict[tuple[str, str], Job] = {}
 _durations: dict[tuple[str, str], deque] = {}  # (model mode, kind) -> recent run seconds
 
 
@@ -134,6 +137,8 @@ def live(kind_name: str, item_id: str) -> dict | None:
         if (r := _running.get(key)) is not None:
             return {"state": "running", "started_at": r["started_at"], "step": r.get("step"),
                     "cause": causes.public(r["cause"])}
+        if (job := _taken.get(key)) is not None:
+            return {"state": "queued", "queued_at": job.queued_at, "ahead": 0}
         for position, job in enumerate(_queue):
             if (job.kind, job.item_id) == key:
                 return {"state": "queued", "queued_at": job.queued_at, "ahead": position}
@@ -156,7 +161,8 @@ def snapshot() -> dict:
                     "cause": r["cause"].model_dump(exclude_none=True) if r["cause"] else None}
                    for (k, i), r in _running.items()]
         queued = [{"kind": j.kind, "item_id": j.item_id, "queued_at": j.queued_at,
-                   "cause": j.cause.model_dump(exclude_none=True) if j.cause else None} for j in _queue]
+                   "cause": j.cause.model_dump(exclude_none=True) if j.cause else None}
+                  for j in [*_taken.values(), *_queue]]
     return {"running": running, "queued": queued}
 
 
@@ -183,28 +189,58 @@ def typical_s(kind_name: str) -> float:
     return round(k.calls * 0.8, 1) if mode == "mock" else k.live_s
 
 
+def wait_s(k: Kind) -> float:
+    """How long a second caller waits for the run under way: each of the kind's model calls may make two attempts
+    within its agent's budget (model_policy.timeout_s, else LLM_TIMEOUT_S), plus a margin. A first run that never
+    returns then holds nobody (nor their pooled connection) for good."""
+    from app.agents import registry
+
+    default = config.settings.llm_timeout_s
+    budgets = []
+    for agent_id in k.agents:
+        try:
+            spec = registry.agent(agent_id)
+        except Exception:  # an unreadable registry: the default budget
+            spec = None
+        policy = spec.model_policy if spec is not None else None
+        budgets.append(policy.timeout_s if policy is not None and policy.timeout_s else default)
+    return k.calls * 2 * max(budgets, default=default) + WAIT_MARGIN_S
+
+
 def run_now(store, kind_name: str, item_id: str, *, trigger: causes.Trigger = "opened",
             cause: causes.AiCause | None = None, note: str | None = None, retry: bool = False) -> None:
     """Run one item's AI in this thread (a person's request, or a job). One run per item at a time in this process:
     a second caller waits for the first and then reads the item again under its lock (which the first holds until
-    its transaction commits), so it sees the result and makes no call. `retry` (Ask AI after a failure) applies to
-    whoever wins the slot; the item's own run decides, under its lock, whether the failure may run again. An item
-    already queued (new work, a batch, a storyline step) runs now, as what it was queued for."""
+    its transaction commits), so it sees the result and makes no call. It waits at most `wait_s`; a run still going
+    then is left to finish, and the caller shows the item as it is (running). `retry` (Ask AI after a failure)
+    belongs to whoever wins the slot, and the item's own run decides, under its lock, whether the failure may run
+    again: a caller that waited for a retry reads its result; one that waited for a run that was not a retry (an
+    opening, a job) keeps its retry and runs it next. An item already queued (new work, a batch, a storyline step;
+    also one the job loop has taken but not started) runs now, as what it was queued for."""
     k = kind(kind_name)
     key = _key(kind_name, item_id)
     if cause is None and (queued := _take_queued(key)) is not None:
         cause, retry = queued.cause or causes.AiCause(trigger="background"), retry or queued.retry
     label, link = _describe(k, store, item_id)  # a database read: not under the registry's lock
+    limit = deadline = None
     while True:
         with _lock:
             running = _running.get(key)
             if running is None:
                 event = threading.Event()
-                _running[key] = entry = {"started_at": datetime.now(), "event": event,
+                _running[key] = entry = {"started_at": datetime.now(), "event": event, "retry": retry,
                                          "cause": cause or causes.current(), "label": label, "link": link}
+                _taken.pop(key, None)  # a job the loop took for it is this run now (or reads its result)
                 break
-        running["event"].wait(timeout=WAIT_S)
-        retry = False  # the run under way decided the failure; this caller reads its result
+        if deadline is None:  # only a caller that waits needs its bound (it reads the agents' budgets)
+            limit = wait_s(k)
+            deadline = time.monotonic() + limit
+        if not running["event"].wait(timeout=max(0.0, deadline - time.monotonic())):
+            log.warning("AI %s %s: still running after %.0f s; this caller shows it as it is", kind_name, item_id,
+                        limit)
+            return
+        if running["retry"]:
+            retry = False  # the run under way was the retry: this caller reads its result
     started = time.monotonic()
     try:
         with causes.using(cause) if cause is not None else _nothing():
@@ -221,12 +257,14 @@ def run_now(store, kind_name: str, item_id: str, *, trigger: causes.Trigger = "o
 
 
 def _take_queued(key: tuple[str, str]) -> Job | None:
+    """The job queued for the item: off the queue, or one the loop has taken but not started (the loop's run then
+    finds the item done)."""
     with _lock:
         for job in list(_queue):
             if (job.kind, job.item_id) == key:
                 _queue.remove(job)
                 return job
-    return None
+        return _taken.get(key)
 
 
 class _nothing:
@@ -250,7 +288,7 @@ def request(kind_name: str, item_id: str, cause: causes.AiCause | None = None, *
     kind(kind_name)
     key = _key(kind_name, item_id)
     with _lock:
-        if key in _running or any((j.kind, j.item_id) == key for j in _queue):
+        if key in _running or key in _taken or any((j.kind, j.item_id) == key for j in _queue):
             return False
         _queue.append(Job(kind_name, item_id, cause or causes.current(), retry=retry))
     return True
@@ -265,19 +303,30 @@ def request_after_commit(store, kind_name: str, item_id: str, cause: causes.AiCa
 
 
 def next_job() -> Job | None:
-    """The first job whose item can be run now (the job loop)."""
+    """The first job whose item can be run now (the job loop). Until its run takes the item's slot it still counts
+    as queued (`_taken`); `release` it when done with it."""
     now = time.monotonic()
     with _lock:
         for job in list(_queue):
             if job.not_before <= now:
                 _queue.remove(job)
+                _taken[_key(job.kind, job.item_id)] = job
                 return job
     return None
+
+
+def release(job: Job) -> None:
+    """The job loop is done with a job it took (run, skipped, put back, or failed before its run)."""
+    key = _key(job.kind, job.item_id)
+    with _lock:
+        if _taken.get(key) is job:
+            del _taken[key]
 
 
 def requeue(job: Job) -> None:
     """Put a job back (the data was being rewritten when its turn came)."""
     job.not_before = time.monotonic() + 1.0
+    release(job)
     with _lock:
         _queue.append(job)
 
@@ -295,10 +344,13 @@ def run_job(store, job: Job) -> None:
             return
         job.attempts += 1
         job.not_before = time.monotonic() + 0.5
+        release(job)
         with _lock:
             _queue.append(job)
     except NotAllowed as e:  # e.g. the exception cleared before its turn
         log.info("AI job %s %s skipped: %s", job.kind, job.item_id, e)
+    finally:
+        release(job)
 
 
 def drain(store) -> int:
@@ -318,6 +370,7 @@ def reset(*, everything: bool = False) -> None:
     remembered causes."""
     with _lock:
         _queue.clear()
+        _taken.clear()
         if everything:
             _durations.clear()
             _remembered.clear()

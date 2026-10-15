@@ -11,18 +11,22 @@ import os
 import subprocess
 import sys
 import threading
+import time
 from collections import Counter
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
 import pytest
+from sqlalchemy import text
 
 from app import main
+from app.agents import cause as causes
 from app.agents import ondemand
 from app.agents import trace as traces
 from app.core import activity, config
 from app.core.models import Role
-from app.core.store import get_store, unit_of_work
+from app.core.store import get_engine, get_store, set_ambient_store, unit_of_work
 from app.llm import budget
 from app.llm.gateway import LlmGateway, set_gateway
 from app.llm.providers import MockProvider, ProviderUnavailable
@@ -35,6 +39,7 @@ from app.modules.protocols import service as protocols
 from app.modules.requisitions import service as requisitions
 from app.modules.storyline import service as storyline
 from app.modules.triage import service as triage
+from tests.test_ai_on_demand import _consented
 from tests.test_spend_guard import _one_pass
 
 API = Path(__file__).resolve().parents[1]
@@ -199,19 +204,49 @@ def test_an_out_of_scope_physician_runs_nothing_and_the_refusal_is_audited(fresh
 # ---------- 5 · work is queued once its request commits (real transactions) ----------
 
 
-def test_a_submitted_requisitions_job_runs_after_the_commit(fresh_state, client, login, monkeypatch):
-    """No shared test store here: each request commits on its own, and the job runs in its own transaction, the
-    moment it is queued (the job loop polls every 0.3 s: it can beat a slow commit). On 5c922b9 the job was queued
-    inside the request, ran before the commit, found no requisition and left it "received" for good."""
-    from app.core.store import set_ambient_store
+LEAKS = ("llm_calls", "agent_traces")  # what a committed run leaves (audit events: their own transactions, kept)
 
-    set_ambient_store(None)  # every request and the job: their own transactions, committed
-    # committed rows outlive the test: no MRI questionnaire or other follow-up (its message leaked into
-    # test_phase2's outbox once), and the requisition's own records are removed below
+
+@contextmanager
+def _committed(monkeypatch, req_id: str | None = None):
+    """No shared test store: every request and job in its own transaction, committed. Committed rows outlive the
+    test, so: no follow-up messages (an MRI questionnaire once leaked into test_phase2's outbox); the requisition
+    `req_id` and its three records put back, one the test created (appended to the yielded list) removed, and the
+    model calls and agent traces made meanwhile deleted (they leaked into the activity of a later test once)."""
+    set_ambient_store(None)
     monkeypatch.setattr(requisitions, "PROCESSED_HOOKS", [])
     ondemand.reset(everything=True)
-    original = ondemand.request
-    ran = []
+    tables = (requisitions.extractions, triage.records, protocols.records)
+    created: list[str] = []
+    with unit_of_work() as store:
+        marks = {t: store.conn().execute(text(f"SELECT coalesce(max(seq), 0) FROM {t}")).scalar() for t in LEAKS}
+        saved = store.requisitions[req_id].model_copy(deep=True) if req_id else None
+        records = [table(store).get(req_id) for table in tables] if req_id else []
+    try:
+        yield created
+    finally:
+        with unit_of_work() as store:
+            if req_id:
+                store.requisitions[req_id] = saved
+                for table, record in zip(tables, records):
+                    if record is None:
+                        table(store).pop(req_id, None)
+                    else:
+                        table(store)[req_id] = record
+            for new_id in created:
+                for table in tables:
+                    table(store).pop(new_id, None)
+                store.requisitions.pop(new_id, None)
+            for name, mark in marks.items():
+                store.conn().execute(text(f"DELETE FROM {name} WHERE seq > :mark"), {"mark": mark})
+        set_ambient_store(None)
+        ondemand.reset(everything=True)
+
+
+def _jobs_run_at_once(monkeypatch) -> list[str]:
+    """Each queued job runs the moment it is queued, in its own thread and transaction (the API's job loop polls
+    every 0.3 s: it can beat a slow commit); returns the items run."""
+    original, ran = ondemand.request, []
 
     def request_and_run_at_once(*args, **kwargs):
         queued = original(*args, **kwargs)
@@ -223,21 +258,25 @@ def test_a_submitted_requisitions_job_runs_after_the_commit(fresh_state, client,
         return queued
 
     monkeypatch.setattr(ondemand, "request", request_and_run_at_once)
-    fd = login("U-FD")
-    sample = client.get("/api/requisitions/samples", headers=fd).json()["samples"][0]
-    req_id = client.post("/api/requisitions", headers=fd, json={
-        "patient_id": sample["patient_id"], "referrer_id": sample["referrer_id"], "text": sample["text"]}).json()["id"]
+    return ran
+
+
+def test_a_submitted_requisitions_job_runs_after_the_commit(fresh_state, client, login, monkeypatch):
+    """On 5c922b9 the job was queued inside the request, ran before the commit, found no requisition and left it
+    "received" for good."""
     try:
-        with unit_of_work() as store:
-            status = store.requisitions[req_id].status
-        assert ran == [req_id] and status == "ready"
+        with _committed(monkeypatch) as created:
+            ran = _jobs_run_at_once(monkeypatch)
+            fd = login("U-FD")
+            sample = client.get("/api/requisitions/samples", headers=fd).json()["samples"][0]
+            req_id = client.post("/api/requisitions", headers=fd, json={
+                "patient_id": sample["patient_id"], "referrer_id": sample["referrer_id"],
+                "text": sample["text"]}).json()["id"]
+            created.append(req_id)
+            with unit_of_work() as store:
+                assert ran == [req_id] and store.requisitions[req_id].status == "ready"
     finally:
-        with unit_of_work() as store:
-            for table in (requisitions.extractions(store), triage.records(store), protocols.records(store)):
-                table.pop(req_id, None)
-            store.requisitions.pop(req_id, None)
         set_ambient_store(fresh_state)
-        ondemand.reset(everything=True)
 
 
 # ---------- 6 · the storyline step's Ask AI asks again for a failed item ----------
@@ -247,7 +286,7 @@ def test_the_storyline_steps_ask_ai_queues_a_failed_review_for_a_retry(fresh_sta
     store = fresh_state
     med_safety.intake(store, force=True)
     review = next(r for r in reviews(store).values() if r.commentary_status == "on_open" and r.encounter_id
-                  and "pharmacist" in r.reviewer_roles)
+                  and "pharmacist" in r.reviewer_roles and _consented(r.patient_id))
     reviews(store)[review_key(review.order_ref)] = review.model_copy(update={"commentary_status": "unavailable"})
     store.modules["storyline"] = {"prepared_at": datetime.now().isoformat()}
     monkeypatch.setattr(storyline, "_step_items", lambda s, key: [("order_review", review.id)])
@@ -355,10 +394,186 @@ def test_the_med_safety_queue_shows_a_queued_item_and_a_done_requisition_is_not_
 def test_a_refused_run_neither_shortens_the_typical_time_nor_hides_the_budget(fresh_state, monkeypatch):
     store = fresh_state
     med_safety.intake(store, force=True)
-    review = next(r for r in reviews(store).values() if r.commentary_status == "on_open" and r.encounter_id)
+    review = next(r for r in reviews(store).values() if r.commentary_status == "on_open" and r.encounter_id
+                  and _consented(r.patient_id))  # else the consent gate refuses before the budget is asked
     default = ondemand.typical_s("order_review")
     monkeypatch.setattr(budget, "refusal", lambda: f"{budget.REFUSAL_PREFIX}: $5.00 of $5.00")
     ondemand.run_now(store, "order_review", review.id, trigger="opened")
     after = get_review(store, review.id)
     assert after.commentary_status == "unavailable" and "budget" in after.commentary["reason"]
     assert ondemand.typical_s("order_review") == default
+
+
+# ---------- second round (the re-review of cfdae75): each test here failed on cfdae75 unless it says otherwise ----
+
+
+def _slow_feedback_run(monkeypatch, release: threading.Event | None = None, hold_s: float = 0.4):
+    """A fake run for feedback item FB-X: it records (item, retry) and holds the slot until `release` (or hold_s)."""
+    calls, started = [], threading.Event()
+
+    def run(store, item_id, retry):
+        calls.append((item_id, retry))
+        started.set()
+        if release is not None:
+            release.wait(10)
+        else:
+            time.sleep(hold_s)
+
+    kind = ondemand.KINDS["feedback"]
+    monkeypatch.setitem(ondemand.KINDS, "feedback", dataclasses.replace(kind, run=run))
+    return calls, started
+
+
+def test_a_second_caller_waits_at_most_its_kinds_budget_then_shows_the_item_running(fresh_state, monkeypatch):
+    """A first run that never returns: on cfdae75 the waiter's loop waited 180 s, then again, for good (holding its
+    request and pooled connection); now it gives up after the kind's budget and the item shows as running."""
+    release = threading.Event()
+    calls, started = _slow_feedback_run(monkeypatch, release)
+    budget_s = getattr(ondemand, "wait_s", None)  # (none on cfdae75)
+    monkeypatch.setattr(ondemand, "wait_s", lambda k: 0.3, raising=False)
+    monkeypatch.setattr(ondemand, "WAIT_S", 0.3, raising=False)  # cfdae75's limit, shortened alike: it waited again
+    first = threading.Thread(target=ondemand.run_now, args=(None, "feedback", "FB-X"))
+    first.start()
+    started.wait(2)
+    second = threading.Thread(target=ondemand.run_now, args=(None, "feedback", "FB-X"), kwargs={"trigger": "asked"})
+    second.start()
+    second.join(5)
+    try:
+        assert not second.is_alive() and calls == [("FB-X", False)]
+        assert ondemand.live("feedback", "FB-X")["state"] == "running"
+    finally:
+        release.set()
+        first.join(5)
+        second.join(5)
+    # the real bound: each model call may make two attempts within its budget (a requisition: three calls)
+    assert budget_s(ondemand.kind("requisition")) >= 3 * 2 * config.settings.llm_timeout_s
+
+
+def test_a_retry_that_waited_for_an_opening_runs_after_it(fresh_state, monkeypatch):
+    """Retry pressed while someone's opening (or a plain job) holds the failed item's slot: that run does not retry,
+    so the Retry runs next (on cfdae75 its flag was cleared and nothing ran again). Two Retries: the second reads the
+    first's result (test_ai_on_demand.py)."""
+    calls, started = _slow_feedback_run(monkeypatch)
+    opening = threading.Thread(target=ondemand.run_now, args=(None, "feedback", "FB-X"), kwargs={"trigger": "opened"})
+    opening.start()
+    started.wait(2)
+    ondemand.run_now(None, "feedback", "FB-X", trigger="asked", retry=True)
+    opening.join(5)
+    assert calls == [("FB-X", False), ("FB-X", True)]
+
+
+def test_two_retries_of_one_failed_requisition_at_once_run_its_pipeline_once(fresh_state, monkeypatch):
+    """Two operations managers press Retry together, each request in its own transaction: one runs the pipeline,
+    the other waits for it, then reads the requisition under its lock once the first has committed. (This held on
+    cfdae75 too: it is the real-transaction version of the fake-run tests.)"""
+    try:
+        with _committed(monkeypatch, "REQ-NEW2"):
+            set_gateway(LlmGateway(FailingFor({"protocol_suggest"})))
+            with unit_of_work() as store:
+                ondemand.run_now(store, "requisition", "REQ-NEW2", trigger="opened")
+            with unit_of_work() as store:
+                assert requisitions.retryable(store, store.requisitions["REQ-NEW2"])
+                before = _calls(store)
+            set_gateway(LlmGateway(MockProvider(latency_s=0.3)))
+
+            def retry():
+                with unit_of_work() as store:
+                    ondemand.run_now(store, "requisition", "REQ-NEW2", trigger="asked", retry=True)
+
+            first, second = threading.Thread(target=retry), threading.Thread(target=retry)
+            first.start()
+            for _ in range(100):
+                if ondemand.live("requisition", "REQ-NEW2"):
+                    break
+                time.sleep(0.02)
+            second.start()
+            first.join(30)
+            second.join(30)
+            with unit_of_work() as store:
+                assert sum((_calls(store) - before).values()) == 3  # extraction, triage, protocol: once
+                assert store.requisitions["REQ-NEW2"].status == "ready"
+                assert protocols.records(store)["REQ-NEW2"].ai_status == "ok"
+    finally:
+        set_ambient_store(fresh_state)
+
+
+def test_a_reprocessed_requisitions_job_runs_after_the_commit(fresh_state, client, login, monkeypatch):
+    """Reprocess (operations) queues the pipeline once its request commits, as a submitted requisition does (this
+    held on cfdae75 too)."""
+    try:
+        with _committed(monkeypatch, "REQ-NEW1"):
+            ran = _jobs_run_at_once(monkeypatch)
+            assert client.post("/api/requisitions/REQ-NEW1/reprocess", headers=login("U-OPS")).status_code == 200
+            with unit_of_work() as store:
+                assert ran == ["REQ-NEW1"] and store.requisitions["REQ-NEW1"].status == "ready"
+    finally:
+        set_ambient_store(fresh_state)
+
+
+def test_an_item_the_job_loop_took_but_has_not_started_runs_as_what_it_was_queued_for(fresh_state):
+    """A submitted requisition is queued after its commit; the loop takes the job and, while its transaction
+    starts, the page that follows the submission opens the requisition. The opening runs it as the submission. On
+    cfdae75 the job was off the queue and not running yet: invisible (`live` None), and the opening ran it as its
+    own (here, outside a request, "background"; in the browser "when you opened it", which the pipeline e2e spec
+    caught once, after this round's budget reads had widened the gap)."""
+    store = fresh_state
+    assert ondemand.request("requisition", "REQ-NEW1", causes.AiCause(trigger="action", note="submitted in the portal"))
+    job = ondemand.next_job()  # the loop has it; its transaction is starting
+    assert (ondemand.live("requisition", "REQ-NEW1") or {}).get("state") == "queued"
+    assert not ondemand.request("requisition", "REQ-NEW1")  # never queued twice
+    before = _calls(store)
+    ondemand.run_now(store, "requisition", "REQ-NEW1", trigger="opened")  # the page's opening POST
+    ondemand.run_job(store, job)  # the loop's run then finds it done
+    assert sum((_calls(store) - before).values()) == 3
+    runs = [t for t in traces.table(store).values() if (t.cause or {}).get("item_id") == "REQ-NEW1"]
+    assert len(runs) == 3 and {t.cause["trigger"] for t in runs} == {"action"}
+    assert ondemand.live("requisition", "REQ-NEW1") is None and ondemand.snapshot()["queued"] == []
+
+
+def test_the_eager_steps_pass_over_an_item_they_cannot_run_now(fresh_state, monkeypatch):
+    """On cfdae75 the eager commentary only ever tried the top pending review: one without an encounter (never
+    commentable) or held by another transaction (a pharmacist deciding it) stopped the background's commentary."""
+    _mode(monkeypatch, "eager")
+    store = fresh_state
+    med_safety.intake(store, force=True)
+    top, held, third = med_safety.pending_commentary(store)[:3]
+    reviews(store)[review_key(top.order_ref)] = top.model_copy(update={"encounter_id": None})
+    settling = med_safety.pending_settlement(store)[:2]
+    other = get_engine().connect()
+    tx = other.begin()
+    try:
+        for name in (held.id, settling[0].id):  # another transaction holds them
+            other.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": med_safety._lock_key(name)})
+        before = _calls(store)
+        med_safety.commentary_step(store)
+        med_safety.settle_step(store)
+        # one item each; it may end without a model call (no consent: refused; a reconciliation with nothing to judge)
+        new = _calls(store) - before
+        assert new["order_review"] <= 1 and set(new) <= {"order_review", "medication_reconciliation"}
+        assert get_review(store, held.id).commentary_status == "pending"
+        assert get_review(store, third.id).commentary_status != "pending"
+        state = [sessions(store).get(session_key(s.encounter_id, s.kind)).ai_status for s in settling]
+        assert state[0] == "pending" and state[1] != "pending"
+    finally:
+        tx.rollback()
+        other.close()
+    assert top.id not in [r.id for r in med_safety.pending_commentary(store)]  # never the background's to comment
+
+
+def test_a_storyline_steps_ask_ai_audits_each_item_it_refuses_when_others_were_asked(fresh_state, client, login,
+                                                                                     monkeypatch):
+    store = fresh_state
+    med_safety.intake(store, force=True)
+    review = next(r for r in reviews(store).values() if r.commentary_status == "on_open" and r.encounter_id
+                  and "pharmacist" in r.reviewer_roles)
+    session = next(s for s in sessions(store).values() if s.ai_status == "on_open")
+    store.modules["storyline"] = {"prepared_at": datetime.now().isoformat()}
+    monkeypatch.setattr(storyline, "_step_items", lambda s, key: [("order_review", review.id), ("medrec", session.id)])
+
+    def outside(store, user, item_id):
+        raise ondemand.NotAllowed("This patient is outside your units")
+
+    monkeypatch.setitem(ondemand.KINDS, "medrec", dataclasses.replace(ondemand.kind("medrec"), check=outside))
+    r = client.post("/api/storyline/steps/medrec/ai", headers=login("U-PHAR-01"))
+    assert r.status_code == 200 and r.json()["items"] == [["order_review", review.id]]
+    assert store.audit.query(resource_type="ai_medrec", resource_id=session.id, outcome="denied")

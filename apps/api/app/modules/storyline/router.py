@@ -9,7 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.agents import ondemand
-from app.core.auth import current_user, deny
+from app.core.auth import client_ip, current_user, deny
 from app.core.models import StaffUser
 from app.core.store import get_store
 from app.ehr import simulator
@@ -34,13 +34,21 @@ def reset(user: StaffUser = Depends(current_user)):
 def step_ai(key: str, request: Request, user: StaffUser = Depends(current_user)):
     """A step's Ask AI on the storyline page: its items' AI (the exception's narrative; the naproxen review and the
     admission reconciliation) is queued now, as this person's storyline step, for the items they may ask for (the
-    items' own checks: the reviewer roles and 6.3 scope); 403 and audited when they may ask for none."""
+    items' own checks: the reviewer roles and 6.3 scope); 403 and audited when they may ask for none, and each item
+    refused when others were asked for is audited too (as a list page's batch)."""
+    store = get_store()
     try:
-        return service.ask_step_ai(get_store(), user, key)
+        out = service.ask_step_ai(store, user, key)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     except ondemand.NotAllowed:
         deny(request, user, resource_type="storyline_step", resource_id=key)
+    for kind_name, item_id in out["denied"]:
+        store.audit.record(user_id=user.id, user_name=user.name, role=str(user.role), action="post",
+                           resource_type=f"ai_{kind_name}", resource_id=item_id, outcome="denied",
+                           source_ip=client_ip(request), reason=f"storyline step {out['step']}: not this person's to "
+                           "ask for")
+    return out
 
 
 @router.post("/advance")

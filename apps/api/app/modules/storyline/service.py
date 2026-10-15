@@ -338,7 +338,8 @@ def ask_step_ai(store: Store, user: StaffUser, key: str) -> dict:
     """The step's Ask AI (the page's AI box): queue the AI of the step's items that exist now, as this person's
     storyline step: an item whose AI has not run (its Advance was not pressed: the clock moved by itself), or one
     whose run failed and may run again (the retry itself is decided by the run, under the item's lock). Each item
-    is checked against the person (who may ask for its AI, 6.3 scope): NotAllowed when they may ask for none."""
+    is checked against the person (who may ask for its AI, 6.3 scope): NotAllowed when they may ask for none, else
+    the refused ones are listed in `denied` ([kind, id]; the caller audits them)."""
     step = S.BY_KEY.get(key)
     if step is None or key not in AI_TEXT:
         raise ValueError("This step's AI runs from its own screen")
@@ -356,7 +357,7 @@ def ask_step_ai(store: Store, user: StaffUser, key: str) -> dict:
         try:
             k.check(store, user, item_id)
         except ondemand.NotAllowed:
-            denied.append(item_id)
+            denied.append([kind_name, item_id])
             continue
         except LookupError:
             continue
@@ -371,7 +372,7 @@ def ask_step_ai(store: Store, user: StaffUser, key: str) -> dict:
             update={"kind": kind_name, "item_id": item_id, "label": label, "link": link}), retry=retry)
         asked.append([kind_name, item_id])
     if denied and not asked:
-        raise ondemand.NotAllowed(f"You may not ask for the AI of {', '.join(denied)}")
+        raise ondemand.NotAllowed(f"You may not ask for the AI of {', '.join(i for _, i in denied)}")
     st.setdefault("ai_steps", {})[key] = {"cause": base.model_dump(exclude_none=True),
                                           "items": [list(i) for i in items], "at": datetime.now().isoformat()}
     store.modules[preset.STATE] = st

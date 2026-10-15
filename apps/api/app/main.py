@@ -207,6 +207,8 @@ def _ai_job(job: ondemand.Job) -> None:
             ondemand.run_job(store, job)
     except Exception:  # the item's own outcome is on its record; keep the loop alive (no payloads: PHI)
         log.exception("AI job %s failed", job.kind)
+    finally:
+        ondemand.release(job)  # also when it failed before its run
 
 
 async def _ai_jobs_loop() -> None:

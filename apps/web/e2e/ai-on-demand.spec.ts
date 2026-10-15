@@ -185,3 +185,29 @@ test("a portal requisition runs at once and its progress shows where the referre
   await page.getByTestId("ai-activity-button").click();
   await expect(page.getByTestId("ai-activity-panel").getByTestId("ai-action-trigger").first()).toContainText("submitted in the portal");
 });
+
+test("a portal requisition still waiting after two minutes: the page stops following and says so", async ({ page }) => {
+  // its job lost (a server restart): the requisition stays queued, so every poll brings the same answer
+  await page.route("**/api/portal/requisitions", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const response = await route.fetch();
+    const body = await response.json();
+    body.requisitions = (body.requisitions as { ai?: object }[]).map((r) => (r.ai ? { ...r, ai: { ...r.ai, state: "queued" } } : r));
+    await route.fulfill({ response, json: body });
+  });
+  await login(page, "referrer");
+  await page.clock.install();
+  await page.goto("/portal/new");
+  await page.getByLabel("New patient").check();
+  await page.getByLabel("First name").fill("Noor");
+  await page.getByLabel("Last name").fill("Example");
+  await page.getByLabel("Date of birth").fill("1968-11-21");
+  await page.getByLabel("Health card number").fill("3456789012");
+  await page.getByLabel("Exam requested").fill("CT head");
+  await page.getByLabel("Clinical information").fill("New persistent headaches for 3 weeks.");
+  await page.getByTestId("submit-requisition").click();
+  await expect(page.getByTestId("submitted-ai")).toBeVisible();
+  await page.clock.fastForward("02:01");
+  await expect(page.getByTestId("submitted-ai-late")).toContainText("taking longer than usual");
+  await expect(page.getByTestId("submitted-ai")).toHaveCount(0);
+});

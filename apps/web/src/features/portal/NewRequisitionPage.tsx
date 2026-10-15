@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Sparkles } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { AiStatus } from "../../components/ai";
 import { Button, Card, ErrorState, Loading, PageHeader } from "../../components/ui";
@@ -26,17 +26,22 @@ function Field({ label, children, hint }: { label: string; children: ReactNode; 
 const FOLLOW_MS = 120_000; // a job lost on a server restart: stop following and say so
 
 function SubmittedAi({ id }: { id: string }) {
-  const [since] = useState(() => Date.now());
+  // A timer, not the polls: an unchanged answer re-renders nothing, so the last poll would never show the message.
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setLate(true), FOLLOW_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
   const reqs = useQuery({
     queryKey: ["portal-reqs"], queryFn: () => api<{ requisitions: PortalRequisition[] }>("/api/portal/requisitions"),
     refetchInterval: (q) => {
       const ai = q.state.data?.requisitions.find((r) => r.id === id)?.ai;
-      return ai && ai.state !== "done" && ai.state !== "unavailable" && Date.now() - since < FOLLOW_MS ? 1000 : false;
+      return ai && ai.state !== "done" && ai.state !== "unavailable" && !late ? 1000 : false;
     },
   });
   const ai = reqs.data?.requisitions.find((r) => r.id === id)?.ai;
   if (!ai) return null;
-  if (ai.state !== "done" && ai.state !== "unavailable" && Date.now() - since >= FOLLOW_MS) {
+  if (ai.state !== "done" && ai.state !== "unavailable" && late) {
     return <p className="text-sm text-slate-600" data-testid="submitted-ai-late">It is taking longer than usual; our staff will triage it if the AI does not.</p>;
   }
   if (ai.state === "done") {

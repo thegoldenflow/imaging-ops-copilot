@@ -336,22 +336,28 @@ def comment(store: Store, review_id: str, *, wait: bool = False, retry: bool = F
 
 
 def commentary_step(store: Store) -> None:
-    """Background step (BACKGROUND_AI=eager): the most urgent commentary still waiting, one per transaction, so a
-    person deciding another review never waits behind it (the review's lock is held until the commit)."""
-    for review in pending_commentary(store)[:1]:
-        comment(store, review.id)
+    """Background step (BACKGROUND_AI=eager): the most urgent commentary it can write now, one per transaction, so a
+    person deciding another review never waits behind it (the review's lock is held until the commit). A review
+    another transaction holds (being decided or commented) is passed over for the next one, so one review never
+    stops the rest."""
+    for review in pending_commentary(store):
+        if comment(store, review.id).commentary_status != "pending":
+            return
 
 
 def settle_step(store: Store) -> None:
-    """Background step (eager): one reconciliation's AI step per transaction."""
-    for session in pending_settlement(store)[:1]:
-        settle(store, session.id)
+    """Background step (eager): one reconciliation's AI step per transaction, passing over one another transaction
+    holds."""
+    for session in pending_settlement(store):
+        if settle(store, session.id).ai_status != "pending":
+            return
 
 
 def pending_commentary(store: Store) -> list[OrderReview]:
-    """Reviews waiting for the background to write their commentary (not those waiting for a person to open them):
-    blocking and most severe first, then the oldest order."""
-    found = reviews(store).find_by("commentary_status", "pending")
+    """Reviews waiting for the background to write their commentary (not those waiting for a person to open them,
+    nor those it can never comment: decided, or without an encounter): blocking and most severe first, then the
+    oldest order."""
+    found = [r for r in reviews(store).find_by("commentary_status", "pending") if _commentable(r, False)]
     return sorted(found, key=lambda r: (not r.blocking, -rules.SEVERITY_RANK[r.severity],
                                         r.authored_at or datetime.min))
 

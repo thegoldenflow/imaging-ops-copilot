@@ -22,7 +22,8 @@ AI on demand: with `BACKGROUND_AI=on_demand` (the demo's default) no model call 
 An item's AI runs when a person opens it or presses Ask AI (in the request, `ondemand.run_now`), or at once for new
 work their action created and for a batch they asked for (`ondemand.request`, run by the API's AI job loop, two at a
 time, queued after the request commits). One run per item at a time: a second caller waits for the first in this
-process and then reads the item again under its lock; a kind's `run(store, item_id, retry)` takes the item's
+process (at most the kind's model budget, `ondemand.wait_s`; then it shows the item running) and then reads the item
+again under its lock, or runs its Retry if the first was not one; a kind's `run(store, item_id, retry)` takes the item's
 database lock, reads it again and calls the model only if the AI has not run, or, with `retry`, if it failed and
 may run again (never over a person's work: a requisition someone corrected, reviewed or approved is not re-run).
 Scope is checked before the model runs (role and 6.3), and refusals are audited. Each run's trace records its

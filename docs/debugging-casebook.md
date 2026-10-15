@@ -1221,6 +1221,44 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
         给 `cause->>'session'` 加了表达式索引（alembic 1.20 的 autogenerate 能比对它，迁移检查通过）。
       - **设计上的已知限制：** 模型调用在请求的事务里进行，占着连接池（10 + 10）和条目的锁；AI 任务还持有共享的重写锁，所以演示重置要等它们。慢模型下约 20 个同时卡住的运行会占满连接池。
         两阶段（读、在事务外调模型、再加锁写回）要改五类条目的写入路径和 agent 在运行里的工具写入，记在 PROGRESS 的已知限制里。
+  13. **第二轮评审（同两位评审复查 cfdae75）：13 条都确认修好，又提了 5 条小问题，全部修了。** 这次先把新测试放到 cfdae75 上跑（`git archive` 解到 scratchpad，同一个 venv，
+      先打印 `app.agents.ondemand.__file__` 确认导入的是旧代码），4 个修 bug 的测试都因为行为而挂，再改代码。
+      - **等待没有上限。** cfdae75 的等待者是 `while True: event.wait(timeout=WAIT_S)`：180 秒超时后回到循环，再等 180 秒。`timeout` 只限制了每一次等待，没有限制总时长；
+        第一个运行永不返回时，后面每个请求连同它占的连接池连接都被挂住。修：按条目种类算一个截止时间（`wait_s`：每次模型调用最多两次尝试 × 该 agent 的预算
+        `model_policy.timeout_s` 或 `LLM_TIMEOUT_S`，再加 30 秒），到点就返回，条目显示为 running。
+        在旧代码上这个测试会挂住而不是失败，所以第二个调用放进线程，`join(5)` 后断言它已经结束；还把旧代码的 `WAIT_S` 也设成 0.3 秒（`monkeypatch.setattr(..., raising=False)`），
+        这样旧代码挂在 `assert (not True)` / `where True = is_alive()`（一直在等），而不是挂在"没有 `wait_s` 这个名字"上。
+      - **等着的 Retry 被丢掉。** 等待者醒来后一律 `retry = False`，理由是"正在跑的那次已经决定了失败的事"。可占位的不一定是重试：一次"打开"或一个普通任务在失败的条目上什么都不做，
+        Retry 就悄悄没了。修：占位者把自己的 `retry` 记进登记表，只有它是重试时等待者才放弃自己的重试。旧代码：`[('FB-X', False), ('FB-X', False)]`；修好后第二次是 `('FB-X', True)`。
+      - **eager 点评卡在队首。** `commentary_step` 只取 `pending_commentary(store)[:1]`：没有 encounter 的医嘱（`_commentable` 永远是 False），或者被另一个事务锁住的医嘱，
+        会一直排在第一，后台点评就此停下（旧代码：`assert (0 == 1)`，一次调用都没有）。修：`pending_commentary` 去掉永远不能点评的（已决定、没有 encounter），
+        步骤跳过此刻拿不到锁的、去做下一个；重整的 `settle_step` 同样处理。测试用第二个连接 `pg_advisory_xact_lock` 占住一条医嘱和一条重整。
+        顺带推翻了自己的一个假设：断言"重整多一次模型调用"挂了，读代码发现 `medrec_agent.judge` 只在 `if todo or discrepancies` 时调模型，没东西可判断的重整直接完成；改为断言状态。
+      - **门户的"比平时久"永远不显示。** 120 秒后轮询停止，最后一次拿到的数据和上一次一样；React Query 的结构共享让组件不再渲染，而判断写在渲染里
+        （`Date.now() - since >= FOLLOW_MS`），所以这句话没有机会出现。修：用 `setTimeout` 的状态驱动。Playwright 测试用 `page.clock.install()` 和 `fastForward("02:01")`，
+        并用 `page.route` 让这张申请单一直是 queued（任务丢了的样子）。
+      - **部分拒绝没有审计。** 故事线的 Ask AI 全部被拒时整步审计，部分被拒时被拒的几项没有记录（旧代码：`query(resource_type='ai_medrec', ...)` 是 `[]`）。修：返回 `[kind, id]`，路由像批量那样逐项审计。
+      - 另补两个测试（在 cfdae75 上也通过：是补覆盖，不是回归）：两个运营经理真的同时按 Retry（各自独立提交的事务），只跑一次流水线（3 次调用），第二个等第一个提交后在锁里重读；
+        Reprocess 也在提交后才入队。
+      - **端到端测试抓到一个竞态，是本轮自己把窗口拉大的。** 第一次跑三个 Playwright 文件时，机器上还同时跑着两套后端测试和旧代码对照，挂了 5 个：都是 5 秒的期望或 60 秒的重置超时，
+        API 日志没有错误，重置最后都返回 200，判断为负载。安静时重跑还剩 2 个，要分开看。一个是药物安全队列在重置后第一次打开时 intake 还在跑（快照：`status: Reviewing new orders…`），
+        本轮没碰这条路径。另一个是流水线：前台刚提交的申请单显示 `when you opened it`，测试要的是 `your action`。这个不是负载能解释的，因为结果是"错"，不是"慢"。
+        假设：任务循环的 `next_job` 把任务从队列取走后、`run_now` 占位前有一段空窗（`asyncio.to_thread`、取连接、重写锁、`k.check`、`_describe`），这时详情页打开的 POST
+        既找不到排队的任务，也看不到正在跑的，就以"打开"的原因自己跑了。为什么 cfdae75 上 35/35 都过、现在挂？因为本轮的 `wait_s` 在占位前读每个 agent 的发布状态
+        （`registry.agent` → `release.effective`，查最近一次评测），把空窗拉长了。
+        验证：写测试模拟"任务已被取走、还没开始，这时有人打开"。在 cfdae75 上 `live()` 是 `None`（这一项从界面上消失），运行记成 `{'background'}` 而不是 `{'action'}`
+        （测试不在 HTTP 请求里，所以是 background；浏览器里就是 opened）。修：取走但还没开始的任务记在 `_taken`，对别人仍是"排队中"（`live`、`request`、`snapshot`），
+        打开时按它排队时的原因运行；占位时清掉，任务跑完、放回或出错都 `release`；`wait_s` 只在真的要等时才算。
+      - **测试自己泄漏到别的测试。** 加了两个提交真实事务的测试后，同一会话里后跑的 `test_the_activity_of_everyone_includes_the_backgrounds_own_runs` 挂了："所有人的活动"里多出
+        `Extracted, triaged and protocolled a requisition`；新测试也数出 6 条 trace 而不是 3 条。提交了的行不会随测试回滚。用 scratchpad 里的 pytest 插件（`-p leakprobe`）
+        在每个测试前后另开一个连接，读每张表的 `max(seq)` 和 `module_state.updated_at`：这三个测试只留下 `llm_calls`、`agent_traces` 和 `audit_events`。
+        审计事件每个测试都会提交（`AuditLog.record` 用独立事务写，哈希链从数据库读上一条），保留；前两张表按测试前记下的 `seq` 删除（`_committed`）。修完再量，只剩 `audit_events` 在变。
+      - **过了午夜，种子换成周四，又挂了 6 个。** 第三次重跑正好跨过 0 点，测试库按 10-15（周四）播种，两种模式挂的是同样 6 个。先在 cfdae75 上跑其中 3 个本轮没改过的测试：一样挂，
+        所以不是本轮造成的。再写一个临时诊断测试，打印前 6 条 `on_open` 医嘱跑 AI 的结果：
+        `ORV-00001 pat-0227 stay-01101 SURG refused consent_missing: order_review needs the patient's consent (ai_processing: missing)`，6 条里 3 条没有 AI 同意。
+        这些测试一直取"第一条有 encounter 的 `on_open` 医嘱"：周三那条恰好有同意，周四没有，AI 在模型之前就被同意闸门拒绝（`refused`，0 次调用）。
+        修：测试按 `ai_processing` 同意挑病人（`_consented`）；eager 步骤的测试改为断言状态（被拒绝也算"处理过了"，不再卡在队首）。
+        剩下的 `test_storyline.py::test_the_whole_story_offline`（`WalkFailed: timed out waiting for step bed done`）在 main（93cc53d）上今天也挂，和本分支无关，另开会话查。
 - **根因：** 后台循环和两个 GET 都是按"AI 输出应该提前备好"设计的；在这个前提下，"谁的点击引起了这次调用"不需要记录，"打开"和"读取"也不必分开。按需之后这两个前提都不成立：
   读取要立刻返回规则结果，AI 要由一个明确的动作触发并记下原因，而原因要穿过 agent 以自己身份运行的那一层。
 - **怎么修：**
@@ -1241,17 +1279,26 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
   2. **身份和原因是两件事。** "以谁的权限写"（agent 自己）和"因为谁的动作而运行"（打开它的人）在审计上要分开；把后者塞进前者，要么泄露权限、要么丢失原因。两个 context 变量各管一件。
   3. **"只跑那一项"要在界面层也检查。** 服务器保证了每一项只跑一次，却保证不了"打开 A 时没有顺带打开 B"。这种问题单元测试看不出来，要在真实页面上数"一次点击产生了几个动作"。
      同理，"跑了几次"对了不等于"记在谁头上"对了：两个触发方式抢同一项时，要决定以哪一个的原因为准，并为这个决定写测试。
+  4. **同一个量在两处计算，迟早不一致。** 成本、"谁"、时间，统一从 trace 读、用同一个函数算。
   5. **"重试"是写操作，要和第一次运行同样小心。** 它要在锁里、读到最新状态后决定，要知道哪些东西是人做的（不能被重建覆盖），要有和原来一样紧的权限。
      评审找出的最重的一条就在这里：为了"让失败的 AI 能再来一次"写的几行，绕过了锁、权限和人的工作。
   6. **证明测试测的是 bug，要在旧代码上看它"为什么"挂。** 挂在 `KeyError`、签名不对上的测试只说明接口变了；把行为断言放到前面，看到"前台的重试返回了 200"，才说明测到了。
-  4. **同一个量在两处计算，迟早不一致。** 成本、"谁"、时间，统一从 trace 读、用同一个函数算。
+     旧代码会挂住的测试（无限等待），要放进线程、限时 `join`，让它"失败"而不是"卡住"。
+  7. **循环里的"带超时等待"不是上限。** 上限是一个截止时间：每一轮只等剩下的时间，到点就返回当前状态，而不是再等一轮。
+  8. **按"对方是谁"清除状态之前，先确认对方真是那种角色。** "等的那个一定是重试"在两个 Retry 的测试里成立，在"打开 + Retry"时不成立。把需要的事实（占位的是不是重试）放进共享的登记表，不要靠推测。
+  9. **只取队首的后台循环会被一个卡住的条目饿死。** 永远做不了的从候选里去掉，暂时做不了的跳过；测试要专门造一个卡在队首的条目。
+  10. **"到时间就显示"不能写在渲染里。** 渲染只在数据变化时发生，时间本身不是数据。用定时器状态驱动，测试用可控的时钟（Playwright `page.clock`）。
+  11. **一个测试偶尔挂了，先问这次改动让什么变慢了。** 新加的一次"便宜的"读，可能正好落在旧竞态的窗口里。再看结果是"慢"还是"错"：慢可以是负载，错不是。
+  12. **提交真实事务的测试要自己收拾，还要量一下收拾干净没有。** 凭记忆列"写了哪些表"会漏；在测试前后数一遍每张表，比读代码可靠。
+  13. **"取第一条"是对数据的隐含假设。** 种子随日期变，第一条的属性也跟着变；测试要写明它需要的条件（这里是 AI 同意），而不是碰巧满足（同 5.12）。
 - **范围：** 平台（`app/agents`、上下文、迁移、AI 任务循环、`Store.after_commit`）/ hospital（医嘱审核、用药重整、Control Tower、故事线）/ imaging（申请单、门户、反馈）/ 网页（状态组件、活动面板、各页面）。
 - **代码：** `apps/api/app/agents/ondemand.py`、`cause.py`、`activity.py`、`ondemand_router.py`（新）、`apps/api/app/core/context.py`（`_origin`、`X-Demo-Session`）、`apps/api/app/agents/trace.py`、`runtime.py`、`apps/api/app/llm/gateway.py`、
   `apps/api/app/core/db/migrations/versions/0011_agent_trace_cause.py`、`apps/api/app/core/db/repo.py`（`where`）、`apps/api/app/main.py`（`_ai_jobs_loop`）、`apps/api/app/modules/med_safety/service.py`、`router.py`、`apps/api/app/modules/control_tower/service.py`、`router.py`、
   `apps/api/app/modules/requisitions/service.py`、`router.py`、`apps/api/app/modules/portal/*`、`apps/api/app/modules/feedback/*`、`apps/api/app/modules/storyline/service.py`、`router.py`、`stubs.py`、`walk.py`、`apps/api/app/ehr/signing.py`、
   `apps/api/app/modules/documentation/service.py`、`apps/web/src/lib/ai.ts`、`session.ts`、`api.ts`、`apps/web/src/components/ai.tsx`、`AiActivity.tsx`、`Layout.tsx`、各 feature 页面、`apps/api/tests/test_ai_on_demand.py`、`apps/web/e2e/ai-on-demand.spec.ts`。
 - **提交：** 分支 `claude/adoring-kirch-14355b` 的 5c922b9 "api, web: AI only on the user's click"（owner 2026-10-14 同意提交，并确认种子积压按需运行这一偏差）；
-  评审修复（第 12 步）在同一分支的下一个提交 "api, web: AI on demand, pre-merge review fixes"，回归测试 `apps/api/tests/test_ai_on_demand_review.py`。
+  评审修复（第 12 步）在同一分支的 cfdae75 "api, web: AI on demand, pre-merge review fixes"，回归测试 `apps/api/tests/test_ai_on_demand_review.py`；
+  第二轮（第 13 步）在下一个提交 "api, web: AI on demand, second review round"，测试在同一个文件的 "second round" 部分和 `ai-on-demand.spec.ts` 的最后一个测试。
 
 ---
 
