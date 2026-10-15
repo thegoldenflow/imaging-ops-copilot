@@ -500,6 +500,11 @@ def test_investigation_trail_and_report(client, login):
 def test_reminders_fire_at_each_stage_and_once(client, login):
     from app.modules.inspection import service as inspection
 
+    ops = login("U-OPS")
+    # Look for the seeded reminder before the calls below send future-dated ones for every document: how many they
+    # send depends on the seeding date and hour, and they can push it out of the overview's 30 newest (casebook 5.16).
+    data = client.get("/api/inspection/overview", headers=ops).json()
+    assert any(r["doc_id"] == "CRED-U-TECH2-REGISTRATION" and r["stage"] == 30 for r in data["reminders"])
     store = get_store()
     doc = inspection.documents(store)["CRED-U-RAD3-REGISTRATION"]
     now = datetime.now()
@@ -514,8 +519,9 @@ def test_reminders_fire_at_each_stage_and_once(client, login):
     assert [r["stage"] for r in later] == [7]
     overdue = [r for r in inspection.process_reminders(store, now + timedelta(days=26)) if r["doc_id"] == doc.id]
     assert [r["stage"] for r in overdue] == [0]
-    data = client.get("/api/inspection/overview", headers=login("U-OPS")).json()
-    assert any(r["doc_id"] == "CRED-U-TECH2-REGISTRATION" and r["stage"] == 30 for r in data["reminders"])
+    data = client.get("/api/inspection/overview", headers=ops).json()
+    assert data["reminders"][0]["sent_at"] == overdue[0]["sent_at"]  # newest first
+    assert any(r["id"] == overdue[0]["id"] for r in data["reminders"])
 
 
 def test_checklist_reflects_records_and_renewal_fixes_it(client, login):

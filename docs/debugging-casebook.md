@@ -2015,17 +2015,56 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
   6. **余量有多少？** 11 条种子提醒的 `sent_at` 相同，排序是稳定的，TECH2 在并列里的位置由插入顺序决定。22 点时它排第 29 名，只比第 30 名高一位：这个测试本来就只剩一位余量，21 点多出的 3 条提醒就把它挤掉了。
 - **根因：** 测试断言"种子的某条提醒在 overview 的最新 30 条里"，但测试自己先往前面塞了 19 到 22 条未来时间的提醒。塞多少取决于种子证书的到期日，而到期日随播种的钟点变
   （`now` 截到整点，共享的随机流被前面按钟点生成的数据消耗掉不同的长度）。21 点播种时多塞的 3 条把 TECH2 挤到第 32 名。
-- **怎么修：** 这次没修（不在评审修复范围里，另提后续）。可选的修法：在测试自己发提醒之前先查 overview；或者断言 `inspection.reminders(store)` 本身而不是 overview 的前 30 条；
-  或者 overview 的断言改成测试自己造的 RAD3 提醒（它们一定排在最前面）。
-- **怎么证明：** 复现是确定的：`TRAVEL_TO=2026-10-14T21:58` 挂，`22:10` 过，5c922b9 和本分支结果相同；名次表和随机状态哈希如上。22 点以后跑的全量里这个测试通过。
+  （修复时多扫了几天，发现挂不挂取决于"日期 + 钟点"的组合，不是每天 21 点都挂，见"怎么证明"第 3 条。）
+- **怎么修：**
+  1. **先判断改产品还是改测试。** overview 的 `reminders` 是"最近发出的提醒"列表，按 `sent_at` 倒序取 30 条。生产里只有 worker 发提醒（`app/main.py` `_intake_loop` 的
+     `inspection reminders` 步骤），传的是 `datetime.now()`，`sent_at` 不会落在未来。未来时间的提醒只在这个测试里出现（它拿 `now + 20 天`、`now + 26 天` 调 `process_reminders`）。
+     所以 overview 的行为没错，改测试。
+  2. **测试改成查两次 overview**（`apps/api/tests/test_phase4.py`）：
+     - 一开始、测试自己发提醒**之前**查一次，断言种子的 `CRED-U-TECH2-REGISTRATION` 30 天提醒在列表里。这时列表里只有种子提醒（下面 31 个播种时刻里最多 11 条），离 30 条有 19 条余量。
+     - 最后再查一次，断言第一条的 `sent_at` 等于测试在 +26 天发出的 RAD3 逾期提醒的 `sent_at`（最新的排最前），并且这条提醒（按 `id`）在列表里。
+       +26 天是整个测试最晚的 `sent_at`，那一次只发 2 到 4 条，一定在前 30 条里，不靠余量。
+     - 中间分阶段的断言不变：60 天外不发、30 / 7 / 0 天各发一次、同一阶段不重发。
+     - `store = get_store()` 和 `doc = ...` 放在第一次请求之后再取：conftest 里每个请求结束后共享 store 会被清空，之后从数据库重新读（和同文件里 "loaded before the last request: read it again" 是同一个约定）。
+- **怎么证明：**
+  1. **修之前先复现，第一次没复现出来。** 在修复用的 worktree（基于 main 93cc53d）用 `TRAVEL_TO=2026-10-14T21:58` 跑旧测试：`1 passed in 143.44s`。
+     可是脱离数据库的 `probe_reminders.py` 在同一份代码上给出 TECH2 第 32 名。两边矛盾，先怀疑前提："会话真的是在 21 点播种的吗？"查测试库里种子提醒的时间：
+     `select distinct r->>'sent_at' from module_state, jsonb_array_elements(data) r where name='inspection_reminders'` → `2026-10-14T21:55`，即播种时 `now` 已经截到 22:00。
+     原因：插件用 `tick=True`，时钟从 21:58 开始走；这个 worktree 的 venv 刚 `uv sync` 完，没有 `.pyc`，导入花了两分多钟，播种时已经过了 22 点。
+     venv 热了之后再跑：`1 failed in 133.91s`，同样是第 513 行 `assert False` / `+  where False = any(...)`，种子 `sent_at` 是 `2026-10-14T20:55`（21 点播种）。复现成立。
+  2. **修之后**，pytest 带时间插件（`PYTHONPATH=<插件目录> uv run --no-sync --with time-machine pytest -p travel`），每次跑完用同一条 SQL 确认播种的钟点：
+
+     | `TRAVEL_TO` | 种子 `sent_at`（播种钟点） | 结果 |
+     |---|---|---|
+     | 10-14 21:58 | 20:55（21 点） | `1 passed in 72.99s` |
+     | 10-14 22:10 | 21:55（22 点） | `1 passed in 424.90s`（和扫描探针、整文件测试并行，所以慢） |
+     | 10-14 14:05 | 13:55（14 点） | `1 passed in 142.09s` |
+     | 10-14 23:30 | 22:55（23 点） | `1 passed in 119.99s` |
+     | 10-15 09:05 | 08:55（10-15 9 点） | `1 passed in 171.13s` |
+     | 10-16 21:10 | 20:55（10-16 21 点） | `1 passed in 76.37s` |
+     | 10-15 00:20 | 10-14 23:55（10-15 0 点） | `1 passed in 112.92s` |
+
+  3. **脱离数据库扫 31 个播种时刻**（scratchpad `sweep_hours.py`：照新旧两版测试的步骤重放，overview 用 `sorted(..., reverse=True)[:30]` 模拟）：10-14 的 24 个钟点（每点 :10）、
+     10-15 到 10-20 每天 21:10，再加 10-14 21:58。旧的最后一条断言只在 10-14 的 21:10 和 21:58 不成立（TECH2 第 32 名），其余 29 个时刻名次 15 到 29；
+     新的两条 overview 断言和分阶段断言在 31 个时刻全部成立，种子提醒最多 11 条。
+     这一步顺带修正了诊断：别的日子的 21:10 旧测试也能过（名次 20 到 23）。挂不挂取决于"日期 + 钟点"的组合，在这 31 个样本里只有 10-14 的 21 点挂。
+  4. 整个 `tests/test_phase4.py` 在自己的测试库上（`TEST_DATABASE_URL=.../ioc_test_lucid_p4`，真实时钟，10-14 22:58 开始）：`31 passed in 552.17s`。
+  5. 两个测试库（`ioc_test_lucid`、`ioc_test_lucid_p4`）用完已删除。
 - **经验：**
   1. "今天过、明天挂"之外还有"这个钟点过、那个钟点挂"：种子把 `now` 截到整点，钟点就成了种子的一部分。和时间有关的失败，先在同一天扫几个整点，再扫日期。
   2. 断言"在前 N 条里"时要算余量：测试自己写进去的数据会占名次，排序键并列（同一个 `sent_at`）时名次还取决于插入顺序。余量只有一位的断言迟早会挂。
   3. 用新旧代码对照只能说明"不是我造成的"，不等于查清了。和 5.11 停在"偶发"不同，这次用"移动时钟复现、脱离数据库量名次、哈希随机状态"三步把原因落实了。
+  4. 用移动时钟复现，先确认关键的那一刻真的落在目标钟点。`tick=True` 的时钟会走，冷启动的 venv 光导入就要两分钟，21:58 出发、22 点以后才播种，复现就"意外通过"了。
+     用数据里的时间戳（这里是种子提醒的 `sent_at`）核对，或者选离整点远的时刻（:10、:30）。复现结果和探针矛盾时，先查前提，别急着下"复现不了"的结论。
+  5. 修"在前 N 条里"这类断言，有两个不靠余量的办法：在测试自己写数据**之前**断言种子数据；或者断言测试自己写的、按排序键一定排在最前的数据。
+     不要靠调大 N，也不要为了测试去改产品的排序。
+  6. "21 点挂"是从一天的样本归纳出来的，多扫几天才知道其实是"10-14 的 21 点"。从样本得出的规律，写下来之前换几个日子再验一次。
 - **范围：** imaging（系统 21 检查准备）；测试。
-- **来源：** 会话 adoring-kirch-14355b（10-14），按需 AI 评审修复的全量测试。
-- **代码：** `apps/api/tests/test_phase4.py`（`test_reminders_fire_at_each_stage_and_once`）、`apps/api/app/modules/inspection/router.py`（overview 的 `rems[:30]`）、
-  `apps/api/app/modules/inspection/service.py`（`process_reminders`、`seed`）、`apps/api/app/seed.py`（`populate` 把 `now` 截到整点）。只记录，没有修改代码；随提交 "api, web: AI on demand, pre-merge review fixes"。
+- **来源：** 诊断：会话 adoring-kirch-14355b（10-14），按需 AI 评审修复的全量测试；修复：会话 lucid-blackburn-3681f2（10-14）。
+- **代码：** `apps/api/tests/test_phase4.py`（`test_reminders_fire_at_each_stage_and_once`，本次修改）；相关、没有修改：`apps/api/app/modules/inspection/router.py`（overview 的 `rems[:30]`）、
+  `apps/api/app/modules/inspection/service.py`（`process_reminders`、`seed`）、`apps/api/app/seed.py`（`populate` 把 `now` 截到整点）、`apps/api/app/main.py`（`_intake_loop`）。
+  诊断随提交 cfdae75 "api, web: AI on demand, pre-merge review fixes"（分支 `claude/adoring-kirch-14355b`）；修复随提交
+  "fix(tests): the inspection reminders test looks for the seeded reminder before sending its own"（分支 `claude/lucid-blackburn-3681f2`）。
 
 > **怎么在另一天测试**（本机做法，见 memory 记录）：
 > - 脱离数据库调用 `generate(Store(), seed, datetime(...))`，几十秒就能扫完一周（5.6）；或者写一个 pytest 插件只冻结播种时刻（`seedat`、`seedtime`：`-p seedtime` 加 `SEED_AT`），
