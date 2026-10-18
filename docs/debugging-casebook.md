@@ -167,10 +167,12 @@
 | 10.6 | 测试悄悄用了真实的 Gemini key | 平台 | 端到端测试 · 环境 |
 | 10.7 | 负载下写一个 75 分钟的长 e2e | hospital | 端到端测试 |
 | 10.8 | Playwright 小坑 | 平台 | 速查表 |
+| 10.9 | 改了前端后故事线 e2e 两次失败、位置不同：先排除自己的改动，再按 10.5 定性 | hospital | 端到端测试 · 偶发 · 未查明 |
 | 11.1 | 电话组件崩溃：`useEffect` 返回了 Promise | imaging | 前端 |
 | 11.2 | `/api/auth/me` 被中断就登出 | 平台 | 前端 · 错误处理 |
 | 11.3 | 刚提交的同行评审从列表消失 | imaging | 前端 · 排序截断 |
 | 11.4 | 中文患者指导混入英文诊断名 | hospital | 多语言 |
+| 11.5 | 演示向导的"Say it"按了没反应：事件发出时通话输入框还没挂上 | hospital | 前端 · 时序 · 端到端 |
 | 12.1 | MedRec 可以绕过工作台签终稿 | hospital | 设计 · 安全 |
 | 12.2 | 一条超出 72 小时权限的记录拖垮整个队列 | hospital | 设计 · 权限 |
 | 12.3 | 来电者亲属关系存反 | hospital | 设计 · 语义 |
@@ -3081,6 +3083,33 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 | Control Tower 用例期待 "Task task-"，却看到 "queued for the workflow" | 开了 Temporal 后，批准由容量工作流异步执行 | 测试给出执行的时间（2.8） | main__025b79fc 10-09 23:45 |
 | Playwright 失败后查库，看到的状态和失败时不一样 | 失败后 Playwright 会重启 worker 并重跑 `beforeAll`（演示重置） | 现场以快照、trace 为准（5.1） | wt-wp8-voice-services-addfd5 10-10 |
 
+
+### 10.9 改了前端以后，故事线全流程 e2e 两次失败，每次挂的地方不一样：先排除"是我的改动"，再按 10.5 定性
+
+- **现象：** 做完故事线演示模式（11.5），把用到通话输入框和故事线页面的四个 spec 放在一起跑（独立数据库 `ioc_e2e_demo`，mock 模型，API 9417，Vite 5181）：
+  5 过 1 失败。`hospital-storyline.spec.ts` 一开头就挂了：`expect(locator).toHaveAttribute(expected) failed`，`getByTestId('story-step-1')`
+  期望 `"active"`，300 秒里 583 次都是 `"done"`，也就是页面上点了 Reset 以后，5 分钟里故事线都没有回到起点。
+  单独重跑这个 spec，重置 34 秒就好了，第 1–10 步也都过了，但第 11 步（随访电话）又失败了：`TimeoutError: locator.click: Timeout 30000ms exceeded`，
+  `getByRole('button', { name: 'Send' })` 一直是 `element is not enabled`，然后 `element was detached from the DOM`。
+- **怎么查的：**
+  1. 先问"是不是我的改动"。这次只动了前端：演示向导、`CallerInput` 里加的监听、`useStoryline(enabled)`。第二次失败正好在 `CallerInput` 上，所以要认真排除。
+     代码层面：新监听只在 `disabled`/`busy` 变化时登记或注销，通知的对象只有演示面板（`useCallerListening`）。演示模式关着时面板不渲染，没人订阅，所以不会让输入框重新挂载、清空文字。
+     `story-reset` 按钮的 testid 和确认框都没变。推理上和失败对不上。
+  2. 再用实验验证：两次失败挂在不同的地方（一次是重置太慢，一次是第 11 步），这是 10.5 说的"轮流失败"特征，问题在共享的东西（机器负载、同一个 API 进程），不在某一步。
+     当时机器上还跑着用户本地 9001 端口的真实 Gemini API 和 Vite。
+  3. 按第一次的顺序（demo-guide → frontdesk-languages → hospital-storyline）原样重跑一遍：3 passed (5.5m)，故事线 12 步 260 秒走完，重置 31 秒。
+- **根因：** **未查明**，归入 10.5 那一类负载下的偶发失败。可以确定的是：同一份代码、同样的顺序，重跑全过；失败的位置不固定。
+  没验证的两个假设：(a) 第一次的重置请求排在 API 里别的长事务后面，超过了 300 秒（没有保存那一轮的 API 日志）；
+  (b) 第 11 步填进去的文字，在点 Send 之前被组件重新挂载清掉了（快照显示元素被 detach）。如果 (b) 再出现，下一步是保存 trace（`--trace on`），看清掉文字的那次渲染是谁触发的。
+- **怎么修：** 没有代码修复。做法：失败的 spec 在同样条件下原样重跑，先确认能不能复现，再决定查不查；这次的重跑把完整 API 日志存进了 scratchpad，下一次能直接看重置请求的耗时。
+- **怎么证明：** 原顺序重跑 3/3 通过，`demo-guide.spec.ts` 单独 1/1 通过，`voice-services` 3/3、`frontdesk-languages` 1/1 通过。
+- **经验：**
+  - 自己刚改过的组件附近出错时，先从代码上推一遍"我的改动能不能造成这个现象"，再用一次原样重跑来确认，两样都要有，光靠推理或者光靠"重跑过了"都不够。
+  - 第一次失败时没存 API 日志（过滤输出时被 `grep -v WebServer` 去掉了），所以假设 (a) 没法验证。长 e2e 要把完整输出写进文件，过滤留到看的时候再做。
+- **范围：** hospital（WP9 故事线 e2e）。
+- **来源：** 本会话 10-18。
+- **代码：** `apps/web/e2e/hospital-storyline.spec.ts`（没改）；演示模式的改动见 11.5。
+
 ---
 
 ## 十一、前端与多语言界面
@@ -3164,6 +3193,32 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** hospital（WP7 双语患者指导）。
 - **来源：** wt-wp7-documentation-c03e03 10-10 04:05–04:10。
 - **代码：** `apps/api/app/modules/documentation/`；提交 a04ca7b。
+
+
+### 11.5 演示向导的"Say it"按了没反应：事件发出去时，通话输入框还没挂上
+
+- **现象：** 新做的故事线演示模式（`DemoGuide.tsx`）有"Say it"按钮，点一下就把来电者的台词送进正在进行的通话，不用复制粘贴。
+  我在浏览器里手动点，两句话都送进去了，身份核验也显示 Verified。可新写的 Playwright 测试 `e2e/demo-guide.spec.ts` 第一次跑就失败：
+  `expect(locator).toContainText(expected) failed`，`unexpected value "Thank you for calling Lakeside General Hospital. ... How can I help you today?"`，
+  卡在 `await expect(page.getByTestId("call-transcript")).toContainText(lines[0])`。也就是通话里只有开场白，来电者那句话根本没出现。
+- **怎么查的：**
+  1. 假设"mock 模型回复慢，60 秒还没等到"。不成立：通话记录里连来电者自己那句都没有。台词一旦送出，回复回来时会和来电者的话一起出现；只有开场白，说明这句话没送出去。
+  2. 假设"事件名或监听写错了"。不成立：同一份代码手动点是好的。手动和测试的差别只有节奏：手动时我在"Start a call"之后等了 3 秒才点"Say it"，测试是紧接着点的。
+  3. 看代码确认时序：`CallerInput`（`features/voice/Console.tsx`）只有在 `startCall` 请求返回、`call` 有值之后才渲染，监听器也是那时才挂上。
+     "Say it"用的是 `window.dispatchEvent` 发自定义事件，发的时候没人监听，事件就直接丢了，页面上没有任何提示。
+  4. 顺着同一思路又找到第二个会吞台词的地方：`submit()` 在 `busy`（Agent 正在回复）时直接 `return`。演讲者在 Agent 回复期间点"Say it"，台词也会悄悄丢掉。测试碰巧没撞上，是因为它等第一句出现后才点第二句。
+- **根因：** 用"发了就不管"的事件跨组件传话，发送方不知道接收方此刻能不能接。接收方不在（输入框还没挂上）或者暂时不收（正在回复）时，输入被静默丢弃。
+- **怎么修：** 输入框只在"能接一句话"的时候登记监听（`listenAsCaller`，依赖 `[disabled, busy]`，不能接时注销）。`demo.ts` 记录当前有没有人在听，
+  向导用 `useCallerListening()` 读这个状态：没人听时"Say it"按钮禁用，提示"start the call first; wait while the agent answers"。
+- **怎么证明：** 测试里加了一条断言：开通话之前 `demo-say-0` 是禁用的（`toBeDisabled`）。Playwright 点击前会自动等按钮变成可用，所以测试不再依赖节奏。
+  重跑 `demo-guide.spec.ts`：1 passed (1.1m)。之后连同 `voice-services`、`frontdesk-languages`、`hospital-storyline` 一起跑，用独立数据库和 mock 模型（见 PROGRESS 对应小节）。
+- **经验：**
+  - 自动化测试点得比人快，正好能暴露"人慢一点就碰不到"的时序问题。手动能过、测试不过时，先比较两边的节奏，而不是先怀疑测试。
+  - 跨组件"发了就不管"的消息，要有一个"对方是否就绪"的状态。界面宁可把按钮禁用并说明原因，也不要收下输入再悄悄丢掉。
+  - 修一个丢输入的路径时，顺手把同一个函数里其他会提前 `return` 的分支也查一遍（这里是 `busy`）。
+- **范围：** hospital（WP9 故事线演示模式）。
+- **来源：** 本会话 10-18，演示模式开发中第一次跑端到端测试。
+- **代码：** `apps/web/src/features/storyline/demo.ts`、`DemoGuide.tsx`、`apps/web/src/features/voice/Console.tsx`、`apps/web/e2e/demo-guide.spec.ts`；分支 `claude/demo-guide`。
 
 ---
 

@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { Bot, Mic, MicOff, Send, User, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, EmptyState } from "../../components/ui";
+import { listenAsCaller } from "../storyline/demo";
 import { speechLang, type CallLang, type Turn } from "./api";
 
 interface Recognition {
@@ -92,6 +93,11 @@ export function CallerInput({ lang, disabled, busy, onSend, quick, placeholder }
     setText("");
     onSend(t);
   };
+  // The storyline's demo guide speaks the caller's scripted lines into the open call (its "Say it" buttons), only
+  // while this input can take one: its buttons are disabled meanwhile.
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+  useEffect(() => (disabled || busy ? undefined : listenAsCaller((t) => submitRef.current(t))), [disabled, busy]);
 
   const toggleMic = () => {
     if (!SpeechRecognitionCtor) return;

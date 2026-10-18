@@ -35,6 +35,14 @@ items (spec 8.1)** that run on preset data with no real logic. The page and the 
 Say once, at the start: "Everything here is synthetic. In every step the AI makes a suggestion or a draft, a named
 person decides, and the audit trail records both. Three steps are roadmap items on preset data, and they say so."
 
+**Demo mode (for an audience).** On the storyline page press **Demo mode**: a guide panel stays in the corner of
+every page. For each step it first shows the introduction (what the step shows, who plays it, the sentence to say,
+what the audience will see); **Start** switches to that person and opens their screen (and starts the clock's
+fast-forward when the step waits for time). It then lists the clicks, gives the caller's lines as **Say it** buttons
+(no copy and paste) and says whose signature the step waits for; the guide never signs, the presenter clicks the
+real button. When the step is done it shows the trail and asks **Continue to the next step?** (**Not yet** pauses
+it; **Resume** goes on). Fold the panel with its arrow when it covers a button. Exit with its cross.
+
 **Advance the clock.** Steps 4, 5, 6, 8, 9 and 11 wait for hospital time to pass: the INR result, the admission
 decision, a free bed, the first night after surgery, the discharge, and 48 hours after discharge. Press **Advance the
 clock** on the step. The hospital's day simulator runs to that moment in the background and the page follows its

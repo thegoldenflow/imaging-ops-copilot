@@ -2,8 +2,9 @@
 
 One synthetic patient through the whole hospital in twelve steps, about ten minutes: Wang Xiuying (王秀英), 72,
 Mandarin-speaking, on warfarin for atrial fibrillation, falls at home and breaks her hip. Every step is "AI proposes
-→ a person signs → audit trail". The guided page is `/storyline` (web `features/storyline/`); the demo script is
-`demo/hospital_journey.md`.
+→ a person signs → audit trail". The guided page is `/storyline` (web `features/storyline/`); its **Demo mode** puts a presenter's guide
+on every page (each step's introduction, the clicks, then "Continue to the next step?"; web only, the same
+API). The demo script is `demo/hospital_journey.md`.
 
 ## Input resources
 

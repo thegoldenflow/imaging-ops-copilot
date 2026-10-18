@@ -6,8 +6,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
-  AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, Clock3, Copy, FastForward, Loader2, Map, Quote,
-  RotateCcw, ShieldCheck, Sparkles, UserRound, Wand2, Workflow,
+  AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, Clock3, Copy, FastForward, Loader2, Map, Presentation,
+  Quote, RotateCcw, ShieldCheck, Sparkles, UserRound, Wand2, Workflow,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -18,6 +18,7 @@ import { ROLE_LABEL } from "../../lib/types";
 import {
   advanceStoryline, askStepAi, clock, hhmm, resetStoryline, storylineKey, useStoryline, type Storyline, type StoryStep,
 } from "./api";
+import { setDemo, startDemo, useDemoMode } from "./demo";
 
 const STATUS = {
   done: { label: "Done", tone: "green" as const },
@@ -29,9 +30,13 @@ const STATUS = {
 export function StorylinePage() {
   const q = useStoryline();
   const queryClient = useQueryClient();
+  const demo = useDemoMode();
   const reset = useMutation({
     mutationFn: resetStoryline,
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => {
+      if (demo.active) setDemo({ started: null, paused: false }); // the guide starts again from step 1
+      return queryClient.invalidateQueries();
+    },
   });
   const onReset = () => {
     if (confirm("Reset the demo data and start the storyline at 07:00?")) reset.mutate();
@@ -41,7 +46,13 @@ export function StorylinePage() {
       <PageHeader
         title="Hospital storyline"
         subtitle="One synthetic patient through the hospital in twelve steps, about ten minutes. Each step: the AI proposes, a person signs, the audit trail records it."
-        actions={<Button variant="secondary" onClick={onReset} loading={reset.isPending} data-testid="story-reset"><RotateCcw className="size-4" />Reset to the start</Button>}
+        actions={<>
+          <Button variant="secondary" onClick={onReset} loading={reset.isPending} data-testid="story-reset"><RotateCcw className="size-4" />Reset to the start</Button>
+          <Button variant="primary" onClick={startDemo} disabled={demo.active} data-testid="story-demo"
+            title="A guide on every page: each step's introduction, your clicks, then “Continue to the next step?”">
+            <Presentation className="size-4" />{demo.active ? "Demo mode on" : "Demo mode"}
+          </Button>
+        </>}
       />
       {reset.isPending && <p className="mb-3 text-sm text-slate-600">Rebuilding the demo data and the storyline's preset (about a minute)…</p>}
       {reset.error && <p className="mb-3 text-sm text-rose-600" role="alert">{(reset.error as Error).message}</p>}

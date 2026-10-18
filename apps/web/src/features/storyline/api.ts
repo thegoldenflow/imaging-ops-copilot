@@ -132,9 +132,10 @@ export interface Storyline {
 
 export const storylineKey = ["storyline"];
 
-export function useStoryline() {
+export function useStoryline(enabled = true) {
   return useQuery({
     queryKey: storylineKey,
+    enabled,
     queryFn: () => api<Storyline>("/api/storyline"),
     refetchInterval: (q) => {
       const d = q.state.data;
