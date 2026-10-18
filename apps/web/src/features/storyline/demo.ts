@@ -8,10 +8,18 @@ export interface DemoState {
   active: boolean;
   started: number | null; // the step the presenter pressed Start on; null: the next step's introduction shows
   paused: boolean; // the presenter answered "Not yet" after a step: the guide waits as a small pill
+  highlights: boolean; // present only the HIGHLIGHTS; the steps in between are done by the demo's automation
 }
 
 const KEY = "ioc.demo";
-const OFF: DemoState = { active: false, started: null, paused: false };
+const OFF: DemoState = { active: false, started: null, paused: false, highlights: false };
+
+// The highlights preset: the Mandarin call; Orthopedics full and the bed manager's approval; the discharge summary's
+// validator blocking lisinopril; the Chinese follow-up call escalating.
+export const HIGHLIGHTS = [1, 5, 9, 11];
+export const isHighlight = (n: number) => HIGHLIGHTS.includes(n);
+/** The first highlight at or after step n, or null when none is left. */
+export const nextHighlight = (n: number) => HIGHLIGHTS.find((h) => h >= n) ?? null;
 const listeners = new Set<() => void>();
 
 function read(): DemoState {
@@ -35,7 +43,7 @@ export function setDemo(next: Partial<DemoState>) {
   listeners.forEach((l) => l());
 }
 
-export const startDemo = () => setDemo({ active: true, started: null, paused: false });
+export const startDemo = (highlights = false) => setDemo({ active: true, started: null, paused: false, highlights });
 export const exitDemo = () => setDemo(OFF);
 
 export function useDemoMode(): DemoState {

@@ -2,12 +2,15 @@
 // ten minutes. Every step says who plays it (one click switches to that person), the click path, the sentence to
 // say and what the screen should show, and then shows the live trail: what the AI proposed, who signed or approved
 // it and the audit events of those records. The clock moves only when a step needs time to pass (Advance).
+// "Do this step for me" and "Jump here" have the demo's automation walk steps through the API as the people who play
+// them (for an interview: the roadmap stubs, a step that failed live, or straight to the next highlight); the steps it
+// did are marked, and so is every record it signed.
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
-  AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, Clock3, Copy, FastForward, Loader2, Map, Presentation,
-  Quote, RotateCcw, ShieldCheck, Sparkles, UserRound, Wand2, Workflow,
+  AlertTriangle, ArrowRight, Bot, CheckCircle2, ChevronDown, ChevronRight, Clock3, Copy, FastForward, Loader2, Map, Presentation,
+  Quote, RotateCcw, ShieldCheck, SkipForward, Sparkles, Star, UserRound, Wand2, Workflow,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -16,9 +19,10 @@ import { causeText, clockTime, seconds, useElapsed, type AiBlock } from "../../l
 import { useAuth } from "../../lib/auth";
 import { ROLE_LABEL } from "../../lib/types";
 import {
-  advanceStoryline, askStepAi, clock, hhmm, resetStoryline, storylineKey, useStoryline, type Storyline, type StoryStep,
+  advanceStoryline, askStepAi, autoplayStep, clock, hhmm, isAutomationNote, jumpToStep, resetStoryline, storylineKey, useStoryline,
+  type Storyline, type StoryStep,
 } from "./api";
-import { setDemo, startDemo, useDemoMode } from "./demo";
+import { HIGHLIGHTS, setDemo, startDemo, useDemoMode } from "./demo";
 
 const STATUS = {
   done: { label: "Done", tone: "green" as const },
@@ -48,9 +52,13 @@ export function StorylinePage() {
         subtitle="One synthetic patient through the hospital in twelve steps, about ten minutes. Each step: the AI proposes, a person signs, the audit trail records it."
         actions={<>
           <Button variant="secondary" onClick={onReset} loading={reset.isPending} data-testid="story-reset"><RotateCcw className="size-4" />Reset to the start</Button>
-          <Button variant="primary" onClick={startDemo} disabled={demo.active} data-testid="story-demo"
+          <Button variant="secondary" onClick={() => startDemo(true)} disabled={demo.active} data-testid="story-demo-highlights"
+            title={`Demo mode with only steps ${HIGHLIGHTS.join(", ")}: the demo's automation does the steps in between`}>
+            <Star className="size-4" />Highlights
+          </Button>
+          <Button variant="primary" onClick={() => startDemo()} disabled={demo.active} data-testid="story-demo"
             title="A guide on every page: each step's introduction, your clicks, then “Continue to the next step?”">
-            <Presentation className="size-4" />{demo.active ? "Demo mode on" : "Demo mode"}
+            <Presentation className="size-4" />{demo.active ? `Demo mode on${demo.highlights ? " (highlights)" : ""}` : "Demo mode"}
           </Button>
         </>}
       />
@@ -122,7 +130,27 @@ function ClockCard({ data, done }: { data: Storyline; done: number }) {
           <p className="mt-0.5 text-[11px] text-slate-500">Fast-forward to {hhmm(data.job.target)} · {data.job.events} events</p>
         </div>
       )}
+      <AutoplayLine data={data} />
     </Card>
+  );
+}
+
+/** The demo's automation: the step it is doing (as whom), or where its last run stopped. */
+function AutoplayLine({ data }: { data: Storyline }) {
+  const job = data.autoplay;
+  if (!job || job.status === "done") return null;
+  if (job.status === "failed") {
+    return (
+      <p className="mt-2 flex gap-1 text-[11px] text-amber-700" role="alert" data-testid="story-autoplay">
+        <AlertTriangle className="mt-px size-3.5 shrink-0" />The demo's automation stopped at step {job.current_n}: {job.error}
+      </p>
+    );
+  }
+  return (
+    <p className="mt-2 flex items-center gap-1 text-[11px] text-ai-800" data-testid="story-autoplay">
+      <Bot className="size-3.5 shrink-0" />Demo automation: step {job.current_n} as {job.current_cast} ({job.done.length} of {job.steps.length} done)
+      <Loader2 className="size-3 animate-spin" />
+    </p>
   );
 }
 
@@ -168,6 +196,11 @@ function StepCard({ step, data }: { step: StoryStep; data: Storyline }) {
             {step.step_ai?.items.some((i) => i.ai.state === "running" || i.ai.state === "queued") && (
               <Badge tone="ai"><Loader2 className="size-3 animate-spin" />AI working</Badge>
             )}
+            {step.automated && (
+              <span data-testid={`story-automated-${step.n}`} title={`Started by ${step.automated.by} at ${hhmm(step.automated.at)}; every record it signed says so`}>
+                <Badge tone="ai"><Bot className="size-3" />Done by the demo's automation as {step.automated.as}</Badge>
+              </span>
+            )}
           </span>
         </span>
         <Badge tone={status.tone}>{status.label}</Badge>
@@ -183,6 +216,12 @@ function StepBody({ step, data, current }: { step: StoryStep; data: Storyline; c
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const advance = useMutation({ mutationFn: advanceStoryline, onSuccess: () => queryClient.invalidateQueries({ queryKey: storylineKey }) });
+  const automation = useMutation({
+    mutationFn: (jump: boolean) => (jump ? jumpToStep(step.key) : autoplayStep(step.key)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: storylineKey }),
+  });
+  const automating = data.autoplay?.status === "running";
+  const later = data.current != null && step.n > data.current;
   const isYou = user?.id === step.cast?.id;
   const go = async () => {
     if (step.cast && !isYou) await login(step.cast.id);
@@ -209,7 +248,20 @@ function StepBody({ step, data, current }: { step: StoryStep; data: Storyline; c
             <Wand2 className="size-3.5" />Then {step.advance_ai}, as soon as the clock gets there.
           </span>
         )}
+        {current && (
+          <Button size="sm" variant="ghost" onClick={() => automation.mutate(false)} loading={automation.isPending} disabled={automating}
+            data-testid={`autoplay-${step.n}`} title={`The demo's automation does this step as ${step.cast?.name ?? "its person"}, through the API; what it signs says so`}>
+            <Bot className="size-3.5" />Do this step for me
+          </Button>
+        )}
+        {later && (
+          <Button size="sm" variant="ghost" onClick={() => automation.mutate(true)} loading={automation.isPending} disabled={automating}
+            data-testid={`jump-${step.n}`} title={`The demo's automation does steps ${data.current}–${step.n - 1}; then this step is the current one`}>
+            <SkipForward className="size-3.5" />Jump here: steps {data.current}{step.n - 1 > data.current! ? `–${step.n - 1}` : ""} done automatically
+          </Button>
+        )}
         {advance.error && <span className="text-xs text-rose-600" role="alert">{(advance.error as Error).message}</span>}
+        {automation.error && <span className="text-xs text-rose-600" role="alert">{(automation.error as Error).message}</span>}
       </div>
       <ol className="flex flex-wrap items-center gap-1 text-xs text-slate-600" aria-label="Click path">
         {step.click_path.map((c, i) => (
@@ -294,6 +346,7 @@ function Trail({ step }: { step: StoryStep }) {
             {s.signatures ? ` · ${s.signatures} signature${s.signatures === 1 ? "" : "s"}` : ""}
           </p>
         ) : <p className="mt-1 text-xs text-slate-500">Waiting for the {step.signoff}</p>}
+        {isAutomationNote(s?.note) && <p className="mt-1 text-[11px] text-ai-700" data-testid={`story-signed-note-${step.n}`}>{s!.note}</p>}
         {step.detail && <p className="mt-1 text-[11px] text-slate-600">{step.detail}</p>}
         {step.written.length > 0 && (
           <p className="mt-1 text-[11px] text-slate-500">EHR: {step.written.join(", ")}</p>

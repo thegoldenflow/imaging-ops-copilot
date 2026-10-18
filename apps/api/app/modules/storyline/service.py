@@ -9,6 +9,8 @@ and the event subscriber that plays the story.
 - `advance(store, user)`: moves the hospital clock to the current step's beat (the INR result, the admission
   decision, her bed, the first post-operative night, the discharge, 48 hours later) as a background fast-forward
   (app/ehr/simjobs.py), so the boards move and the subscribers react while it runs.
+- Demo mode's "Do this step for me" and "Jump to step N" are app/modules/storyline/autoplay.py: the status shows its
+  job (`autoplay`) and marks the steps it did (`automated`).
 - `handle(event)`: the subscriber (consumer `storyline`). It reacts only to the storyline patient's events: the
   cards of app/modules/storyline/stubs.py, the EHR script of app/ehr/storyline.py, the scripted discharge
   reconciliation, and, with Temporal configured, the start of her InpatientJourneyWorkflow at the registration
@@ -76,8 +78,10 @@ def reset(user: StaffUser) -> dict:
     store.modules[preset.STATE] = st
     bridge.on_reset()
     from app.agents import ondemand
+    from app.modules.storyline import autoplay
 
     ondemand.reset()  # queued AI jobs refer to the old data
+    autoplay.on_reset()  # a running automation stops after its step; its marks go with the old data
     return st
 
 
@@ -446,7 +450,8 @@ def _signature(doc: dict | None) -> dict | None:
         return None
     return {"ref": f"DocumentReference/{doc['id']}", "status": doc.get("docStatus"), "signatures": len(sigs),
             "by": ", ".join(x["name"] or x["by"] or "?" for x in sigs) or None,
-            "at": sigs[-1]["at"] if sigs else doc.get("date")}
+            "at": sigs[-1]["at"] if sigs else doc.get("date"),
+            "note": next((x["note"] for x in reversed(sigs) if x.get("note")), None)}  # the demo automation's
 
 
 def _facts(store: Store, st: dict) -> dict:
@@ -677,6 +682,7 @@ BEAT_HINT = {"inr": "the INR result comes back about 45 minutes after the orders
 
 
 def status(store: Store, user: StaffUser) -> dict:
+    from app.modules.storyline import autoplay
     from app.workflows import client, progress
 
     st = state(store)
@@ -689,7 +695,9 @@ def status(store: Store, user: StaffUser) -> dict:
                                                                            "role": str(user.role), "units": []},
         "temporal": {"configured": link is not None,
                      "status": (link.status() if link is not None else client.offline_status())},
-        "patient": None, "steps": [], "current": None, "beats": {}}
+        "patient": None, "steps": [], "current": None, "beats": {},
+        "autoplay": autoplay.current(st["prepared_at"]) if st is not None else None}
+    automated = autoplay.marks(st["prepared_at"]) if st is not None else {}
     journey = progress.get(S.JOURNEY)
     view["journey"] = progress.summary(journey) if journey is not None else None
     facts, story_beats = _cached(store, st, view["job"]) if st is not None else (None, {})
@@ -711,6 +719,7 @@ def status(store: Store, user: StaffUser) -> dict:
                 "signoff": step.signoff, "writes": step.writes, "seconds": step.seconds, "stub": step.stub,
                 "beat": step.beat, "beat_hint": BEAT_HINT.get(step.beat or ""), "permission": step.permission,
                 "cast": _user(store, S.CAST[step.cast]), "cast_key": step.cast}
+        item["automated"] = automated.get(step.key)  # done by the demo's automation: who started it, as whom
         if facts is not None:
             item.update(_step_state(step, facts, store))
             if step.key in AI_TEXT:

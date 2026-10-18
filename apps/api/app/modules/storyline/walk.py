@@ -10,7 +10,14 @@ Two things depend on where the API runs, so the caller passes them in:
   refresh and narration, the documentation intake, the follow-up sweep). In process (tests) the caller runs those
   steps; against a running API it just waits a moment, the API's own loops do it.
 - `advance(beat)`: moving the hospital clock to the step's beat. Against a running API this is
-  POST /api/storyline/advance and waiting for the fast-forward job; in process the caller steps the simulator.
+  POST /api/storyline/advance and waiting for the fast-forward job (`api_advance`); in process the caller steps the
+  simulator.
+
+The demo's "Do this step for me" and "Jump to step N" (autoplay.py) run the same walk inside the API, as the cast
+with sign-in tokens marked as the automation's (`automation`: who started it). Every note the walk writes then says
+"Demo automation on behalf of <name> (<role>), started by <presenter>". A step the presenter began by hand is
+finished from where it stands: a decided card, an approved exception, a handled discrepancy or a signature already
+there is not done again.
 """
 
 from __future__ import annotations
@@ -56,13 +63,23 @@ class StepRun:
 class Walk:
     def __init__(self, client: Any, *, pump: Callable[[], None], advance: Callable[["Walk", str], None],
                  log: Callable[[str], None] = lambda _m: None, timeout_s: float = 120,
-                 summary_timeout_s: float | None = None) -> None:
+                 summary_timeout_s: float | None = None, automation: str | None = None,
+                 people: dict[str, tuple[str, str]] | None = None) -> None:
         self.client, self.pump, self._advance, self.log, self.timeout_s = client, pump, advance, log, timeout_s
         # Step 9 waits for the discharge summary draft: against a live model longer than for other background work
         # (scripts/storyline_report.py passes timeout_s + summary_draft_s()); None: timeout_s.
         self.summary_timeout_s = summary_timeout_s
+        # The demo automation (autoplay.py): who started it, and the cast's names and roles for its notes
+        self.automation, self.people = automation, people or {}
         self.tokens: dict[str, str] = {}
         self.runs: list[StepRun] = []
+
+    def note(self, text: str, user: str) -> str:
+        """A note or reason the walk writes as `user`: as it is, or marked as the demo automation's."""
+        if not self.automation:
+            return text
+        name, role = self.people.get(user, (user, "?"))
+        return f"Demo automation on behalf of {name} ({role}), started by {self.automation}: {text}"
 
     # ----- HTTP as a member of staff -----
 
@@ -111,7 +128,14 @@ class Walk:
 
     def decide(self, task_ref: str, user: str, decision: str = "approve", note: str = "") -> dict:
         return self.post(f"/api/agents/tasks/{task_ref.split('/', 1)[1]}/decision", user,
-                         {"decision": decision, "note": note})
+                         {"decision": decision, "note": self.note(note, user)})
+
+    def decide_card(self, key: str, user: str, note: str) -> dict:
+        """Wait for the step's card and decide it, unless it is decided already (the presenter clicked it)."""
+        card = self.proposal(key, user)
+        if not self.step(key, user).get("signed"):
+            self.decide(card["ref"], user, note=note)
+        return card
 
     def proposal(self, key: str, user: str | None = None) -> dict:
         return self.wait(f"the AI proposal of step {key}", lambda: self.step(key, user).get("proposal"))
@@ -147,46 +171,55 @@ class Walk:
                 self.log(f"[{run.seconds:6.1f} s] step {st.n:2d} {st.key}: {'ok' if run.ok else 'FAILED'} {run.result}")
         return self.runs
 
+    def _registration(self, user: str) -> dict | None:
+        return next((r for r in self.get("/api/voice/requests", user)["requests"]
+                     if r.get("kind") == "registration" and r.get("patient_id") == S.PATIENT), None)
+
     def _call(self, user: str):
-        lines = self.status(user)["patient"]["call_lines"]
-        call = self.post("/api/voice/calls", user)
-        for line in lines:
-            reply = self.post(f"/api/voice/calls/{call['id']}/turn", user, {"text": line})
-            if reply.get("ended"):
-                break
-        call = self.get(f"/api/voice/calls/{call['id']}", user)
-        if not call.get("ended_at"):
-            call = self.post(f"/api/voice/calls/{call['id']}/end", user)
-        if call.get("language") != "zh-Hans" or call.get("patient_id") != S.PATIENT:
-            raise WalkFailed(f"call not verified in Chinese: {call.get('language')} {call.get('patient_id')}")
-        request = self.wait("the registration request", lambda: next(
-            (r for r in self.get("/api/voice/requests", user)["requests"] if r.get("kind") == "registration"), None))
+        request = self._registration(user)  # the presenter's call already verified her: only the confirmation left
+        what = "the presenter's call"
+        if request is None:
+            lines = self.status(user)["patient"]["call_lines"]
+            call = self.post("/api/voice/calls", user)
+            for line in lines:
+                reply = self.post(f"/api/voice/calls/{call['id']}/turn", user, {"text": line})
+                if reply.get("ended"):
+                    break
+            call = self.get(f"/api/voice/calls/{call['id']}", user)
+            if not call.get("ended_at"):
+                call = self.post(f"/api/voice/calls/{call['id']}/end", user)
+            if call.get("language") != "zh-Hans" or call.get("patient_id") != S.PATIENT:
+                raise WalkFailed(f"call not verified in Chinese: {call.get('language')} {call.get('patient_id')}")
+            request = self.wait("the registration request", lambda: self._registration(user))
+            what = f"call {call['id']} ({call['caller_relation']})"
         self.decide(f"Task/{request['task_id']}", user, note="Registered at the ED desk")
         step = self.done("call")
-        return f"call {call['id']} ({call['caller_relation']}), registration Task {request['task_id']}", step["written"]
+        return f"{what}, registration Task {request['task_id']}", step["written"]
 
     def _triage(self, user: str):
-        card = self.proposal("triage", user)
-        self.decide(card["ref"], user, note="CTAS 2 confirmed at triage")
+        card = self.decide_card("triage", user, "CTAS 2 confirmed at triage")
         step = self.done("triage")
         if "0.82" not in (step.get("detail") or ""):
             raise WalkFailed(f"admission probability: {step.get('detail')}")
         return f"{card['label']}; {step['detail']}", step["written"]
 
     def _imaging(self, user: str):
-        card = self.proposal("imaging", user)
-        self.decide(card["ref"], user, note="Order both")
+        card = self.decide_card("imaging", user, "Order both")
         step = self.done("imaging")
         return card["summary"], step["written"]
 
     def _inr(self, user: str):
         self.advance("inr")
-        card = self.proposal("inr", user)
-        self.decide(card["ref"], user, note="Seen: vitamin K given, anaesthesia informed")
+        card = self.decide_card("inr", user, "Seen: vitamin K given, anaesthesia informed")
         step = self.done("inr")
         return card["summary"], step["written"]
 
     def _bed(self, user: str):
+        approved = (self.step("bed", user).get("signed") or {}).get("ref")
+        if approved:  # the presenter approved the rounds: only the wait for her bed is left
+            self.advance("admitted")
+            step = self.done("bed")
+            return f"{approved} approved before; admitted", step["written"]
         self.advance("decision")
         exc = self.wait("the Orthopedics exception (high, she is boarding)", lambda: next(
             (e for e in self.get("/api/control-tower/exceptions", user)["exceptions"]
@@ -199,7 +232,7 @@ class Walk:
         actions = [m["action_id"] for m in detail["menu"] if m["action_id"] in ("overflow_discharge_rounds",
                                                                                 "confirm_discharges")]
         self.post(f"/api/control-tower/exceptions/{exc['id']}/approve", user,
-                  {"action_ids": actions, "note": "Round early on Surgery"})
+                  {"action_ids": actions, "note": self.note("Round early on Surgery", user)})
         self.advance("admitted")
         step = self.done("bed")
         return f"{exc['title']} ({exc['id']}) approved: {', '.join(actions)}", step["written"]
@@ -214,7 +247,8 @@ class Walk:
             raise WalkFailed("no warfarin interaction finding on the naproxen order")
         if view.get("can_decide"):
             self.post(f"/api/med-safety/reviews/{review['id']}/decision", user,
-                      {"decision": "request_change", "reason": "Stop naproxen: warfarin at home, INR 3.8"})
+                      {"decision": "request_change", "reason": self.note("Stop naproxen: warfarin at home, INR 3.8",
+                                                                         user)})
         session = self.wait("the admission reconciliation", lambda: next(
             (m for m in self.get(f"/api/med-safety/encounters/{S.STAY}", user).get("medrec") or []
              if m.get("kind") == "admission"), None))
@@ -238,9 +272,12 @@ class Walk:
                     body = {"action": "accept", "reason": "Held on purpose: INR 3.8 before surgery"}
                 else:
                     body = {"action": "accept", "reason": "Reviewed with the orthopaedic team"}
+                body["reason"] = self.note(body["reason"], user)
                 self.post(f"/api/med-safety/medrec/{sid}/items/{item['id']}", user, body)
-        self.post(f"/api/med-safety/medrec/{sid}/sign", user)
-        self.post(f"/api/med-safety/medrec/{sid}/sign", surgeon)
+        if self.get(f"/api/med-safety/medrec/{sid}", user)["status"] == "open":  # not signed by hand already
+            self.post(f"/api/med-safety/medrec/{sid}/sign", user)
+        if self.get(f"/api/med-safety/medrec/{sid}", surgeon)["status"] == "pharmacist_signed":
+            self.post(f"/api/med-safety/medrec/{sid}/sign", surgeon)
         step = self.done("medrec")
         return f"{len(omissions)} omission(s) incl. amlodipine; MedRec {sid} final", step["written"]
 
@@ -251,15 +288,14 @@ class Walk:
         if not board.get("predicted_minutes") or board["predicted_minutes"] - board["booked_minutes"] < 15:
             raise WalkFailed(f"no overrun predicted: {board}")
         adjusted = self.post(f"/api/control-tower/or-cases/{board['appointment_id']}/adjust", user,
-                             {"note": "Adjusted to the predicted duration; theatre staff told"})
+                             {"note": self.note("Adjusted to the predicted duration; theatre staff told", user)})
         step = self.done("or")
         return f"booked {adjusted['previous_minutes']} -> {adjusted['minutes']} min (predicted " \
                f"{adjusted['predicted_minutes']})", step["written"]
 
     def _news2(self, user: str):
         self.advance("night")
-        card = self.proposal("news2", user)
-        self.decide(card["ref"], user, note="Assessed: fluids, analgesia review, physician informed")
+        card = self.decide_card("news2", user, "Assessed: fluids, analgesia review, physician informed")
         step = self.done("news2")
         return card.get("summary") or card["label"], step["written"]
 
@@ -268,6 +304,11 @@ class Walk:
         view = self.wait("the discharge summary draft", lambda: self._draft_summary(user), self.summary_timeout_s)
         red = [i for i in (view.get("validation") or {}).get("issues") or [] if i.get("severity") == "red"]
         names = {(i.get("value") or "").lower() for i in red}
+        if self.automation and view.get("can_sign") and view.get("edits"):
+            # the presenter already removed the untraceable medicine: only the signature is left
+            self.post(f"/api/documentation/documents/{view['id']}/sign", user)
+            step = self.done("summary")
+            return "edited by hand before; signed", step["written"]
         if not red or view.get("can_sign"):
             raise WalkFailed(f"the validator blocked nothing: {red}")
         content = view["content"]
@@ -309,20 +350,52 @@ class Walk:
         call = self.get(f"/api/voice/followups/{call_id}", user)
         if call["status"] == "scheduled":
             self.post(f"/api/voice/followups/{call_id}/start", user)
-            for text in [*lines, "没有了，谢谢。", "没有了。", "没有了。", "没有了。", "没有了。", "没有了。"]:
+            call = self.get(f"/api/voice/followups/{call_id}", user)
+        if call["status"] == "in_progress" and not call.get("escalated"):
+            # answered from the question the call is at: her birth date only while it asks who she is (a call the
+            # presenter placed may be past that)
+            asked = next((t.get("question") for t in reversed(call.get("transcript") or []) if t["role"] == "agent"),
+                         None)
+            kind = next((q["kind"] for q in call.get("script") or [] if q["key"] == asked), "identity")
+            for text in [*(lines if kind == "identity" else lines[1:]), "没有了，谢谢。", "没有了。", "没有了。", "没有了。",
+                         "没有了。", "没有了。"]:
                 answer = self.post(f"/api/voice/followups/{call_id}/answer", user, {"text": text})
                 if answer.get("ended"):
                     break
         call = self.get(f"/api/voice/followups/{call_id}", user)
         if not call.get("escalated"):
             raise WalkFailed(f"no escalation: {call.get('status')} {call.get('rule_hits')}")
-        self.post(f"/api/voice/followups/{call_id}/actions", user,
-                  {"kind": "callback", "note": "Called back: wound reviewed tomorrow at the fracture clinic"})
+        if not any(a.get("kind") in ("callback", "close", "refer") for a in call.get("nurse_actions") or []):
+            self.post(f"/api/voice/followups/{call_id}/actions", user, {
+                "kind": "callback", "note": self.note("Called back: wound reviewed tomorrow at the fracture clinic",
+                                                      user)})
         step = self.done("followup")
         return f"{call_id}: escalated ({call.get('priority')}), call-back recorded", step["written"]
 
     def _coding(self, user: str):
-        card = self.proposal("coding", user)
-        self.decide(card["ref"], user, note="Codes confirmed")
+        card = self.decide_card("coding", user, "Codes confirmed")
         self.done("coding")
         return card["summary"], [card["ref"]]
+
+
+def api_advance(client: Any, *, user: str, deadline_s: float = 900, poll_s: float = 1.5) -> Callable[[Walk, str], None]:
+    """`advance` against a running API: POST /api/storyline/advance (as `user`) whenever no fast-forward runs, until
+    the clock is at the beat; the API's job and loops do the rest (the storyline report, the demo automation)."""
+
+    def advance(walk: Walk, beat: str) -> None:
+        deadline = time.monotonic() + deadline_s
+        while True:
+            status = walk.status()
+            target = status["beats"].get(beat)
+            if target and status["now"] >= target:
+                return
+            job = status.get("job") or {}
+            if job.get("status") != "running":
+                r = client.post("/api/storyline/advance", headers=walk.headers(user))
+                if r.status_code >= 400 and "Already there" not in r.text and "Not yet" not in r.text:
+                    raise WalkFailed(f"advance {beat}: {r.status_code} {r.text[:300]}")
+            if time.monotonic() > deadline:
+                raise WalkFailed(f"the clock did not reach {beat}")
+            time.sleep(poll_s)
+
+    return advance

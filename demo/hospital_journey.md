@@ -43,6 +43,34 @@ fast-forward when the step waits for time). It then lists the clicks, gives the 
 real button. When the step is done it shows the trail and asks **Continue to the next step?** (**Not yet** pauses
 it; **Resume** goes on). Fold the panel with its arrow when it covers a button. Exit with its cross.
 
+**Do this step for me, jump to a step, highlights (a live interview).** The demo's automation walks steps for you,
+through the API as the people who play them (the same walk as the scripted run below), in the API's background; the
+guide shows its progress step by step.
+
+- **Do this step for me** (the guide's introduction, and while it is your turn; also on the storyline page's current
+  step): the automation does the current step. Use it for the roadmap stubs (4, 8, 12), or when a step goes wrong
+  live: it finishes the step from where it stands (a card you already accepted, the exception you approved, the
+  medicine you removed from the summary, a follow-up call already answering are not done again). The guide then
+  shows the trail and asks the usual question. If the automation stops, the guide says at which step and why: press
+  it again or do the step by hand.
+- **Jump to step N** (the guide's introduction, or **Jump here** on a later step of the storyline page): the
+  automation does every step from the current one up to N−1; N is then the current step and the guide introduces it.
+- **Highlights** (the storyline page's **Highlights** button, or the guide's **Highlights only** box): the guide
+  presents only steps 1, 5, 9 and 11: the Mandarin call; Orthopedics full and the bed manager's approval; the
+  discharge summary's validator blocking lisinopril; the Chinese follow-up call escalating. After a highlight,
+  **Yes, continue** has the automation do the steps up to the next highlight (2–4, 6–8, 10), and after step 11 the
+  last one. About 4–5 minutes of talking instead of 10. Getting from step 1 to step 5 takes the automation about 20
+  seconds against the mock model, longer with a real one (step 6 and step 9 wait for the model): talk over it, the
+  panel lists each step as it is done.
+
+Who did what stays plain, for the audience and in the records. The automation is your demo action, audited under
+the name you are signed in as (`simulator_event`, action `autoplay`). It signs in as each step's person, and every
+audit event of those requests, every signature it adds to a document and every note it writes say "Demo automation
+on behalf of <name> (<role>), started by <you>"; its requests come from the address `demo-automation`. The storyline
+page marks the steps it did (**Done by the demo's automation as …**) and shows the note under the signature. Say,
+when it runs: "These steps are done by a script through the same API, as the people who play them; the records say
+so, so nobody mistakes them for a person's decision."
+
 **Advance the clock.** Steps 4, 5, 6, 8, 9 and 11 wait for hospital time to pass: the INR result, the admission
 decision, a free bed, the first night after surgery, the discharge, and 48 hours after discharge. Press **Advance the
 clock** on the step. The hospital's day simulator runs to that moment in the background and the page follows its

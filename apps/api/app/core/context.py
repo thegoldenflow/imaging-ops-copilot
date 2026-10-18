@@ -9,10 +9,16 @@ The context object is shared by reference: FastAPI runs dependencies and the
 endpoint in separate worker threads with copies of the context variables, so a
 value set by a dependency would not reach the endpoint, but a change to the shared
 object does.
+
+The storyline's demo automation ("Do this step for me", app/modules/storyline/autoplay.py) acts as the people who
+play a step, through the HTTP API, with sign-in tokens registered here for the run. `current_user` marks such a
+request (`automation`: who started it), and the audit log and the signing service then say so on every event and
+signature of that person (`automation_note`): the record shows it was the demo's automation, not the person.
 """
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -33,6 +39,41 @@ class RequestContext:
     user: StaffUser | None = None
     source_ip: str | None = None
     session: str | None = None  # the browser's demo session id (X-Demo-Session), not an identity
+    automation: str | None = None  # the demo automation's request: who started it (e.g. "Casey Brooks")
+
+
+# Sign-in tokens of a running demo automation -> who started it. In memory: one API process (docs/DEPLOY.md), and a
+# token outlives its run only as an ordinary session of that person.
+_automation_lock = threading.Lock()
+_automation: dict[str, str] = {}
+
+
+def register_automation(token: str, started_by: str) -> None:
+    with _automation_lock:
+        _automation[token] = started_by
+
+
+def unregister_automation(tokens) -> None:
+    with _automation_lock:
+        for token in tokens:
+            _automation.pop(token, None)
+
+
+def automation_of(token: str | None) -> str | None:
+    """Who started the demo automation that signs in with this token, or None for a person's own session."""
+    if not token:
+        return None
+    with _automation_lock:
+        return _automation.get(token)
+
+
+def automation_note(user_id: str, user_name: str, role: str) -> str | None:
+    """'Demo automation on behalf of <name> (<role>), started by <presenter>' when the current request is the demo
+    automation acting as this person; None otherwise (a person's own request, or the system inside one)."""
+    ctx = _origin.get()
+    if ctx is None or not ctx.automation or ctx.user is None or ctx.user.id != user_id:
+        return None
+    return f"Demo automation on behalf of {user_name} ({role}), started by {ctx.automation}"
 
 
 _context: ContextVar[RequestContext | None] = ContextVar("request_context", default=None)

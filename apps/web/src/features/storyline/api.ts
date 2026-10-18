@@ -1,5 +1,7 @@
 // The hospital storyline's API (spec 8.2, WP9): GET /api/storyline (the twelve steps with their live trail),
-// POST /api/storyline/reset (demo reset + preset), POST /api/storyline/advance (the clock to the step's beat).
+// POST /api/storyline/reset (demo reset + preset), POST /api/storyline/advance (the clock to the step's beat), and the
+// demo's automation: POST /api/storyline/steps/{key}/autoplay (do the current step) and .../jump (do every step before
+// that one), a background job whose progress GET shows as `autoplay`.
 
 import { useQuery } from "@tanstack/react-query";
 import type { AiBlock } from "../../lib/ai";
@@ -48,6 +50,34 @@ export interface Signed {
   tasks?: string[];
 }
 
+/** A step the demo's automation did: who started it (the presenter's session) and the person it acted as. */
+export interface Automated {
+  by: string;
+  as: string;
+  at: string;
+  job: string;
+}
+
+/** The demo's automation ("Do this step for me", "Jump to step N"): the walk through the API as the cast. */
+export interface AutoplayJob {
+  id: string;
+  status: "running" | "done" | "failed";
+  mode: "step" | "jump";
+  keys: string[];
+  steps: number[];
+  target: number | null;
+  done: string[];
+  current: string | null;
+  current_n: number | null;
+  current_title: string | null;
+  current_cast: string | null;
+  results: { n: number; key: string; ok: boolean; seconds: number; result: string }[];
+  started_by: { id: string; name: string; role: string };
+  started_at: string;
+  finished_at: string | null;
+  error: string | null;
+}
+
 export interface AuditEntry {
   event_type: string;
   action: string;
@@ -87,6 +117,7 @@ export interface StoryStep {
   detail: string | null;
   step_ai?: StepAi;
   advance_ai?: string | null; // what pressing this step's Advance makes the AI do
+  automated?: Automated | null;
 }
 
 export interface SimJob {
@@ -127,6 +158,7 @@ export interface Storyline {
   steps: StoryStep[];
   current: number | null;
   beats: Record<string, string | null>;
+  autoplay: AutoplayJob | null;
   capacity?: { surgery_ready?: string[]; warnings?: string[] };
 }
 
@@ -140,7 +172,7 @@ export function useStoryline(enabled = true) {
     refetchInterval: (q) => {
       const d = q.state.data;
       const aiBusy = d?.steps.some((s) => s.step_ai?.items.some((i) => i.ai.state === "running" || i.ai.state === "queued"));
-      return d?.job?.status === "running" || aiBusy ? 1000 : 3000;
+      return d?.job?.status === "running" || d?.autoplay?.status === "running" || aiBusy ? 1000 : 3000;
     },
   });
 }
@@ -148,6 +180,10 @@ export function useStoryline(enabled = true) {
 export const resetStoryline = () => post<{ ok: boolean; prepared_at: string }>("/api/storyline/reset");
 export const advanceStoryline = () => post<{ job: SimJob; beat: string; target: string }>("/api/storyline/advance");
 export const askStepAi = (key: string) => post<{ step: number; items: string[][] }>(`/api/storyline/steps/${key}/ai`);
+export const autoplayStep = (key: string) => post<AutoplayJob>(`/api/storyline/steps/${key}/autoplay`);
+export const jumpToStep = (key: string) => post<AutoplayJob>(`/api/storyline/steps/${key}/jump`);
+/** The note the demo's automation writes on what it signs. */
+export const isAutomationNote = (note: string | null | undefined) => !!note?.startsWith("Demo automation on behalf of");
 
 /** Hospital-clock strings carry their own offset: show them as written (no time-zone conversion). */
 export const clock = (iso: string | null | undefined) => (iso ? `${iso.slice(0, 10)} ${iso.slice(11, 16)}` : "–");

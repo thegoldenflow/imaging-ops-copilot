@@ -10,7 +10,7 @@ import secrets
 from fastapi import Depends, HTTPException, Request
 
 from app.core import activity
-from app.core.context import request_context
+from app.core.context import automation_of, request_context
 from app.core.models import IMAGING_ROLES, Role, StaffUser
 from app.core.store import get_store
 
@@ -45,6 +45,7 @@ def current_user(request: Request) -> StaffUser:
     ctx = request_context()
     if ctx is not None:
         ctx.user = user  # for layers without the request, e.g. the LLM gateway's ai_call audit event
+        ctx.automation = automation_of(token)  # the storyline's demo automation acting as this person
     return user
 
 

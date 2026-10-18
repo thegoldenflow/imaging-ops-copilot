@@ -7,20 +7,28 @@
 //    progress, and whose signature the step waits for. The guide never signs: the presenter clicks the real button.
 // 3. Done: the step's trail (what the AI proposed, who signed, the audit events) and the question to the audience,
 //    "Continue to the next step?", in the panel so the screen stays usable. Not yet pauses the guide until resumed.
+//
+// The demo's automation, for a live interview: "Do this step for me" (in the introduction and while it is your turn:
+// the roadmap stubs, or a step that went wrong live, finished from where it stands) and "Jump to step N" have the API
+// walk the steps as the people who play them; every record it signs says so. Highlights only presents steps 1, 5, 9
+// and 11: "Yes, continue" then has the automation do the steps in between.
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
-  ArrowRight, CheckCircle2, ChevronDown, ChevronUp, FastForward, Loader2, Map, Mic, Pause, Play, Presentation, Quote,
-  RotateCcw, ShieldCheck, Sparkles, UserRound, X,
+  AlertTriangle, ArrowRight, Bot, CheckCircle2, ChevronDown, ChevronUp, Circle, FastForward, Loader2, Map, Mic, Pause, Play,
+  Presentation, Quote, RotateCcw, ShieldCheck, SkipForward, Sparkles, Star, UserRound, X,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AiBadge, Badge, Button } from "../../components/ui";
 import { useAuth } from "../../lib/auth";
 import { ROLE_LABEL } from "../../lib/types";
-import { advanceStoryline, hhmm, resetStoryline, storylineKey, useStoryline, type Storyline, type StoryStep } from "./api";
-import { exitDemo, sayAsCaller, setDemo, useCallerListening, useDemoMode } from "./demo";
+import {
+  advanceStoryline, autoplayStep, hhmm, jumpToStep, resetStoryline, storylineKey, useStoryline, type AutoplayJob, type Storyline,
+  type StoryStep,
+} from "./api";
+import { exitDemo, HIGHLIGHTS, isHighlight, nextHighlight, sayAsCaller, setDemo, useCallerListening, useDemoMode } from "./demo";
 
 export function DemoGuide() {
   const demo = useDemoMode();
@@ -32,6 +40,7 @@ export function DemoGuide() {
     return <Panel title="Demo mode"><p className="flex items-center gap-2 text-sm text-slate-600"><Loader2 className="size-4 animate-spin" />Loading the storyline…</p></Panel>;
   }
   if (!data.prepared) return <NotSetUp />;
+  if (data.autoplay?.status === "running") return <Automating job={data.autoplay} data={data} />;
 
   const started = demo.started ? data.steps[demo.started - 1] : undefined;
   if (started?.done) {
@@ -39,7 +48,9 @@ export function DemoGuide() {
   }
   if (data.current == null) return <Complete data={data} />;
   const current = data.steps[data.current - 1];
-  return demo.started === current.n ? <YourTurn step={current} data={data} /> : <Intro step={current} data={data} />;
+  if (demo.started === current.n) return <YourTurn step={current} data={data} />;
+  if (demo.highlights && !isHighlight(current.n)) return <HighlightsGap step={current} data={data} />;
+  return <Intro step={current} data={data} />;
 }
 
 /** The floating panel, bottom right; it can be folded to its title bar so it never hides the button to press. */
@@ -68,10 +79,12 @@ function Panel({ title, badges, children, testId }: { title: ReactNode; badges?:
 }
 
 function StepBadges({ step, data }: { step: StoryStep; data: Storyline }) {
+  const demo = useDemoMode();
   return (
     <>
       <Badge tone="brand">{step.module}</Badge>
       {step.stub && <Badge tone="slate"><Map className="size-3" />Roadmap (8.1): preset data</Badge>}
+      {demo.highlights && <Badge tone="ai"><Star className="size-3" />Highlights</Badge>}
       <span className="text-[11px] text-slate-500">{data.steps.filter((s) => s.done).length} of {data.steps.length} done</span>
     </>
   );
@@ -101,11 +114,67 @@ function useAdvance() {
   return useMutation({ mutationFn: advanceStoryline, onSuccess: () => queryClient.invalidateQueries({ queryKey: storylineKey }) });
 }
 
+/** The demo's automation: do the current step, or jump to a later one. Resolves once the job shows in the storyline. */
+function useAutomation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, jump }: { key: string; jump?: boolean }) => (jump ? jumpToStep(key) : autoplayStep(key)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: storylineKey }),
+  });
+}
+
+/** Where the last automation run stopped, when it stopped at this step. */
+function AutomationFailed({ data, step }: { data: Storyline; step: StoryStep }) {
+  const job = data.autoplay;
+  if (job?.status !== "failed" || job.current_n !== step.n) return null;
+  return (
+    <p className="flex gap-1.5 rounded-lg bg-amber-50 p-2 text-xs text-amber-800" role="alert" data-testid="demo-autoplay-failed">
+      <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+      <span>The demo's automation stopped at step {step.n}: {job.error ?? "no reason given"}. Try again, or do it by hand.</span>
+    </p>
+  );
+}
+
+function HighlightsToggle() {
+  const demo = useDemoMode();
+  return (
+    <label className="flex items-center gap-2 text-xs text-slate-600">
+      <input type="checkbox" className="size-3.5 accent-brand-600" checked={demo.highlights}
+        onChange={(e) => setDemo({ highlights: e.target.checked })} data-testid="demo-highlights" />
+      Highlights only: steps {HIGHLIGHTS.join(", ")}; the rest done automatically
+    </label>
+  );
+}
+
+/** Jump to a later step: the steps before it are done by the demo's automation. */
+function JumpTo({ data }: { data: Storyline }) {
+  const automation = useAutomation();
+  const later = data.steps.filter((s) => data.current != null && s.n > data.current);
+  const [to, setTo] = useState<number | null>(null);
+  if (!later.length) return null;
+  const target = data.steps[(to ?? later[0].n) - 1];
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1.5 text-xs">
+        <SkipForward className="size-3.5 shrink-0 text-slate-500" />
+        <select className="h-7 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-1.5 text-xs" value={target.n}
+          onChange={(e) => setTo(Number(e.target.value))} aria-label="Jump to step" data-testid="demo-jump-select">
+          {later.map((s) => <option key={s.n} value={s.n}>{s.n}. {s.title}</option>)}
+        </select>
+        <Button size="sm" variant="ghost" className="h-7" onClick={() => automation.mutate({ key: target.key, jump: true })}
+          loading={automation.isPending} data-testid="demo-jump">Jump</Button>
+      </div>
+      {automation.error && <p className="text-xs text-rose-600" role="alert">{(automation.error as Error).message}</p>}
+    </div>
+  );
+}
+
 // ----- 1. the introduction -----
 
 function Intro({ step, data }: { step: StoryStep; data: Storyline }) {
   const open = useOpenStep();
   const advance = useAdvance();
+  const automation = useAutomation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const jobRunning = data.job?.status === "running";
@@ -122,10 +191,12 @@ function Intro({ step, data }: { step: StoryStep; data: Storyline }) {
       setBusy(false);
     }
   };
+  const doIt = () => automation.mutate({ key: step.key }, { onSuccess: () => setDemo({ started: step.n, paused: false }) });
   return (
     <Panel title={`Demo · step ${step.n} of ${data.steps.length}`} badges={<StepBadges step={step} data={data} />} testId={`demo-intro-${step.n}`}>
       <p className="text-base font-semibold text-slate-900">{step.title}</p>
       <Cast step={step} />
+      <AutomationFailed data={data} step={step} />
       <blockquote className="flex gap-2 rounded-lg bg-brand-50/60 p-2.5 text-slate-800">
         <Quote className="mt-0.5 size-4 shrink-0 text-brand-600" />
         <span><span className="block text-[11px] font-semibold tracking-wide text-brand-700 uppercase">Say</span>{step.say}</span>
@@ -140,11 +211,19 @@ function Intro({ step, data }: { step: StoryStep; data: Storyline }) {
         </p>
       )}
       {error && <p className="text-xs text-rose-600" role="alert">{error}</p>}
-      <div className="flex items-center gap-2">
+      {automation.error && <p className="text-xs text-rose-600" role="alert">{(automation.error as Error).message}</p>}
+      <div className="flex flex-wrap items-center gap-2">
         <Button variant="primary" onClick={start} loading={busy} data-testid="demo-start">
           <Play className="size-4" />Start step {step.n}
         </Button>
-        <Button variant="ghost" size="sm" onClick={exitDemo}>Exit demo</Button>
+        <Button variant="secondary" size="sm" onClick={doIt} loading={automation.isPending} data-testid="demo-autoplay"
+          title={`The demo's automation does this step as ${step.cast?.name ?? "its person"}, through the API; what it signs says so`}>
+          <Bot className="size-3.5" />Do this step for me
+        </Button>
+      </div>
+      <div className="space-y-2 border-t border-slate-100 pt-2">
+        <JumpTo data={data} />
+        <HighlightsToggle />
       </div>
     </Panel>
   );
@@ -157,6 +236,7 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
   const location = useLocation();
   const open = useOpenStep();
   const advance = useAdvance();
+  const automation = useAutomation();
   const [showSay, setShowSay] = useState(false);
   const job = data.job?.status === "running" ? data.job : null;
   const lines = step.key === "call" ? data.patient?.call_lines : step.key === "followup" ? data.patient?.followup_lines : undefined;
@@ -166,17 +246,13 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
   return (
     <Panel title={`Demo · step ${step.n} of ${data.steps.length} · your turn`} badges={<StepBadges step={step} data={data} />} testId={`demo-doing-${step.n}`}>
       <p className="font-semibold text-slate-900">{step.title}</p>
+      <AutomationFailed data={data} step={step} />
       {elsewhere && (
         <Button size="sm" variant="secondary" onClick={() => void open(step)} data-testid="demo-open">
           <ArrowRight className="size-3.5" />Back to {step.cast ? `${step.cast.name}'s ` : ""}{step.route}
         </Button>
       )}
-      {job && (
-        <div data-testid="demo-clock">
-          <p className="flex items-center gap-1.5 text-xs text-ai-800"><Loader2 className="size-3.5 animate-spin" />Moving the hospital clock to {hhmm(job.target)}…</p>
-          <div className="mt-1 h-1.5 rounded bg-slate-100"><div className="h-1.5 rounded bg-ai-600" style={{ width: `${Math.round(job.progress * 100)}%` }} /></div>
-        </div>
-      )}
+      {job && <ClockBar job={job} />}
       {!job && step.status === "waiting" && (
         <div className="space-y-1">
           <Button size="sm" variant="ai" onClick={() => advance.mutate()} loading={advance.isPending} data-testid="demo-advance">
@@ -214,10 +290,60 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
         <Loader2 className="size-3.5 shrink-0 animate-spin text-slate-400" />
         {step.status === "waiting" ? "Waiting for the hospital clock" : `Waiting for the ${step.signoff}: the guide never signs, you click the button on the screen.`}
       </p>
-      <button type="button" onClick={() => setShowSay(!showSay)} className="text-xs text-brand-700 hover:underline">
-        {showSay ? "Hide what to say" : "What to say"}
-      </button>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <button type="button" onClick={() => setShowSay(!showSay)} className="text-xs text-brand-700 hover:underline">
+          {showSay ? "Hide what to say" : "What to say"}
+        </button>
+        <button type="button" onClick={() => automation.mutate({ key: step.key })} disabled={automation.isPending}
+          className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-brand-700 hover:underline disabled:opacity-50" data-testid="demo-autoplay"
+          title="When the step goes wrong live: the demo's automation finishes it from where it stands, as the people who play it">
+          {automation.isPending ? <Loader2 className="size-3 animate-spin" /> : <Bot className="size-3" />}Do this step for me
+        </button>
+      </div>
+      {automation.error && <p className="text-xs text-rose-600" role="alert">{(automation.error as Error).message}</p>}
       {showSay && <p className="rounded-lg bg-brand-50/60 p-2 text-xs text-slate-800">{step.say}</p>}
+    </Panel>
+  );
+}
+
+function ClockBar({ job }: { job: NonNullable<Storyline["job"]> }) {
+  return (
+    <div data-testid="demo-clock">
+      <p className="flex items-center gap-1.5 text-xs text-ai-800"><Loader2 className="size-3.5 animate-spin" />Moving the hospital clock to {hhmm(job.target)}…</p>
+      <div className="mt-1 h-1.5 rounded bg-slate-100"><div className="h-1.5 rounded bg-ai-600" style={{ width: `${Math.round(job.progress * 100)}%` }} /></div>
+    </div>
+  );
+}
+
+// ----- the demo's automation at work -----
+
+function Automating({ job, data }: { job: AutoplayJob; data: Storyline }) {
+  const clockJob = data.job?.status === "running" ? data.job : null;
+  return (
+    <Panel title={job.target ? `Demo · getting to step ${job.target}` : `Demo · doing step ${job.steps[0]} for you`}
+      badges={<Badge tone="ai"><Bot className="size-3" />Demo automation</Badge>} testId="demo-automating">
+      <p className="text-xs text-slate-700">
+        The demo's automation does {job.steps.length === 1 ? "this step" : `steps ${job.steps[0]}–${job.steps[job.steps.length - 1]}`} through
+        the API as the people who play {job.steps.length === 1 ? "it" : "them"}. Every record it signs says
+        “Demo automation on behalf of …, started by {job.started_by.name}”.
+      </p>
+      <ol className="space-y-1 text-xs" data-testid="demo-automating-steps">
+        {job.steps.map((n, i) => {
+          const s = data.steps[n - 1];
+          const done = job.done.includes(job.keys[i]);
+          const now = !done && job.current === job.keys[i];
+          return (
+            <li key={n} className={clsx("flex items-start gap-1.5", done ? "text-slate-500" : now ? "font-medium text-slate-900" : "text-slate-400")}
+              data-state={done ? "done" : now ? "running" : "pending"}>
+              {done ? <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
+                : now ? <Loader2 className="mt-0.5 size-3.5 shrink-0 animate-spin text-ai-600" /> : <Circle className="mt-0.5 size-3.5 shrink-0" />}
+              <span>{n}. {s.title}{now && job.current_cast ? <span className="block font-normal text-ai-700">as {job.current_cast}</span> : null}</span>
+            </li>
+          );
+        })}
+      </ol>
+      {clockJob && <ClockBar job={clockJob} />}
+      {job.target && <p className="text-xs text-slate-500">Then step {job.target}: {data.steps[job.target - 1].title}</p>}
     </Panel>
   );
 }
@@ -238,6 +364,12 @@ function Trail({ step }: { step: StoryStep }) {
         <span><span className="font-semibold text-slate-700">A person signed: </span>
           {s ? `${s.decision ?? s.status ?? "signed"} by ${s.by && s.by === step.cast?.id ? step.cast.name : s.by ?? "?"}${s.at ? ` at ${hhmm(s.at)}` : ""}` : <span className="text-slate-500">recorded by the EHR</span>}</span>
       </li>
+      {step.automated && (
+        <li className="flex gap-2 text-ai-800" data-testid="demo-trail-automated">
+          <Bot className="mt-0.5 size-3.5 shrink-0" />
+          <span>Done by the demo's automation as {step.automated.as}, started by {step.automated.by}: the records say so</span>
+        </li>
+      )}
       <li className="flex gap-2">
         <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-slate-600" />
         <span><span className="font-semibold text-slate-700">Audit trail: </span>{step.audit.length ? `${step.audit.length} event${step.audit.length === 1 ? "" : "s"} (${[...new Set(step.audit.map((a) => a.event_type))].join(", ")})` : "recorded by the EHR"}</span>
@@ -248,26 +380,73 @@ function Trail({ step }: { step: StoryStep }) {
 
 function AskNext({ step, data }: { step: StoryStep; data: Storyline }) {
   // In the panel, not a modal: the screen behind stays usable (end the call, show the result) while the question is up.
+  const demo = useDemoMode();
+  const automation = useAutomation();
   const next = data.current != null ? data.steps[data.current - 1] : null;
+  // Highlights only: the next step shown is the next highlight; the automation does the steps before it on "Yes"
+  const highlight = next && demo.highlights && !isHighlight(next.n) ? nextHighlight(next.n) : null;
+  const skipping = !!next && demo.highlights && !isHighlight(next.n);
+  const shown = highlight ? data.steps[highlight - 1] : skipping ? null : next;
+  const proceed = () => {
+    if (!next || !skipping) {
+      setDemo({ started: null, paused: false });
+      return;
+    }
+    // to the next highlight, or with none left the rest of the story (one step at a time)
+    automation.mutate(highlight ? { key: data.steps[highlight - 1].key, jump: true } : { key: next.key },
+      { onSuccess: () => setDemo({ started: null, paused: false }) });
+  };
   return (
     <Panel title={`Demo · step ${step.n} of ${data.steps.length} done`} badges={<StepBadges step={step} data={data} />} testId={`demo-ask-${step.n}`}>
       <p className="flex items-center gap-2 font-semibold text-slate-900"><CheckCircle2 className="size-5 shrink-0 text-emerald-600" />{step.title}</p>
       <div className="rounded-lg border border-slate-200 p-2.5"><Trail step={step} /></div>
-      {next && (
-        <p className="text-xs text-slate-500">Next · step {next.n}{next.cast ? `, played by ${next.cast.name}` : ""}:
-          <span className="block text-sm font-medium text-slate-800">{next.title}</span></p>
+      {shown && (
+        <p className="text-xs text-slate-500">Next{highlight ? " highlight" : ""} · step {shown.n}{shown.cast ? `, played by ${shown.cast.name}` : ""}:
+          <span className="block text-sm font-medium text-slate-800">{shown.title}</span>
+          {highlight && next && highlight > next.n && (
+            <span className="block" data-testid="demo-ask-skipping">On the way the demo's automation does {highlight - next.n === 1 ? `step ${next.n}` : `steps ${next.n}–${highlight - 1}`}.</span>
+          )}
+        </p>
+      )}
+      {skipping && !highlight && next && (
+        <p className="text-xs text-slate-500" data-testid="demo-ask-skipping">That was the last highlight. The demo's automation does the rest, from step {next.n}.</p>
       )}
       <div className="rounded-lg bg-brand-50 p-3" data-testid="demo-ask" role="group" aria-labelledby="demo-ask-title">
-        <p id="demo-ask-title" className="font-semibold text-slate-900">{next ? "Continue to the next step?" : "That was the last step. See the whole story?"}</p>
+        <p id="demo-ask-title" className="font-semibold text-slate-900">{next ? (skipping && !highlight ? "Finish the story?" : "Continue to the next step?") : "That was the last step. See the whole story?"}</p>
         <div className="mt-2 flex gap-2">
-          <Button variant="primary" onClick={() => setDemo({ started: null, paused: false })} data-testid="demo-continue">
+          <Button variant="primary" onClick={proceed} loading={automation.isPending} data-testid="demo-continue">
             {next ? "Yes, continue" : "Yes, show the summary"}<ArrowRight className="size-4" />
           </Button>
           <Button variant="secondary" onClick={() => setDemo({ paused: true })} data-testid="demo-not-yet">
             <Pause className="size-4" />Not yet
           </Button>
         </div>
+        {automation.error && <p className="mt-1 text-xs text-rose-600" role="alert">{(automation.error as Error).message}</p>}
       </div>
+      <HighlightsToggle />
+    </Panel>
+  );
+}
+
+/** Highlights only, and the current step is not one of them (the toggle was turned on, or the automation stopped). */
+function HighlightsGap({ step, data }: { step: StoryStep; data: Storyline }) {
+  const automation = useAutomation();
+  const highlight = nextHighlight(step.n);
+  const go = () => automation.mutate(highlight ? { key: data.steps[highlight - 1].key, jump: true } : { key: step.key });
+  return (
+    <Panel title="Demo · highlights" badges={<StepBadges step={step} data={data} />} testId="demo-highlights-gap">
+      <AutomationFailed data={data} step={step} />
+      <p className="text-slate-700">Highlights only: steps {HIGHLIGHTS.join(", ")}. Step {step.n} ({step.title}) is not one of them.</p>
+      {automation.error && <p className="text-xs text-rose-600" role="alert">{(automation.error as Error).message}</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button variant="primary" onClick={go} loading={automation.isPending} data-testid="demo-highlights-go">
+          <SkipForward className="size-4" />{highlight ? `Go to step ${highlight}` : "Finish the story"}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setDemo({ highlights: false })}>Show every step</Button>
+      </div>
+      <p className="text-xs text-slate-500">
+        The demo's automation does {highlight ? (highlight - step.n === 1 ? `step ${step.n}` : `steps ${step.n}–${highlight - 1}`) : `step ${step.n}`} as the people who play {highlight && highlight - step.n > 1 ? "them" : "it"}.
+      </p>
     </Panel>
   );
 }
@@ -316,6 +495,7 @@ function Complete({ data }: { data: Storyline }) {
   const proposals = data.steps.filter((s) => s.proposal).length;
   const signed = data.steps.filter((s) => s.signed).length;
   const audit = data.steps.reduce((n, s) => n + s.audit.length, 0);
+  const automated = data.steps.filter((s) => s.automated).length;
   return (
     <Panel title="Demo · the story is complete" testId="demo-complete">
       <p className="flex items-center gap-2 font-semibold text-slate-900"><CheckCircle2 className="size-5 text-emerald-600" />All {data.steps.length} steps are done</p>
@@ -323,6 +503,7 @@ function Complete({ data }: { data: Storyline }) {
         <li><Sparkles className="mr-1 inline size-3.5 text-ai-600" />{proposals} AI proposals, each a suggestion or a draft</li>
         <li><UserRound className="mr-1 inline size-3.5" />{signed} decisions signed by a named person</li>
         <li><ShieldCheck className="mr-1 inline size-3.5" />{audit} audit events recording both</li>
+        {automated > 0 && <li><Bot className="mr-1 inline size-3.5 text-ai-600" />{automated} step{automated === 1 ? "" : "s"} done by the demo's automation, marked as such</li>}
       </ul>
       <div className="flex gap-2">
         <Button variant="primary" size="sm" onClick={() => navigate("/storyline")} data-testid="demo-summary">See the whole trail</Button>
