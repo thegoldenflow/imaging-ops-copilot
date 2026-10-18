@@ -259,6 +259,51 @@ docker compose -f docker-compose.prod.yml up -d
 
 新版本如果带数据库迁移，API 启动时自动升级表结构。升级后再回滚到旧镜像，旧代码可能读不了新表结构：发版前先按下文做一次备份，回滚时连库一起恢复。
 
+### 从 v0.1.0 升级（2026-10-18 实际做过一次）
+
+v0.1.0 是内存版，服务器上的 compose 文件里只有 `api` 和 `web`，没有数据库。所以只改 tag 不够，还要：
+
+1. 先备份旧文件：`cp -p .env .env.bak-v0.1.0`、`cp -p docker-compose.prod.yml docker-compose.prod.yml.bak-v0.1.0`。
+2. 用仓库里新的 `docker-compose.prod.yml` 替换旧的（新增 `postgres` 服务和 `pgdata` 数据卷）。
+3. `.env` 里补上 `POSTGRES_PASSWORD`、`PHI_ENCRYPTION_KEY`、`PHI_BLIND_INDEX_KEY`（在服务器上用 `openssl rand -hex 24` 和 `openssl rand -base64 32` 生成，不要打印出来），
+   用真 key 时再加 `LLM_DAILY_BUDGET_USD`。
+4. 先把镜像拉好（`docker compose ... pull`，或 `docker pull` 两个新 tag 和 `postgres:16-alpine`），再 `docker compose -f docker-compose.prod.yml up -d`。
+
+停机时间从旧 API 被替换开始，到新 API 建好表、生成完演示数据（通过健康检查）为止。在一台 2 vCPU、已经在用 swap 的机器上，这段时间约 80 秒。
+v0.1.0 没有持久数据，所以不需要备份数据库。回滚：把两个 `.bak-v0.1.0` 文件改回原名，再执行 `up -d --remove-orphans`（会删掉 `ioc_db` 容器，数据卷保留）。
+
+发版前可以先在本机对着一个临时库冒烟测试新的 API 镜像（mock 模型、关掉后台），健康检查通过后再推送：
+
+```bash
+docker exec imaging-ops-copilot-postgres-1 psql -U ioc -d ioc -c "CREATE DATABASE ioc_smoke"
+docker run -d --name ioc_smoke --network imaging-ops-copilot_default \
+  -e DATABASE_URL=postgresql+psycopg://ioc:ioc@postgres:5432/ioc_smoke \
+  -e PHI_ENCRYPTION_KEY=$(openssl rand -base64 32) -e PHI_BLIND_INDEX_KEY=$(openssl rand -base64 32) \
+  -e LLM_PROVIDER=mock -e BACKGROUND_WORKERS=0 wsyjh8/imaging-ops-api:$VER
+# 等 docker exec ioc_smoke python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/api/health').read())" 成功，然后：
+docker rm -f ioc_smoke && docker exec imaging-ops-copilot-postgres-1 psql -U ioc -d ioc -c "DROP DATABASE ioc_smoke"
+```
+
+2026-10-18 实测内存：本机冒烟测试的 API 生成完演示数据后约 865MB；服务器上刚启动、没人用时 API 约 680MB，有人登录、打开首页之后约 860MB；Postgres 约 170MB，nginx 约 9MB。
+那台服务器（3.7GB 内存，十几个容器）上线后可用内存约 0.9GB，有轻度换页。
+
+### API 内存上限（`API_MEM_LIMIT`，默认 1536m）
+
+一次“Reset demo”在服务器上用了 28 秒，API 的 anon 内存从 829MiB 升到 1179MiB，之后**不回落**。本机用同一个镜像连做 4 次重置：
+anon 从 869MiB 依次到 1047、1466、1814MiB，最后一次故事线重置后 2291MiB，每次多留下约 400MiB（内存泄漏，原因未查明，见调试手册 7.8）。
+不加上限的话，API 会随着重置次数一直涨，把同一台机器上的其他服务挤进 swap。
+
+所以 `docker-compose.prod.yml` 给 API 设了 `mem_limit` 和 `memswap_limit`（同一个值，也就是不许用 swap），默认 1.5GiB：
+刚启动约 850MiB，一次重置的峰值约 1.2GiB，放得下；泄漏攒到上限时，内核杀掉 API，`restart: unless-stopped` 把它拉起来，内存回到起点。
+重置在一个数据库事务里写数据，中途被杀会回滚，旧数据完好；登录令牌存在库里，重启后不用重新登录。代价是被杀的那个请求失败，API 重启期间（约半分钟）页面报 502。
+
+```bash
+docker stats --no-stream ioc_api                                   # MEM USAGE / LIMIT
+docker inspect ioc_api --format 'oom={{.State.OOMKilled}} restarts={{.RestartCount}}'
+```
+
+机器内存更大时可以在 `.env` 里调高，例如 `API_MEM_LIMIT=2g`，然后 `up -d`。
+
 ## 备份与恢复
 
 数据库和密钥要分开备份：库的备份里只有密文，没有 `.env` 里的两把 PHI 密钥就解不开；反过来密钥丢了，备份也没用。把 `.env` 存到密码管理器之类的地方，不要和数据库备份放在一起。
@@ -324,6 +369,6 @@ Windows 开发机常有被 Hyper-V 保留的端口段（`netsh interface ipv4 sh
 | 上传胸片报 413 | 超过 nginx 的 25MB 限制（`apps/web/nginx.conf`） |
 | 工作流页面显示 "unreachable" | 设了 `TEMPORAL_ADDRESS` 但 `ioc_temporal` 没起来，或没加 `--profile workflows` |
 | 工作流页面显示 "offline" 但想开 | API 没读到 `TEMPORAL_ADDRESS=temporal:7233`：写进 `.env` 后 `up -d` 重建 API |
-| API 容器被 OOM 杀掉（`docker inspect ioc_api` 里 `OOMKilled: true`） | 内存不够：见上文“资源”，加内存或 swap；不要在小机器上开 HAPI |
+| API 容器被 OOM 杀掉（`docker inspect ioc_api` 里 `OOMKilled: true`） | 多半是撞到了 `API_MEM_LIMIT`：几次重置后泄漏攒满了上限（见“API 内存上限”），它会自己重启，数据不丢。频繁发生就调高上限或加内存；不要在小机器上开 HAPI |
 | “Reset demo” 后几十秒页面很慢 | 正在重新生成全院数据，等它完成；每日自动重置（`DEMO_DAILY_RESET_HOUR`）挑没人用的时间 |
 | 审计日志里 IP 全是同一个内网地址 | 代理链没有传 `X-Forwarded-For`；Caddy 默认会传，检查是否被改过 |
