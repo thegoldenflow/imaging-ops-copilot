@@ -11,7 +11,7 @@ triage, imaging orders) are app/ehr/accepted.py; this is everything around them:
 | the triage is recorded (ADT^A08) | the ED physician sees her now (bay); INR and blood count ordered at +4 min (INR 3.8 at +45 min); the decision to admit at +95 min (bed request for Orthopedics); the stay: admission when a bed is free, admission orders as planned (naproxen new, warfarin held, home amlodipine left out), the OR case booked 10 min after the decision for 14:30 in a free room (90 min booked, 115 min in fact), spot vital signs at 02:00 with NEWS2 7, discharge prescriptions the next afternoon but one, discharge at 11:00 on post-operative day 3 | 3-11 |
 | the bed manager approves the early rounds on Surgery (exception.decided) | the Surgery team discharges its two discharge-ready patients now + 20 and + 35 min | 5 |
 | one of them leaves (ADT^A03) | her admission is retried one minute after that bed's housekeeping, with that bed held for her | 5 |
-| she is admitted (ADT^A01 IMP) | the admitting note on her hypertension (the planted source of step 9's untraceable medicine) | 9 |
+| she is admitted (ADT^A01 IMP) | her known atrial fibrillation and osteoporosis as diagnoses of the stay; the admitting note on her hypertension (the planted source of step 9's untraceable medicine) | 9 |
 
 Everything is idempotent (marks in the storyline's state, plan entries keyed by id), since bus handlers may run
 again. Her events after the admission are `fixed` in time: while she boards, the simulator's retries move only the
@@ -65,6 +65,7 @@ DISCHARGE_RX = [
 ]  # naproxen stopped
 HYPERTENSION_NOTE = ("Blood pressure controlled on amlodipine at home. Lisinopril was discussed with the patient and "
                      "her daughter as an alternative but not started.")
+KNOWN_CONDITIONS = ("cond-j0001-afib", "cond-j0001-osteo")  # her problem list (the preset), also diagnoses of the stay
 
 
 def state(store: Store) -> dict | None:
@@ -237,13 +238,26 @@ def admit_after_cleaning(store: Store, stay_id: str, bed: str | None) -> str | N
 
 
 def admission_note(store: Store) -> str | None:
-    """The admitting physician's problem note on her hypertension (the EHR's record; step 9's discharge summary
-    draft picks the lisinopril up from it, and the validator finds no order behind it)."""
+    """The admitting physician's diagnoses of her stay besides the fracture: her known conditions from the problem
+    list (atrial fibrillation, osteoporosis) and the problem note on her hypertension (the EHR's record; step 9's
+    discharge summary draft picks the lisinopril up from it, and the validator finds no order behind it).
+    The summary reads the stay's diagnoses only: without her atrial fibrillation on the stay, a draft that said what
+    her warfarin is for was blocked too (live run 10-18, casebook)."""
     rid = "cond-j0001-htn-note"
     stay = store.fhir.read("Encounter", S.STAY)
     if stay is None or store.fhir.read("Condition", rid) is not None:
         return None
     at = parse(stay["period"]["start"]) + timedelta(minutes=20)
+    for known in KNOWN_CONDITIONS:
+        problem = store.fhir.read("Condition", known)
+        if problem is None or store.fhir.read("Condition", f"{known}-stay") is not None:
+            continue
+        store.fhir.create({
+            "resourceType": "Condition", "id": f"{known}-stay",
+            "clinicalStatus": C.concept(C.CONDITION_CLINICAL, "active"),
+            "category": [C.concept(C.CONDITION_CATEGORY, "encounter-diagnosis")],
+            "code": problem["code"], "subject": ref("Patient", S.PATIENT), "encounter": ref("Encounter", S.STAY),
+            "onsetDateTime": problem.get("onsetDateTime"), "recordedDate": fhir_datetime(at)})
     store.fhir.create({
         "resourceType": "Condition", "id": rid,
         "clinicalStatus": C.concept(C.CONDITION_CLINICAL, "active"),

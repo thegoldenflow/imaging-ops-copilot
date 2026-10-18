@@ -59,7 +59,10 @@ test("highlights: play step 1, the automation does steps 2-4, the guide introduc
     await expect(page.getByTestId(`story-automated-${n}`)).toBeVisible();
   }
   await expect(page.getByTestId("story-automated-1")).toHaveCount(0); // the presenter played step 1
-  await expect(page.getByTestId("story-step-5")).toHaveAttribute("data-status", /waiting|active/);
+  // Orthopedics is flagged from 07:00 (the preset fills it), but her step waits for the admission decision: it was
+  // "active" with no Advance anywhere, and the presenter was stuck (live run 10-18)
+  await expect(page.getByTestId("story-step-5")).toHaveAttribute("data-status", "waiting");
+  await expect(page.getByTestId("story-step-5").getByTestId("advance")).toBeVisible();
   await page.getByTestId("story-step-2").getByRole("button").first().click(); // open the done step's card
   await expect(page.getByTestId("story-signed-note-2")).toContainText("Demo automation on behalf of Eun-ji Abernathy (nurse), started by Maya Nakamura");
 
@@ -68,4 +71,16 @@ test("highlights: play step 1, the automation does steps 2-4, the guide introduc
   await expect(page).toHaveURL(/\/control-tower/);
   await expect(page.getByTestId("current-user")).toHaveText("Jordan Lee");
   await expect(page.getByTestId("demo-doing-5")).toContainText("Approve");
+  // Start moved the clock to the decision: her step is ready, and the exception is high with her boarding
+  const auth = { Authorization: `Bearer ${token}` };
+  await expect.poll(async () => {
+    const view = await (await request.get("/api/storyline", { headers: auth })).json();
+    return view.steps[4].status;
+  }, { timeout: 120_000, intervals: [1000, 2000, 3000] }).toBe("active");
+  // polled: the Control Tower's sync of the decision commits with the hospital loop's pass, a moment after her record
+  const ops = (await (await request.post("/api/auth/login", { data: { user_id: "U-OPS" } })).json()).token;
+  await expect.poll(async () => {
+    const list = await (await request.get("/api/control-tower/exceptions", { headers: { Authorization: `Bearer ${ops}` } })).json();
+    return list.exceptions.find((e: { key: string; status: string }) => e.key === "unit_occupancy:ORTH" && e.status === "open")?.severity;
+  }, { timeout: 60_000, intervals: [1000, 2000, 3000] }).toBe("high");
 });

@@ -17,8 +17,9 @@ highlights (steps 1, 5, 9, 11) with the automation doing the steps in between (`
   a plan horizon long enough for the stay and the 48-hour follow-up.
 - The storyline's EHR script (`app/ehr/storyline.py`): her course in the simulator's plan (seen, labs with the INR
   of 3.8, the decision to admit, the stay with its admission orders, the OR case, the night's vital signs with a
-  NEWS2 of 7, the discharge prescriptions, the discharge) and the Surgery team's early discharges after the bed
-  manager's approval.
+  NEWS2 of 7, the discharge prescriptions, the discharge), the admitting physician's diagnoses of the stay (her
+  known atrial fibrillation and osteoporosis from the problem list, the hypertension note that names lisinopril)
+  and the Surgery team's early discharges after the bed manager's approval.
 - People's EHR actions on accepted suggestion cards (`app/ehr/accepted.py`): registration, triage, imaging orders.
 - The modules of WP5–WP8 for steps 5–11, unchanged in how they work: the Control Tower, medication safety,
   documentation, voice services.
@@ -71,6 +72,12 @@ and off. The backend test `tests/test_storyline.py` runs the same walk in proces
   bed (Thursday 10-15's data), and the walk and the page's Advance stopped at a beat already past (casebook 5.17). A
   bed manager who moves another patient into that bed by hand in that minute still could. When the second freed bed
   is cleaned first, her own retry takes it (Friday's data) and the hold lapses.
+- A step with a beat waits (and offers Advance) while the clock is before it, unless the records show its moment
+  came: its card, review or call (the beat is a minute or two after the event; with Temporal the journey's timer
+  schedules the follow-up call early). For the bed step that is her bed request at the admission decision, not the
+  Orthopedics exception: the Control Tower opens that (medium) at 07:00 because the preset fills the unit, and the
+  step's AI narrates it only once she boards it (high). Before, the bed step took the 07:00 exception for its
+  proposal, showed itself ready and offered no Advance (live run 10-18).
 - Past the generated 36-hour plan only the storyline's events, the ward rounds and housekeeping happen: the rest of
   the hospital stands still on day 2 to day 5 (nothing else is planned there).
 - With Temporal on, the follow-up call waits for the journey's timer (`WORKFLOW_FOLLOWUP_DELAY_S`): set it to a few

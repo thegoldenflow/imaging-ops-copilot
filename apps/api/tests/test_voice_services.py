@@ -549,6 +549,19 @@ def test_nurse_actions_write_communications_close_and_refer(fresh_state, client,
                        json={"kind": "close", "note": "done"}).status_code == 403
 
 
+def test_a_nurse_action_is_at_hospital_time_as_the_communication_it_writes(fresh_state, client, login):
+    """The call-back was stamped with the wall clock (the storyline's trail showed 03:39 next to hospital times,
+    live run 10-18); the Communication it writes, the call's due time and the escalation are hospital time."""
+    store = fresh_state
+    call = _escalated(store)
+    item = client.post(f"/api/voice/followups/{call.id}/actions", headers=login(NURSE),
+                       json={"kind": "callback", "note": "Called back: drainage soaking one gauze a day"}).json()
+    action = item["nurse_actions"][0]
+    sent = store.fhir.read("Communication", action["communication_id"])["sent"]
+    assert parse(action["at"]) == parse(sent).replace(tzinfo=None, microsecond=0)
+    assert parse(action["at"]) == hospital_now(store).replace(microsecond=0)
+
+
 # ---------- gateway increments ----------
 
 

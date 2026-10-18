@@ -34,6 +34,7 @@ VISIT = "ed-j0001"  # the ED visit (Encounter EMER)
 STAY = "stay-j0001"  # the admission (Encounter IMP)
 SURGERY = "surg-j0001"  # the OR case (Appointment from the generator's numbering, request orreq-surg-j0001)
 JOURNEY = f"journey-{STAY}"
+FOLLOWUP_CALL = f"FU-{STAY}"  # her follow-up call (app/modules/voice_services/followup.py `call_id_for`)
 SURGEON = "prac-surg-02"  # Dr. Victor Osei, Orthopedics: attending and surgeon
 PROCEDURE = "52734007"  # total replacement of hip (the generator's operation for a neck-of-femur fracture)
 DIAGNOSIS = "5913000"  # fracture of neck of femur
@@ -218,9 +219,9 @@ STEPS: tuple[Step, ...] = (
          "patient-language instructions", "ward nurse", "DocumentReference (final)", 45, roles=("nurse",),
          permission="A nurse signs the patient instructions, not a physician; the default language follows her record (Simplified Chinese)."),
     Step(11, "followup", "48 hours later: a Chinese follow-up call escalates heavy wound drainage", "7.4 follow-up",
-         "ward_nurse", "/follow-up",
-         ("Advance the clock 48 hours", "Follow-up calls", "Her call", "Place call", "Answer as the patient",
-          "Escalation on top", "Call back"),
+         "ward_nurse", f"/follow-up?call={FOLLOWUP_CALL}",  # her call, on the Calls tab (not yet in the Queue)
+         ("Advance the clock 48 hours", f"Follow-up calls, Calls tab: her call (MRN {MRN})", "Place call",
+          "Answer as the patient", "Queue tab: her escalation on top", "Call back"),
          "Two days after discharge the AI calls her in Mandarin with questions from her signed instructions. She "
          "says the wound keeps leaking: the rule layer escalates at once, and the nurse calls her back.",
          ("Red flag: heavy wound drainage, with her words", "Task followup-escalation (urgent)",

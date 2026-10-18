@@ -19,7 +19,7 @@ import { causeText, clockTime, seconds, useElapsed, type AiBlock } from "../../l
 import { useAuth } from "../../lib/auth";
 import { ROLE_LABEL } from "../../lib/types";
 import {
-  advanceStoryline, askStepAi, autoplayStep, clock, hhmm, isAutomationNote, jumpToStep, resetStoryline, storylineKey, useStoryline,
+  advanceStoryline, askStepAi, autoplayStep, clock, hhmm, isAutomationNote, jumpToStep, resetStoryline, routePath, storylineKey, useStoryline,
   type Storyline, type StoryStep,
 } from "./api";
 import { HIGHLIGHTS, setDemo, startDemo, useDemoMode } from "./demo";
@@ -234,7 +234,7 @@ function StepBody({ step, data, current }: { step: StoryStep; data: Storyline; c
       <div className="flex flex-wrap items-center gap-2">
         {step.cast && (
           <Button size="sm" variant={isYou ? "primary" : "secondary"} onClick={go} data-testid={`switch-${step.n}`}>
-            {isYou ? <>Open {step.route}<ArrowRight className="size-3.5" /></> : <>Switch to {step.cast.name} ({ROLE_LABEL[step.cast.role] ?? step.cast.role}) and open {step.route}</>}
+            {isYou ? <>Open {routePath(step.route)}<ArrowRight className="size-3.5" /></> : <>Switch to {step.cast.name} ({ROLE_LABEL[step.cast.role] ?? step.cast.role}) and open {routePath(step.route)}</>}
           </Button>
         )}
         {current && step.status === "waiting" && (

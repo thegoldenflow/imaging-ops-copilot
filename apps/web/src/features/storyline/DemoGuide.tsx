@@ -25,7 +25,7 @@ import { AiBadge, Badge, Button } from "../../components/ui";
 import { useAuth } from "../../lib/auth";
 import { ROLE_LABEL } from "../../lib/types";
 import {
-  advanceStoryline, autoplayStep, hhmm, jumpToStep, resetStoryline, storylineKey, useStoryline, type AutoplayJob, type Storyline,
+  advanceStoryline, autoplayStep, hhmm, jumpToStep, resetStoryline, routePath, storylineKey, useStoryline, type AutoplayJob, type Storyline,
   type StoryStep,
 } from "./api";
 import { exitDemo, HIGHLIGHTS, isHighlight, nextHighlight, sayAsCaller, setDemo, useCallerListening, useDemoMode } from "./demo";
@@ -240,7 +240,7 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
   const [showSay, setShowSay] = useState(false);
   const job = data.job?.status === "running" ? data.job : null;
   const lines = step.key === "call" ? data.patient?.call_lines : step.key === "followup" ? data.patient?.followup_lines : undefined;
-  const elsewhere = location.pathname !== step.route || (step.cast && user?.id !== step.cast.id);
+  const elsewhere = location.pathname !== routePath(step.route) || (step.cast && user?.id !== step.cast.id);
   const aiWorking = step.step_ai?.items.some((i) => i.ai.state === "running" || i.ai.state === "queued");
   const canSay = useCallerListening();
   return (
@@ -249,7 +249,7 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
       <AutomationFailed data={data} step={step} />
       {elsewhere && (
         <Button size="sm" variant="secondary" onClick={() => void open(step)} data-testid="demo-open">
-          <ArrowRight className="size-3.5" />Back to {step.cast ? `${step.cast.name}'s ` : ""}{step.route}
+          <ArrowRight className="size-3.5" />Back to {step.cast ? `${step.cast.name}'s ` : ""}{routePath(step.route)}
         </Button>
       )}
       {job && <ClockBar job={job} />}

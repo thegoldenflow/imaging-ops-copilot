@@ -342,7 +342,7 @@ class Walk:
 
     def _followup(self, user: str):
         self.advance("followup")
-        call_id = f"FU-{S.STAY}"
+        call_id = S.FOLLOWUP_CALL
         self.wait("the scheduled follow-up call", lambda: (r := self.client.get(
             f"/api/voice/followups/{call_id}", headers=self.headers(user))).status_code == 200 and
             r.json().get("status") in ("scheduled", "in_progress", "completed"), timeout_s=self.timeout_s * 2)

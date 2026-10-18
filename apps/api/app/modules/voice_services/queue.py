@@ -16,8 +16,6 @@ refer to a physician (a physician Task; the nurse Task completed as referred).
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from app.agents.runtime import runtime
 from app.core.models import StaffUser
 from app.core.store import Store
@@ -166,7 +164,7 @@ def act(store: Store, user: StaffUser, call_id: str, kind: str, note: str) -> di
             run.finish(outcome=record.status)
             raise PermissionError(f"{record.reason}: {record.detail}")
         action = {"kind": kind, "note": note, "by": user.id, "name": user.name, "role": str(user.role),
-                  "at": datetime.now().isoformat(timespec="seconds"),
+                  "at": hospital_now(store).isoformat(timespec="seconds"),  # hospital time, as its Communication
                   "communication_id": record.output["communication_id"]}
         if kind == "refer":
             referral = run.tool("createCallTask", {

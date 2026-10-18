@@ -104,6 +104,7 @@ as the step is done, and the step's badge turns **Done**.
    - **Acknowledge.** Say: "This is a roadmap item: the routing runs on a preset rule, and the architecture for the real one is in the data model."
 
 5. **3:10 — No orthopaedic bed (7.1 Control Tower, bed manager).** **Advance the clock** to the admission decision, then **Switch to Jordan Lee**, then **Control Tower**.
+   - The Control Tower flags Orthopedics (medium) from 07:00, because the preset fills it. The step still waits for her admission decision, so **Advance the clock** (and the guide's **Start**, which presses it) is offered until then. At the decision she boards, and the exception turns high.
    - The exception card reads **Orthopedics at 100% occupancy** (high). Its narrative is written by the AI from the rule engine's facts as soon as the step's **Advance** brought the exception (the storyline page's step shows "AI working", then when it was generated), and its actions include **Early discharge rounds on Surgery (2 ready)**.
    - Choose that action and press **Approve**. Tasks go to the owner roles, and the Surgery team discharges the two ready patients early (scripted).
    - **Advance the clock** until she has a bed: the first Surgery bed the discharges free, after housekeeping, is hers.
@@ -124,16 +125,17 @@ as the step is done, and the step's badge turns **Done**.
 
 9. **6:35 — Discharge summary (7.3, surgeon).** **Advance the clock** to the discharge, then **Switch to Dr. Victor Osei**, then **Documentation**, then her stay, then **Draft with AI**.
    - Every line of the draft cites its source. One medicine, **lisinopril**, came from a note rather than an order: the validator marks it red ("no matching source") and **Sign** is blocked.
+   - Her known conditions (atrial fibrillation, hypertension, osteoporosis) are diagnoses of her stay. A draft that says what her warfarin or metoprolol is for ("for atrial fibrillation") cites them, so the lisinopril is the only red item.
    - **Remove** it, then **Sign**. `dsum-stay-j0001` is final.
 
 10. **7:45 — Patient instructions (7.3, ward nurse).** **Switch to Vera Uchida**, then **Documentation**, then her patient instructions.
     - They are in 简体中文 by default, from her record. The warfarin section says 每周吃的绿叶蔬菜量要大致相同 (eat about the same amount of green vegetables each week), followed by the wound red flags.
     - **Sign.**
 
-11. **8:30 — Follow-up call 48 hours later (7.4, ward nurse).** **Advance the clock** 48 hours (with Temporal on, the journey's timer schedules the call). Then **Follow-up calls**, her call, **Place call**.
+11. **8:30 — Follow-up call 48 hours later (7.4, ward nurse).** **Advance the clock** 48 hours (with Temporal on, the journey's timer schedules the call). Then **Follow-up calls**, the **Calls** tab, her call (MRN 40720001), **Place call**. The step's **Switch to Vera Uchida** (and the guide's **Start**) opens her call there (`/follow-up?call=FU-stay-j0001`). The page otherwise opens on its **Queue**, which lists only calls that need a nurse, and hers does not need one yet.
     - Answer as the patient with the two phrases from the storyline page: her birth date, then "还行，就是伤口一直在渗液，纱布都湿透了。"
     - The rule layer escalates at once: a red flag for heavy wound drainage, quoting her words, and a Task `followup-escalation` (urgent) for the nurses of her last unit.
-    - **Call back.** The call never gives medical advice.
+    - On the **Queue** tab her escalation is on top. **Call back** (the note is recorded at hospital time, like every other step's signature). The call never gives medical advice.
 
 12. **9:30 — Coding (8.1 roadmap stub, coder).** **Switch to Maya Nakamura**, then **Review queue**, then **Coding suggestion**.
     - The card suggests S72.0 fracture of neck of femur (ICD-10-CA), with W19, I48 and Z92.1, and the CCI 1.VA.53 rubric. It carries the **Roadmap** badge.

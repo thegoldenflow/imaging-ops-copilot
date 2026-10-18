@@ -184,6 +184,8 @@ export const autoplayStep = (key: string) => post<AutoplayJob>(`/api/storyline/s
 export const jumpToStep = (key: string) => post<AutoplayJob>(`/api/storyline/steps/${key}/jump`);
 /** The note the demo's automation writes on what it signs. */
 export const isAutomationNote = (note: string | null | undefined) => !!note?.startsWith("Demo automation on behalf of");
+/** The page a step's route opens, without its link to an item (`/follow-up?call=…` is on `/follow-up`). */
+export const routePath = (route: string) => route.split("?")[0];
 
 /** Hospital-clock strings carry their own offset: show them as written (no time-zone conversion). */
 export const clock = (iso: string | null | undefined) => (iso ? `${iso.slice(0, 10)} ${iso.slice(11, 16)}` : "–");

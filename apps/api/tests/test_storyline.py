@@ -184,9 +184,38 @@ def test_the_whole_story_offline(story, client):
     assert summary["docStatus"] == "final"
     # the live walk's wait for this draft counts a call per chunk and the synthesis (summary_draft_s)
     assert len(documents.read_data(summary)["inputs"]["chunks"]) + 1 == SUMMARY_CALLS
+    # the red values: the lisinopril and the note it cites (that line's wrong_source_type), nothing else
+    assert runs[8].result == "blocked ['condition/cond-j0001-htn-note', 'lisinopril']; removed and signed"
+    _only_the_lisinopril_is_untraceable(documents.read_data(summary))
     assert store.fhir.read("DocumentReference", f"pinstr-{S.STAY}")["docStatus"] == "final"
     reported = store.fhir.search("Observation", patient=S.PATIENT, category="patient-reported")
     assert reported and store.fhir.search("Task", patient=S.PATIENT, code="followup-escalation")
+    # the nurse's call-back at hospital time, as every other step's signature (it was the wall clock: 03:39 live)
+    assert parse(view["beats"]["followup"]) <= parse(steps["followup"]["signed"]["at"]) <= parse(view["now"])
+
+
+def _only_the_lisinopril_is_untraceable(data: dict) -> None:
+    """Live (10-18) the model wrote what her warfarin and metoprolol are for ("for atrial fibrillation"), and the
+    validator blocked those lines too: her chronic conditions were on her problem list (the clinic visit), not on the
+    stay the summary reads. Her known conditions are diagnoses of the stay: a draft that names them, written as the
+    live model did, is blocked by the lisinopril alone."""
+    from app.modules.documentation import summary_agent
+    from app.modules.documentation.validator import DischargeSummaryValidator
+
+    content = data["content"]  # as signed: the lisinopril removed
+    for line in (m for cat in content["medications"].values() for m in cat):
+        if line["name"].lower() in ("warfarin", "metoprolol"):
+            line["note"] = f"{line['note']} For atrial fibrillation.".strip()
+    content["hospital_course"][0]["text"] += " Known atrial fibrillation on warfarin, hypertension and osteoporosis."
+    validator = DischargeSummaryValidator(summary_agent.sources_from(data["sources"]), data["inputs"]["table"])
+    assert [(i.code, i.value) for i in validator.validate(content).issues if i.severity == "red"] == []
+    # and the draft's lisinopril, cited to the hypertension note it came from: the one line blocked
+    content["medications"]["new"].append({"text": "Lisinopril 10 mg once daily", "name": "lisinopril",
+                                          "rxcui": "29046", "dose": "10 mg oral once daily", "note": "For hypertension.",
+                                          "source_refs": ["Condition/cond-j0001-htn-note"]})
+    red = [i for i in validator.validate(content).issues if i.severity == "red"]
+    assert {i.path for i in red} == {f"medications.new[{len(content['medications']['new']) - 1}]"}
+    assert ("untraceable_medication", "lisinopril") in {(i.code, i.value) for i in red}
 
 
 def test_the_bed_the_early_rounds_free_is_hers_though_someone_elses_admission_comes_due_first(story, client,
@@ -236,6 +265,60 @@ def test_the_bed_the_early_rounds_free_is_hers_though_someone_elses_admission_co
         assert stay["location"][-1]["location"]["reference"] == offered
         other = store.fhir.read("Encounter", rival)  # admitted to another free bed, or still waiting for one
         assert other is None or other["location"][-1]["location"]["reference"] != offered
+
+
+def test_the_bed_step_waits_for_the_admission_decision_though_orthopedics_is_flagged_already(story, client,
+                                                                                            monkeypatch):
+    """The preset fills Orthopedics at 07:00, so the Control Tower's `unit_occupancy:ORTH` is open (medium) long
+    before her admission decision. The bed step took that exception for its proposal and counted as ready: no
+    Advance on the storyline page or in the demo guide, and the presenter was stuck at step 5 (live run on Monday
+    10-19's data, 10-18). The step waits for the decision, and its Advance has the AI narrate the exception only
+    once she boards (high), not the medium one before her."""
+    from app.ehr import simjobs
+    from app.modules.control_tower import exceptions as X
+
+    store = story
+    walk = Walk(client, pump=H.pump, advance=H.advance, timeout_s=60)
+    walk.run(["call", "triage", "imaging", "inr"])
+
+    def orth():
+        live = sorted((e for e in X.all_exceptions(store) if e.key == "unit_occupancy:ORTH" and e.status in X.LIVE),
+                      key=lambda e: e.detected_at)
+        return live[-1] if live else None
+
+    early = orth()
+    assert early is not None and early.facts["ed_boarders"] == 0  # flagged before she needs a bed
+    view = walk.status()
+    step = next(s for s in view["steps"] if s["key"] == "bed")
+    assert view["current"] == 5 and step["proposal"]["ref"] == f"FlowException/{early.id}"
+    assert step["status"] == "waiting" and step["beat"] == "decision"
+    assert parse(step["beat_at"]) > parse(view["now"])
+    # the guide's Start (or the step's Advance): the fast-forward runs in the API's background, here the harness
+    monkeypatch.setattr(simjobs, "start", lambda store, *a, operator, until=None, **kw: {
+        "id": "test", "status": "done", "target": until.isoformat()})
+    assert client.post("/api/storyline/advance", headers=walk.headers(S.CAST["bed_manager"])).status_code == 200
+    H.pump()
+    walk.status()  # the queued AI goes out with a request (after commit) ...
+    H.pump()  # ... and runs in the next pass: nothing to run before she boards
+    assert store.modules["storyline"]["ai_steps"]["bed"]["items"] == []
+    assert X.get(store, early.id).narration_status != "done"
+    H.advance(walk, "decision")
+    walk.status()
+    H.pump()
+    exc, step = orth(), walk.step("bed")
+    assert step["status"] == "active" and exc.severity == "high" and exc.facts["ed_boarders"] >= 1
+    assert store.modules["storyline"]["ai_steps"]["bed"]["items"] == [["exception", exc.id]]
+    assert exc.narration_status == "done"  # the narrative of the exception she boards, not of the medium one
+
+
+def test_the_follow_up_step_opens_her_call_on_the_calls_tab():
+    """The follow-up page opens on its Queue, which lists only calls that need a nurse; her scheduled call is under
+    Calls (live run 10-18). The step's route opens her call there (the guide's Start, the page's switch)."""
+    from app.modules.voice_services import followup
+
+    step = S.BY_KEY["followup"]
+    assert step.route == f"/follow-up?call={followup.call_id_for(S.STAY)}"
+    assert any(c.startswith("Follow-up calls, Calls tab: her call") for c in step.click_path)
 
 
 def test_the_summary_step_can_wait_for_a_whole_draft_against_a_live_model():

@@ -3,11 +3,13 @@
 // and the manual follow-ups), with the MRN, the discharge date, the call summary, the red flags and the patient's
 // own words. The nurse writes a call-back note, closes the escalation or refers it to a physician; each is a
 // Communication. Calls: the scheduled calls, placed here with the patient simulated (type or speak as them).
+// /follow-up?call=FU-… (the storyline's step 11 and its demo guide) opens that call on the Calls tab.
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { AlertTriangle, Bell, Bot, CheckCircle2, ClipboardList, Phone, PhoneCall, PhoneMissed, RefreshCw, Send, Siren, Stethoscope } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { AiBadge, Badge, Button, Card, EmptyState, ErrorState, Loading, PageHeader, Stat, Tabs } from "../../components/ui";
 import { useAuth } from "../../lib/auth";
 import {
@@ -35,13 +37,24 @@ function statusBadge(item: FollowupItem) {
 
 export function FollowUpPage() {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<Tab>("open");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const location = useLocation();
+  const linked = params.get("call");
+  // a linked call is listed under Calls before it needs a nurse (the Queue lists only those that do)
+  const [tab, setTab] = useState<Tab>(linked ? "calls" : "open");
+  const [selected, setSelected] = useState<string | null>(linked);
   const list = useFollowups(tab);
   const summary = useEscalationSummary(true);
   const scan = useMutation({ mutationFn: sweep, onSuccess: () => queryClient.invalidateQueries({ queryKey: ["voice"] }) });
   const items = list.data?.items ?? [];
 
+  useEffect(() => {
+    // opened again with a link while the page is shown (the demo guide's "Back to …"): that call again
+    if (linked) {
+      setTab("calls");
+      setSelected(linked);
+    }
+  }, [linked, location.key]);
   useEffect(() => {
     if (!selected && items.length) setSelected(items[0].id);
   }, [items, selected]);
