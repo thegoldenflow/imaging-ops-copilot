@@ -35,6 +35,12 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+psycopg://ioc:${POSTGRES_PASSWORD}@postgres:5432/ioc
+    # Memory cap, RAM only (no swap), so the API cannot push the host's other services into swap. Measured
+    # 2026-10-18: ~850 MiB after start, ~1.2 GiB peak during a demo reset, and each reset leaves ~400 MiB more
+    # behind. Past the cap the kernel kills the API and restart: unless-stopped brings it back; a reset killed
+    # midway rolls back (one transaction). Override with API_MEM_LIMIT in .env. See docs/DEPLOY.md.
+    mem_limit: ${API_MEM_LIMIT:-1536m}
+    memswap_limit: ${API_MEM_LIMIT:-1536m}
     depends_on:
       postgres:
         condition: service_healthy
