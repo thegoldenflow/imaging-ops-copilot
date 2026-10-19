@@ -346,7 +346,8 @@ class Walk:
         self.wait("the scheduled follow-up call", lambda: (r := self.client.get(
             f"/api/voice/followups/{call_id}", headers=self.headers(user))).status_code == 200 and
             r.json().get("status") in ("scheduled", "in_progress", "completed"), timeout_s=self.timeout_s * 2)
-        lines = self.status(user)["patient"]["followup_lines"]
+        patient = self.status(user)["patient"]
+        lines, closing = patient["followup_lines"], patient["followup_closing"]
         call = self.get(f"/api/voice/followups/{call_id}", user)
         if call["status"] == "scheduled":
             self.post(f"/api/voice/followups/{call_id}/start", user)
@@ -357,8 +358,7 @@ class Walk:
             asked = next((t.get("question") for t in reversed(call.get("transcript") or []) if t["role"] == "agent"),
                          None)
             kind = next((q["kind"] for q in call.get("script") or [] if q["key"] == asked), "identity")
-            for text in [*(lines if kind == "identity" else lines[1:]), "没有了，谢谢。", "没有了。", "没有了。", "没有了。",
-                         "没有了。", "没有了。"]:
+            for text in [*(lines if kind == "identity" else lines[1:]), *[closing] * 6]:
                 answer = self.post(f"/api/voice/followups/{call_id}/answer", user, {"text": text})
                 if answer.get("ended"):
                     break

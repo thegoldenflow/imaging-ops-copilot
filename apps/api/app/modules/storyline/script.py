@@ -64,11 +64,16 @@ CAST = {
     "admin": "U-ADMIN",
 }
 
-# What the daughter and the patient say (the storyline page offers them as one-click phrases)
-CALL_LINES = ("你好，我妈妈在家摔倒了，救护车正在把她送到你们急诊。",
-              "我是她女儿。她叫王秀英，{birth_zh}出生，健康卡尾号4821。",
-              "没有了，谢谢。")
-FOLLOWUP_LINES = ("{birth_zh}", "还行，就是伤口一直在渗液，纱布都湿透了。")
+# What the daughter and the patient say (the storyline page offers them as one-click phrases), each with its English
+# translation: fixed text, the subtitles for an English-speaking audience (no model translates them)
+CALL_LINES = (("你好，我妈妈在家摔倒了，救护车正在把她送到你们急诊。",
+               "Hello, my mother fell at home, and an ambulance is bringing her to your emergency department."),
+              ("我是她女儿。她叫王秀英，{birth_zh}出生，健康卡尾号4821。",
+               "I'm her daughter. Her name is Wang Xiuying, born {birth_en}, health card ending in 4821."),
+              ("没有了，谢谢。", "No, that's all, thank you."))
+FOLLOWUP_LINES = (("{birth_zh}", "{birth_en}"),
+                  ("还行，就是伤口一直在渗液，纱布都湿透了。", "I'm all right, but the wound keeps leaking; the gauze is soaked through."))
+FOLLOWUP_CLOSING = ("没有了。", "No, nothing else.")  # the follow-up's remaining questions, until the call ends
 
 IMAGING_REQUEST = {
     REQUISITIONS[0]: ("XR_HIP", "X-ray left hip and pelvis"),
@@ -97,6 +102,21 @@ def birth_date(day: date) -> date:
 def birth_zh(day: date) -> str:
     b = birth_date(day)
     return f"{b.year}年{b.month}月{b.day}日"
+
+
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+          "November", "December")
+
+
+def birth_en(day: date) -> str:
+    b = birth_date(day)
+    return f"{MONTHS[b.month - 1]} {b.day}, {b.year}"
+
+
+def lines(pairs, day: date) -> list[tuple[str, str]]:
+    """The scripted lines with her birth date filled in: (what is said, its English translation)."""
+    values = {"birth_zh": birth_zh(day), "birth_en": birth_en(day)}
+    return [(text.format(**values), en.format(**values)) for text, en in pairs]
 
 
 @dataclass(frozen=True)

@@ -726,10 +726,16 @@ def status(store: Store, user: StaffUser) -> dict:
     facts, story_beats = _cached(store, st, view["job"]) if st is not None else (None, {})
     if st is not None:
         day = parse(st["prepared_at"]).date()
+        call_lines, followup_lines = S.lines(S.CALL_LINES, day), S.lines(S.FOLLOWUP_LINES, day)
+        closing = S.FOLLOWUP_CLOSING
         view["patient"] = {"id": S.PATIENT, "mrn": S.MRN, "name": f"{S.GIVEN} {S.FAMILY}", "name_zh": S.FAMILY_ZH + S.GIVEN_ZH,
                            "birth_date": st["birth_date"], "age": S.AGE, "language": S.LANGUAGE,
-                           "call_lines": [line.format(birth_zh=S.birth_zh(day)) for line in S.CALL_LINES],
-                           "followup_lines": [line.format(birth_zh=S.birth_zh(day)) for line in S.FOLLOWUP_LINES],
+                           "call_lines": [text for text, _ in call_lines],
+                           "followup_lines": [text for text, _ in followup_lines],
+                           "followup_closing": closing[0],
+                           # each scripted line in another language -> its English translation (the subtitles)
+                           "translations": {text: en for text, en in [*call_lines, *followup_lines, closing]
+                                            if text != en},
                            "imaging_record": S.IMAGING_PATIENT, "mpi": st.get("mpi")}
         view["beats"] = story_beats
         view["capacity"] = {"surgery_ready": (st.get("capacity") or {}).get("surgery_ready"),

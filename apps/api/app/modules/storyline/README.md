@@ -5,8 +5,10 @@ Mandarin-speaking, on warfarin for atrial fibrillation, falls at home and breaks
 → a person signs → audit trail". The guided page is `/storyline` (web `features/storyline/`); its **Demo mode** puts a presenter's guide
 on every page (each step's introduction, the clicks, then "Continue to the next step?"). For a live interview the
 guide can have the demo's automation do a step ("Do this step for me"), jump to a step, or present only the
-highlights (steps 1, 5, 9, 11) with the automation doing the steps in between (`autoplay.py`). The demo script is
-`demo/hospital_journey.md`.
+highlights (steps 1, 5, 9, 11) with the automation doing the steps in between (`autoplay.py`). For an
+English-speaking audience the Mandarin calls have English subtitles in demo mode: the caller's scripted lines have
+fixed translations (`script.py`), the agent's replies their hand-written English (`Turn.gloss`, voice services). The
+demo script is `demo/hospital_journey.md`.
 
 ## Input resources
 
@@ -27,7 +29,9 @@ highlights (steps 1, 5, 9, 11) with the automation doing the steps in between (`
 ## Output schema
 
 - `GET /api/storyline`: per step the AI proposal (a Task or an exception, its agent and run), the signature or
-  approval, the EHR records written and their audit events; the hospital clock, Temporal's state, the journey.
+  approval, the EHR records written and their audit events; the hospital clock, Temporal's state, the journey; the
+  patient with the caller's scripted lines (`call_lines`, `followup_lines`, `followup_closing`) and each line's
+  English translation when it is not English (`translations`, fixed text: the subtitles).
 - `POST /api/storyline/reset` (demo reset + preset), `POST /api/storyline/advance` (fast-forward to the step's beat).
 - The demo's automation (`autoplay.py`): `POST /api/storyline/steps/{key}/autoplay` (the current step) and
   `POST /api/storyline/steps/{key}/jump` (every step from the current one up to the one before `key`), 409 when the

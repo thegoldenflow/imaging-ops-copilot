@@ -152,6 +152,8 @@ export interface Storyline {
     language: string;
     call_lines: string[];
     followup_lines: string[];
+    followup_closing: string; // her answer to the follow-up's remaining questions ("nothing else")
+    translations: Record<string, string>; // each scripted line not in English -> its English translation (fixed text)
     imaging_record: string;
     mpi: { hospital: string; imaging: string; matched_on: string; note: string } | null;
   } | null;

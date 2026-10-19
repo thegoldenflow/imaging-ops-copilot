@@ -23,6 +23,7 @@ from app.modules.storyline import script as S
 from app.modules.storyline import service, stubs
 from app.modules.storyline.walk import SUMMARY_CALLS, Walk, WalkFailed, summary_draft_s
 from app.modules.voice_services import identity
+from app.modules.voice_services import phrases as P
 from tests import storyline_harness as H
 
 
@@ -122,6 +123,23 @@ def test_the_call_centre_proposes_the_registration_and_the_clerk_registers_her(s
     assert event.actor == f"user:{S.CAST['clerk']}"  # the EHR records who registered her (EVN-5)
     triage_card = stubs.find_card(store, "triage")  # the next step's card, written as the visit arrived
     assert triage_card is not None and "CTAS 2" in triage_card["description"]
+
+
+def test_the_scripted_lines_come_with_english_translations(story, client, login):
+    """The subtitles for an English-speaking audience: each Chinese line of the caller has a fixed translation, which
+    says the same things (the identity check reads the same birth date and card digits from it)."""
+    patient = client.get("/api/storyline", headers=login(S.CAST["clerk"])).json()["patient"]
+    said = [*patient["call_lines"], *patient["followup_lines"], patient["followup_closing"]]
+    translations = patient["translations"]
+    assert set(translations) == set(said) and not any(P.CJK.search(t) for t in translations.values())
+    day = parse(story.modules["hospital_plan"]["generated_for"]).date()
+    who = patient["call_lines"][1]
+    assert translations[who] == (f"I'm her daughter. Her name is Wang Xiuying, born {S.birth_en(day)}, health card "
+                                 "ending in 4821.")
+    zh, en = identity.parse(who), identity.parse(translations[who])
+    assert (zh.birth_date, zh.card_last4, zh.relation) == (en.birth_date, en.card_last4, en.relation) == (
+        S.birth_date(day).isoformat(), "4821", "daughter")
+    assert translations[patient["followup_lines"][0]] == S.birth_en(day)
 
 
 def test_a_walk_in_registration_plans_a_visit(fresh_state):

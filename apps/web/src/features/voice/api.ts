@@ -15,6 +15,7 @@ export interface Turn {
   intent?: string | null;
   source?: string | null;
   question?: string | null;
+  gloss?: string | null; // an agent turn in Chinese: the same hand-written reply in English (the subtitle)
 }
 
 export interface CallAction {

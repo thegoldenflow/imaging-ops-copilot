@@ -11,14 +11,14 @@ rules-only fallback and the nurse's actions). Web: `apps/web/src/features/voice/
 
 | File | What |
 | --- | --- |
-| `models.py` | `HospitalCall` (module table `voice_calls`), `FollowupCall` (`followup_calls`), `Turn`; transcripts encrypted at rest |
+| `models.py` | `HospitalCall` (module table `voice_calls`), `FollowupCall` (`followup_calls`), `Turn`; transcripts encrypted at rest; an agent turn in Chinese keeps the same reply in English (`Turn.gloss`, the web's English subtitles) |
 | `callcenter.py` | the inbound call's dialog: safety rules, pending steps (identity, which appointment, which time, yes/no), intents |
 | `intents.py`, `call_agent.py` | keyword rules (emergency, distress, a person, the six intents, yes/no, ordinals) and the model's intent recognition |
 | `identity.py` | parsing name, birth date, last four card digits and the caller's relation (English and Chinese) |
 | `kb.py` | the hospital FAQ (`knowledge/hospital_faq/*.md`: sections with keywords and answers in three languages) |
 | `followup.py` | the four trigger conditions, scheduling (sweep and journey), the scripted call, escalation and write-back |
 | `redflags.py`, `followup_agent.py` | the nine red-flag rules (negation, temperatures) and the escalation classifier |
-| `phrases.py` | every sentence the agents say, in `en`, `zh-Hans`, `zh-Hant`; the service names |
+| `phrases.py` | every sentence the agents say, in `en`, `zh-Hans`, `zh-Hant`; the service names. A reply carries its English rendering (`Said.en`: the same templates and values in English, not a model's translation) |
 | `queue.py` | the nurse follow-up queue and its actions (call-back note, close, refer) |
 | `tools.py` | the tool handlers (config/tools: findCaller, getPatientAppointments, findAppointmentSlots, writeCallRecord, createCallTask, recordPatientReportedObservation, moveAppointment, cancelBookedAppointment) |
 | `service.py`, `router.py`, `journey.py` | views, clerk requests, demo cases; the API; the journey's `scheduleFollowupCall` step |

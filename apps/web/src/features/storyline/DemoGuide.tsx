@@ -256,7 +256,8 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
   const job = data.job?.status === "running" ? data.job : null;
   // the follow-up call goes on with its questions (medicines, appointments, red flags): "nothing else" until it ends
   const lines = step.key === "call" ? data.patient?.call_lines
-    : step.key === "followup" ? [...(data.patient?.followup_lines ?? []), "没有了。"] : undefined;
+    : step.key === "followup" ? [...(data.patient?.followup_lines ?? []), data.patient?.followup_closing ?? ""].filter(Boolean) : undefined;
+  const translations = data.patient?.translations ?? {};
   // the admission reconciliation is co-signed by her surgeon (the summary's author) once the pharmacist has signed
   const cosigner = step.key === "medrec" && step.signed?.by && !step.done ? data.steps.find((s) => s.key === "summary")?.cast : undefined;
   const cosigning = !!cosigner && user?.id === cosigner.id;
@@ -310,7 +311,14 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
           <ul className="space-y-1.5">
             {lines.map((l, i) => (
               <li key={l} className="flex items-start gap-2">
-                <span className="flex-1 text-xs text-slate-800" lang="zh-CN">{l}</span>
+                <span className="flex-1 text-xs text-slate-800">
+                  <span lang={data.patient?.language}>{l}</span>
+                  {translations[l] && (
+                    <span className="mt-0.5 block text-[11px] text-slate-500 italic" lang="en" data-testid={`demo-say-translation-${i}`}>
+                      <span className="font-medium not-italic">Translation: </span>{translations[l]}
+                    </span>
+                  )}
+                </span>
                 <Button size="sm" variant="secondary" className="h-7 shrink-0 px-2" onClick={() => sayAsCaller(l)} disabled={!canSay} data-testid={`demo-say-${i}`}>
                   <Mic className="size-3" />Say it
                 </Button>

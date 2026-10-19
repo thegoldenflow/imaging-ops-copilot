@@ -227,7 +227,8 @@ function StepBody({ step, data, current }: { step: StoryStep; data: Storyline; c
     if (step.cast && !isYou) await login(step.cast.id);
     navigate(step.route);
   };
-  const lines = step.key === "call" ? data.patient?.call_lines : step.key === "followup" ? data.patient?.followup_lines : undefined;
+  const lines = step.key === "call" ? data.patient?.call_lines
+    : step.key === "followup" ? [...(data.patient?.followup_lines ?? []), data.patient?.followup_closing ?? ""].filter(Boolean) : undefined;
   const jobRunning = data.job?.status === "running";
   return (
     <div className="space-y-3 border-t border-slate-100 p-3 pt-2.5 text-sm">
@@ -275,7 +276,7 @@ function StepBody({ step, data, current }: { step: StoryStep; data: Storyline; c
         <Quote className="mt-0.5 size-4 shrink-0 text-brand-600" />
         <span>{step.say}</span>
       </blockquote>
-      {lines && <Phrases lines={lines} />}
+      {lines && <Phrases lines={lines} lang={data.patient?.language} translations={data.patient?.translations ?? {}} />}
       <div className="grid gap-3 md:grid-cols-2">
         <div>
           <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">The screen should show</p>
@@ -291,14 +292,17 @@ function StepBody({ step, data, current }: { step: StoryStep; data: Storyline; c
   );
 }
 
-function Phrases({ lines }: { lines: string[] }) {
+function Phrases({ lines, lang, translations }: { lines: string[]; lang?: string; translations: Record<string, string> }) {
   return (
     <div className="rounded-lg border border-dashed border-slate-300 p-2 text-xs">
       <p className="mb-1 font-semibold text-slate-500">What the caller says (type or paste in the call):</p>
       <ul className="space-y-1">
         {lines.map((l) => (
           <li key={l} className="flex items-center justify-between gap-2">
-            <span className="text-slate-800" lang="zh-CN">{l}</span>
+            <span className="text-slate-800">
+              <span lang={lang}>{l}</span>
+              {translations[l] && <span className="block text-[11px] text-slate-500 italic" lang="en"><span className="font-medium not-italic">Translation: </span>{translations[l]}</span>}
+            </span>
             <button type="button" className="inline-flex items-center gap-1 text-brand-700 hover:underline" onClick={() => void navigator.clipboard?.writeText(l)}>
               <Copy className="size-3" />Copy
             </button>

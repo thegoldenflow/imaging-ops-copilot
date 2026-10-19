@@ -39,11 +39,20 @@ person decides, and the audit trail records both. Three steps are roadmap items 
 every page. For each step it first shows the introduction (what the step shows, who plays it, the sentence to say,
 what the audience will see); **Start** switches to that person and opens their screen (and starts the clock's
 fast-forward when the step waits for time). It then lists the clicks, gives the caller's lines as **Say it** buttons
-(no copy and paste) and says whose signature the step waits for; the guide never signs, the presenter clicks the
+(no copy and paste; a Chinese line has its English translation under it) and says whose signature the step waits for; the guide never signs, the presenter clicks the
 real button, which the guide marks on the screen with an amber ring and a label ("Start the call", "Confirm the
 registration the AI pre-filled", "Approve the actions the AI recommends"…): the first button of the step not yet pressed,
 so someone who has never seen the app knows where to click. When the step is done it shows the trail and asks **Continue to the next step?** (**Not yet** pauses
 it; **Resume** goes on). Fold the panel with its arrow when it covers a button. Exit with its cross.
+
+**English subtitles (an English-speaking audience).** While demo mode is on, every Chinese turn of the call centre's
+and the follow-up call's transcript has its English under it, marked "Translation". The caller's scripted lines have
+fixed translations (`app/modules/storyline/script.py`, `patient.translations` on `GET /api/storyline`); the agent's
+reply is the same hand-written reply in English (`phrases.py` writes every sentence in each language; the turn keeps
+it as `gloss`). No model translates anything, so the subtitles cost nothing and say exactly what the call said. The
+transcript's **English subtitles** box turns them off, or on outside demo mode (per browser). A line typed by hand has
+no subtitle. Say once: "The patient's side is in Mandarin; the subtitles are the script's own English, not a
+translation by the AI."
 
 **Do this step for me, jump to a step, highlights (a live interview).** The demo's automation walks steps for you,
 through the API as the people who play them (the same walk as the scripted run below), in the API's background; the
@@ -86,7 +95,7 @@ as the step is done, and the step's badge turns **Done**.
 
 1. **0:00 — The call (7.4 call centre, clerk).** **Switch to Maya Nakamura**, then on **Call centre** press **Start call**. Click the daughter's two phrases on the storyline page to copy them, and paste each one as a turn:
    "你好，我妈妈在家摔倒了，救护车正在把她送到你们急诊。" and "我是她女儿。她叫王秀英，……出生，健康卡尾号4821。"
-   - The screen shows the reply in Chinese, the call's language switched to 简体中文, and the identity check "Verified" (name, birth date and the last four digits of the card).
+   - The screen shows the reply in Chinese, the call's language switched to 简体中文, and the identity check "Verified" (name, birth date and the last four digits of the card). In demo mode each Chinese turn has its English subtitle.
    - Say: "Her daughter calls in Mandarin. The call centre answers in Chinese, checks who the patient is and pre-fills the ED registration. Nothing is recorded yet."
    - Under **Requests**, the card **ED registration · pre-filled from the call** (AI) shows Wang Xiuying, MRN 40720001, complaint fall, arriving by ambulance. Press **Confirm**, then **End call**: the summary begins "Call from the patient's daughter".
    - The EHR registers the visit `ed-j0001` (EMER) with the clerk as the operator. Permissions: the clerk sees that she is registered, never why.
@@ -135,7 +144,7 @@ as the step is done, and the step's badge turns **Done**.
     - **Sign.**
 
 11. **8:30 — Follow-up call 48 hours later (7.4, ward nurse).** **Advance the clock** 48 hours (with Temporal on, the journey's timer schedules the call). Then **Follow-up calls**, the **Calls** tab, her call (MRN 40720001), **Place call**. The step's **Switch to Vera Uchida** (and the guide's **Start**) opens her call there (`/follow-up?call=FU-stay-j0001`). The page otherwise opens on its **Queue**, which lists only calls that need a nurse, and hers does not need one yet.
-    - Answer as the patient with the two phrases from the storyline page: her birth date, then "还行，就是伤口一直在渗液，纱布都湿透了。"
+    - Answer as the patient with the two phrases from the storyline page: her birth date, then "还行，就是伤口一直在渗液，纱布都湿透了。" (I'm all right, but the wound keeps leaking; the gauze is soaked through). Then "没有了。" (nothing else) to the remaining questions.
     - The rule layer escalates at once: a red flag for heavy wound drainage, quoting her words, and a Task `followup-escalation` (urgent) for the nurses of her last unit.
     - On the **Queue** tab her escalation is on top. **Call back** (the note is recorded at hospital time, like every other step's signature). The call never gives medical advice.
 
