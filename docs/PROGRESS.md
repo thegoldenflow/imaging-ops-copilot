@@ -1549,6 +1549,11 @@ Second step: the same story with a patient who speaks English, for an audience t
 - [x] Tests: `tests/test_storyline.py`'s Mandarin fixture plants `zh` explicitly; the English whole-story test now plants without a language (the default) and checks the state says `en`; `test_the_two_patients_share_the_story_and_differ_in_language` checks the default is English. `tests/test_storyline_autoplay.py` runs on the default story now: its check of her follow-up answer is language-neutral (it looked for 渗液). Playwright: `demo-guide` resets to `zh` explicitly (it checks the Mandarin call's subtitles); `demo-highlights` resets without a language and checks that the story is the English one; `hospital-storyline` already picks `zh` in the page's select; `demo-english` resets to `en`.
 - [x] Results (mock model, own databases, API 9419, Vite 5181): full backend suite 917 passed, 1 failed (the same unrelated board test, casebook 5.18: seeded on Monday about 03:00); `npx tsc -b` clean; Playwright `demo-english`, `demo-guide`, `demo-highlights`, `hospital-storyline` 4/4 (9.6 min).
 
+### A reset counts as the day's reset (found on the live server, 2026-10-19) — done
+
+- [x] On ops.jasonyao.dev (v0.3.0, `DEMO_DAILY_RESET_HOUR=8`, UTC), a storyline reset after 08:00 was wiped about a minute later by the scheduler's daily reset (audit: `Scheduler · daily demo reset` at 17:59:36 and again at 18:03:55): `reset_store()` rewrites `module_state` from the generated data, which has no `daily_reset` marker, and the intake loop checks every 2 s, idle or not. In an interview this meant a story prepared before the start was gone a minute later. Now `reset_store()` marks the day as reset. Casebook 12.15, `tests/test_daily_reset.py` (fails without the fix).
+- [ ] Not changed: the daily reset itself still leaves the storyline unprepared (a presenter resets the story before a demo anyway).
+
 ## Environment notes
 
 - `ANTHROPIC_API_KEY` and `GOOGLE_AGENT_PLATFORM_API_KEY` are not configured in the cloud environment; everything runs in mock mode there.

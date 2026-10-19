@@ -192,6 +192,8 @@
 | 12.11 | 其他设计小记 | hospital | 速查表 |
 | 12.12 | 故事线第 5 步没有"推进时钟"：07:00 就开着的骨科异常被当成了这一步的提议 | hospital | 设计 · 状态 · 演示 |
 | 12.13 | 回电时间是墙上时间：两个时钟写进同一条记录 | hospital | 设计 · 时间 |
+| 12.14 | 第 7 步的签名时间是审计事件的时间；随访通话自己的时间也是墙上时间 | hospital | 设计 · 时间 |
+| 12.15 | 线上故事线重置一分钟后被每日自动重置冲掉：手动重置抹掉了"今天已重置"的标记 | 平台 / hospital | 定时任务 · 线上配置 · 审计 |
 | 13.1 | 函数名覆盖了模块级的锁 | hospital | Python |
 | 13.2 | 循环导入只在某个入口出现 | 平台 | Python |
 | 13.3 | 新代码绕开测试的注入点 | 平台 | Python · 测试 |
@@ -3801,6 +3803,38 @@ WP9 开工前的只读审计、读端到端截图、核对 README 里的一句�
   `apps/api/app/modules/voice_services/followup.py`、`apps/api/app/modules/voice_services/models.py`、`apps/api/tests/test_storyline.py`、
   `apps/api/tests/test_voice_services.py`；相关、没有修改：`apps/api/app/core/audit.py`、`apps/api/app/modules/voice_services/queue.py`、
   `apps/api/app/modules/control_tower/service.py`。提交：本案所在的提交。
+
+
+### 12.15 线上故事线重置一分钟后又变成"未设置"：每日自动重置把手动重置当成"今天还没重置"
+
+- **现象：** v0.3.0 部署后（10-19），在线上 ops.jasonyao.dev 重置故事线（英文病人），`POST /api/storyline/reset` 返回 200，紧接着查状态也正常
+  （`Margaret Ellis | current 1`）。可是打开演示模式，引导面板却显示 "The storyline is not set up"，管理员查 `GET /api/storyline` 也变成 `prepared False`。
+- **怎么查的：**
+  1. 先排除"缓存/读错"：直接查服务器数据库，`module_state` 里根本没有 `storyline` 这一行，`app_meta.seeded_at = 2026-10-19T17:59:36`，
+     说明在我的重置（17:59:08 返回）**之后**又有一次整套演示数据重新生成，把故事线的预设盖掉了。
+  2. 谁触发的？`docker logs -t` 按时间读 17:55–18:01：只有我那一次 `POST /api/storyline/reset`，没有别的重置请求，所以是服务器内部触发的。
+     顺带看到 17:58:13 有一次 OOM（exit 137）：浏览器一打开页面，空闲暂停的后台任务恢复，内存超过 1.5 GiB 上限（7.8 的泄漏），这次 OOM 不是重置引起的。
+  3. 假设"每日自动重置"：服务器 `.env` 里 `DEMO_DAILY_RESET_HOUR=8`（容器是 UTC），当时 18:01，已过钟点。审计表里查 `action='reset'`：
+     `2026-10-19 17:59:36 | Scheduler | daily demo reset`。坐实。
+  4. 为什么今天会跑两次？读 `app/modules/admin/service.py::maybe_daily_reset`：它用 `store.modules["daily_reset"] == 今天` 判断今天是否已经重置。
+     而 `reset_store()` 用新生成的数据**整体覆盖** `module_state`，新数据里没有这个标记，所以任何手动重置（页头的 Reset demo、故事线重置）之后标记都没了。
+     `app/main.py` 的后台循环每 2 秒检查一次，这一步不受空闲暂停影响，过了钟点就立刻再重置一次（生成约 1 分钟），把刚种好的故事线冲掉。
+     第一次是我早上 07:10（UTC，钟点前）的重置清掉了标记；08:00 那次本该补上，但站点没人用、后台没跑。17:58 有人访问后它开始跑，
+     和我 17:58:37 发起的故事线重置并行生成：我的先提交（17:59:08），它后提交（17:59:36），把我的覆盖了。
+  5. 再验证一遍机制：重新重置故事线后，标记又消失了（`module_state` 里查不到）。每 15 秒查一次状态：`14:03:55 prepared=False`，
+     审计里多了 `18:03:55 Scheduler daily demo reset`。也就是**今天之内每次重置都会被随后的自动重置冲掉**；放在面试里，就是"开场前准备好的故事线一分钟后消失"。
+- **根因：** 每日重置的"今天已重置"标记存在会被重置整体覆盖的数据里。手动重置抹掉了它，调度器就把手动重置当成"今天还没重置"。
+- **怎么修：** `reset_store()` 写完新数据后，把 `daily_reset` 标记设为今天（`app/core/store.py`）：任何重置都算今天的重置，数据已经是新的，调度器当天不再动它。
+  调度器自己那次重置照常（它调用的也是 `reset_store()`，然后再写一次标记）。
+- **怎么证明：** `tests/test_daily_reset.py`：重置后，在钟点之后调用 `maybe_daily_reset` 返回 False，调度器没有重置；没有标记的一天它照常重置一次、只一次，钟点前不重置。
+  去掉修复时，第一个测试失败在 `assert None == '2026-10-19'`（重置后标记消失）。线上验证见 PROGRESS（v0.3.1）。
+- **经验：**
+  - "返回 200、紧接着查也正常，过一会儿又不对"：先看数据库里的事实（哪一行没了、`seeded_at` 是几点），再按时间读日志，找"谁在那之后写过"。审计表是最好的证人。
+  - 判断"今天做过没有"的标记，不能放在会被整体覆盖的数据里；或者覆盖它的操作要负责把它写回去。
+  - 本地开发几乎碰不到这个问题：本机不设 `DEMO_DAILY_RESET_HOUR`。只在线上才有的配置，要专门想一遍它和手动操作会怎样交错。
+- **范围：** 平台（演示数据重置）；影响线上故事线演示。
+- **来源：** 本会话 10-19，线上高光版走查前的重置。
+- **代码：** `apps/api/app/core/store.py`（`reset_store`）、`apps/api/app/modules/admin/service.py`（`maybe_daily_reset`）、`apps/api/tests/test_daily_reset.py`；分支 `claude/daily-reset-marker`。
 
 ---
 
