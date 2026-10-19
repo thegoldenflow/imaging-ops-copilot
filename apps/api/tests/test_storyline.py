@@ -332,6 +332,39 @@ def test_the_bed_step_waits_for_the_admission_decision_though_orthopedics_is_fla
     assert exc.narration_status == "done"  # the narrative of the exception she boards, not of the medium one
 
 
+def test_a_status_read_that_straddles_the_early_rounds_commit_does_not_freeze_the_bed_step(story, client):
+    """The status caches its facts and beats under a key (clock, last event, last audited write, the store's change
+    counter). A poll read the storyline's state, then the bus handler committed the bed manager's early-rounds mark
+    (only the state and the plan: no event, no audited write, the clock still), then the poll read the key, already
+    counting that commit, and cached beats computed from the state read before it: no time for "admitted". Nothing
+    changed the key afterwards, so Advance answered "Not yet" until the e2e gave up after 12 minutes (2 of about 8
+    runs, 10-18; casebook 10.10). Here the request's copy of the state predates the mark while the database has it
+    (as two transactions leave it); the beats come from the database."""
+    import copy
+
+    store = story
+    walk = Walk(client, pump=H.pump, advance=H.advance, timeout_s=60)
+    walk.run(["call", "triage", "imaging", "inr"])
+    H.advance(walk, "decision")
+    H.pump()
+    exc_id = walk.proposal("bed")["ref"].split("/", 1)[1]
+    walk.post(f"/api/control-tower/exceptions/{exc_id}/approve", S.CAST["bed_manager"],
+              {"action_ids": ["overflow_discharge_rounds"], "note": "Round early on Surgery"})
+    bus.drain()  # the storyline's handler marks the early rounds
+    assert "early_rounds" in store.modules["storyline"]["marks"]
+    store.save()  # the mark is in the database
+    # this request read the state before that commit: its copy (and what it last read) lacks the mark
+    before = copy.deepcopy(store.modules["storyline"])
+    before["marks"].pop("early_rounds")
+    store.modules._values["storyline"] = before
+    store.modules._snap["storyline"] = store.modules._encode("storyline", before)
+    service._FACTS.clear()
+    view = service.status(store, store.staff.get("U-ADMIN"))
+    assert view["beats"]["admitted"] is not None
+    step = next(s for s in view["steps"] if s["key"] == "bed")
+    assert step["beat"] == "admitted" and step["beat_at"] == view["beats"]["admitted"]
+
+
 def test_the_follow_up_step_opens_her_call_on_the_calls_tab():
     """The follow-up page opens on its Queue, which lists only calls that need a nurse; her scheduled call is under
     Calls (live run 10-18). The step's route opens her call there (the guide's Start, the page's switch)."""

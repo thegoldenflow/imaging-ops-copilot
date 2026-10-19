@@ -169,6 +169,7 @@
 | 10.7 | 负载下写一个 75 分钟的长 e2e | hospital | 端到端测试 |
 | 10.8 | Playwright 小坑 | 平台 | 速查表 |
 | 10.9 | 改了前端后故事线 e2e 两次失败、位置不同：先排除自己的改动，再按 10.5 定性 | hospital | 端到端测试 · 偶发 · 未查明 |
+| 10.10 | 合并后故事线卡在第 5 步：状态缓存的内容比键旧，之后键不再变（死锁） | hospital / 平台 | 端到端测试 · 缓存 · 竞态 · 复现 |
 | 11.1 | 电话组件崩溃：`useEffect` 返回了 Promise | imaging | 前端 |
 | 11.2 | `/api/auth/me` 被中断就登出 | 平台 | 前端 · 错误处理 |
 | 11.3 | 刚提交的同行评审从列表消失 | imaging | 前端 · 排序截断 |
@@ -3168,6 +3169,54 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** hospital（WP9 故事线 e2e）。
 - **来源：** 本会话 10-18。
 - **代码：** `apps/web/e2e/hospital-storyline.spec.ts`（没改）；演示模式的改动见 11.5。
+
+
+### 10.10 合并后故事线 e2e 卡在第 5 步：状态缓存在"一读一写"之间存下了旧的拍子，之后键再也不变
+
+- **现象：** 三个演示分支合并到 main（44f5799）后统一跑测试：`npx tsc -b` 干净，后端 911/911，Playwright 7 个里 6 过。
+  `hospital-storyline.spec.ts` 在第 5 步失败：`Error: the clock did not reach step 5's moment`（`advanceClock` 等满 12 分钟）。
+  失败时的页面快照：时钟 08:37，第 5 步 "Waiting for the clock"，签字栏写着 "approved by Jordan Lee · 08:37"，
+  但 Advance 按钮旁的提示是 `"Not yet: approve the early rounds on Surgery first; her bed is the first one they free"`。床位经理明明批准了，后端却说"还没批准"。
+- **怎么查的：**
+  1. 读代码确定这句话从哪来：`advance()` 里 `view["beats"].get("admitted")` 为 `None` 时抛 `Not yet`。
+     `beats()` 里 "admitted" 只在 storyline 状态有 `bed_offered` 或 `early_rounds` 标记时才有值；`early_rounds` 由事件 `exception.decided` 的处理函数
+     `_approved()` → `ehr_story.early_rounds()` 写入。所以问题变成："标记没写进去"还是"写了但没被看到"。
+  2. 想看失败时的数据库，但那个库已经被后面 voice-services spec 的演示重置清掉了（`domain_events` 只剩 5 行）。证据没了，只能复现。
+  3. 假设 A："一个 storyline 事件处理函数反复抛错，后面的事件都排在它后面"。看 `app/ehr/events.py`：处理函数抛错会 `log.exception("event handler failed: ...")`，
+     3 次后 parked 并写 dead letter，不会一直堵着。失败那一轮的 API 日志里**没有任何 ERROR/WARNING**。假设 A 被否定。
+  4. 按失败时的顺序原样重跑四个 spec，并加探针每 5 秒查一次数据库（时钟、storyline 标记、她的住院、骨科例外批准的动作）：4/4 通过，第 5 步正常
+     （批准 08:37 → `early_rounds` 标记 → `bed_offered` → 入院）。没复现。
+  5. 把 storyline spec 单独连跑 3 次，探针改成单条 SQL、2 秒一次，并加上 storyline 消费者未完成的投递记录。第 1、2 次通过，**第 3 次卡在第 5 步**，而且现场还在：
+     数据库里 `early_rounds` 标记完整（`{"at": "2026-10-19T08:37:00", "stays": [...]}`，`updated_at` 21:36:33），批准的动作里有 `overflow_discharge_rounds`，
+     消费者游标追平（109/109），没有失败的投递。但运行中的 API `GET /api/storyline` 返回 `admitted: None`，`POST /advance` 返回 `Not yet`。
+     也就是说**标记写进去了，API 却看不到**。假设"标记没写进去"被否定。
+  6. 用另一个 Python 进程连同一个库调用 `service.beats(store)`：`'admitted': '2026-10-19T10:54:00'`。同样的代码、同样的数据，新进程算得对，运行中的 API 算错，说明是 API 进程里的缓存。
+  7. 找到缓存：`status()` 把 facts 和 beats 存在进程内的 `_FACTS`（WP9 起就有，8d3cd5e），键是（`prepared_at`、`store.version`、时钟、最大事件序号、最大的被审计写入序号）。
+     做一个只改变键、不碰故事线的实验：以床位经理身份把另一个无关的 OR 例外 defer 一下（产生一个新事件）。前一秒 API 还是 `None`，下一秒就是 `10:54`，第 3 次运行随后在 760 秒通过第 5 步。
+     确认是这个缓存。
+  8. 第一个修复想法是把 `module_state` 里 storyline 和 hospital_plan 的 `updated_at` 加进键。写回归测试，结果**不加修复测试也通过**，说明测试没抓到真正的条件。
+     回去读 `Store.commit()`：commit 会 `save()`，`save()` 有写入就把 `app_meta.version` 加一，所以处理函数写标记时**键里的 version 其实变了**。
+     那旧值是怎么存进去的？读 `status()` 的顺序：它一开始就 `st = state(store)` 读了 storyline 状态，然后做了几次别的数据库读取（模拟器状态要读很大的 hospital_plan、工作流进度），
+     最后才在 `_cached()` 里读键。如果处理函数恰好在这两次读取之间提交：键读到的是**新的** version，而 `beats()` 用的是这次请求**一开始读到的旧状态**（`ModuleSpace` 在一个工作单元里缓存读过的值），
+     于是"没有 admitted"被存在新键下。之后没有任何写入，键不再变，旧值一直被返回；时钟只有 Advance 能推，而 Advance 又说 Not yet，死锁。
+     `updated_at` 和 version 一样是在键里读的，同样晚于状态，所以第一个修复想法是错的。
+- **根因：** 缓存的内容可能比它的键旧：键在请求后段读，内容用的却是请求开头读到的模块状态。只有当事件处理函数的提交恰好落在这两次读取之间时才会发生，负载越重窗口越宽，所以是偶发的
+  （10-18 约 8 次运行里 2 次）。
+- **怎么修：** `ModuleSpace.refresh(*names)`（`app/core/db/repo.py`）：让这些 blob 下次使用时从数据库重读（本工作单元未保存的改动保留；detached store 不动）。
+  `_cached()` 未命中时先 `refresh(preset.STATE, "hospital_plan")` 再算 facts 和 beats，这样存下的内容一定不比键旧。内容如果比键新是无害的：下次轮询键会变，再算一次。
+- **怎么证明：** 回归测试 `test_a_status_read_that_straddles_the_early_rounds_commit_does_not_freeze_the_bed_step` 直接构造"数据库里已经有标记、这次请求手里的副本还没有"：
+  去掉修复时失败在 `assert None is not None`（正是线上的症状），加上修复通过。`test_storyline.py`、`test_storyline_autoplay.py`、`test_db.py` 通过；合并后的完整测试见 PROGRESS。
+- **经验：**
+  - 证据会被后面的测试清掉：长 e2e 里一旦失败，先保住现场（这次是第二轮复现时现场还活着才查清的）。复现时探针要能区分"数据没写"和"写了没看到"。
+  - "新进程算得对、老进程算得错"是缓存问题的标志性证据，比读代码猜快得多。
+  - 一个只改变缓存键的无害操作（defer 一个无关例外）是验证"是不是缓存"的好实验：现象立刻消失就坐实了。
+  - 写回归测试要先确认它在不修复时会失败。这次第一个测试不修也过，才发现最初的"根因"不对。
+  - 缓存的正确性条件是"内容不比键旧"：键要在内容之前读，或者内容要在读键之后重新读。
+  - 10.9 的第一次失败（重置后 300 秒第 1 步还是 done）**不是**这个原因：重置会 `touch()`，version 会变。它仍未查明。
+- **范围：** hospital（WP9 故事线状态缓存；平台的 `ModuleSpace`）。
+- **来源：** 本会话 10-18 合并后的测试与两轮复现。
+- **代码：** `apps/api/app/modules/storyline/service.py`（`_cached`、`_facts_key`）、`apps/api/app/core/db/repo.py`（`ModuleSpace.refresh`）、
+  `apps/api/tests/test_storyline.py`；分支 `claude/storyline-facts-cache-key`。
 
 ---
 

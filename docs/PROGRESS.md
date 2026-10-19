@@ -1505,6 +1505,12 @@ After the four fixes above were merged to main (44f5799), the last two wall-cloc
 - [x] Results (mock model, own databases `ioc_test_herschel*`, Temporal off): `tests/test_storyline.py` and `tests/test_voice_services.py` 48/48 (5.3 min, the whole-story walk included); full backend suite 913/913 (23.2 min); the web is unchanged (no `tsc` run needed). An OR Appointment with the `or-adjustment` extension round-trips unchanged through the local HAPI server (probe written, read back, deleted).
 - [ ] Follow-up (a design question for the owner, not a bug): under each step's signature the storyline page lists the step's audit events with their own time, the wall clock (the hash-chained log's), next to the hospital-time signature.
 
+### Storyline status cache: what is cached is never older than its key (found after merging the demo branches, 2026-10-18) — done
+
+- [x] After the three demo branches were merged (44f5799): `tsc` clean, backend 911/911, Playwright 6 of 7. `hospital-storyline` stopped at step 5 (`the clock did not reach step 5's moment`): approved, yet Advance answered "Not yet". Reproduced on the third of three consecutive runs with a database probe: the early-rounds mark was in the database while the running API computed no time for "admitted"; a fresh process computed 10:54; an unrelated decision (a new event, so a new cache key) unstuck it at once.
+- [x] Cause: `status()` read the storyline state first and the cache key later; a bus handler's commit in between (the early-rounds mark: state and plan only) was counted by the key but not by the beats cached under it, and nothing changed the key again. Fix: on a cache miss the storyline state and the plan are read again (`ModuleSpace.refresh`, `app/core/db/repo.py`) before the facts and beats are computed. Casebook 10.10.
+- [x] Regression test `test_a_status_read_that_straddles_the_early_rounds_commit_does_not_freeze_the_bed_step` (fails without the fix on `assert None is not None`). An earlier fix idea (`module_state.updated_at` in the key) was dropped: its test passed without any fix.
+
 ## Environment notes
 
 - `ANTHROPIC_API_KEY` and `GOOGLE_AGENT_PLATFORM_API_KEY` are not configured in the cloud environment; everything runs in mock mode there.
