@@ -73,6 +73,7 @@ class Walk:
         self.automation, self.people = automation, people or {}
         self.tokens: dict[str, str] = {}
         self.runs: list[StepRun] = []
+        self._who: S.Patient | None = None
 
     def note(self, text: str, user: str) -> str:
         """A note or reason the walk writes as `user`: as it is, or marked as the demo automation's."""
@@ -107,6 +108,12 @@ class Walk:
 
     def status(self, user: str = S.CAST["admin"]) -> dict:
         return self.get("/api/storyline", user)
+
+    def who(self) -> S.Patient:
+        """The storyline's patient as the reset chose her (what she says, her calls' language, her instructions)."""
+        if self._who is None:
+            self._who = S.patient((self.status()["patient"] or {}).get("story_language"))
+        return self._who
 
     def step(self, key: str, user: str | None = None) -> dict:
         n = S.BY_KEY[key].n
@@ -156,7 +163,7 @@ class Walk:
     # ----- the steps -----
 
     def run(self, keys: list[str] | None = None) -> list[StepRun]:
-        for st in S.STEPS:
+        for st in S.steps(self.who().language):
             if keys and st.key not in keys:
                 continue
             user = S.CAST[st.cast]
@@ -188,8 +195,9 @@ class Walk:
             call = self.get(f"/api/voice/calls/{call['id']}", user)
             if not call.get("ended_at"):
                 call = self.post(f"/api/voice/calls/{call['id']}/end", user)
-            if call.get("language") != "zh-Hans" or call.get("patient_id") != S.PATIENT:
-                raise WalkFailed(f"call not verified in Chinese: {call.get('language')} {call.get('patient_id')}")
+            if call.get("language") != self.who().call_language or call.get("patient_id") != S.PATIENT:
+                raise WalkFailed(f"call not verified in {self.who().call_language}: {call.get('language')} "
+                                 f"{call.get('patient_id')}")
             request = self.wait("the registration request", lambda: self._registration(user))
             what = f"call {call['id']} ({call['caller_relation']})"
         self.decide(f"Task/{request['task_id']}", user, note="Registered at the ED desk")
@@ -334,8 +342,10 @@ class Walk:
             f"/api/documentation/encounters/{S.STAY}/patient-instructions", json={},
             headers=self.headers(user))).status_code < 400 and r.json().get("content") and r.json())
         text = str(view.get("rendered") or view.get("texts") or view)
-        if "绿叶蔬菜" not in text:
-            raise WalkFailed("no warfarin diet advice in the Chinese instructions")
+        if view.get("default_language") != self.who().call_language:
+            raise WalkFailed(f"her instructions default to {view.get('default_language')}, not her language")
+        if self.who().diet not in text:
+            raise WalkFailed(f"no warfarin diet advice ({self.who().diet!r}) in her instructions")
         self.post(f"/api/documentation/documents/{view['id']}/sign", user)
         step = self.done("instructions")
         return f"{view['id']} ({view.get('default_language')}) signed", step["written"]

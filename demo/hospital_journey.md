@@ -2,7 +2,9 @@
 
 What it shows: one synthetic patient from a phone call to the coding of her stay, through every hospital system of
 phases 6–8. Wang Xiuying (王秀英), 72, speaks Mandarin, takes warfarin for atrial fibrillation, falls at home and
-breaks her left hip. Every step follows the same pattern: **the AI proposes, a person signs, and the audit trail
+breaks her left hip. For an English-speaking audience there are two ways: keep her and turn on demo mode, whose English
+subtitles follow the Mandarin calls; or reset to the English-speaking patient, Margaret Ellis (see "The English-speaking
+patient" below). Every step follows the same pattern: **the AI proposes, a person signs, and the audit trail
 records it**. The guided page **Hospital storyline** (`/storyline`) shows each step's click path, the sentence to
 say, and what the screen should show. The person you are playing is in the top right. Each step has a one-click
 switch to the person who plays it, so the audience sees what that role may see and do.
@@ -16,7 +18,7 @@ items (spec 8.1)** that run on preset data with no real logic. The page and the 
 - **Database:** `docker compose up -d postgres`, then `uv run alembic upgrade head` in `apps/api`.
 - **No key needed:** in `apps/api/.env`, `LLM_PROVIDER=mock` uses the recorded mock answers. A real provider works too, because every model call goes through the LLM gateway.
 - **API and web app:** start the API (`uv run uvicorn app.main:app --port 9417`) and the web app (`npm run dev`).
-- **Reset to the start:** sign in as the administrator (Casey Brooks), open **Hospital storyline** and press **Reset to the start**. This takes about a minute: the demo data is rebuilt and the storyline's preset is planted. The hospital clock then stands at 07:00 on the demo day. Wang Xiuying is expected in the ED but has not arrived. Orthopedics and Surgery are full, and exactly two Surgery patients are ready for discharge. The reset is `POST /api/storyline/reset`: a demo control like the header's Reset demo, available to any signed-in user and audited.
+- **Reset to the start:** sign in as the administrator (Casey Brooks), open **Hospital storyline**, pick the patient beside the button (Mandarin-speaking: Wang Xiuying, the default; English-speaking: Margaret Ellis; it keeps the current story's patient until you pick the other) and press **Reset to the start**. This takes about a minute: the demo data is rebuilt and the storyline's preset is planted. The hospital clock then stands at 07:00 on the demo day. Wang Xiuying is expected in the ED but has not arrived. Orthopedics and Surgery are full, and exactly two Surgery patients are ready for discharge. The reset is `POST /api/storyline/reset`: a demo control like the header's Reset demo, available to any signed-in user and audited.
 - **Temporal off (offline mode, the default):** leave `TEMPORAL_ADDRESS` unset. The story is walked step by step with the same cards, signatures and records. The page's Temporal card says "Temporal off: the story runs step by step (offline mode)".
 - **Temporal on:** for a single process, use `TEMPORAL_ADDRESS=127.0.0.1:7233`, `TEMPORAL_NAMESPACE=hospital-demo` and `TEMPORAL_WORKER_IN_API=1`. To run the worker separately, start `docker compose --profile workflows up -d temporal` and then `uv run python -m app.workflows.worker`. Set the demo timers too: `WORKFLOW_FOLLOWUP_DELAY_S=20`, plus `WORKFLOW_SIGNOFF_TIMEOUT_S=600` and `WORKFLOW_ESCALATION_TIMEOUT_S=600` so that the escalations stay quiet while you talk. Her InpatientJourneyWorkflow (`journey-stay-j0001`) starts when the clerk registers her in step 1. Steps 2–12 are its activities, the signatures are its signals, and the follow-up call waits for its timer after the instructions are signed. The page's Temporal card links to the journey's timeline.
 - **The cast:** the page switches to each person for you. Each switch is a demo login of that user, and the role's permissions apply from that moment.
@@ -43,7 +45,8 @@ fast-forward when the step waits for time). It then lists the clicks, gives the 
 real button, which the guide marks on the screen with an amber ring and a label ("Start the call", "Confirm the
 registration the AI pre-filled", "Approve the actions the AI recommends"…): the first button of the step not yet pressed,
 so someone who has never seen the app knows where to click. When the step is done it shows the trail and asks **Continue to the next step?** (**Not yet** pauses
-it; **Resume** goes on). Fold the panel with its arrow when it covers a button. Exit with its cross.
+it; **Resume** goes on). When the button to press is under the panel, the panel moves to the bottom left; fold it
+with its arrow if it still covers something. Exit with its cross.
 
 **English subtitles (an English-speaking audience).** While demo mode is on, every Chinese turn of the call centre's
 and the follow-up call's transcript has its English under it, marked "Translation". The caller's scripted lines have
@@ -143,7 +146,7 @@ as the step is done, and the step's badge turns **Done**.
     - They are in 简体中文 by default, from her record. The warfarin section says 每周吃的绿叶蔬菜量要大致相同 (eat about the same amount of green vegetables each week), followed by the wound red flags.
     - **Sign.**
 
-11. **8:30 — Follow-up call 48 hours later (7.4, ward nurse).** **Advance the clock** 48 hours (with Temporal on, the journey's timer schedules the call). Then **Follow-up calls**, the **Calls** tab, her call (MRN 40720001), **Place call**. The step's **Switch to Vera Uchida** (and the guide's **Start**) opens her call there (`/follow-up?call=FU-stay-j0001`). The page otherwise opens on its **Queue**, which lists only calls that need a nurse, and hers does not need one yet.
+11. **8:30 — Follow-up call 48 hours later (7.4, ward nurse).** **Advance the clock** 48 hours (with Temporal on, the journey's timer schedules the call). Then **Follow-up calls**, the **Calls** tab, her call (MRN 40720001), **Place call**. The step's **Switch to Vera Uchida** (and the guide's **Start**) opens her call there (`/follow-up?call=FU-stay-j0001`). Opened before the clock gets there (the guide's Start opens it and then moves the clock), it says "This call is not scheduled yet" and shows the call by itself once it is. The page otherwise opens on its **Queue**, which lists only calls that need a nurse, and hers does not need one yet.
     - Answer as the patient with the two phrases from the storyline page: her birth date, then "还行，就是伤口一直在渗液，纱布都湿透了。" (I'm all right, but the wound keeps leaking; the gauze is soaked through). Then "没有了。" (nothing else) to the remaining questions.
     - The rule layer escalates at once: a red flag for heavy wound drainage, quoting her words, and a Task `followup-escalation` (urgent) for the nurses of her last unit.
     - On the **Queue** tab her escalation is on top. **Call back** (the note is recorded at hospital time, like every other step's signature). The call never gives medical advice.
@@ -155,6 +158,29 @@ as the step is done, and the step's badge turns **Done**.
 **9:55 — Close.** Back on the storyline page, all twelve steps show **Done**, each with its AI proposal, its signer and its
 audit events. Say: "Twelve suggestions, twelve people's decisions, and the records written back to the EHR by the
 people who are allowed to write them."
+
+## The English-speaking patient
+
+Pick **English-speaking: Margaret Ellis** before **Reset to the start** (or in demo mode's reset, or
+`POST /api/storyline/reset` with `{"language": "en"}`). The same 72-year-old woman's course in every respect: warfarin
+for atrial fibrillation, the fall, the hip fracture, the same ids (`pat-j0001`, MRN 40720001, `ed-j0001`,
+`stay-j0001`), cast, clock and checks. What changes:
+
+- **Step 1.** Her daughter, Laura Bennett, calls in English: "Hello, my mother fell at home, and an ambulance is
+  bringing her to your emergency department." Then "I'm her daughter. Her name is Margaret Ellis, born …, health card
+  ending in 4821." The agent stays in English, asks for her name, birth date and the last four card digits, says
+  "Thank you, I've found the record for Margaret" and pre-fills the ED registration. Say: "Her daughter calls the
+  hospital's line. The call centre checks who she is and pre-fills the ED registration; the clerk confirms it."
+- **Step 10.** Her instructions are in English by default (from her record); the Chinese versions are one click away.
+  The warfarin section says "Eat about the same amount of green vegetables each week."
+- **Step 11.** The follow-up call is in English: her birth date, then "I'm all right, but the wound keeps leaking; the
+  gauze is soaked through." The rule layer escalates at once ("A nurse will call you back within 30 minutes"), and
+  "No, nothing else." answers the remaining questions.
+- The step titles and the sentences to say no longer mention Mandarin; there is nothing to subtitle. The highlights
+  are the same four steps.
+
+The Mandarin story stays the default; use the English one when the audience should hear the patient's side, and the
+Mandarin one with subtitles when the multilingual point matters.
 
 ## The two paths
 
@@ -181,6 +207,7 @@ The patient's link to her imaging-centre record (`PT-J0001`) is a preset MPI rec
 
     uv run python scripts/storyline_report.py --api http://127.0.0.1:9417 --report    # a running API (Temporal on or off)
     uv run python scripts/storyline_report.py --in-process --report                   # this process, rolled back
+    uv run python scripts/storyline_report.py --api http://127.0.0.1:9417 --language en  # the English-speaking patient
 
 The end-to-end test `apps/web/e2e/hospital-storyline.spec.ts` walks the page itself.
 

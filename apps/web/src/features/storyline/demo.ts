@@ -14,8 +14,8 @@ export interface DemoState {
 const KEY = "ioc.demo";
 const OFF: DemoState = { active: false, started: null, paused: false, highlights: false };
 
-// The highlights preset: the Mandarin call; Orthopedics full and the bed manager's approval; the discharge summary's
-// validator blocking lisinopril; the Chinese follow-up call escalating.
+// The highlights preset: the daughter's call; Orthopedics full and the bed manager's approval; the discharge summary's
+// validator blocking lisinopril; the follow-up call escalating (Mandarin or English, as the reset chose her).
 export const HIGHLIGHTS = [1, 5, 9, 11];
 export const isHighlight = (n: number) => HIGHLIGHTS.includes(n);
 /** The first highlight at or after step n, or null when none is left. */

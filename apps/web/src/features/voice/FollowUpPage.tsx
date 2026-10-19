@@ -13,7 +13,7 @@ import { useLocation, useSearchParams } from "react-router-dom";
 import { AiBadge, Badge, Button, Card, EmptyState, ErrorState, Loading, PageHeader, Stat, Tabs } from "../../components/ui";
 import { useAuth } from "../../lib/auth";
 import {
-  answerFollowup, MISSING_LABEL, noAnswer, nurseAction, PRIORITY_LABEL, PRIORITY_TONE, startFollowup, sweep,
+  answerFollowup, MISSING_LABEL, noAnswer, notScheduled, nurseAction, PRIORITY_LABEL, PRIORITY_TONE, startFollowup, sweep,
   useDemo, useEscalationSummary, useFollowup, useFollowups, type FollowupItem,
 } from "./api";
 import { CallerInput, SpeakerToggle, Transcript, useSpeech } from "./Console";
@@ -108,6 +108,16 @@ function Detail({ id }: { id: string }) {
   const { user } = useAuth();
   const nurse = user?.role === "nurse"; // nurses place the calls and handle escalations; physicians read
   if (q.isLoading) return <Card><Loading /></Card>;
+  if (notScheduled(q.error)) {
+    return (
+      <Card>
+        <div data-testid="followup-not-scheduled">
+          <EmptyState title="This call is not scheduled yet" icon={<Phone className="size-8" />}
+            hint="Calls are scheduled 48 hours after discharge. It shows here as soon as it is (checked every few seconds)." />
+        </div>
+      </Card>
+    );
+  }
   if (q.error || !q.data) return <Card><ErrorState error={q.error} onRetry={() => q.refetch()} /></Card>;
   const item = q.data;
   return (

@@ -1,5 +1,6 @@
 // The hospital storyline's API (spec 8.2, WP9): GET /api/storyline (the twelve steps with their live trail),
-// POST /api/storyline/reset (demo reset + preset), POST /api/storyline/advance (the clock to the step's beat), and the
+// POST /api/storyline/reset (demo reset + preset, with the patient's language: zh, Wang Xiuying, or en, Margaret
+// Ellis), POST /api/storyline/advance (the clock to the step's beat), and the
 // demo's automation: POST /api/storyline/steps/{key}/autoplay (do the current step) and .../jump (do every step before
 // that one), a background job whose progress GET shows as `autoplay`.
 
@@ -146,10 +147,12 @@ export interface Storyline {
     id: string;
     mrn: string;
     name: string;
-    name_zh: string;
+    name_native: string | null; // her name in Chinese characters (the Mandarin-speaking patient)
     birth_date: string;
     age: number;
-    language: string;
+    language: string; // her record's language (BCP 47)
+    story_language: string; // the reset's choice: zh or en
+    call_language: string; // her calls' and instructions' language: zh-Hans or en
     call_lines: string[];
     followup_lines: string[];
     followup_closing: string; // her answer to the follow-up's remaining questions ("nothing else")
@@ -162,6 +165,7 @@ export interface Storyline {
   beats: Record<string, string | null>;
   autoplay: AutoplayJob | null;
   capacity?: { surgery_ready?: string[]; warnings?: string[] };
+  languages: { code: string; label: string }[]; // the reset's choice of patient
 }
 
 export const storylineKey = ["storyline"];
@@ -179,7 +183,12 @@ export function useStoryline(enabled = true) {
   });
 }
 
-export const resetStoryline = () => post<{ ok: boolean; prepared_at: string }>("/api/storyline/reset");
+export const resetStoryline = (language = "zh") => post<{ ok: boolean; prepared_at: string; language: string }>("/api/storyline/reset", { language });
+/** The reset's choice when the storyline does not say (the Mandarin story is the default). */
+export const LANGUAGES = [
+  { code: "zh", label: "Mandarin-speaking: Wang Xiuying (王秀英)" },
+  { code: "en", label: "English-speaking: Margaret Ellis" },
+];
 export const advanceStoryline = () => post<{ job: SimJob; beat: string; target: string }>("/api/storyline/advance");
 export const askStepAi = (key: string) => post<{ step: number; items: string[][] }>(`/api/storyline/steps/${key}/ai`);
 export const autoplayStep = (key: string) => post<AutoplayJob>(`/api/storyline/steps/${key}/autoplay`);
