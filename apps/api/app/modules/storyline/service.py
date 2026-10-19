@@ -542,6 +542,11 @@ def _cached(store: Store, st: dict, job: dict | None) -> tuple[dict, dict]:
     if hit and (hit["key"] == key or (running and hit["prepared_at"] == st.get("prepared_at")
                                       and time.monotonic() - hit["at"] < FACTS_WHILE_RUNNING_S)):
         return hit["facts"], hit["beats"]
+    # what is cached under the key must be read after it: the state status() read first may predate a commit the key
+    # already counts (the bus handler that marks the early rounds writes only the state and the plan), and the stale
+    # beats would then be served under that key until the clock moved, which only Advance does (casebook 10.10)
+    store.modules.refresh(preset.STATE, "hospital_plan")
+    st = state(store) or st
     facts, story_beats = _facts(store, st), beats(store)
     with _FACTS_LOCK:
         _FACTS["last"] = {"key": key, "at": time.monotonic(), "prepared_at": st.get("prepared_at"), "facts": facts,

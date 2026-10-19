@@ -794,6 +794,18 @@ class ModuleSpace:
             return default
         return value
 
+    def refresh(self, *names: str) -> None:
+        """Read these blobs or configs from the database again on their next use: what another transaction committed
+        since this unit of work first read them becomes visible. A value changed here and not yet saved is kept; a
+        detached store has no database to read from."""
+        if self._store.detached:
+            return
+        for name in names:
+            if name in self._values and self._encode(name, self._values[name]) != self._snap.get(name, _MISSING):
+                continue
+            self._values.pop(name, None)
+            self._snap.pop(name, None)
+
     def module(self, name: str, factory: Callable[[], Any]) -> Any:
         """The named state, created from `factory` the first time it is needed."""
         kind = self._kind(name)
