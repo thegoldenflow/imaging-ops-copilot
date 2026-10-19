@@ -169,12 +169,17 @@ export function Spotlight({ hit }: { hit: Hit | null }) {
   const pad = 4;
   const above = rect.top > 48;
   const left = Math.max(8, Math.min(rect.left - pad, window.innerWidth - 300));
+  // a button of the guide panel: the label goes to its left, outside the panel, not over the panel's own text
+  // (phone width: the panel spans the screen, so it stays above)
+  const beside = window.innerWidth >= 640 && !!hit.el.closest("[data-testid=demo-guide]");
+  const place = beside ? { right: window.innerWidth - rect.left + pad + 8, top: Math.max(8, rect.top + rect.height / 2 - 13) }
+    : above ? { left, top: rect.top - pad - 32 } : { left, top: rect.bottom + pad + 8 };
   return (
     <div className="pointer-events-none fixed inset-0 z-[60]" aria-hidden="true" data-testid="demo-spotlight">
       <div className="absolute animate-pulse rounded-lg ring-4 ring-amber-400 ring-offset-2"
         style={{ left: rect.left - pad, top: rect.top - pad, width: rect.width + 2 * pad, height: rect.height + 2 * pad }} />
       <div className="absolute flex max-w-[18rem] items-center gap-1.5 rounded-md bg-amber-400 px-2 py-1 text-xs font-semibold text-amber-950 shadow-lg"
-        style={above ? { left, top: rect.top - pad - 32 } : { left, top: rect.bottom + pad + 8 }} data-testid="demo-spotlight-label">
+        style={place} data-testid="demo-spotlight-label">
         <MousePointerClick className="size-3.5 shrink-0" />{hit.label}
       </div>
     </div>
