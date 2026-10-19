@@ -449,6 +449,10 @@ def reset_store(seed: int | None = None) -> Store:
     if not store.detached:
         store.conn().execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": REWRITE_LOCK})
     persist(data, store, rows)
+    # A reset is today's reset: the generated data carries no marker, and without one the scheduler's daily reset
+    # (DEMO_DAILY_RESET_HOUR, checked every 2 s) regenerated the data again within seconds of a reset done after its
+    # hour, wiping what the caller planted next (the storyline's preset: casebook 12.15).
+    store.modules["daily_reset"] = datetime.now().date().isoformat()
     clear_process_cache()
     return store
 
