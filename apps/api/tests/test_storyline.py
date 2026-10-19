@@ -10,6 +10,8 @@ import pytest
 
 from app.core.store import Store, use_store
 from app.ehr import accepted, simulator
+from app.ehr import storyline as ehr_story
+from app.ehr.clock import hospital_now
 from app.ehr.events import bus
 from app.ehr.gateway import Actor, FhirAccessDenied, FhirConflict, FhirGateway
 from app.ehr.seed import journey
@@ -156,6 +158,22 @@ def test_only_the_or_coordinator_adjusts_a_booked_case(story):
         fhir.adjust_or_booking(other["id"], 30, reason="not an OR case")
 
 
+def test_the_or_step_is_signed_at_the_hospital_time_of_the_adjustment(story, client, login):
+    """Step 7's "Signed by" took the time of the adjustment's audit event, which is the wall clock (04:31 in the
+    trail of the 10-18 run, among hospital times days later); the booking records the change at hospital time."""
+    store = story
+    case = next(c for c in build(tower_fhir(), parse(simulator.clock(store)["now"])).or_cases if c.status == "booked")
+    minutes = max(case.booked_minutes, ehr_story.BOOKED_MINUTES) + 25  # longer than her booking: step 7 "adjusted"
+    r = client.post(f"/api/control-tower/or-cases/{case.appointment_id}/adjust", headers=login(S.CAST["bed_manager"]),
+                    json={"minutes": minutes, "note": "Adjusted to the predicted duration"})
+    assert r.status_code == 200, r.text
+    facts = {"cards": {}, "journey_tasks": [], "appointment": store.fhir.read("Appointment", case.appointment_id),
+             "audit": store.audit.query(resource_id=case.appointment_id, newest_first=True)}
+    signed = service._step_state(next(s for s in S.STEPS if s.key == "or"), facts, store)["signed"]
+    assert signed["decision"] == "adjusted" and signed["by"] == store.staff[S.CAST["bed_manager"]].name
+    assert parse(signed["at"]) == hospital_now(store).replace(microsecond=0)
+
+
 def test_block_overtime_counts_only_cases_booked_to_end_by_the_block():
     day = datetime(2026, 10, 9)
     end = day.replace(hour=16)
@@ -179,6 +197,9 @@ def test_the_whole_story_offline(story, client):
         assert any(a["event_type"] in ("approve", "sign") for a in steps[key]["audit"]), key
     assert steps["bed"]["detail"].startswith("bed SURG-")  # the bed the early discharges freed
     assert steps["or"]["detail"] == "booked 115 min"
+    # the coordinator's adjustment at hospital time, after her admission and before her first night (it was the
+    # audit event's time: the wall clock)
+    assert parse(view["beats"]["admitted"]) <= parse(steps["or"]["signed"]["at"]) <= parse(view["beats"]["night"])
     store = story
     summary = store.fhir.read("DocumentReference", f"dsum-{S.STAY}")
     assert summary["docStatus"] == "final"

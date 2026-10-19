@@ -68,9 +68,10 @@ def get(call_id: str, store: Store | None = None) -> FollowupCall | None:
 
 
 def save(call: FollowupCall, store: Store | None = None) -> None:
-    call.updated_at = datetime.now()
+    store = store or get_store()
+    call.updated_at = hospital_now(store)  # every time on the call is hospital time, as its discharge and due time
     table(store)[call.id] = call
-    (store or get_store()).touch()
+    store.touch()
 
 
 def call_id_for(encounter_id: str) -> str:
@@ -230,7 +231,7 @@ def schedule(store: Store, encounter_id: str, *, source: str = "sweep", workflow
     cond = check(encounter_id, discharged_at)
     call = FollowupCall(id=call_id_for(encounter_id), encounter_id=encounter_id, patient_id=cond.patient_id or "",
                         unit_id=cond.unit_id, discharged_at=cond.discharged_at, source=source, workflow_id=workflow_id,
-                        language=cond.language)
+                        language=cond.language, created_at=hospital_now(store))
     if cond.missing:
         reason = "; ".join(cond.reasons)
         call.status, call.missing, call.reason = "manual", cond.missing, reason
@@ -326,7 +327,7 @@ def start_call(store: Store, call_id: str, user: StaffUser | None = None) -> tup
         call.task_id = module_manual_task(call.encounter_id, reason)
         save(call, store)
         raise CallError(reason)
-    call.status, call.started_at, call.step, call.retries = "in_progress", datetime.now(), 0, 0
+    call.status, call.started_at, call.step, call.retries = "in_progress", hospital_now(store), 0, 0
     with acting_as_system(), _run(call, encounter_id=call.encounter_id) as run:
         record = run.tool("writeCallRecord", {
             "patient_id": call.patient_id, "encounter_id": call.encounter_id, "communication_id": call.communication_id,
@@ -343,7 +344,7 @@ def start_call(store: Store, call_id: str, user: StaffUser | None = None) -> tup
     patient = system_fhir().read("Patient", call.patient_id)
     first = patient_name(patient.to_fhir() if patient else None, call.language)
     reply = P.say(P.FU["intro"], call.language, first=first)
-    call.transcript.append(Turn(role="agent", text=reply, lang=call.language, question="identity"))
+    call.transcript.append(Turn(role="agent", text=reply, at=call.started_at, lang=call.language, question="identity"))
     save(call, store)
     return reply, call
 
@@ -358,14 +359,15 @@ def answer(store: Store, call_id: str, text: str) -> tuple[str, FollowupCall, bo
     if not text:
         raise CallError("Empty answer")
     question = call.script[call.step]
-    call.transcript.append(Turn(role="caller", text=text, lang=call.language, question=question["key"]))
+    now = hospital_now(store)
+    call.transcript.append(Turn(role="caller", text=text, at=now, lang=call.language, question=question["key"]))
     with acting_as_system(), _run(call, encounter_id=call.encounter_id) as run:
         engine = _Call(store, call, run)
         reply = engine.handle(question, text)
         run.finish(outcome="completed")
     call.run_ids.append(run.run_id)
     asked = call.script[call.step]["key"] if not engine.ended and call.step < len(call.script) else None
-    call.transcript.append(Turn(role="agent", text=reply, lang=call.language, question=asked))
+    call.transcript.append(Turn(role="agent", text=reply, at=now, lang=call.language, question=asked))
     save(call, store)
     return reply, call, engine.ended
 
@@ -383,7 +385,7 @@ def no_answer(store: Store, call_id: str) -> FollowupCall:
             "kind": "followup-call", "direction": "outbound", "status": "not-done", "status_reason": "no answer",
             "language": call.language, "text": "Post-discharge follow-up call: no answer."})
         run.finish(outcome="completed")
-    call.status, call.ended_at, call.reason = "no_answer", datetime.now(), "the patient did not answer the call"
+    call.status, call.ended_at, call.reason = "no_answer", hospital_now(store), "the patient did not answer the call"
     call.task_id = module_manual_task(call.encounter_id, "the automated follow-up call was not answered")
     call.review_status, call.priority = "open", "routine"
     save(call, store)
@@ -461,7 +463,7 @@ class _Call:
         if self.call.dob_failures < 2:
             return self.say("dob_retry")
         self.ended = True
-        self.call.status, self.call.ended_at = "not_confirmed", datetime.now()
+        self.call.status, self.call.ended_at = "not_confirmed", hospital_now(self.store)
         self.call.reason = "the patient's identity could not be confirmed on the follow-up call"
         self.run.tool("writeCallRecord", {
             "patient_id": self.call.patient_id, "encounter_id": self.call.encounter_id,
@@ -595,7 +597,7 @@ class _Call:
             "status": "completed", "language": call.language, "text": call.summary[:8000],
             "escalated": call.escalated, "priority": call.priority or "routine",
             **({"about": about} if about else {})})
-        call.status, call.ended_at = "completed", datetime.now()
+        call.status, call.ended_at = "completed", hospital_now(self.store)
         call.review_status = "open" if call.escalated else "none"
         first = self.first_name()
         if call.escalated and call.priority in ("stat", "urgent"):

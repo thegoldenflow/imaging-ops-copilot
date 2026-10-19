@@ -44,6 +44,7 @@ from app.core.store import Store, ambient_store, get_store, reset_store
 from app.ehr import simjobs, simulator
 from app.ehr import storyline as ehr_story
 from app.ehr.events import DomainEvent, bus, domain_events
+from app.ehr.gateway import or_adjustments
 from app.ehr.seed import journey as preset
 from app.fhir.dt import parse
 from app.modules.storyline import script as S
@@ -637,9 +638,12 @@ def _step_state(step: S.Step, f: dict, store: Store) -> dict:
         adjusted = appt is not None and (appt.get("minutesDuration") or 0) > ehr_story.BOOKED_MINUTES
         audit = _audit(f["audit"], [f"Appointment/{appt['id']}"]) if appt else []
         if adjusted:
+            # who and when from the appointment's own record of the change (hospital time); the audit event's time
+            # is the wall clock
+            change = (or_adjustments(appt) or [{}])[-1]
             who = next((a for a in audit if a["event_type"] == "write"), None)
-            out["signed"] = {"by": who["user"] if who else None, "decision": "adjusted",
-                             "at": who["at"] if who else None, "ref": f"Appointment/{appt['id']}"}
+            out["signed"] = {"by": change.get("name") or (who["user"] if who else None), "decision": "adjusted",
+                             "at": change.get("at"), "ref": f"Appointment/{appt['id']}"}
         out["proposal"] = _proposal(signoff, "OR booking check (journey)") if signoff else (
             {"label": "Surgical duration prediction", "ref": f"Appointment/{appt['id']}", "agent": "control_tower"}
             if appt else None)

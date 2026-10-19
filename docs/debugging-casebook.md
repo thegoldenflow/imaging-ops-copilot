@@ -3585,11 +3585,78 @@ WP9 开工前的只读审计、读端到端截图、核对 README 里的一句�
     `AssertionError: assert datetime.datetime(2026, 10, 18, 4, 10, 35) == datetime.datetime(2026, 10, 19, 7, 0)`；不带插件通过。
   - 整条走查测试断言第 11 步的签名时间落在随访节拍和当前医院时间之间。
 - **经验：** 系统里有两个时钟，每写一个时间戳都要问"这是哪个钟"。最容易漏的是同一个函数里一个用 A 钟、一个用 B 钟。搜一遍 `datetime.now()` 是很便宜的检查：
-  随访模块里还有几个（通话的 `started_at`、`ended_at`、`updated_at`），它们不进故事线的轨迹，这次没有改，记作后续。
-  修完后在 e2e 的 API 上把 12 步轨迹的签名时间全列出来，又发现第 7 步（OR 排程调整）是 `2026-10-18T04:31:54`：它取自审计事件的时间戳（墙上时间），而调整本身（`FhirGateway.adjust_or_booking`）没有记医院时间。要改得动 Control Tower 或网关，超出这次的四个问题，记作后续。修一个时间戳之后，把同一个视图里所有时间列一遍，比只验证修的那一个更能发现同类问题。
+  随访模块里还有几个（通话的 `started_at`、`ended_at`、`updated_at`），它们不进故事线的轨迹，这次没有改，记作后续（12.14 修复）。
+  修完后在 e2e 的 API 上把 12 步轨迹的签名时间全列出来，又发现第 7 步（OR 排程调整）是 `2026-10-18T04:31:54`：它取自审计事件的时间戳（墙上时间），而调整本身（`FhirGateway.adjust_or_booking`）没有记医院时间。要改得动 Control Tower 或网关，超出这次的四个问题，记作后续（12.14 修复）。修一个时间戳之后，把同一个视图里所有时间列一遍，比只验证修的那一个更能发现同类问题。
 - **范围：** hospital（WP8 随访、WP9 故事线轨迹）。
 - **来源：** 10-18 真实 Gemini 演示实跑；本会话修复。
 - **代码：** `apps/api/app/modules/voice_services/queue.py`（`act`）、`apps/api/tests/test_voice_services.py`、`apps/api/tests/test_storyline.py`。提交：本案所在的提交。
+
+### 12.14 第 7 步的签名时间是审计事件的时间；随访通话自己的时间也是墙上时间
+
+- **现象：** 12.13 修完后，把 12 步轨迹的 "Signed by … at" 全列出来，只有第 7 步（OR 协调员调整排程）是 `2026-10-18T04:31:54`，那是开发机的墙上时间。
+  其他步骤都是医院时间（医院日 10-19 往后几天）。12.13 顺手搜 `datetime.now()` 时还发现，随访通话的 `started_at`、`ended_at`、`updated_at` 也用墙上时间，
+  当时记作后续。这次两个一起处理。
+- **怎么查的：**
+  1. **第 7 步的时间从哪来？** `storyline/service.py` 的 `_step_state` 里 `"or"` 分支：`who = next(a for a in audit if a["event_type"] == "write")`，
+     `"at": who["at"]`；`_audit` 里这个 `at` 是 `e.ts.isoformat(...)`，也就是审计事件的时间戳。
+  2. **假设一：审计事件的时间就是墙上时间。** 读 `core/audit.py`：`_event` 写 `"ts": (ts or datetime.now())`，参数 `ts` 只给种子导入历史事件用。
+     审计日志是哈希链，记的是"系统什么时候记下这件事"，按设计就是墙上时间，不该改。实验：先写回归测试（下面），把三个源文件换回 HEAD 的版本、测试保留，
+     第 7 步的签名时间是 `2026-10-18T20:53:34`（跑测试的那一刻），医院时钟是 `2026-10-19 07:00`。假设一成立。
+  3. **假设二：调整这件事在别处记过医院时间，只是第 7 步没去读。** 逐个看：`FhirGateway.adjust_or_booking` 只改 `end` 和 `minutesDuration`，再写一条审计；
+     FHIR 记录的 `meta.lastUpdated` 由 `fhirstore._stamp_time()` 写，也是 `datetime.now()`；等这次调整的 journey 签核 Task（`proposeSchedule`）只有开着
+     Temporal 时才有，10-18 的现场和离线测试里都没有。假设二不成立：医院时间哪儿都没记，只能让写入的那一层记下来。
+  4. **记在哪一层？** 有两条路会调整排程：Control Tower 的 `POST /api/control-tower/or-cases/{id}/adjust`（`service.adjust_booking`），和特权工具
+     `adjustOrBooking`（`agents/handlers.py`）。两条都经过 `FhirGateway.adjust_or_booking`，所以记在网关，只记在 Control Tower 会漏掉工具那条。
+     记成 Appointment 自己的扩展，和签名记在文档上（`signing.py` 的 `signature` 扩展）是同一个做法。故事线已经在 `_facts` 里通过网关读她的 Appointment，
+     读扩展不需要新的读取，也就没有新的审计（每次读她的病历都记审计），守卫 `test_modules_go_through_the_gateway` 也不受影响。
+  5. **扩展里放什么？** 先想放调整理由，后来没放：`llm/fhir_deid.py` 的 `FREE_TEXT` 对 Appointment 只清理 `description`、`comment`、`patientInstruction`，
+     放在扩展里的自由文本如果哪天随 Appointment 进了提示词，就绕过了去标识化。理由已经在审计事件里，扩展只记人（引用的 display 会被统一处理）、医院时间、
+     原时长和新时长。
+  6. **HAPI 后端能不能存？** 在本机 HAPI（docker 里的 `hapi`）上写一个带这个扩展的 OR Appointment 再读回来，`or_adjustments()` 读出的内容和写入的完全一样，
+     然后删掉了这条探针记录。
+  7. **随访通话的时间该不该是医院时间？** 看谁用：`queue.view` 把 `started_at`、`ended_at`、`updated_at` 和 `discharged_at`、`due_at`（医院时间）
+     放在同一个条目里给随访页。探针插件在每次 `followup.save` 后打印（旧代码）：出院 `2026-10-16 15:57`，应打 `2026-10-19 07:00`，开始却是
+     `2026-10-18 20:55`。同一条记录里，电话比应打的时间早 10 小时，两个时钟放在一起比，结论就是错的。应该改。
+     （任务说明里说随访页"显示"这几个时间。查了 `FollowUpPage.tsx`：页面只显示出院、应打和护士操作的时间，这三个字段只在 API 返回里。）
+  8. **假设三：`updated_at` 换钟会弄乱护士队列的排序。** 读 `updated_at` 的只有两处：`queue.items` 的排序键 `(review_status != "open", 优先级, updated_at)`，
+     和 `queue.summary` 的 `latest`（前端类型里有，但 grep 不到任何地方读它）。写 `updated_at` 的只有 `followup.save`，种子不直接造随访记录。
+     所以改完后比较的始终是同一个钟，两个钟都只往前走，顺序不会颠倒。差别只在并列：医院时钟停着的时候（演示里多数时间是这样），同一优先级的条目
+     `updated_at` 相同，次序退回到表的插入次序（`EntityTable.values()` 按 `seq`，也就是创建次序），以前是按最后一次更新的墙上时间。
+     等待时间按医院时间算，时钟停着时大家等得一样久，先建的排前面也说得通。假设三不成立，只把并列的规则写进了文档。
+- **根因：**
+  - 第 7 步把审计日志的时间（"系统什么时候记下"，墙上时间）当成了业务时间（"协调员在医院的哪个时刻调整的"）来用，而调整本身没有在任何地方记下业务时间。
+  - 随访模块的时间戳直接用 `datetime.now()`，而同一条记录里的出院时间、应打时间是医院时间。
+- **怎么修：**
+  - `app/ehr/gateway.py`：`adjust_or_booking` 往 Appointment 上追加扩展 `urn:demo-hospital:ext:or-adjustment`（`by`、`time` 为 `hospital_now`、
+    `previous-minutes`、`minutes`），每调整一次加一条；新函数 `or_adjustments(appointment)` 读出来。
+  - `app/modules/storyline/service.py`：第 7 步的签名人和时间取最后一条调整；签名人在扩展缺失时仍退回到审计事件的用户，时间不再退回（宁可不显示，也不显示错的钟）。
+  - `app/modules/voice_services/followup.py`：`save` 的 `updated_at`、`schedule` 的 `created_at`、`start_call` 的 `started_at`、三处 `ended_at`
+    （完成、无人接听、身份未确认），以及随访通话记录里的每一轮对话（`Turn.at`），都用 `hospital_now`。呼叫中心的 `HospitalCall` 没动：它有专门的
+    `hospital_time` 字段，墙上时间和医院时间是有意都记的。
+  - 文档：`docs/data-model.md`（扩展列表、`adjust_or_booking`、随访记录的时间）、storyline README 的已知失败模式。
+- **怎么证明：**
+  - 新测试 `test_the_or_step_is_signed_at_the_hospital_time_of_the_adjustment`（`tests/test_storyline.py`）：通过 Control Tower 的接口调整一个排程，
+    第 7 步的状态由协调员签、时间等于医院时间。它故意不导入 `or_adjustments`，所以能在旧代码上跑：
+    `AssertionError: assert datetime.datetime(2026, 10, 18, 20, 53, 34) == datetime.datetime(2026, 10, 19, 7, 0)`。新代码通过。
+  - 新测试 `test_a_follow_up_call_is_timed_on_the_hospital_clock`（`tests/test_voice_services.py`）：通话的创建、开始、结束、更新时间和每一轮对话
+    都等于医院时间，而且 出院 < 应打 ≤ 开始 ≤ 结束。旧代码上失败在第一条：`created_at` 和 `started_at` 是两个不同的墙上时间
+    （`20:53:39.323897` 对 `20:53:39.419543`）。同一个探针在新代码上：开始、结束、更新都是 `2026-10-19 07:00:00`。
+  - 整条走查测试 `test_the_whole_story_offline` 加了一条：第 7 步的签名时间在她入院的节拍和术后第一晚的节拍之间。
+  - 两个相关测试文件 48 passed（5.3 分钟，含整条走查）；全量后端测试 913 passed（23.2 分钟，比 12.12 时多了这两个新测试）。前端没有改动。
+- **经验：**
+  - 审计日志的时间和业务时间回答的是两个问题："系统什么时候记下的"和"这件事在医院的哪个时刻发生"。平时两者只差几毫秒，看不出来；有模拟时钟的系统里
+    能差几天。要显示业务时间，就从业务记录里取；业务记录里没有，就让写入的那一层记下来，不要借审计的时间。
+  - 有两个入口做同一件事时（接口和特权工具），把记录放在两条路都经过的那一层（网关），而不是只放在发现问题的那个入口。
+  - 往记录里加字段前，想一下它会流到哪里：自由文本放进扩展，会绕过去标识化的字段清单。能不放就不放。
+  - 换排序键用的钟之前，把读它的地方全列出来，再想清楚并列时怎么排。两个钟都只往前走，换钟不会让次序颠倒，变的是并列的规则。
+  - 轨迹里每一步下面列出的审计事件，显示的仍是审计自己的时间（墙上时间），和上面医院时间的签名放在一起。这是设计问题（审计日志本来就该记真实时间），
+    不是这次的 bug，记作后续，交给负责人决定页面上要不要注明。
+- **范围：** hospital（WP9 故事线轨迹、WP8 随访）。
+- **来源：** 12.13 的后续；本会话（`claude/exciting-herschel-7102a7`，基于合并了 12.12–12.13 的 main 44f5799）修复。
+- **代码：** `apps/api/app/ehr/gateway.py`（`adjust_or_booking`、`or_adjustments`、`OR_ADJUSTMENT`）、`apps/api/app/modules/storyline/service.py`（`_step_state`）、
+  `apps/api/app/modules/voice_services/followup.py`、`apps/api/app/modules/voice_services/models.py`、`apps/api/tests/test_storyline.py`、
+  `apps/api/tests/test_voice_services.py`；相关、没有修改：`apps/api/app/core/audit.py`、`apps/api/app/modules/voice_services/queue.py`、
+  `apps/api/app/modules/control_tower/service.py`。提交：本案所在的提交。
 
 ---
 

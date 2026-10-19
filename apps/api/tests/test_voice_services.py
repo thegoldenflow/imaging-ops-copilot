@@ -562,6 +562,19 @@ def test_a_nurse_action_is_at_hospital_time_as_the_communication_it_writes(fresh
     assert parse(action["at"]) == hospital_now(store).replace(microsecond=0)
 
 
+def test_a_follow_up_call_is_timed_on_the_hospital_clock(fresh_state, client, login):
+    """The call's start, end and last update were the wall clock, in the item that shows its discharge and due time
+    (hospital time): the call could start before it was due. Every time on the call is hospital time."""
+    store = fresh_state
+    call = _escalated(store)  # scheduled, placed, answered and finished while the hospital clock stands
+    now = hospital_now(store)
+    assert call.created_at == call.started_at == call.ended_at == call.updated_at == now
+    assert {t.at for t in call.transcript} == {now}
+    item = client.get(f"/api/voice/followups/{call.id}", headers=login(NURSE)).json()
+    assert parse(item["discharged_at"]) < parse(item["due_at"]) <= parse(item["started_at"]) <= parse(item["ended_at"])
+    assert parse(item["updated_at"]) == now
+
+
 # ---------- gateway increments ----------
 
 

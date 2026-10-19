@@ -84,7 +84,8 @@ class FollowupCall(BaseModel):
     review_status: str = "none"  # none, open, closed, referred (the nurse's handling)
     nurse_actions: list[dict] = Field(default_factory=list)  # [{kind, note, by, role, at, communication_id, task_id}]
     run_ids: list[str] = Field(default_factory=list)
+    # hospital time, as the discharge and the due time (followup.py sets them; the defaults are for a bare model)
     created_at: datetime = Field(default_factory=datetime.now)
     started_at: datetime | None = None
     ended_at: datetime | None = None
-    updated_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)  # the queue sorts by it: how long an item has waited

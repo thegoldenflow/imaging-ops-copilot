@@ -78,6 +78,7 @@ BED_MANAGER_ROLES = {Role.OPERATIONS_MANAGER}
 CANCELLABLE = ("proposed", "pending", "booked")  # appointments a clerk may still cancel (not arrived or done)
 WRITABLE = ("Task", "DocumentReference", "Communication", "Flag", "Appointment", "Observation")
 SOURCE_MODULE = EXT + "source-module"  # the module that created a document (its registry entry governs signing)
+OR_ADJUSTMENT = EXT + "or-adjustment"  # on an OR Appointment, per duration change: who, when (hospital time), minutes
 
 
 def patient_reported(observation: dict) -> bool:
@@ -233,6 +234,22 @@ def _status(resource: dict) -> str | None:
 def source_module(document: dict | None) -> str | None:
     return next((e.get("valueCode") for e in (document or {}).get("extension") or []
                  if e.get("url") == SOURCE_MODULE), None)
+
+
+def or_adjustments(appointment: dict | None) -> list[dict]:
+    """[{by, name, at, previous_minutes, minutes}] from an OR appointment's adjustment extensions, oldest first
+    (`at`: hospital time)."""
+    out = []
+    for ext in (appointment or {}).get("extension") or []:
+        if ext.get("url") != OR_ADJUSTMENT:
+            continue
+        parts = {e.get("url"): e for e in ext.get("extension") or []}
+        by = (parts.get("by") or {}).get("valueReference") or {}
+        out.append({"by": by.get("reference"), "name": by.get("display"),
+                    "at": (parts.get("time") or {}).get("valueDateTime"),
+                    "previous_minutes": (parts.get("previous-minutes") or {}).get("valueInteger"),
+                    "minutes": (parts.get("minutes") or {}).get("valueInteger")})
+    return out
 
 
 class FhirGateway:
@@ -772,7 +789,8 @@ class FhirGateway:
         end moves with it, everything else stays (procedure, surgeon, room, ASA class, urgency, request). The
         operations manager only (6.3 has no OR-coordinator role), or the privileged tool adjustOrBooking on such an
         approver's authority; the module's tools must allow booked appointments. Audited with the old and new
-        durations."""
+        durations; the appointment records the change (extension `or-adjustment`: who, the hospital time, the old
+        and new minutes), as a signature records itself on a document: the audit event's time is the wall clock."""
         if self.policy is not None and (self.role != "operations_manager" or self.actor.kind != "user"):
             self._deny("update", "Appointment", appointment_id, "only the OR coordinator (operations manager) adjusts "
                                                                 "an operating-room booking")
@@ -791,8 +809,15 @@ class FhirGateway:
             raise ValueError("an OR booking lasts 15 to 600 minutes")
         start = parse(current["start"])
         before = current.get("minutesDuration")
+        by = ref("Practitioner", self.actor.practitioner_id, self.actor.name) if self.actor.practitioner_id else \
+            {"reference": f"urn:demo-hospital:user:{self.actor.id}", "display": self.actor.name}
+        at = hospital_now(get_store())
+        change = {"url": OR_ADJUSTMENT, "extension": [
+            {"url": "by", "valueReference": by}, {"url": "time", "valueDateTime": fhir_datetime(at)},
+            *([{"url": "previous-minutes", "valueInteger": int(before)}] if before is not None else []),
+            {"url": "minutes", "valueInteger": int(minutes)}]}
         adjusted = {**current, "end": fhir_datetime(start + timedelta(minutes=int(minutes))),
-                    "minutesDuration": int(minutes)}
+                    "minutesDuration": int(minutes), "extension": [*(current.get("extension") or []), change]}
         validate(adjusted)
         stored = self.backend.update(adjusted)
         self._audit("update", "Appointment", appointment_id,

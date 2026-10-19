@@ -78,6 +78,11 @@ and off. The backend test `tests/test_storyline.py` runs the same walk in proces
   Orthopedics exception: the Control Tower opens that (medium) at 07:00 because the preset fills the unit, and the
   step's AI narrates it only once she boards it (high). Before, the bed step took the 07:00 exception for its
   proposal, showed itself ready and offered no Advance (live run 10-18).
+- A step's signature time ("signed by … at") is hospital time, read from the record the person's act wrote (the
+  card's Task, the document's signature, the bed manager's decision, the OR booking's `or-adjustment` extension, the
+  nurse's action on the follow-up call). The audit events listed under it keep their own time, the wall clock (the
+  hash-chained log's). Before, step 7 took its signature time from its audit event (04:31 live on 10-18, among
+  hospital times days later), and step 11 from a wall-clock nurse action.
 - Past the generated 36-hour plan only the storyline's events, the ward rounds and housekeeping happen: the rest of
   the hospital stands still on day 2 to day 5 (nothing else is planned there).
 - With Temporal on, the follow-up call waits for the journey's timer (`WORKFLOW_FOLLOWUP_DELAY_S`): set it to a few
