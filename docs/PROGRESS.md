@@ -1554,6 +1554,11 @@ Second step: the same story with a patient who speaks English, for an audience t
 - [x] On ops.jasonyao.dev (v0.3.0, `DEMO_DAILY_RESET_HOUR=8`, UTC), a storyline reset after 08:00 was wiped about a minute later by the scheduler's daily reset (audit: `Scheduler · daily demo reset` at 17:59:36 and again at 18:03:55): `reset_store()` rewrites `module_state` from the generated data, which has no `daily_reset` marker, and the intake loop checks every 2 s, idle or not. In an interview this meant a story prepared before the start was gone a minute later. Now `reset_store()` marks the day as reset. Casebook 12.15, `tests/test_daily_reset.py` (fails without the fix).
 - [ ] Not changed: the daily reset itself still leaves the storyline unprepared (a presenter resets the story before a demo anyway).
 
+### Demo mode: the way in is marked too (owner's direction, 2026-10-19) — done
+
+- [x] `features/storyline/EntryHints.tsx` (mounted beside the routes, so it covers the sign-in page): while the guide is not on screen (demo mode off, or nobody signed in), the same amber spotlight marks the way into demo mode: the administrator's card on the sign-in page ("Start here: sign in as Casey Brooks…"), the menu's Hospital storyline on the home page, the Demo mode button on the storyline page. `e2e/demo-guide.spec.ts` checks the sign-in and storyline hints; `demo-guide` and `demo-english` 2/2.
+- [ ] Seen once, not reproduced (two reruns, with and without this change, passed): in `demo-guide.spec.ts` the call centre lost its open call right after the second caller line ("No call in progress", the call itself still `in_progress` in Recent calls), as if the page had been mounted again. A presenter would have to start the call again. Not investigated yet.
+
 ## Environment notes
 
 - `ANTHROPIC_API_KEY` and `GOOGLE_AGENT_PLATFORM_API_KEY` are not configured in the cloud environment; everything runs in mock mode there.
