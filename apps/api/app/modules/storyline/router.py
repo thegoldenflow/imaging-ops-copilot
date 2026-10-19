@@ -16,6 +16,7 @@ from app.core.models import StaffUser
 from app.core.store import get_store
 from app.ehr import simulator
 from app.modules.storyline import autoplay, service
+from app.modules.storyline import script as S
 
 router = APIRouter(prefix="/api/storyline")
 
@@ -26,13 +27,13 @@ def storyline(user: StaffUser = Depends(current_user)):
 
 
 class ResetIn(BaseModel):
-    language: str = "zh"  # the patient: zh (Wang Xiuying, Mandarin-speaking) or en (Margaret Ellis, English-speaking)
+    language: str = S.DEFAULT  # the patient: en (Margaret Ellis, English-speaking) or zh (Wang Xiuying, Mandarin)
 
 
 @router.post("/reset")
 def reset(body: ResetIn | None = None, user: StaffUser = Depends(current_user)):
     """The demo reset followed by the storyline's preset (about a minute), with the patient who speaks the chosen
-    language (no body: Mandarin, the default story); 422 for a language no storyline patient speaks."""
+    language (no body: English, the default story); 422 for a language no storyline patient speaks."""
     try:
         state = service.reset(user, (body or ResetIn()).language)
     except ValueError as e:

@@ -4,8 +4,8 @@
 // it and the audit events of those records. The clock moves only when a step needs time to pass (Advance).
 // "Do this step for me" and "Jump here" have the demo's automation walk steps through the API as the people who play
 // them (for an interview: the roadmap stubs, a step that failed live, or straight to the next highlight); the steps it
-// did are marked, and so is every record it signed. The reset picks the patient: Wang Xiuying, who speaks Mandarin
-// (the default), or Margaret Ellis, who speaks English; the story is the same.
+// did are marked, and so is every record it signed. The reset picks the patient: Margaret Ellis, who speaks English
+// (the default), or Wang Xiuying, who speaks Mandarin (English subtitles in demo mode); the story is the same.
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
@@ -39,7 +39,7 @@ export function StorylinePage() {
   // the patient the reset starts with: the current story's unless the presenter picks the other one
   const [picked, setPicked] = useState<string | null>(null);
   const languages = q.data?.languages ?? LANGUAGES;
-  const language = picked ?? q.data?.patient?.story_language ?? "zh";
+  const language = picked ?? q.data?.patient?.story_language ?? "en";
   const reset = useMutation({
     mutationFn: () => resetStoryline(language),
     onSuccess: () => {

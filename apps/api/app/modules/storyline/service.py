@@ -2,7 +2,7 @@
 and the event subscriber that plays the story.
 
 - `reset(user, language)`: the demo reset followed by the preset (app/ehr/seed/journey.py), one click from the
-  storyline page, with the patient who speaks `language` (zh: Wang Xiuying, the default; en: Margaret Ellis).
+  storyline page, with the patient who speaks `language` (en: Margaret Ellis, the default; zh: Wang Xiuying).
   Workflows still running from before are terminated by the reset (6.5).
 - `status(store, user)`: per step what the AI proposed, who signed or approved and when, what the EHR wrote and
   the audit events of those records, read through FhirGateway as the storyline (system actor, audited) plus the
@@ -66,7 +66,7 @@ def state(store: Store) -> dict | None:
 # ---------- reset ----------
 
 
-def reset(user: StaffUser, language: str = "zh") -> dict:
+def reset(user: StaffUser, language: str | None = None) -> dict:
     """The demo reset, then the storyline's preset with the patient who speaks `language`: the story starts at 07:00
     on the hospital day."""
     from app.workflows import bridge
@@ -237,8 +237,8 @@ def beats(store: Store) -> dict[str, str | None]:
 
 
 def patient_of(st: dict | None) -> S.Patient:
-    """The storyline's patient as the reset chose her (a story planted before the choice existed: Mandarin)."""
-    return S.patient((st or {}).get("language"))
+    """The storyline's patient as the reset chose her (a story planted before the choice existed was Mandarin)."""
+    return S.patient((st or {}).get("language") or "zh")
 
 
 def advance(store: Store, user: StaffUser) -> dict:

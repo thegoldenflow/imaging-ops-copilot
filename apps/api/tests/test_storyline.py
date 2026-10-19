@@ -30,18 +30,19 @@ from tests import storyline_harness as H
 
 @pytest.fixture
 def story(fresh_state):
+    """The story with the Mandarin-speaking patient, Wang Xiuying (the reset's language `zh`)."""
     accepted.install()
     service.install()
-    journey.plant(fresh_state, "U-ADMIN")
+    journey.plant(fresh_state, "U-ADMIN", "zh")
     return fresh_state
 
 
 @pytest.fixture
 def story_en(fresh_state):
-    """The story with the English-speaking patient (the reset's language `en`)."""
+    """The default story: the English-speaking patient, Margaret Ellis (no language chosen)."""
     accepted.install()
     service.install()
-    journey.plant(fresh_state, "U-ADMIN", "en")
+    journey.plant(fresh_state, "U-ADMIN")
     return fresh_state
 
 
@@ -227,6 +228,7 @@ def test_the_whole_story_offline_with_the_english_speaking_patient(story_en, cli
     """The reset's other patient: Margaret Ellis, who speaks English. The same twelve steps and checks; her daughter's
     call (the identity check on her English name, birth date and card digits), her instructions and her follow-up call
     are in English, and no step's text speaks of Mandarin or Chinese."""
+    assert story_en.modules["storyline"]["language"] == "en"  # the default story
     view, runs = _the_whole_story(story_en, client)
     patient = view["patient"]
     assert (patient["name"], patient["name_native"], patient["language"], patient["story_language"]) == (
@@ -253,14 +255,14 @@ def test_the_two_patients_share_the_story_and_differ_in_language():
     assert [(s.n, s.key, s.cast, s.route, s.beat, s.seconds, s.stub, s.ai) for s in zh] == \
         [(s.n, s.key, s.cast, s.route, s.beat, s.seconds, s.stub, s.ai) for s in en]
     assert [a.key for a, b in zip(zh, en) if a != b] == ["call", "instructions", "followup"]
-    assert S.steps() is S.STEPS and S.patient().language == "zh"  # no choice: the Mandarin story
-    with pytest.raises(ValueError, match="choose one of zh, en"):
+    assert S.steps("zh") is S.STEPS and S.steps() == en and S.patient().language == "en"  # no choice: English
+    with pytest.raises(ValueError, match="choose one of en, zh"):
         S.patient("fr")
 
 
 def test_the_reset_refuses_a_language_no_patient_speaks(fresh_state, client, login):
     r = client.post("/api/storyline/reset", headers=login("U-ADMIN"), json={"language": "fr"})
-    assert r.status_code == 422 and "zh, en" in r.json()["detail"]
+    assert r.status_code == 422 and "en, zh" in r.json()["detail"]
     assert "storyline" not in fresh_state.modules  # refused before anything was rebuilt
 
 

@@ -7,7 +7,7 @@ demo, test and eval keeps the data it was built on; the storyline's reset (app/m
 the demo reset followed by `plant`.
 
 1. The patient `pat-j0001`, in the language the presenter chose at the reset (app/modules/storyline/script.py
-   `PATIENTS`): Wang Xiuying, Mandarin (the default; her usual name in Chinese too), or Margaret Ellis, English.
+   `PATIENTS`): Margaret Ellis, English (the default), or Wang Xiuying, Mandarin (her usual name in Chinese too).
    Either way 72 (born on 8 March, so she is 72 on any hospital day), atrial fibrillation on warfarin, hypertension
    on amlodipine, metoprolol, atorvastatin, osteoporosis; one admission seven months ago; her daughter as contact;
    consents to AI processing, follow-up calls and SMS; a phone number. Her record at the imaging centre
@@ -70,9 +70,9 @@ class _PresetBuilder(Builder):
         return f"{prefix}-jp{self._counters[prefix]:04d}"
 
 
-def plant(store: Store, operator: str | None, language: str = "zh") -> dict:
-    """Write the preset for the patient who speaks `language` (zh, en); returns the storyline's state (also stored as
-    the `storyline` module blob)."""
+def plant(store: Store, operator: str | None, language: str | None = None) -> dict:
+    """Write the preset for the patient who speaks `language` (en, zh; none: the default, English); returns the
+    storyline's state (also stored as the `storyline` module blob)."""
     who = S.patient(language)
     plan = store.modules["hospital_plan"]
     now = parse(plan["generated_for"])

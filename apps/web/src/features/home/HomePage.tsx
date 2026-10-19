@@ -274,10 +274,10 @@ export function HomePage() {
           <div className="min-w-0">
             <p className="flex items-center gap-2 text-sm font-semibold text-slate-900"><RouteIcon className="size-4 text-brand-600" />Storyline 7 · one patient through the hospital (10 minutes)</p>
             <p className="mt-1 text-sm text-slate-600">
-              Wang Xiuying, 72, Mandarin, on warfarin, breaks her hip: the call centre, triage, imaging, a critical INR, a full
-              Orthopedics, medication safety, the OR, a NEWS2 night, the discharge documents, a Chinese follow-up call and
-              coding. Twelve steps, each one AI proposes, a person signs, the audit trail records it. For an English-speaking
-              audience: English subtitles, or the same story with Margaret Ellis, who speaks English (chosen at the reset).
+              Margaret Ellis, 72, on warfarin, breaks her hip: the call centre, triage, imaging, a critical INR, a full
+              Orthopedics, medication safety, the OR, a NEWS2 night, the discharge documents, a follow-up call and coding.
+              Twelve steps, each one AI proposes, a person signs, the audit trail records it. The same story with Wang Xiuying,
+              who speaks Mandarin (English subtitles in demo mode), is one pick away at the reset.
             </p>
           </div>
           <Link to="/storyline" className="flex shrink-0 items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700">

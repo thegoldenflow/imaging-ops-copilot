@@ -550,7 +550,7 @@ function NotSetUp({ data }: { data: Storyline }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const languages = data.languages ?? LANGUAGES;
-  const [language, setLanguage] = useState("zh");
+  const [language, setLanguage] = useState("en");
   const reset = useMutation({
     mutationFn: () => resetStoryline(language),
     onSuccess: async () => {

@@ -1,6 +1,6 @@
 // The hospital storyline's API (spec 8.2, WP9): GET /api/storyline (the twelve steps with their live trail),
-// POST /api/storyline/reset (demo reset + preset, with the patient's language: zh, Wang Xiuying, or en, Margaret
-// Ellis), POST /api/storyline/advance (the clock to the step's beat), and the
+// POST /api/storyline/reset (demo reset + preset, with the patient's language: en, Margaret Ellis, the default, or
+// zh, Wang Xiuying), POST /api/storyline/advance (the clock to the step's beat), and the
 // demo's automation: POST /api/storyline/steps/{key}/autoplay (do the current step) and .../jump (do every step before
 // that one), a background job whose progress GET shows as `autoplay`.
 
@@ -183,11 +183,11 @@ export function useStoryline(enabled = true) {
   });
 }
 
-export const resetStoryline = (language = "zh") => post<{ ok: boolean; prepared_at: string; language: string }>("/api/storyline/reset", { language });
-/** The reset's choice when the storyline does not say (the Mandarin story is the default). */
+export const resetStoryline = (language = "en") => post<{ ok: boolean; prepared_at: string; language: string }>("/api/storyline/reset", { language });
+/** The reset's choice when the storyline does not say (the English story is the default). */
 export const LANGUAGES = [
-  { code: "zh", label: "Mandarin-speaking: Wang Xiuying (王秀英)" },
   { code: "en", label: "English-speaking: Margaret Ellis" },
+  { code: "zh", label: "Mandarin-speaking: Wang Xiuying (王秀英)" },
 ];
 export const advanceStoryline = () => post<{ job: SimJob; beat: string; target: string }>("/api/storyline/advance");
 export const askStepAi = (key: string) => post<{ step: number; items: string[][] }>(`/api/storyline/steps/${key}/ai`);

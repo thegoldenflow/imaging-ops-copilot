@@ -11,7 +11,9 @@ const expect = baseExpect.configure({ timeout: 60_000 });
 test("demo mode: introduce the step, play it, ask the audience before the next one", async ({ page, request }) => {
   test.setTimeout(300_000);
   const { token } = await (await request.post("/api/auth/login", { data: { user_id: "U-ADMIN" } })).json();
-  const reset = await request.post("/api/storyline/reset", { headers: { Authorization: `Bearer ${token}` }, timeout: 180_000 });
+  // the Mandarin-speaking patient (the default is the English one): her call with its English subtitles
+  const reset = await request.post("/api/storyline/reset", { headers: { Authorization: `Bearer ${token}` }, data: { language: "zh" },
+    timeout: 180_000 });
   expect(reset.ok()).toBeTruthy();
   const story = await (await request.get("/api/storyline", { headers: { Authorization: `Bearer ${token}` } })).json();
   const lines: string[] = story.patient.call_lines;

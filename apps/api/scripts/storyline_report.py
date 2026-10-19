@@ -8,8 +8,9 @@
         in this process, on the configured database, inside one transaction that is rolled back (the preset is
         planted on the data as it is; the background work is run between the steps: tests/storyline_harness.py).
         With --report, writes evals/storyline/report_in_process.json and .md.
-    --language en walks the English-speaking patient's story (Margaret Ellis; the reports get the suffix _en);
-    the default is zh, Wang Xiuying's.
+    --language zh walks the Mandarin-speaking patient's story (Wang Xiuying); the default is en, Margaret Ellis's.
+    The English story's reports get the suffix _en (the reports without one are Wang Xiuying's, the default until
+    2026-10-19).
 
 The walk (app/modules/storyline/walk.py) is the same one the backend test runs. Nothing here judges a model: the
 report shows that the story runs from start to finish, what each step proposed and wrote, and how long it took.
@@ -127,8 +128,8 @@ def main() -> None:
     mode.add_argument("--api", help="base URL of a running API, e.g. http://127.0.0.1:9445")
     mode.add_argument("--in-process", action="store_true")
     parser.add_argument("--report", action="store_true", help="write evals/storyline/report_<mode>.json and .md")
-    parser.add_argument("--language", default="zh", choices=["zh", "en"],
-                        help="the patient's language: zh (Wang Xiuying, the default) or en (Margaret Ellis)")
+    parser.add_argument("--language", default="en", choices=["en", "zh"],
+                        help="the patient's language: en (Margaret Ellis, the default) or zh (Wang Xiuying)")
     parser.add_argument("--timeout", type=float, default=180,
                         help="seconds to wait for one step's background work (--api: the discharge summary step "
                              "waits this plus the longest a summary draft can take)")

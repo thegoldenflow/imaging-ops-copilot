@@ -7,5 +7,7 @@ The hospital storyline walked from start to finish: one synthetic patient, twelv
 - `report_temporal.json` and `.md` come from a running API with a Temporal server and a worker: her InpatientJourneyWorkflow (`journey-stay-j0001`) strings steps 2–12 together.
 - `--in-process` writes `report_in_process.*`: the walk in one process, rolled back. Not kept here; the backend test `tests/test_storyline.py` runs the same walk.
 - Threshold: all twelve steps pass, with Temporal on and with it off.
+- The patient: `--language en` (Margaret Ellis, the default since 2026-10-19; reports `report_<mode>_en.*`) or `--language zh`
+  (Wang Xiuying). The reports kept here without a suffix are Wang Xiuying's, made before the default changed.
 
 The seconds are the walk's own: API calls, waits for the API's background loops, and the clock's fast-forwards. They are not the presenter's. The talking and clicking budget is in `demo/hospital_journey.md` (under 10 minutes). The runs here were made on the demo database with the mock model, while the machine was shared with other sessions; the `git` field reads `-dirty` when the run was made before the commit.

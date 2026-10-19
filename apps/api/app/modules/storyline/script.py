@@ -6,11 +6,11 @@ page and `demo/hospital_journey.md` show: the click path, the one sentence to sa
 Ids are fixed (`*-j0001`), so tests, the page and the demo script can name them; times are the hospital clock's and
 come from the plan when the story runs.
 
-The presenter picks her language at the reset (`PATIENTS`): Wang Xiuying, Mandarin-speaking (`zh`, the default and
-the spec's case: the call and the follow-up in Chinese, the instructions in Simplified Chinese), or Margaret Ellis,
-English-speaking (`en`, for an English-speaking audience). The clinical course, the ids, the cast, the checks and the
-twelve steps are the same; her name, her record's language, what she and her daughter say and the step texts that
-mention the language differ (`steps(language)`).
+The presenter picks her language at the reset (`PATIENTS`): Margaret Ellis, English-speaking (`en`, the default: the
+owner presents in English), or Wang Xiuying, Mandarin-speaking (`zh`, the spec's case: the call and the follow-up in
+Chinese with English subtitles in demo mode, the instructions in Simplified Chinese). The clinical course, the ids,
+the cast, the checks and the twelve steps are the same; her name, her record's language, what she and her daughter
+say and the step texts that mention the language differ (`steps(language)`; `STEPS` holds the Mandarin story's).
 
 Everything here is fictional (synthetic data only).
 """
@@ -118,6 +118,17 @@ def _english(text: str) -> tuple[str, str]:
 
 
 PATIENTS: dict[str, Patient] = {
+    "en": Patient(
+        "en", "English-speaking: Margaret Ellis", "en", "English", "Margaret", "Ellis", None,
+        ("Laura", "Bennett"), "margaret.ellis@example.com",
+        call_lines=(_english("Hello, my mother fell at home, and an ambulance is bringing her to your emergency "
+                             "department."),
+                    _english("I'm her daughter. Her name is Margaret Ellis, born {birth}, health card ending in 4821."),
+                    _english("No, that's all, thank you.")),
+        followup_lines=(_english("{birth}"),
+                        _english("I'm all right, but the wound keeps leaking; the gauze is soaked through.")),
+        followup_closing=_english("No, nothing else."),
+        diet="green vegetables"),
     "zh": Patient(
         "zh", "Mandarin-speaking: Wang Xiuying (王秀英)", "zh-CN", "Chinese (China)", "Xiuying", "Wang", ("秀英", "王"),
         ("Li", "Chen"), "xiuying.wang@example.com",
@@ -131,27 +142,18 @@ PATIENTS: dict[str, Patient] = {
                          "I'm all right, but the wound keeps leaking; the gauze is soaked through.")),
         followup_closing=("没有了。", "No, nothing else."),
         diet="绿叶蔬菜"),
-    "en": Patient(
-        "en", "English-speaking: Margaret Ellis", "en", "English", "Margaret", "Ellis", None,
-        ("Laura", "Bennett"), "margaret.ellis@example.com",
-        call_lines=(_english("Hello, my mother fell at home, and an ambulance is bringing her to your emergency "
-                             "department."),
-                    _english("I'm her daughter. Her name is Margaret Ellis, born {birth}, health card ending in 4821."),
-                    _english("No, that's all, thank you.")),
-        followup_lines=(_english("{birth}"),
-                        _english("I'm all right, but the wound keeps leaking; the gauze is soaked through.")),
-        followup_closing=_english("No, nothing else."),
-        diet="green vegetables"),
 }
 LANGUAGES = tuple(PATIENTS)
+DEFAULT = "en"  # the reset's patient when none is chosen (owner's direction, 2026-10-19; it was Mandarin)
 
 
 def patient(language: str | None = None) -> Patient:
-    """The storyline's patient in that language (none: the default story, Mandarin)."""
-    found = PATIENTS.get(language or "zh")
+    """The storyline's patient in that language (none: the default story, English)."""
+    found = PATIENTS.get(language or DEFAULT)
     if found is None:
         raise ValueError(f"No storyline patient speaks {language!r}: choose one of {', '.join(LANGUAGES)}")
     return found
+
 
 IMAGING_REQUEST = {
     REQUISITIONS[0]: ("XR_HIP", "X-ray left hip and pelvis"),
@@ -335,7 +337,8 @@ BY_KEY = {s.key: s for s in STEPS}
 TOTAL_SECONDS = sum(s.seconds for s in STEPS)
 assert TOTAL_SECONDS <= 600, TOTAL_SECONDS
 
-# The English-speaking patient: the texts of the steps that name her language (the rest of the story is the same)
+# The English-speaking patient: the texts of the steps that name her language (`STEPS` has the Mandarin story's;
+# the rest of the story is the same)
 EN_STEPS: dict[str, dict] = {
     "call": {
         "title": "A daughter calls the hospital; the clerk confirms the ED registration",

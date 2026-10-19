@@ -1,10 +1,11 @@
 # Hospital storyline (spec 8.2, WP9)
 
-One synthetic patient through the whole hospital in twelve steps, about ten minutes: Wang Xiuying (王秀英), 72,
-Mandarin-speaking, on warfarin for atrial fibrillation, falls at home and breaks her hip. The reset can start the same
-story with Margaret Ellis, who speaks English (`script.PATIENTS`, the reset's `language`: `zh`, the default, or `en`):
-the same course, ids, cast, steps and checks; her name, her record's language, her daughter's and her own lines and
-the step texts that name the language (steps 1, 10, 11: `script.steps(language)`) differ. Every step is "AI proposes
+One synthetic patient through the whole hospital in twelve steps, about ten minutes: a woman of 72 on warfarin for
+atrial fibrillation falls at home and breaks her hip. By default she is Margaret Ellis, who speaks English (the owner
+presents in English); the reset can start the same story with Wang Xiuying (王秀英), who speaks Mandarin, spec 8.2's
+case (`script.PATIENTS`, the reset's `language`: `en`, the default, or `zh`): the same course, ids, cast, steps and
+checks; her name, her record's language, her daughter's and her own lines and the step texts that name the language
+(steps 1, 10, 11: `script.steps(language)`) differ. Every step is "AI proposes
 → a person signs → audit trail". The guided page is `/storyline` (web `features/storyline/`); its **Demo mode** puts a presenter's guide
 on every page (each step's introduction, the clicks, then "Continue to the next step?"). For a live interview the
 guide can have the demo's automation do a step ("Do this step for me"), jump to a step, or present only the
@@ -35,7 +36,7 @@ demo script is `demo/hospital_journey.md`.
   approval, the EHR records written and their audit events; the hospital clock, Temporal's state, the journey; the
   patient with the caller's scripted lines (`call_lines`, `followup_lines`, `followup_closing`) and each line's
   English translation when it is not English (`translations`, fixed text: the subtitles).
-- `POST /api/storyline/reset` (demo reset + preset; body `{"language": "zh" | "en"}`, none: `zh`; 422 for another
+- `POST /api/storyline/reset` (demo reset + preset; body `{"language": "en" | "zh"}`, none: `en`; 422 for another
   language, before anything is rebuilt), `POST /api/storyline/advance` (fast-forward to the step's beat). The status
   gives the reset's choices (`languages`) and the story's patient (`patient.story_language`, `name_native`,
   `call_language`: her calls' and instructions' language).
