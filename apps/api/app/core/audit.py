@@ -15,6 +15,10 @@ patient's MRN hash, the encounter, the purpose module and the prompt version
 (ai_call). These fields were added after the first events were written; a field
 that is null is left out of the digest, so the chain over old and new events
 verifies unchanged.
+
+An event of a person that the storyline's demo automation caused (its request acts
+as that person, app/core/context.py) says so in its reason: "Demo automation on
+behalf of <name> (<role>), started by <presenter>".
 """
 
 from __future__ import annotations
@@ -111,6 +115,11 @@ class AuditLog:
         prompt_version: str | None = None,
     ) -> AuditEvent:
         event_type = event_type or event_type_for(action)
+        from app.core.context import automation_note
+
+        note = automation_note(user_id, user_name, str(role))
+        if note and "demo automation" not in (reason or "").lower():  # the walk's own notes may say so already
+            reason = f"{reason} · {note}" if reason else note
         if event_type not in EVENT_TYPES:
             raise ValueError(f"Unknown audit event type {event_type!r}")
         fields = {"user_id": user_id, "user_name": user_name, "role": str(role), "action": action,

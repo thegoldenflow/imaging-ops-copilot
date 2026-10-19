@@ -92,7 +92,7 @@
 | 3.10 | 合并后 5 个测试失败：未提交的真实运行记录改变了发布状态 | 平台 | 测试 · 共享状态 |
 | 3.11 | 504 重试永远不会触发：重试预算被一次超时吃光 | 平台 | 真实模型 · 重试 |
 | 3.12 | 文书只过 10/30：用单次失败率推算整份通过率 | hospital | 真实模型 · 可用性 |
-| 3.13 | 故事线第 9 步：验证器抓到模型编造的"房颤" | hospital | 真实模型 · 幻觉 |
+| 3.13 | 故事线第 9 步：验证器抓到模型编造的"房颤"（结论已更正，见 3.24） | hospital | 真实模型 · 幻觉 |
 | 3.14 | 电话 agent 的"中文失败"其实是 MINIMAL 思考 | 平台 / imaging | 真实模型 · A/B 实验 |
 | 3.15 | 重试救回 2/3，剩下的是连环卡顿 | 平台 / hospital | 真实模型 · 可用性 |
 | 3.16 | 一半预算的副作用：用药两个 agent 的慢调用被 12.5 秒截断 | 平台 / hospital | 真实模型 · 超时 |
@@ -103,6 +103,7 @@
 | 3.21 | 空闲花钱的续篇：空闲暂停 + 每日预算；"重置会清零预算"、开着的标签页、时钟回来跳半小时 | 平台 / hospital | 真实模型 · 成本 · 设计 |
 | 3.22 | 后台 AI 按需：只为打开的东西付钱；顺带抓到"决定和点评同时写"的竞态，以及一个只会卡住、不会失败的测试 | hospital / 平台 | 成本 · 并发 · 测试 |
 | 3.23 | AI 只在用户点击时运行：读取不调模型、"谁点的"被 `acting_as_system` 抹掉、一次点击跑了两项；合并前评审的 13 条（重试扔掉人的工作等） | 平台 / hospital / imaging | 成本 · 设计 · 可追溯 · 端到端 · 评审 · 权限 |
+| 3.24 | 出院小结在真实模型下拦了三项："房颤"不是幻觉，是住院记录里少了她的慢性病（更正 3.13） | hospital | 真实模型 · 数据一致性 · 校验器 |
 | 4.1 | 来电者口述的出生日期没被去标识化 | imaging | 隐私 |
 | 4.2 | 两个字母的姓（Hu、Li）泄露 | hospital | 隐私 |
 | 4.3 | 去标识化评测满分，说明评测集太简单 | hospital | 隐私 · 评测可信度 |
@@ -167,10 +168,13 @@
 | 10.6 | 测试悄悄用了真实的 Gemini key | 平台 | 端到端测试 · 环境 |
 | 10.7 | 负载下写一个 75 分钟的长 e2e | hospital | 端到端测试 |
 | 10.8 | Playwright 小坑 | 平台 | 速查表 |
+| 10.9 | 改了前端后故事线 e2e 两次失败、位置不同：先排除自己的改动，再按 10.5 定性 | hospital | 端到端测试 · 偶发 · 未查明 |
 | 11.1 | 电话组件崩溃：`useEffect` 返回了 Promise | imaging | 前端 |
 | 11.2 | `/api/auth/me` 被中断就登出 | 平台 | 前端 · 错误处理 |
 | 11.3 | 刚提交的同行评审从列表消失 | imaging | 前端 · 排序截断 |
 | 11.4 | 中文患者指导混入英文诊断名 | hospital | 多语言 |
+| 11.5 | 演示向导的"Say it"按了没反应：事件发出时通话输入框还没挂上 | hospital | 前端 · 时序 · 端到端 |
+| 11.6 | 随访页打开在 Queue 标签，她的电话在 Calls 下：步骤的路由只到页面 | hospital | 前端 · 演示 · 深链接 |
 | 12.1 | MedRec 可以绕过工作台签终稿 | hospital | 设计 · 安全 |
 | 12.2 | 一条超出 72 小时权限的记录拖垮整个队列 | hospital | 设计 · 权限 |
 | 12.3 | 来电者亲属关系存反 | hospital | 设计 · 语义 |
@@ -182,6 +186,8 @@
 | 12.9 | "最新的骨科异常"不是稳定标识 | hospital | 设计 |
 | 12.10 | 架构守卫测试：真问题和误报 | hospital | 设计 · 架构测试 |
 | 12.11 | 其他设计小记 | hospital | 速查表 |
+| 12.12 | 故事线第 5 步没有"推进时钟"：07:00 就开着的骨科异常被当成了这一步的提议 | hospital | 设计 · 状态 · 演示 |
+| 12.13 | 回电时间是墙上时间：两个时钟写进同一条记录 | hospital | 设计 · 时间 |
 | 13.1 | 函数名覆盖了模块级的锁 | hospital | Python |
 | 13.2 | 循环导入只在某个入口出现 | 平台 | Python |
 | 13.3 | 新代码绕开测试的注入点 | 平台 | Python · 测试 |
@@ -867,6 +873,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **怎么查的：** 故事线脚本只预期一个红项（预埋的陷阱）。看第二个红项的内容：病人在用华法林，模型给它补了一个"常见适应证"房颤，而病人的诊断列表里没有房颤。
 - **根因：** 模型的"合理补全"在临床文书里就是幻觉；可溯源校验器按设计把它拦下。
 - **怎么修：** 不改校验器（它在正确工作）。后续可以在 prompt 里明确"适应证只能来自输入的诊断"，故事线脚本也要能处理模型额外产生的红项。
+- **更正（10-18，见 3.24）：** "编造"的结论不准确。她确实有房颤（预设的问题列表 `cond-j0001-afib`），出院处方里华法林和美托洛尔的用药原因也写着房颤，模型是照着输入写的；缺的是住院这次的诊断。修复是入院时把她的慢性病记成住院诊断，校验器没有改。
 - **经验：** 真实模型和 mock 的差别常常不在"答错"，而在"多说了一句看似合理的话"。这正是可溯源校验存在的理由：让每句话都能对回输入，多出来的就会被抓住。
 - **范围：** hospital（WP7 文书、WP9 故事线）。
 - **来源：** 2026-10-12 合并后的故事线实跑（`scripts/storyline_report.py --api`，未写报告）。
@@ -1302,6 +1309,60 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **提交：** 分支 `claude/adoring-kirch-14355b` 的 5c922b9 "api, web: AI only on the user's click"（owner 2026-10-14 同意提交，并确认种子积压按需运行这一偏差）；
   评审修复（第 12 步）在同一分支的 cfdae75 "api, web: AI on demand, pre-merge review fixes"，回归测试 `apps/api/tests/test_ai_on_demand_review.py`；
   第二轮（第 13 步）在下一个提交 "api, web: AI on demand, second review round"，测试在同一个文件的 "second round" 部分和 `ai-on-demand.spec.ts` 的最后一个测试。
+
+### 3.24 出院小结在真实模型下拦了三项："房颤"不是幻觉，是住院记录里少了她的慢性病（更正 3.13）
+
+- **现象：** 10-18 用真实 Gemini 走故事线演示（重点预设 1、5、9、11），第 9 步出院小结的草稿两次写到 "atrial fibrillation"：
+  华法林和美托洛尔的那一行都写着 "for atrial fibrillation"。校验器除了预埋的 lisinopril，又把这两行标红：
+  `condition 'atrial fibrillation' in the text is not a diagnosis of the input`。演示脚本说只有 lisinopril 一项被拦。
+  10-12 的实跑（3.13）遇到过同一个红项，当时的结论是"模型给华法林补了一个常见适应证，是幻觉，校验器拦得对"。
+- **怎么查的：**
+  1. **先核对"她到底有没有房颤"，而不是先接受"幻觉"的说法。** 故事线脚本（`script.py` 开头）和演示脚本第一段都写她"因房颤服用华法林"。
+     预设 `app/ehr/seed/journey.py` 的 `_patient` 写了三个 Condition：`cond-j0001-afib`、`cond-j0001-htn`、`cond-j0001-osteo`，
+     但都挂在 21 天前的门诊 `enc-j0001-clinic` 上，类别是默认的 `problem-list-item`。所以模型说的是真的，要查的是：小结的输入里有没有这件事。
+  2. **读小结从哪里取诊断。** 代理的 `getEncounterBundle`（`app/agents/handlers.py`）和不调模型的 `read_inputs`（`documentation/service.py`）
+     都用 `get_encounter_resources(rtype, encounter_id)`，只取挂在这次住院上的资源。校验器的 `scan_text` 只认 `diagnosis`、`encounter` 两类来源。
+  3. **用 mock 复现（探针 `tests/test_zz_probe.py`，不提交）：** 走到第 9 步，打印住院上的 Condition：只有骨折 `cond-stay-j0001-adm-1`
+     和入院时写的高血压备注 `cond-j0001-htn-note`。诊断来源里没有房颤、骨质疏松。mock 的草稿只拦 lisinopril：mock 的输出是固定的，不写用药原因，
+     所以 mock 下看不出这个问题。
+  4. **把 mock 草稿改成真实模型的写法，再用同一份来源校验：** 华法林、美托洛尔的 `note` 加 "For atrial fibrillation."，病程里加一句
+     "Known atrial fibrillation on warfarin, hypertension and osteoporosis."。红项：`untraceable_diagnosis 'atrial fibrillation'` 在
+     `medications.changed[0]`（华法林）和 `medications.continued[2]`（美托洛尔），正好是现场被拦的两行；`'osteoporosis'` 也会被拦；高血压不拦。复现成立。
+  5. **模型为什么会写 "for atrial fibrillation"？** 出院处方（`app/ehr/storyline.py` 的 `DISCHARGE_RX`）里华法林和美托洛尔的 `reason` 就是 49436004（房颤）。
+     在 e2e 库上用小结自己的 `read_inputs` 重建输入，用药分块里写着 `warfarin | intent: plan | reason: Atrial fibrillation` 和
+     `metoprolol | intent: plan | reason: Atrial fibrillation`。**模型是在照抄输入，不是在补全。** 输入自相矛盾：处方说用药原因是房颤，住院的诊断里却没有房颤。
+  6. **任务说明里还说"高血压也缺"。** 第 3 步已经看到高血压有住院级的 `cond-j0001-htn-note`，第 4 步也证实它不拦。这一点不成立，修复里不需要再加高血压。
+- **根因：** 她的慢性病只记在门诊的问题列表上，这次住院只记了骨折和高血压备注；出院小结只读住院的诊断，而出院处方的用药原因写着房颤。
+  真实模型照着输入写出用药原因，校验器就把它当成"不是输入里的诊断"拦下。3.13 的"模型幻觉"结论不准确：当时没有核对完整病历和模型实际收到的输入。
+- **怎么修（两个方案）：**
+  - (A) 小结的取数也读病人的问题列表：所有出院小结的输入都会变，分块数、文书评测的基线跟着变；"编造诊断"的评测用例（5.12）也可能因为病人的问题列表里
+    恰好有那个病而失效。不选。
+  - (B) **入院时把她已知的慢性病记成这次住院的诊断**（选这个）：`app/ehr/storyline.py` 的 `admission_note`（她入院时故事线订阅者调用）在写高血压备注的同时，
+    把问题列表上的房颤、骨质疏松复制成住院的 encounter-diagnosis（`cond-j0001-afib-stay`、`cond-j0001-osteo-stay`，onset 用问题列表上的）。
+    这也是真实入院记录的写法（入院医生列出合并症），文书模块自己的预埋病例早就这样做（`app/ehr/seed/documentation.py` 的 `plant_warfarin` 把房颤记在住院上）。
+    只有故事线的数据变，其他演示、测试和评测都不受影响。
+  - 不改校验器：如果把处方的 `reasonCode` 也当作诊断来源，任何处方上写的原因都能绕过"诊断必须是医生为这次住院记录的"这条规则。
+  - 文档：`docs/data-model.md`（她的固定 id）、storyline README、演示脚本第 9 步；3.13 加了指向本案的更正。
+- **怎么证明：**
+  - 探针在新代码上：住院 Condition 多了 `cond-j0001-afib-stay`、`cond-j0001-osteo-stay`；同样改写过的草稿只剩 lisinopril 那一行的两个红项
+    （`wrong_source_type` 指向它引用的高血压备注，和 `untraceable_medication`）。
+  - 回归测试（`tests/test_storyline.py`，整条走查 `test_the_whole_story_offline` 调用 `_only_the_lisinopril_is_untraceable`）：取签名后的小结
+    （lisinopril 已删），按真实模型的写法改写，校验结果没有红项；再加回 lisinopril 一行（引用高血压备注），红项只落在这一行。
+    小结的分块数仍是 4（`len(chunks) + 1 == SUMMARY_CALLS`），所以线上走查等待草稿的时间估算不变。
+  - Playwright `hospital-storyline.spec.ts`（mock，自己的库）第 9 步照常：删掉红项后可以签名。
+  - **用真实模型怎么验证**（本会话没有跑：要真 key，也要花钱）：在自己的库上用真 key 起一个 API，用 `scripts/storyline_report.py --api http://127.0.0.1:<端口> --report`
+    走完 12 步。第 9 步的结果应当是 "blocked [...]; removed and signed"，括号里只有 lisinopril 和它引用的 `condition/cond-j0001-htn-note`；
+    报告里不应再有 `untraceable_diagnosis`。演示时看第 9 步：红项只有 lisinopril 一行。
+- **经验：**
+  - "模型幻觉"是一个需要证据的结论。先在完整病历和模型实际收到的输入里找这句话的来源：这次输入里白纸黑字写着用药原因是房颤。
+    把"被拦"当成"拦得对"，3.13 就漏掉了一个数据不一致。
+  - mock 测不出"模型多写了一句真话"，因为 mock 的输出是固定的。可以把 mock 的输出改成真实模型的写法再校验（这次的回归测试就是这样），不花钱也能锁住这个行为。
+  - 数据自相矛盾（处方的原因有、住院的诊断没有），迟早会被某个严格的校验器发现。修数据，不放宽校验器：校验器的规则是安全设计。
+- **范围：** hospital（WP7 文书、WP9 故事线的 EHR 脚本）。
+- **来源：** 10-18 真实 Gemini 演示实跑；本会话（`claude/infallible-margulis-7d3c3f`，基于 `claude/objective-sammet-1845e1`）修复。
+- **代码：** `apps/api/app/ehr/storyline.py`（`admission_note`、`KNOWN_CONDITIONS`）、`apps/api/tests/test_storyline.py`（`_only_the_lisinopril_is_untraceable`）；
+  相关、没有修改：`apps/api/app/modules/documentation/facts.py`（`build`）、`validator.py`（`scan_text`）、`apps/api/app/agents/handlers.py`（`get_encounter_bundle`）。
+  提交：本案所在的提交 "fix(storyline): four fixes from the live highlights run"。
 
 ---
 
@@ -3081,6 +3142,33 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 | Control Tower 用例期待 "Task task-"，却看到 "queued for the workflow" | 开了 Temporal 后，批准由容量工作流异步执行 | 测试给出执行的时间（2.8） | main__025b79fc 10-09 23:45 |
 | Playwright 失败后查库，看到的状态和失败时不一样 | 失败后 Playwright 会重启 worker 并重跑 `beforeAll`（演示重置） | 现场以快照、trace 为准（5.1） | wt-wp8-voice-services-addfd5 10-10 |
 
+
+### 10.9 改了前端以后，故事线全流程 e2e 两次失败，每次挂的地方不一样：先排除"是我的改动"，再按 10.5 定性
+
+- **现象：** 做完故事线演示模式（11.5），把用到通话输入框和故事线页面的四个 spec 放在一起跑（独立数据库 `ioc_e2e_demo`，mock 模型，API 9417，Vite 5181）：
+  5 过 1 失败。`hospital-storyline.spec.ts` 一开头就挂了：`expect(locator).toHaveAttribute(expected) failed`，`getByTestId('story-step-1')`
+  期望 `"active"`，300 秒里 583 次都是 `"done"`，也就是页面上点了 Reset 以后，5 分钟里故事线都没有回到起点。
+  单独重跑这个 spec，重置 34 秒就好了，第 1–10 步也都过了，但第 11 步（随访电话）又失败了：`TimeoutError: locator.click: Timeout 30000ms exceeded`，
+  `getByRole('button', { name: 'Send' })` 一直是 `element is not enabled`，然后 `element was detached from the DOM`。
+- **怎么查的：**
+  1. 先问"是不是我的改动"。这次只动了前端：演示向导、`CallerInput` 里加的监听、`useStoryline(enabled)`。第二次失败正好在 `CallerInput` 上，所以要认真排除。
+     代码层面：新监听只在 `disabled`/`busy` 变化时登记或注销，通知的对象只有演示面板（`useCallerListening`）。演示模式关着时面板不渲染，没人订阅，所以不会让输入框重新挂载、清空文字。
+     `story-reset` 按钮的 testid 和确认框都没变。推理上和失败对不上。
+  2. 再用实验验证：两次失败挂在不同的地方（一次是重置太慢，一次是第 11 步），这是 10.5 说的"轮流失败"特征，问题在共享的东西（机器负载、同一个 API 进程），不在某一步。
+     当时机器上还跑着用户本地 9001 端口的真实 Gemini API 和 Vite。
+  3. 按第一次的顺序（demo-guide → frontdesk-languages → hospital-storyline）原样重跑一遍：3 passed (5.5m)，故事线 12 步 260 秒走完，重置 31 秒。
+- **根因：** **未查明**，归入 10.5 那一类负载下的偶发失败。可以确定的是：同一份代码、同样的顺序，重跑全过；失败的位置不固定。
+  没验证的两个假设：(a) 第一次的重置请求排在 API 里别的长事务后面，超过了 300 秒（没有保存那一轮的 API 日志）；
+  (b) 第 11 步填进去的文字，在点 Send 之前被组件重新挂载清掉了（快照显示元素被 detach）。如果 (b) 再出现，下一步是保存 trace（`--trace on`），看清掉文字的那次渲染是谁触发的。
+- **怎么修：** 没有代码修复。做法：失败的 spec 在同样条件下原样重跑，先确认能不能复现，再决定查不查；这次的重跑把完整 API 日志存进了 scratchpad，下一次能直接看重置请求的耗时。
+- **怎么证明：** 原顺序重跑 3/3 通过，`demo-guide.spec.ts` 单独 1/1 通过，`voice-services` 3/3、`frontdesk-languages` 1/1 通过。
+- **经验：**
+  - 自己刚改过的组件附近出错时，先从代码上推一遍"我的改动能不能造成这个现象"，再用一次原样重跑来确认，两样都要有，光靠推理或者光靠"重跑过了"都不够。
+  - 第一次失败时没存 API 日志（过滤输出时被 `grep -v WebServer` 去掉了），所以假设 (a) 没法验证。长 e2e 要把完整输出写进文件，过滤留到看的时候再做。
+- **范围：** hospital（WP9 故事线 e2e）。
+- **来源：** 本会话 10-18。
+- **代码：** `apps/web/e2e/hospital-storyline.spec.ts`（没改）；演示模式的改动见 11.5。
+
 ---
 
 ## 十一、前端与多语言界面
@@ -3164,6 +3252,61 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** hospital（WP7 双语患者指导）。
 - **来源：** wt-wp7-documentation-c03e03 10-10 04:05–04:10。
 - **代码：** `apps/api/app/modules/documentation/`；提交 a04ca7b。
+
+
+### 11.5 演示向导的"Say it"按了没反应：事件发出去时，通话输入框还没挂上
+
+- **现象：** 新做的故事线演示模式（`DemoGuide.tsx`）有"Say it"按钮，点一下就把来电者的台词送进正在进行的通话，不用复制粘贴。
+  我在浏览器里手动点，两句话都送进去了，身份核验也显示 Verified。可新写的 Playwright 测试 `e2e/demo-guide.spec.ts` 第一次跑就失败：
+  `expect(locator).toContainText(expected) failed`，`unexpected value "Thank you for calling Lakeside General Hospital. ... How can I help you today?"`，
+  卡在 `await expect(page.getByTestId("call-transcript")).toContainText(lines[0])`。也就是通话里只有开场白，来电者那句话根本没出现。
+- **怎么查的：**
+  1. 假设"mock 模型回复慢，60 秒还没等到"。不成立：通话记录里连来电者自己那句都没有。台词一旦送出，回复回来时会和来电者的话一起出现；只有开场白，说明这句话没送出去。
+  2. 假设"事件名或监听写错了"。不成立：同一份代码手动点是好的。手动和测试的差别只有节奏：手动时我在"Start a call"之后等了 3 秒才点"Say it"，测试是紧接着点的。
+  3. 看代码确认时序：`CallerInput`（`features/voice/Console.tsx`）只有在 `startCall` 请求返回、`call` 有值之后才渲染，监听器也是那时才挂上。
+     "Say it"用的是 `window.dispatchEvent` 发自定义事件，发的时候没人监听，事件就直接丢了，页面上没有任何提示。
+  4. 顺着同一思路又找到第二个会吞台词的地方：`submit()` 在 `busy`（Agent 正在回复）时直接 `return`。演讲者在 Agent 回复期间点"Say it"，台词也会悄悄丢掉。测试碰巧没撞上，是因为它等第一句出现后才点第二句。
+- **根因：** 用"发了就不管"的事件跨组件传话，发送方不知道接收方此刻能不能接。接收方不在（输入框还没挂上）或者暂时不收（正在回复）时，输入被静默丢弃。
+- **怎么修：** 输入框只在"能接一句话"的时候登记监听（`listenAsCaller`，依赖 `[disabled, busy]`，不能接时注销）。`demo.ts` 记录当前有没有人在听，
+  向导用 `useCallerListening()` 读这个状态：没人听时"Say it"按钮禁用，提示"start the call first; wait while the agent answers"。
+- **怎么证明：** 测试里加了一条断言：开通话之前 `demo-say-0` 是禁用的（`toBeDisabled`）。Playwright 点击前会自动等按钮变成可用，所以测试不再依赖节奏。
+  重跑 `demo-guide.spec.ts`：1 passed (1.1m)。之后连同 `voice-services`、`frontdesk-languages`、`hospital-storyline` 一起跑，用独立数据库和 mock 模型（见 PROGRESS 对应小节）。
+- **经验：**
+  - 自动化测试点得比人快，正好能暴露"人慢一点就碰不到"的时序问题。手动能过、测试不过时，先比较两边的节奏，而不是先怀疑测试。
+  - 跨组件"发了就不管"的消息，要有一个"对方是否就绪"的状态。界面宁可把按钮禁用并说明原因，也不要收下输入再悄悄丢掉。
+  - 修一个丢输入的路径时，顺手把同一个函数里其他会提前 `return` 的分支也查一遍（这里是 `busy`）。
+- **范围：** hospital（WP9 故事线演示模式）。
+- **来源：** 本会话 10-18，演示模式开发中第一次跑端到端测试。
+- **代码：** `apps/web/src/features/storyline/demo.ts`、`DemoGuide.tsx`、`apps/web/src/features/voice/Console.tsx`、`apps/web/e2e/demo-guide.spec.ts`；分支 `claude/demo-guide`。
+
+### 11.6 随访页打开在 Queue 标签，她的电话却在 Calls 下
+
+- **现象：** 10-18 的真实 Gemini 演示，第 11 步（重点）：向导的 **Start** 切到 Vera Uchida，打开 `/follow-up`。页面停在 **Queue** 标签，列表里是别的病人的升级，
+  默认选中第一个；她那通已经安排、还没拨的电话不在这里。向导的点击路径写的是 "Her call"，演讲者得自己想到切到 **Calls**。
+- **怎么查的：**
+  1. `FollowUpPage.tsx`：标签的初始值是 `"open"`（Queue）。Queue 只列需要护士处理的（升级、手动随访），已安排的电话只在 Calls 下。
+  2. 故事线第 11 步的 `route` 是 `/follow-up`，只到页面，不到对象。
+  3. `e2e/hospital-storyline.spec.ts` 第 11 步本来就有一行 `page.getByRole("tab", { name: "Calls" }).click()`：测试的作者知道要切标签，
+     点击路径和演示脚本没写。
+  4. 其他页面已经有"链接到对象"的约定：`/control-tower?exception=…`、`/med-safety?review=…`、`?medrec=…`、`/documentation?encounter=…`（AI 活动面板用它们）。
+- **根因：** 步骤的路由只到页面；页面的默认标签是为护士的日常工作设计的（先看需要处理的），和演示要的（打开她这一通电话）不一致。
+- **怎么修：** 两边都改，页面和向导保持一致：
+  - 随访页支持 `?call=<id>`：打开 Calls 标签并选中这通电话。页面已经打开时再带链接导航（向导的 "Back to …"），也会重新选中（effect 依赖 `location.key`，
+    每次导航都会变，即使 URL 一样）。
+  - 第 11 步的 route 改为 `/follow-up?call=FU-stay-j0001`（`script.FOLLOWUP_CALL`），点击路径写成 "Follow-up calls, Calls tab: her call (MRN 40720001)" 和
+    "Queue tab: her escalation on top"；演示脚本同步。
+  - route 带了查询串之后，有三处拿它当路径用，都要改：向导判断"是不是在别的页面"的 `location.pathname !== step.route` 会永远成立（一直显示 Back to）；
+    按钮上的文字会带上查询串；e2e 的 `play()` 用 `new RegExp(step.route.replace("/", "\\/"))` 匹配 URL，而 `?` 在正则里是量词，会匹配失败。
+    前两处用新的 `routePath()`（只取路径部分），e2e 改为转义所有正则特殊字符。
+- **怎么证明：** `hospital-storyline.spec.ts` 第 11 步删掉了手动切标签，改为断言 Calls 标签 `aria-selected="true"`、她的电话高亮，然后直接 **Place call**，
+  通过（三个 spec `3 passed (7.2m)`）。后端小测试 `test_the_follow_up_step_opens_her_call_on_the_calls_tab` 锁住 route 和 `followup.call_id_for` 一致。`npx tsc -b` 通过。
+- **经验：**
+  - 测试里"顺手多点一下"（切一个标签）往往说明脚本少写了一步：测试的作者知道，演讲者不知道。写演示脚本时，把端到端测试的每一个点击和脚本逐条对一遍。
+  - 给一个字符串加查询参数之前，先搜一遍所有拿它做比较、显示、拼正则的地方。
+- **范围：** hospital（WP8 随访页、WP9 故事线演示模式）。
+- **来源：** 10-18 真实 Gemini 演示实跑；本会话修复。
+- **代码：** `apps/web/src/features/voice/FollowUpPage.tsx`、`apps/web/src/features/storyline/api.ts`（`routePath`）、`DemoGuide.tsx`、`StorylinePage.tsx`、
+  `apps/api/app/modules/storyline/script.py`（第 11 步、`FOLLOWUP_CALL`）、`apps/web/e2e/hospital-storyline.spec.ts`。提交：本案所在的提交。
 
 ---
 
@@ -3341,6 +3484,112 @@ WP9 开工前的只读审计、读端到端截图、核对 README 里的一句�
 | --- | --- | --- | --- |
 | `adjustOrBooking.yaml` 被注册表拒绝：`app.agents.registry.RegistryError: adjustOrBooking.yaml: 1 validation error for ToolSpec`（"privileged tools take the approval record"） | 特权工具必须把 `approval_task_id` 列为必填 | 加上必填字段 | wt-wp9-storyline-7d11cd 10-10 21:53 |
 | `ValidationError: 3 validation errors for DomainEvent attrs.codes.str Input should be a valid string [type=string_type, input_value=['wound_drainage'], input_type=list]` | 平台事件属性必须是标量，红旗代码是列表 | 拼成字符串 | wt-wp8-voice-services-addfd5 10-10 07:12 |
+
+### 12.12 故事线第 5 步没有"推进时钟"：骨科异常 07:00 就开着，被当成了这一步的提议
+
+- **现象：** 10-18 用真实 Gemini 走故事线演示（12 步：4 步手动、8 步由演示自动化完成）。重点预设的第 5 步（骨科满床，床位经理批准）卡住了：
+  故事线页面和演示向导都没有 **Advance the clock** 按钮；向导的 **Start** 只切到 Jordan Lee、打开 Control Tower，不推进时钟。时钟停在 07:46，
+  她的入院决定在 08:37。Control Tower 上的骨科异常是 medium，里面还没有她。自动化能走过去，因为 `walk.py` 直接调 `POST /api/storyline/advance`；
+  按页面操作的演讲者走不过去。
+- **怎么查的：**
+  1. **先读页面什么时候显示 Advance。** `StorylinePage.tsx` 和 `DemoGuide.tsx` 都是 `step.status === "waiting"` 才显示；向导的 Start 也只在 waiting 时调
+     `advance.mutate()`。后端的 `service.advance()` 本身不看状态（所以自动化能过）。问题在后端算出来的 `status`。
+  2. **读状态规则**（`service.status()`）：`"waiting" if beat and (beat_at is None or beat_at > now) and (not item["proposal"] or beat != step.beat) else "active"`。
+     节拍还没到、但这一步"已经有提议"时就算 active。第 5 步的提议是 `_facts` 里的骨科异常 `unit_occupancy:ORTH`。
+  3. **假设一：异常在入院决定之前就存在。** 预设（`app/ehr/seed/journey.py`）07:00 把骨科填满；Control Tower 的规则 `unit_occupancy`（`rules.py`）
+     在占用 ≥ 95% 时开异常，没有空床是 medium，她开始排队后（`free == 0 and ed_boarders >= 1`）才是 high。照这样推，每天 07:00 第一次刷新就有这个异常，
+     和是不是周一无关。
+  4. **先写回归测试复现**（真实时钟是周日 10-18，播种周一 10-19，和现场是同一天的数据）：走完 1–4 步，断言第 5 步是 waiting：
+     `AssertionError: assert ('active' == 'waiting')`。探针打印 `EXC-00003 med 2026-10-19 07:00:00`、`ed_boarders` 0、`net_gap` -4，时钟 07:46，节拍 08:37。假设一成立。
+  5. **这条规则为什么写成"有提议就算 active"？** 逐个看有节拍的步骤：INR 的危急值卡片、naproxen 的医嘱审核、NEWS2 卡片、随访电话，都是节拍等待的那件事
+     发生时才出现；节拍本身比事件晚 1–2 分钟（`beats()` 里的 +1、+2 分钟）；Temporal 开着时，随访电话由旅程的计时器提前安排。所以这条规则的本意是
+     "这一步的时刻已经到了"，对这四步成立。出院小结（第 9 步）的文档在出院前不会产生：缺出院用药表时 `draft_summary` 返回 insufficient，不写文档。
+     **只有第 5 步的提议是医院级的骨科异常，和她无关，可以早于节拍存在。** 其他节拍步骤没有同样的问题。
+  6. **假设二：只把状态改成 waiting 还不够。** 按下 Advance 时 `_remember_driver` 登记第 5 步的 AI，`ai_step` 下一轮就把"当前的骨科异常"钉成这一步的项目并请求叙述。
+     在旧代码上加探针：07:46 Advance 之后马上钉住 `EXC-00003`，叙述写完（`done`），这时它还是 medium、不包括她；08:37 决定之后异常升为 high，
+     `narration_status` 被重置为 `on_open`（`exceptions.sync`：严重度一变叙述就作废），而第 5 步的项目已经钉住（`STEP_ITEMS["bed"] = 1`），不会再请求。
+     床位经理打开时看到"AI 正在写"，之前还花钱写了一份没用的叙述。假设二成立。
+- **根因：** 状态规则用"这一步的提议已经存在"代表"这一步的时刻已经到了"。对卡片、审核、电话成立，因为它们随那个时刻产生；对第 5 步不成立：
+  它的提议是医院级的骨科异常，预设 07:00 就把骨科填满，异常比她的入院决定早 90 分钟。第 5 步因此一开始就是 active，页面和向导都不给 Advance。
+  同一个假设也让 Advance 把 medium 的异常交给了这一步的 AI。
+- **怎么修**（`apps/api/app/modules/storyline/service.py`）：
+  - `_step_state` 给每一步多算一个 `ready`："节拍等待的那件事已经发生"。默认仍是"有提议"；第 5 步改成"她的入院决定已经发生"，即急诊的床位申请
+    `ServiceRequest/bedreq-ed-j0001` 存在（模拟器在 `_on_ed_decision` 里写，新常量 `BED_REQUEST`）。状态规则用 `ready` 代替 `proposal`。`ready` 只在内部用，不进 API。
+  - `_step_items("bed")`：只有她的入院决定已经过去、而且骨科异常是 high 时，这个异常才算这一步的项目。要求 high，是因为决定是快进线程里的模拟器写的，
+    Control Tower 的刷新在 API 的另一个循环里：只看决定，可能在刷新之前就把还是 medium 的异常钉住。
+    第一版在这里用 `store.fhir.read` 直接读床位申请，全量测试里的架构守卫 `test_modules_go_through_the_gateway` 把它抓了出来（模块不能绕过 FhirGateway 读 FHIR）。
+    换成网关也不合适：这个函数在第 5 步等待期间每轮医院循环都会跑，而网关对她病历的每次读取都记审计。所以改为读计划：
+    计划里她的 `ed_decision` 事件时刻不晚于医院时钟（和 `beats()` 用的是同一个事件）。状态用的 `ready` 仍然读床位申请，走网关，而且在 `_facts` 的缓存里。
+  - 第 5 步的提议照旧显示这个异常（它确实存在），只是不再决定状态。
+  - 文档：storyline README 的已知失败模式、演示脚本第 5 步。
+- **怎么证明：**
+  - 新回归测试 `test_the_bed_step_waits_for_the_admission_decision_though_orthopedics_is_flagged_already`：先断言前提（1–4 步后异常已经存在，`ed_boarders == 0`）；
+    第 5 步 waiting、节拍在后；按 Advance（`simjobs.start` 换成记录器，时钟由测试 harness 推进）之后、决定之前，这一步的 AI 项目为空，异常的叙述不是 done；
+    推进到决定之后变成 active，异常是 high、`ed_boarders >= 1`，项目就是这个异常，叙述 done。旧代码上失败在 `'active' == 'waiting'`，新代码通过。
+  - 同一份探针在新代码上：Advance 之后 `[] med on_open`，决定之后 `EXC-00007 high 1 done [['exception', 'EXC-00007']] active`。
+  - **按星期扫**（新测试加探针，`-p travel` 到当天 10:00，每天一个测试库，4 个进程并行，每个约 4.3 分钟；周一用真实时钟，周日播种周一 10-19）：
+
+    | 医院日 | 07:00 起的骨科异常 | `ed_boarders` / `net_gap` | 新代码：Advance 后、决定前 | 决定后 |
+    | --- | --- | --- | --- | --- |
+    | 周一 10-19 | `EXC-00003` med | 0 / -4 | `[] med on_open` | high，`done`，active |
+    | 周二 10-13 | `EXC-00015` med | 0 / -2 | `[] med on_open` | high，`done`，active |
+    | 周三 10-14 | `EXC-00019` med | 0 / -2 | `[] med on_open` | high，`done`，active |
+    | 周四 10-15 | `EXC-00015` med | 0 / -3 | `[] med on_open` | high，`done`，active |
+    | 周五 10-16 | `EXC-00025` med | 0 / -4 | `[] med on_open` | high，`done`，active |
+
+    每个工作日都是"07:00 就有 medium 的异常"，所以旧代码在任何一天都会卡在第 5 步，不是 10-19 的数据特别。`net_gap` 都是负的，异常在她排队之前不会是 high，
+    所以"决定已过 + high"这个条件在每一天都在决定之后才成立。扫完用 `DROP DATABASE IF EXISTS` 删掉了 4 个库。
+    （第一次扫描跑的是第一版：`_step_items` 读床位申请。改成读计划之后，相关测试文件重跑 49 passed，再按同样方式扫一遍 4 天：结果和上表一样，每个约 2.5 分钟。）
+  - 全量后端测试 911 passed（20.3 分钟）。
+  - Playwright：`demo-highlights.spec.ts` 原来对第 5 步的断言是 `/waiting|active/`。写测试的人看到了 active，但把它放过了。现在断言 waiting、有 Advance 按钮，
+    Start 之后轮询到 active，骨科异常是 high。`hospital-storyline.spec.ts` 的 `advanceClock(5)` 在旧代码上一看到 active 就直接返回（按代码推断，
+    之后打开的是 medium 的异常）；现在真的推进到决定（e2e 日志：`118 s 5 bed (bed SURG-04-B)`）。三个 spec 一起 `3 passed (7.2m)`。
+  - **我自己新加的 e2e 断言第二次跑挂了：** 和全量后端测试同时跑时，`demo-highlights` 在最后一行失败：`Expected: "high"  Received: "med"`。
+    第 5 步已经轮询到 active，紧接着读 Control Tower 的异常却还是 medium。第一次跑（机器空闲）是通过的。
+    为了不靠猜，在 e2e 的 API 上写了一个时间线脚本（scratchpad `timeline_step5.py`：重置、自动化跳到第 5 步、按 Advance，然后每 0.5 秒记录任务、时钟、
+    第 5 步状态和异常）：空闲时 2.7 秒那一次采样里，任务 done、时钟 08:37、第 5 步 active、`EXC-00041 high` 同时出现，没有中间态。
+    所以窗口很短，只在负载下才张开。**推测**（读代码，没有用实验证实）：`control_tower.service.refresh` 先把 `_processed["key"]` 设成新快照的键，再在自己的事务里
+    同步异常；医院循环的那次刷新还没提交时，请求里的刷新看到键已处理就跳过，读到的仍是旧的 medium。循环那一步提交后，下一次读就是 high，
+    所以床位经理看到的最多是片刻的旧值，不是一直错。断言改为轮询（60 秒内等到 high），只改测试，Control Tower 没有改。
+- **经验：**
+  - 用一个"代理信号"表示一个状态（"有提议" ≈ "时刻到了"）时，要逐个核对：每个使用者的信号是不是真的随那个状态产生。四步成立、一步不成立，问题就出在那一步。
+  - 测试里"两个都行"的断言（`/waiting|active/`）往往说明写的人当时看到了意外的值。宽松的断言要写清楚为什么两个都对，否则就是被放过的 bug。
+  - 修界面状态时，把"按钮按下之后会发生什么"也走一遍：只改状态，Advance 会出现，可 AI 会叙述错的版本，还白花一次调用。
+  - 自动化脚本绕过了界面（直接调 API），所以"自动化能过"不等于"演讲者能过"。演示里每个要手动做的步骤，都要有一个按页面走的测试。
+  - 一个视图的状态变了，不等于另一个视图已经看到：故事线的状态读的是病历，Control Tower 读的是自己同步过的异常表，中间隔着一次后台循环的提交。
+    跨两个读模型的端到端断言要轮询；只在空闲机器上通过的断言，换个负载就会挂。
+  - 架构守卫（grep 规则的测试，见 12.10）这次抓到的是真问题：修 bug 时顺手写的一行 `store.fhir.read` 绕过了网关。先跑相关的几个测试文件、最后再跑全量，全量里的这类守卫就是为这种"顺手"准备的。
+  - 问题报告里写的是"在 10-19 的数据上"，那只是现场碰到的那一天。扫一周才知道每一天都这样：报告给出的条件往往比真实条件窄，先验证范围再决定修法。
+- **范围：** hospital（WP9 故事线的状态、演示模式）。
+- **来源：** 10-18 真实 Gemini 演示实跑；本会话（`claude/infallible-margulis-7d3c3f`，基于 `claude/objective-sammet-1845e1`）修复。
+- **代码：** `apps/api/app/modules/storyline/service.py`（`_step_state`、`status`、`_step_items`、`BED_REQUEST`）、`apps/api/tests/test_storyline.py`、
+  `apps/web/e2e/demo-highlights.spec.ts`；相关、没有修改：`apps/api/app/modules/control_tower/rules.py`（`unit_occupancy`）、`exceptions.py`（`sync`）、
+  `apps/api/app/ehr/simulator.py`（`_on_ed_decision`）。提交：本案所在的提交 "fix(storyline): four fixes from the live highlights run"。
+
+### 12.13 回电时间是墙上时间：故事线轨迹里 03:39 夹在医院时间中间
+
+- **现象：** 10-18 的真实 Gemini 演示，第 11 步的轨迹 "Signed by" 显示护士回电在 03:39，那是开发机的墙上时间（演示是在凌晨跑的）。
+  其他步骤显示的都是医院时间（医院日 10-19 往后几天）。
+- **怎么查的：**
+  1. 第 11 步的 `signed.at` 取自 `call.nurse_actions[-1]["at"]`（`service._step_state`）。
+  2. 写它的是 `voice_services/queue.py` 的 `act`：`"at": datetime.now().isoformat(timespec="seconds")`。
+  3. 同一个函数里的其他时间：通过 Tool Gateway 写的 Communication 的 `sent` 用 `voice_services/tools.py` 的 `_now()`，也就是 `hospital_now`；
+     事件 `followup.handled`、`followup.escalated` 也用 `hospital_now`。只有护士操作的 `at` 用的是墙上时间。
+  4. 医院时钟（`app/ehr/clock.py`）只在日程模拟器运行时走，和墙上时间可以差几天（故事线的随访在医院日之后第 5 天）。
+- **根因：** 同一条记录的两个时间来自两个钟：Communication 用医院时间，护士操作用墙上时间。
+- **怎么修：** `queue.act` 的 `at` 改用 `hospital_now(store)`，和它写的 Communication 一致；随访页上护士操作的时间也就是医院时间了。
+- **怎么证明：**
+  - 新测试 `test_a_nurse_action_is_at_hospital_time_as_the_communication_it_writes`（`tests/test_voice_services.py`）：护士操作的 `at` 等于 Communication 的 `sent`，
+    也等于当时的医院时间。
+  - 用插件 `-p wallclock` 把 `queue.hospital_now` 换回 `datetime.now()`（旧行为），只跑这个测试：
+    `AssertionError: assert datetime.datetime(2026, 10, 18, 4, 10, 35) == datetime.datetime(2026, 10, 19, 7, 0)`；不带插件通过。
+  - 整条走查测试断言第 11 步的签名时间落在随访节拍和当前医院时间之间。
+- **经验：** 系统里有两个时钟，每写一个时间戳都要问"这是哪个钟"。最容易漏的是同一个函数里一个用 A 钟、一个用 B 钟。搜一遍 `datetime.now()` 是很便宜的检查：
+  随访模块里还有几个（通话的 `started_at`、`ended_at`、`updated_at`），它们不进故事线的轨迹，这次没有改，记作后续。
+  修完后在 e2e 的 API 上把 12 步轨迹的签名时间全列出来，又发现第 7 步（OR 排程调整）是 `2026-10-18T04:31:54`：它取自审计事件的时间戳（墙上时间），而调整本身（`FhirGateway.adjust_or_booking`）没有记医院时间。要改得动 Control Tower 或网关，超出这次的四个问题，记作后续。修一个时间戳之后，把同一个视图里所有时间列一遍，比只验证修的那一个更能发现同类问题。
+- **范围：** hospital（WP8 随访、WP9 故事线轨迹）。
+- **来源：** 10-18 真实 Gemini 演示实跑；本会话修复。
+- **代码：** `apps/api/app/modules/voice_services/queue.py`（`act`）、`apps/api/tests/test_voice_services.py`、`apps/api/tests/test_storyline.py`。提交：本案所在的提交。
 
 ---
 

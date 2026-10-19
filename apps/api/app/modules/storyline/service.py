@@ -9,6 +9,8 @@ and the event subscriber that plays the story.
 - `advance(store, user)`: moves the hospital clock to the current step's beat (the INR result, the admission
   decision, her bed, the first post-operative night, the discharge, 48 hours later) as a background fast-forward
   (app/ehr/simjobs.py), so the boards move and the subscribers react while it runs.
+- Demo mode's "Do this step for me" and "Jump to step N" are app/modules/storyline/autoplay.py: the status shows its
+  job (`autoplay`) and marks the steps it did (`automated`).
 - `handle(event)`: the subscriber (consumer `storyline`). It reacts only to the storyline patient's events: the
   cards of app/modules/storyline/stubs.py, the EHR script of app/ehr/storyline.py, the scripted discharge
   reconciliation, and, with Temporal configured, the start of her InpatientJourneyWorkflow at the registration
@@ -49,6 +51,7 @@ from app.modules.storyline import stubs
 
 log = logging.getLogger("app.storyline")
 CONSUMER = "storyline"
+BED_REQUEST = f"bedreq-{S.VISIT}"  # the ED's bed request at the admission decision (the simulator writes it)
 EVENT_TYPES = ("patient.admitted", "patient.discharged", "encounter.updated", "result.available", "task.decided",
                "exception.decided", "document.signed")
 CLEAN_MAX = timedelta(minutes=102)  # the simulator's housekeeping takes 45-100 minutes
@@ -76,8 +79,10 @@ def reset(user: StaffUser) -> dict:
     store.modules[preset.STATE] = st
     bridge.on_reset()
     from app.agents import ondemand
+    from app.modules.storyline import autoplay
 
     ondemand.reset()  # queued AI jobs refer to the old data
+    autoplay.on_reset()  # a running automation stops after its step; its marks go with the old data
     return st
 
 
@@ -284,13 +289,20 @@ def _driver(store: Store, event: DomainEvent | None = None) -> causes.AiCause | 
 
 
 def _step_items(store: Store, key: str) -> list[tuple[str, str]]:
-    """The items whose AI a step shows, as (kind, id), once they exist."""
+    """The items whose AI a step shows, as (kind, id), once they exist. The bed step's exception counts only once she
+    boards it (the admission decision passed, and the exception high with it): the preset fills Orthopedics, so the
+    Control Tower flags it (medium) from 07:00, and a narrative of that one would not mention her (it is written
+    again when the severity changes). The decision is read from the plan, not her record: this runs on every pass of
+    the hospital loop while the step waits, and each read of her record is audited."""
     from app.modules.control_tower import exceptions as X
     from app.modules.med_safety import service as MS
 
     if key == "bed":
+        decision = _event_at(store.modules.get("hospital_plan") or {"events": []}, kind="ed_decision", visit=S.VISIT)
+        if decision is None or decision > parse(simulator.clock(store)["now"]):
+            return []
         live = sorted((e for e in X.all_exceptions(store) if e.key == "unit_occupancy:ORTH" and e.status in X.LIVE
-                       and e.cleared_at is None), key=lambda e: e.detected_at)
+                       and e.cleared_at is None and e.severity == "high"), key=lambda e: e.detected_at)
         return [("exception", live[-1].id)] if live else []
     if key == "medrec":
         out = []
@@ -446,7 +458,8 @@ def _signature(doc: dict | None) -> dict | None:
         return None
     return {"ref": f"DocumentReference/{doc['id']}", "status": doc.get("docStatus"), "signatures": len(sigs),
             "by": ", ".join(x["name"] or x["by"] or "?" for x in sigs) or None,
-            "at": sigs[-1]["at"] if sigs else doc.get("date")}
+            "at": sigs[-1]["at"] if sigs else doc.get("date"),
+            "note": next((x["note"] for x in reversed(sigs) if x.get("note")), None)}  # the demo automation's
 
 
 def _facts(store: Store, st: dict) -> dict:
@@ -477,6 +490,7 @@ def _facts(store: Store, st: dict) -> dict:
         "stay": _read("Encounter", S.STAY), "ctas": _read("Observation", f"ctas-{S.VISIT}"),
         "xr": _read("ServiceRequest", f"ord-{S.VISIT}-xr-hip"), "ct": _read("ServiceRequest", f"ord-{S.VISIT}-ct-hip"),
         "inr": _read("Observation", f"obs-ord-{S.VISIT}-inr"), "exception": orth[-1] if orth else None,
+        "bed_request": _read("ServiceRequest", BED_REQUEST),
         "order_review": order_review, "medrec": medrec, "appointment": appointment,
         "news2": next(iter(gw.search("Flag", encounter=S.STAY, code="news2")), None),
         "summary": _read("DocumentReference", f"dsum-{S.STAY}"),
@@ -550,7 +564,8 @@ def _audit(events: list, refs: list[str]) -> list[dict]:
 
 
 def _step_state(step: S.Step, f: dict, store: Store) -> dict:
-    """proposal / signed / written / detail for one step, from the records."""
+    """proposal / signed / written / detail for one step, from the records; `ready`: what the step's beat waits for
+    has happened (by default its proposal is there: the card, the review, the call come with that moment)."""
     c, out = f["cards"], {"proposal": None, "signed": None, "written": [], "detail": None, "done": False}
     if step.key == "call":
         card = c.get("registration")
@@ -595,6 +610,9 @@ def _step_state(step: S.Step, f: dict, store: Store) -> dict:
             out["written"] = [f"Encounter/{S.STAY}"] + [b for b in beds if b]
             out["detail"] = f"bed {beds[-1].split('/')[-1]}" if beds and beds[-1] else None
         out["done"] = bool(stay and out["signed"])
+        # her moment is the admission decision (the bed request), not the exception: the Control Tower opens that
+        # as soon as Orthopedics is full, and the preset fills it at 07:00
+        out["ready"] = bool(f["bed_request"])
     elif step.key == "medrec":
         rev, ses = f["order_review"], f["medrec"]
         if rev is not None:
@@ -665,6 +683,7 @@ def _step_state(step: S.Step, f: dict, store: Store) -> dict:
     refs = [r for r in [(out["proposal"] or {}).get("ref"), (out["signed"] or {}).get("ref"), *out["written"],
                         *out.pop("audit_refs", [])] if r]
     out["audit"] = _audit(f["audit"], refs)
+    out.setdefault("ready", bool(out["proposal"]))
     return out
 
 
@@ -677,6 +696,7 @@ BEAT_HINT = {"inr": "the INR result comes back about 45 minutes after the orders
 
 
 def status(store: Store, user: StaffUser) -> dict:
+    from app.modules.storyline import autoplay
     from app.workflows import client, progress
 
     st = state(store)
@@ -689,7 +709,9 @@ def status(store: Store, user: StaffUser) -> dict:
                                                                            "role": str(user.role), "units": []},
         "temporal": {"configured": link is not None,
                      "status": (link.status() if link is not None else client.offline_status())},
-        "patient": None, "steps": [], "current": None, "beats": {}}
+        "patient": None, "steps": [], "current": None, "beats": {},
+        "autoplay": autoplay.current(st["prepared_at"]) if st is not None else None}
+    automated = autoplay.marks(st["prepared_at"]) if st is not None else {}
     journey = progress.get(S.JOURNEY)
     view["journey"] = progress.summary(journey) if journey is not None else None
     facts, story_beats = _cached(store, st, view["job"]) if st is not None else (None, {})
@@ -711,12 +733,14 @@ def status(store: Store, user: StaffUser) -> dict:
                 "signoff": step.signoff, "writes": step.writes, "seconds": step.seconds, "stub": step.stub,
                 "beat": step.beat, "beat_hint": BEAT_HINT.get(step.beat or ""), "permission": step.permission,
                 "cast": _user(store, S.CAST[step.cast]), "cast_key": step.cast}
+        item["automated"] = automated.get(step.key)  # done by the demo's automation: who started it, as whom
         if facts is not None:
             item.update(_step_state(step, facts, store))
             if step.key in AI_TEXT:
                 item["step_ai"] = _step_ai(store, step.key, st)
         else:
-            item.update(proposal=None, signed=None, written=[], audit=[], detail=None, done=False)
+            item.update(proposal=None, signed=None, written=[], audit=[], detail=None, done=False, ready=False)
+        ready = item.pop("ready")
         if not item["done"] and not current_found:
             current_found = True
             view["current"] = step.n
@@ -726,8 +750,10 @@ def status(store: Store, user: StaffUser) -> dict:
                 item.update(beat=beat, beat_hint=BEAT_HINT[beat])
             beat_at = view["beats"].get(beat) if beat else None
             item["advance_ai"] = AI_TEXT.get(AI_BY_BEAT.get(beat or "", ""))
+            # waiting while the beat is ahead, unless the step's moment came already (the beat is a minute or two
+            # after the event it waits for; with Temporal the journey's timer schedules the follow-up call early)
             item["status"] = "waiting" if beat and (beat_at is None or parse(beat_at) > now) and \
-                (not item["proposal"] or beat != step.beat) else "active"
+                (not ready or beat != step.beat) else "active"
             item["beat_at"] = beat_at
         else:
             item["status"] = "done" if item["done"] else "pending"

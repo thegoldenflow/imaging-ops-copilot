@@ -35,6 +35,42 @@ items (spec 8.1)** that run on preset data with no real logic. The page and the 
 Say once, at the start: "Everything here is synthetic. In every step the AI makes a suggestion or a draft, a named
 person decides, and the audit trail records both. Three steps are roadmap items on preset data, and they say so."
 
+**Demo mode (for an audience).** On the storyline page press **Demo mode**: a guide panel stays in the corner of
+every page. For each step it first shows the introduction (what the step shows, who plays it, the sentence to say,
+what the audience will see); **Start** switches to that person and opens their screen (and starts the clock's
+fast-forward when the step waits for time). It then lists the clicks, gives the caller's lines as **Say it** buttons
+(no copy and paste) and says whose signature the step waits for; the guide never signs, the presenter clicks the
+real button. When the step is done it shows the trail and asks **Continue to the next step?** (**Not yet** pauses
+it; **Resume** goes on). Fold the panel with its arrow when it covers a button. Exit with its cross.
+
+**Do this step for me, jump to a step, highlights (a live interview).** The demo's automation walks steps for you,
+through the API as the people who play them (the same walk as the scripted run below), in the API's background; the
+guide shows its progress step by step.
+
+- **Do this step for me** (the guide's introduction, and while it is your turn; also on the storyline page's current
+  step): the automation does the current step. Use it for the roadmap stubs (4, 8, 12), or when a step goes wrong
+  live: it finishes the step from where it stands (a card you already accepted, the exception you approved, the
+  medicine you removed from the summary, a follow-up call already answering are not done again). The guide then
+  shows the trail and asks the usual question. If the automation stops, the guide says at which step and why: press
+  it again or do the step by hand.
+- **Jump to step N** (the guide's introduction, or **Jump here** on a later step of the storyline page): the
+  automation does every step from the current one up to N−1; N is then the current step and the guide introduces it.
+- **Highlights** (the storyline page's **Highlights** button, or the guide's **Highlights only** box): the guide
+  presents only steps 1, 5, 9 and 11: the Mandarin call; Orthopedics full and the bed manager's approval; the
+  discharge summary's validator blocking lisinopril; the Chinese follow-up call escalating. After a highlight,
+  **Yes, continue** has the automation do the steps up to the next highlight (2–4, 6–8, 10), and after step 11 the
+  last one. About 4–5 minutes of talking instead of 10. Getting from step 1 to step 5 takes the automation about 20
+  seconds against the mock model, longer with a real one (step 6 and step 9 wait for the model): talk over it, the
+  panel lists each step as it is done.
+
+Who did what stays plain, for the audience and in the records. The automation is your demo action, audited under
+the name you are signed in as (`simulator_event`, action `autoplay`). It signs in as each step's person, and every
+audit event of those requests, every signature it adds to a document and every note it writes say "Demo automation
+on behalf of <name> (<role>), started by <you>"; its requests come from the address `demo-automation`. The storyline
+page marks the steps it did (**Done by the demo's automation as …**) and shows the note under the signature. Say,
+when it runs: "These steps are done by a script through the same API, as the people who play them; the records say
+so, so nobody mistakes them for a person's decision."
+
 **Advance the clock.** Steps 4, 5, 6, 8, 9 and 11 wait for hospital time to pass: the INR result, the admission
 decision, a free bed, the first night after surgery, the discharge, and 48 hours after discharge. Press **Advance the
 clock** on the step. The hospital's day simulator runs to that moment in the background and the page follows its
@@ -68,6 +104,7 @@ as the step is done, and the step's badge turns **Done**.
    - **Acknowledge.** Say: "This is a roadmap item: the routing runs on a preset rule, and the architecture for the real one is in the data model."
 
 5. **3:10 — No orthopaedic bed (7.1 Control Tower, bed manager).** **Advance the clock** to the admission decision, then **Switch to Jordan Lee**, then **Control Tower**.
+   - The Control Tower flags Orthopedics (medium) from 07:00, because the preset fills it. The step still waits for her admission decision, so **Advance the clock** (and the guide's **Start**, which presses it) is offered until then. At the decision she boards, and the exception turns high.
    - The exception card reads **Orthopedics at 100% occupancy** (high). Its narrative is written by the AI from the rule engine's facts as soon as the step's **Advance** brought the exception (the storyline page's step shows "AI working", then when it was generated), and its actions include **Early discharge rounds on Surgery (2 ready)**.
    - Choose that action and press **Approve**. Tasks go to the owner roles, and the Surgery team discharges the two ready patients early (scripted).
    - **Advance the clock** until she has a bed: the first Surgery bed the discharges free, after housekeeping, is hers.
@@ -88,16 +125,17 @@ as the step is done, and the step's badge turns **Done**.
 
 9. **6:35 — Discharge summary (7.3, surgeon).** **Advance the clock** to the discharge, then **Switch to Dr. Victor Osei**, then **Documentation**, then her stay, then **Draft with AI**.
    - Every line of the draft cites its source. One medicine, **lisinopril**, came from a note rather than an order: the validator marks it red ("no matching source") and **Sign** is blocked.
+   - Her known conditions (atrial fibrillation, hypertension, osteoporosis) are diagnoses of her stay. A draft that says what her warfarin or metoprolol is for ("for atrial fibrillation") cites them, so the lisinopril is the only red item.
    - **Remove** it, then **Sign**. `dsum-stay-j0001` is final.
 
 10. **7:45 — Patient instructions (7.3, ward nurse).** **Switch to Vera Uchida**, then **Documentation**, then her patient instructions.
     - They are in 简体中文 by default, from her record. The warfarin section says 每周吃的绿叶蔬菜量要大致相同 (eat about the same amount of green vegetables each week), followed by the wound red flags.
     - **Sign.**
 
-11. **8:30 — Follow-up call 48 hours later (7.4, ward nurse).** **Advance the clock** 48 hours (with Temporal on, the journey's timer schedules the call). Then **Follow-up calls**, her call, **Place call**.
+11. **8:30 — Follow-up call 48 hours later (7.4, ward nurse).** **Advance the clock** 48 hours (with Temporal on, the journey's timer schedules the call). Then **Follow-up calls**, the **Calls** tab, her call (MRN 40720001), **Place call**. The step's **Switch to Vera Uchida** (and the guide's **Start**) opens her call there (`/follow-up?call=FU-stay-j0001`). The page otherwise opens on its **Queue**, which lists only calls that need a nurse, and hers does not need one yet.
     - Answer as the patient with the two phrases from the storyline page: her birth date, then "还行，就是伤口一直在渗液，纱布都湿透了。"
     - The rule layer escalates at once: a red flag for heavy wound drainage, quoting her words, and a Task `followup-escalation` (urgent) for the nurses of her last unit.
-    - **Call back.** The call never gives medical advice.
+    - On the **Queue** tab her escalation is on top. **Call back** (the note is recorded at hospital time, like every other step's signature). The call never gives medical advice.
 
 12. **9:30 — Coding (8.1 roadmap stub, coder).** **Switch to Maya Nakamura**, then **Review queue**, then **Coding suggestion**.
     - The card suggests S72.0 fracture of neck of femur (ICD-10-CA), with W19, I48 and Z92.1, and the CCI 1.VA.53 rubric. It carries the **Roadmap** badge.

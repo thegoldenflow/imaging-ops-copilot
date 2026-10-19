@@ -71,7 +71,7 @@ async function play(page: Page, request: APIRequestContext, n: number): Promise<
   const c = await card(page, n);
   await expect(c).toContainText(step.permission.slice(0, 40)); // what switching to this role shows
   await c.getByTestId(`switch-${n}`).click();
-  await expect(page).toHaveURL(new RegExp(step.route.replace("/", "\\/")));
+  await expect(page).toHaveURL(new RegExp(step.route.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&"))); // step 11: ?call=…
   await expect(page.getByTestId("current-user")).toHaveText(step.cast.name);
   return step;
 }
@@ -376,8 +376,9 @@ test("hospital storyline: twelve steps, each proposed by the AI, signed by a per
     return r.ok() ? (await r.json()).status : "";
   }, { timeout: 240_000, intervals: [2000, 3000, 5000] }).toBe("scheduled");
   await play(page, request, 11);
-  await page.getByRole("tab", { name: "Calls" }).click();
-  await page.getByTestId(`followup-FU-${STAY}`).click();
+  // the step opens her call (/follow-up?call=…) on the Calls tab: a scheduled call is not in the Queue yet
+  await expect(page.getByRole("tab", { name: "Calls" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId(`followup-FU-${STAY}`)).toHaveClass(/bg-brand-50/);
   await page.getByTestId("place-call").click();
   const call = page.getByTestId("followup-call-transcript");
   await expect(call).toContainText("出生日期");

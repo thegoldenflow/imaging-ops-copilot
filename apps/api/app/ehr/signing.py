@@ -8,7 +8,8 @@ A draft is created as `docStatus=preliminary` by the module that wrote it (its
    (system actors and agents cannot sign);
 2. the signer's role must be one of the module's `required_signoff_role` and the
    patient must be in the signer's scope (their units, or a break-glass grant);
-3. adds a signature (extension `signature`: role, signer, time). With `cosign`
+3. adds a signature (extension `signature`: role, signer, time; and a `note` when
+   the storyline's demo automation signed as that person, app/core/context.py). With `cosign`
    (medication reconciliation: pharmacist and physician) the draft stays
    preliminary until every listed role has signed; otherwise one signature
    finalises it. The final document gets `docStatus=final` and `authenticator`:
@@ -60,7 +61,7 @@ class SignResult:
 
 
 def signatures(document: dict) -> list[dict]:
-    """[{role, by, at}] from the document's signature extensions."""
+    """[{role, by, name, at, note}] from the document's signature extensions (note: the demo automation's, else None)."""
     out = []
     for ext in document.get("extension") or []:
         if ext.get("url") != SIGNATURE:
@@ -69,7 +70,8 @@ def signatures(document: dict) -> list[dict]:
         out.append({"role": (parts.get("role") or {}).get("valueCode"),
                     "by": ((parts.get("signer") or {}).get("valueReference") or {}).get("reference"),
                     "name": ((parts.get("signer") or {}).get("valueReference") or {}).get("display"),
-                    "at": (parts.get("time") or {}).get("valueDateTime")})
+                    "at": (parts.get("time") or {}).get("valueDateTime"),
+                    "note": (parts.get("note") or {}).get("valueString")})
     return out
 
 
@@ -136,9 +138,12 @@ def sign(fhir: FhirGateway, document_id: str, *, at: datetime | None = None, flo
     at = at or hospital_now(get_store())
     signer = ref("Practitioner", fhir.actor.practitioner_id, fhir.actor.name) if fhir.actor.practitioner_id else \
         {"reference": f"urn:demo-hospital:user:{fhir.actor.id}", "display": fhir.actor.name}
+    from app.core.context import automation_note
+
+    note = automation_note(fhir.actor.id, fhir.actor.name, role)  # the demo automation signing as this person
     doc.setdefault("extension", []).append({"url": SIGNATURE, "extension": [
         {"url": "role", "valueCode": role}, {"url": "signer", "valueReference": signer},
-        {"url": "time", "valueDateTime": fhir_datetime(at)}]})
+        {"url": "time", "valueDateTime": fhir_datetime(at)}, *([{"url": "note", "valueString": note}] if note else [])]})
     signed = [s["role"] for s in done] + [role]
     missing = [r for r in entry.required_signoff_role if r not in signed] if entry.cosign else []
     if not missing:
