@@ -126,6 +126,7 @@
 | 5.15 | 新入院住院的旧医嘱没人审：24 小时和 48 小时两个窗口之间有缝 | hospital | 日期依赖 · 产品缺口 · 扫描 |
 | 5.16 | 检查准备的提醒测试只在 21 点挂：种子随钟点变，"最新 30 条"只剩一位余量 | imaging | 日期依赖 · 种子 · 测试假设 |
 | 5.17 | 周四的故事线停在第 5 步：空出来的床在她入院前一分钟被别人拿走（首选不是保留） | hospital | 日期依赖 · 竞态 · 探针 |
+| 5.18 | 阅片看板的测试周一凌晨挂：未读数随播种的钟点变，阈值 50 只在工作日白天够（未修） | imaging | 日期依赖 · 种子 · 测试假设 |
 | 6.1 | `localhost` 建连接要 8 秒，播种像卡住 | 环境 | 环境 · 网络 |
 | 6.2 | `websockets` 反复被删坏 | 环境 | 环境 · 依赖 |
 | 6.3 | Docker 数据盘写满（10-09） | 环境 | 环境 · 磁盘 |
@@ -176,6 +177,8 @@
 | 11.4 | 中文患者指导混入英文诊断名 | hospital | 多语言 |
 | 11.5 | 演示向导的"Say it"按了没反应：事件发出时通话输入框还没挂上 | hospital | 前端 · 时序 · 端到端 |
 | 11.6 | 随访页打开在 Queue 标签，她的电话在 Calls 下：步骤的路由只到页面 | hospital | 前端 · 演示 · 深链接 |
+| 11.7 | 演示模式第 11 步：随访页先打开、电话后排上，详情停在 404 不再请求 | hospital | 前端 · 时序 · 深链接 · 端到端 |
+| 11.8 | 聚光灯点亮的按钮被演示向导自己挡住 | hospital | 前端 · 演示 · 布局 |
 | 12.1 | MedRec 可以绕过工作台签终稿 | hospital | 设计 · 安全 |
 | 12.2 | 一条超出 72 小时权限的记录拖垮整个队列 | hospital | 设计 · 权限 |
 | 12.3 | 来电者亲属关系存反 | hospital | 设计 · 语义 |
@@ -2254,6 +2257,39 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 
 ---
 
+### 5.18 影像阅片看板的测试周一凌晨挂：未读数随播种的钟点变，阈值 50 只在工作日白天够
+
+- **现象：** 故事线英语患者改动后的全量后端测试（10-19 凌晨开始，`1 failed, 917 passed in 1530.38s`）里有一个和这次改动无关的失败：
+  `tests/test_phase3.py::test_board_groups_unread_studies_with_turnaround_targets`，`AssertionError: assert 44 > 50`
+  （`data["kpis"]["unread"] == len(data["studies"]) > 50`，影像中心系统 3 的阅片看板）。
+- **怎么查的：**
+  1. **是不是我的改动？** 这次只改了故事线、语音服务和故事线预置（`git diff 0a8f704 --stat`），影像中心的阅片看板和它的种子一行没碰。单独跑这个测试（01:33）：一样挂，说明不是全量里别的测试留下的状态。
+  2. **是不是和钟点有关？** 用 scratchpad 的 time-machine 插件（`-p travel`，`TRAVEL_TO=2026-10-19T10:00`）把整个 pytest 会话放到同一天 10 点，同一份代码：`1 passed`。日期没变，钟点变了结果就变，和 5.16 一样是种子随钟点变。
+  3. **钟点怎么影响未读数？** 读 `app/modules/backlog/service.py` `seed`：过去 `HISTORY_DAYS` 天里每个已完成的检查生成一个 study，按阅片医生的速度抽一个出报告时间（`performed + hours`）；
+     出报告时间还在 `now` 之后的就是"未读"，构成今天的积压。所以积压 = 最近完成、还没到出报告时间的检查，取决于 `now` 落在一周的哪一天、哪个钟点。
+  4. **量一下（scratchpad `probe_unread.py`：`Store()` + `populate(s, now=..., hospital=False)`，数 `backlog.unread(s)`）：**
+
+     | 播种时刻 | 未读 |
+     |---|---|
+     | 10-19（周一）01:00 | 44 |
+     | 10-19 04:00 | 40 |
+     | 10-19 07:00 | 36 |
+     | 10-19 10:00 | 75 |
+     | 10-15（周四）01:00 | 158 |
+     | 10-15 10:00 | 135 |
+
+     失败那次的 44 正是周一 01:00 的值（`populate` 把 `now` 截到整点）。周一凌晨前面是周末（检查少），当天的检查还没开始，夜里旧的积压陆续出报告，所以越到早上越少；
+     周一 10 点当天上午的检查完成了，积压回到 50 以上；工作日凌晨（周四）前一天的积压还很多。
+- **根因：** 测试用了一个固定阈值"未读多于 50"，隐含假设是在工作日或白天播种。周一（周末之后）早上大约 9 点前播种，积压只有 36–44，测试就挂。不是代码回归，是测试对种子的假设。
+- **怎么修：** **未修**（和本次任务无关，列为后续）。可选做法：阈值改成"有积压"（`> 0`，并保留分组求和、逾期等结构性断言）；或像 5.16 那样在测试里固定播种时刻。
+- **怎么证明：** 上面的两次对照（01:33 挂、10:00 过，同一份代码）和探针表。
+- **经验：**
+  - 种子按 `now` 生成的数据，测试里的数量阈值要么相对于种子算，要么固定播种时刻；固定阈值迟早碰到"周一早上"这类边角。
+  - 和 5.16 一样：先用 time-machine 换钟点确认"钟点决定"，再用一个不连数据库的探针把数量随时刻的变化量出来，比读代码猜快。
+- **范围：** imaging（系统 3 阅片看板的测试）。
+- **来源：** 本会话 10-19 凌晨的全量后端测试。
+- **代码：** `apps/api/tests/test_phase3.py`（`test_board_groups_unread_studies_with_turnaround_targets`）、`apps/api/app/modules/backlog/service.py`（`seed`）。未修改。
+
 ## 六、开发环境（Windows 开发机）
 
 环境问题的特点是报错和你的代码毫无关系，容易浪费大量时间。遇到"莫名其妙"的错误，先问：是不是环境变了？
@@ -3356,6 +3392,65 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **来源：** 10-18 真实 Gemini 演示实跑；本会话修复。
 - **代码：** `apps/web/src/features/voice/FollowUpPage.tsx`、`apps/web/src/features/storyline/api.ts`（`routePath`）、`DemoGuide.tsx`、`StorylinePage.tsx`、
   `apps/api/app/modules/storyline/script.py`（第 11 步、`FOLLOWUP_CALL`）、`apps/web/e2e/hospital-storyline.spec.ts`。提交：本案所在的提交。
+
+### 11.7 演示模式第 11 步：随访页先打开、电话后排上，详情一直停在 404
+
+- **现象：** 新写的 Playwright `e2e/demo-english.spec.ts`（英语患者，演示模式加聚光灯走第 1、11 步）第一次跑，第 11 步失败：
+  `expect(locator).toHaveText(expected) failed`，`Expected: "Place the follow-up call"`，`Received: "Open the nurse's queue"`，等满 300 秒。
+  调用记录里聚光灯先是 `"Advance the hospital clock"`，之后 584 次都是 `"Open the nurse's queue"`。也就是页面上一直没有 **Place the call**。
+- **怎么查的：**
+  1. **先弄清聚光灯在说什么。** `Spotlight.tsx` 第 11 步的目标依次是 `place-call`、三个 Say it、Queue 标签……第一个"在屏幕上、可用、还没做完"的被点亮。
+     显示 "Open the nurse's queue" 说明 `place-call` 不在屏幕上，三个 Say it 都禁用（没有通话在听），才轮到 Queue 标签。问题变成：为什么没有 Place the call。
+  2. **假设 A："时钟还没走到出院后 48 小时，电话还没排上"**（Start 会开始快进）。看失败时的页面快照（`error-context.md`）：左边 Calls 列表里有
+     `MRN 40720001 scheduled Discharged Thu, Oct 22, 11:00 AM · SURG`。电话已经排上了，假设 A 被否定。
+  3. 同一份快照的右边详情区是 `alert: No follow-up FU-stay-j0001` 和 `Try again` 按钮。**列表说有，详情说没有**：两个查询看到的不是同一时刻的数据。
+  4. **读代码确定时序。** 向导的 Start（`DemoGuide.tsx` `Intro.start`）先 `navigate("/follow-up?call=FU-stay-j0001")`，**然后**才 `advance.mutate()` 开始 48 小时快进。
+     页面一打开，`useFollowup("FU-stay-j0001")` 就请求详情，这时电话还不存在，后端 404（`voice_services/queue.py` 的 `No follow-up {call_id}`，和快照里的文字一致）。
+  5. **为什么之后不恢复。** 列表 `useFollowups` 每 5 秒刷新（`refetchInterval: 5000`）；详情 `useFollowup` 没有 `refetchInterval`；全局 `QueryClient` 是
+     `retry: 1, refetchOnWindowFocus: false`（`main.tsx`）。所以 404 重试一次后就停在错误状态。读代码还可知：点列表里她那一行也没用，`setSelected` 设的是同一个 id，
+     查询键不变，不会重新请求；只有手动点 "Try again" 才行。
+  6. **为什么以前没发现。** `hospital-storyline.spec.ts` 第 11 步先用 API 轮询等 `status == "scheduled"`，**再**打开页面（`play()`），详情第一次请求就有数据；
+     PROGRESS 也记着第 11 步的聚光灯目标 "not yet walked in demo mode by a test"。这和语言无关，中文故事线的演示模式一样会碰到；英语用例是第一个按演讲者的顺序
+     （先打开页面、再等时钟）走第 11 步的测试。
+- **根因：** 深链接打开的对象可能"还没出现"（这里是 48 小时后才排上的随访电话），而详情查询只在打开时问一次：第一次 404 之后既不轮询，也没有别的操作会让它重新请求。
+  列表会自己刷新，所以两边对不上。
+- **怎么修：** `useFollowup`（`features/voice/api.ts`）在 404 时每 3 秒再问一次（`refetchInterval: (q) => (notScheduled(q.state.error) ? 3000 : false)`，
+  `notScheduled` = `ApiError` 且状态 404），有数据就停。详情区对 404 不再显示红色错误，而是 "This call is not scheduled yet"（`followup-not-scheduled`），
+  说明它会自动出现；其他错误照旧显示 Try again。
+- **怎么证明：** `demo-english.spec.ts` 加了断言：Start 之后先看到 `followup-not-scheduled`，时钟走完、电话排上后聚光灯指向 "Place the follow-up call"。
+  修复后的第二次运行过了这一步（又在下一步停住，见 11.8）；修复前同一步等满 300 秒失败（上面的现象）。整个 spec 的通过记录见 PROGRESS。
+- **经验：**
+  - "列表有、详情没有"是两个查询刷新策略不同的标志：先比较两个查询各自什么时候问的、之后还会不会再问。
+  - 深链接要考虑"对象还没出现"：演示里先打开页面、再推进时钟是常态。对这种页面，404 的意思是"还没有"，不是"出错了"。
+  - 端到端测试先用 API 等到数据、再打开页面，会绕过用户真实的顺序。至少要有一个测试按用户的顺序走（先打开、后等待）。
+- **范围：** hospital（WP8 随访页、WP9 故事线演示模式）。
+- **来源：** 本会话 10-19，英语患者的演示模式 e2e 第一次运行。
+- **代码：** `apps/web/src/features/voice/api.ts`（`useFollowup`、`notScheduled`）、`apps/web/src/features/voice/FollowUpPage.tsx`（`Detail`）、
+  `apps/web/e2e/demo-english.spec.ts`。提交：本案所在的提交。
+
+### 11.8 聚光灯点亮的按钮被演示向导自己挡住
+
+- **现象：** 11.7 修好后的第二次运行，聚光灯已经指向 "Place the follow-up call"，可 `page.getByTestId("place-call").click()` 一直点不下去，最后
+  `Test timeout of 1200000ms exceeded.`。调用记录重复了 1814 次：`element is visible, enabled and stable` 之后是
+  `<li>Place call</li> from <section aria-label="Demo guide" data-testid="demo-guide" ...> subtree intercepts pointer events`。
+- **怎么查的：**
+  1. Playwright 的提示已经说清了：按钮可见、可用、稳定，但点击位置上最上层的元素是向导面板里 "Now click" 列表的一行。所以不是按钮的问题，是被盖住了。
+  2. 看布局：向导是 `fixed` 在右下角（`sm:right-4 sm:bottom-4 sm:w-[24rem]`，最高 `75vh`）；随访详情卡片的按钮在卡片标题栏右侧。测试窗口 1360×900 时，面板覆盖横向
+     约 960–1344 像素，纵向从底边往上最多到约 209 像素（`75vh`），按钮正好在里面。演讲者在笔记本屏幕上会遇到同样的事：聚光灯的金色框画在按钮上，但点下去点的是向导。
+  3. 演示脚本原来的办法是"面板挡住按钮时用箭头把它折起来"，可下一步的 Say it 又在面板里，现场要反复折叠、展开。
+  4. 别的步骤为什么没碰到：已有的演示模式测试（`demo-guide`、`demo-highlights`）只走第 1、2、5 步，这些步骤要按的按钮在页面左上或中间。
+- **根因：** 面板的位置固定，不知道要按的按钮在哪；聚光灯知道目标在哪，却没有把这个信息给面板。
+- **怎么修：** `Panel` 接收聚光灯当前的目标（`avoid={hit}`），`useDockAway` 每帧比较：目标在面板外、并且在"面板放在右下角时"的矩形里、而不在"放在左下角时"的矩形里，
+  面板就移到左下角（`sm:left-4`，`data-dock="left"`）；目标回到面板里（Say it）或不再被挡时回到右下角。两个位置都按计算出来的矩形判断，不用面板当前的位置，所以不会来回跳。
+  手机宽度（面板横跨屏幕）不移动。
+- **怎么证明：** `demo-english.spec.ts` 在点 Place the call 之前断言 `demo-guide` 的 `data-dock` 是 `left`，然后点击成功，第 11 步继续往下走。
+- **经验：**
+  - Playwright 的 "subtree intercepts pointer events" 直接说出了是谁挡住了谁：先看它指的元素，再看布局，不用猜。
+  - 一个"指给你看"的功能（聚光灯）和一个"占着屏幕"的功能（浮动面板）要互相知道对方：既然知道目标在哪，就让面板让开。
+  - 文档里写"遇到这种情况就手动折起来"，往往说明设计上还差一步。
+- **范围：** hospital（WP9 故事线演示模式）。
+- **来源：** 本会话 10-19，英语患者的演示模式 e2e 第二次运行。
+- **代码：** `apps/web/src/features/storyline/DemoGuide.tsx`（`Panel`、`useDockAway`）、`apps/web/e2e/demo-english.spec.ts`。提交：本案所在的提交。
 
 ---
 

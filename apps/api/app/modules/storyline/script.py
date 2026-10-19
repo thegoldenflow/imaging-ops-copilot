@@ -1,30 +1,33 @@
 """The hospital storyline's script (spec 8.2): who the patient is, who plays each part, and the twelve steps.
 
-One synthetic patient through the whole hospital: Wang Xiuying, 72, Mandarin-speaking, on warfarin for atrial
-fibrillation, falls at home and breaks her hip. Every step is "AI proposes -> a person signs -> audit trail". The
-step texts here are what the storyline page and `demo/hospital_journey.md` show: the click path, the one sentence
-to say, and what the screen should show. Ids are fixed (`*-j0001`), so tests, the page and the demo script can
-name them; times are the hospital clock's and come from the plan when the story runs.
+One synthetic patient through the whole hospital: 72, on warfarin for atrial fibrillation, falls at home and breaks
+her hip. Every step is "AI proposes -> a person signs -> audit trail". The step texts here are what the storyline
+page and `demo/hospital_journey.md` show: the click path, the one sentence to say, and what the screen should show.
+Ids are fixed (`*-j0001`), so tests, the page and the demo script can name them; times are the hospital clock's and
+come from the plan when the story runs.
+
+The presenter picks her language at the reset (`PATIENTS`): Margaret Ellis, English-speaking (`en`, the default: the
+owner presents in English), or Wang Xiuying, Mandarin-speaking (`zh`, the spec's case: the call and the follow-up in
+Chinese with English subtitles in demo mode, the instructions in Simplified Chinese). The clinical course, the ids,
+the cast, the checks and the twelve steps are the same; her name, her record's language, what she and her daughter
+say and the step texts that mention the language differ (`steps(language)`; `STEPS` holds the Mandarin story's).
 
 Everything here is fictional (synthetic data only).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
 PATIENT = "pat-j0001"
 MRN = "40720001"
 HEALTH_CARD = "6845294821"  # synthetic; the caller gives the last four digits
 HEALTH_CARD_VERSION = "AB"
-GIVEN, FAMILY = "Xiuying", "Wang"
-GIVEN_ZH, FAMILY_ZH = "秀英", "王"
 AGE = 72
 BIRTH_MONTH_DAY = (3, 8)
 PHONE = "+1-416-555-0188"  # 555-01xx: reserved for fiction
-DAUGHTER = ("Li", "Chen", "陈丽", "+1-416-555-0172")
-LANGUAGE = "zh-CN"
+DAUGHTER_PHONE = "+1-416-555-0172"
 
 IMAGING_PATIENT = "PT-J0001"  # her record at the imaging centre (a separate system: linked by the preset MPI record)
 IMAGING_REFERRER = "R-ED01"
@@ -64,11 +67,93 @@ CAST = {
     "admin": "U-ADMIN",
 }
 
-# What the daughter and the patient say (the storyline page offers them as one-click phrases)
-CALL_LINES = ("你好，我妈妈在家摔倒了，救护车正在把她送到你们急诊。",
-              "我是她女儿。她叫王秀英，{birth_zh}出生，健康卡尾号4821。",
-              "没有了，谢谢。")
-FOLLOWUP_LINES = ("{birth_zh}", "还行，就是伤口一直在渗液，纱布都湿透了。")
+
+
+@dataclass(frozen=True)
+class Patient:
+    """Who she is, by the language she speaks. What she and her daughter say are (line, English translation) pairs:
+    the storyline page offers them as one-click phrases, and the translation is the subtitle of a line in another
+    language (fixed text, no model translates it); `{birth}` / `{birth_en}` is her birth date as said."""
+
+    language: str  # the reset's choice: zh or en
+    label: str  # the choice as the presenter reads it
+    code: str  # her record's communication.language (BCP 47)
+    display: str
+    given: str
+    family: str
+    native: tuple[str, str] | None  # (given, family) in Chinese characters: her usual name in Chinese
+    daughter: tuple[str, str]  # given, family (her phone: DAUGHTER_PHONE)
+    email: str
+    call_lines: tuple[tuple[str, str], ...]
+    followup_lines: tuple[tuple[str, str], ...]
+    followup_closing: tuple[str, str]  # her answer to the follow-up's remaining questions, until the call ends
+    diet: str  # the warfarin diet advice of her instructions in their default language (the walk checks it)
+
+    @property
+    def name(self) -> str:
+        return f"{self.given} {self.family}"
+
+    @property
+    def native_name(self) -> str | None:
+        return self.native[1] + self.native[0] if self.native else None
+
+    @property
+    def call_language(self) -> str:
+        """Her record's language as the modules render it: her calls once she is verified, and the default language
+        of her patient instructions."""
+        return "zh-Hans" if self.code.startswith("zh") else "en"
+
+    def birth(self, day: date) -> str:
+        return birth_zh(day) if self.language == "zh" else birth_en(day)
+
+    def lines(self, pairs: tuple[tuple[str, str], ...], day: date) -> list[tuple[str, str]]:
+        """The scripted lines with her birth date filled in: (what is said, its English translation)."""
+        values = {"birth": self.birth(day), "birth_en": birth_en(day)}
+        return [(text.format(**values), en.format(**values)) for text, en in pairs]
+
+
+def _english(text: str) -> tuple[str, str]:
+    """A line said in English: no translation (no subtitle)."""
+    return text, text
+
+
+PATIENTS: dict[str, Patient] = {
+    "en": Patient(
+        "en", "English-speaking: Margaret Ellis", "en", "English", "Margaret", "Ellis", None,
+        ("Laura", "Bennett"), "margaret.ellis@example.com",
+        call_lines=(_english("Hello, my mother fell at home, and an ambulance is bringing her to your emergency "
+                             "department."),
+                    _english("I'm her daughter. Her name is Margaret Ellis, born {birth}, health card ending in 4821."),
+                    _english("No, that's all, thank you.")),
+        followup_lines=(_english("{birth}"),
+                        _english("I'm all right, but the wound keeps leaking; the gauze is soaked through.")),
+        followup_closing=_english("No, nothing else."),
+        diet="green vegetables"),
+    "zh": Patient(
+        "zh", "Mandarin-speaking: Wang Xiuying (王秀英)", "zh-CN", "Chinese (China)", "Xiuying", "Wang", ("秀英", "王"),
+        ("Li", "Chen"), "xiuying.wang@example.com",
+        call_lines=(("你好，我妈妈在家摔倒了，救护车正在把她送到你们急诊。",
+                     "Hello, my mother fell at home, and an ambulance is bringing her to your emergency department."),
+                    ("我是她女儿。她叫王秀英，{birth}出生，健康卡尾号4821。",
+                     "I'm her daughter. Her name is Wang Xiuying, born {birth_en}, health card ending in 4821."),
+                    ("没有了，谢谢。", "No, that's all, thank you.")),
+        followup_lines=(("{birth}", "{birth_en}"),
+                        ("还行，就是伤口一直在渗液，纱布都湿透了。",
+                         "I'm all right, but the wound keeps leaking; the gauze is soaked through.")),
+        followup_closing=("没有了。", "No, nothing else."),
+        diet="绿叶蔬菜"),
+}
+LANGUAGES = tuple(PATIENTS)
+DEFAULT = "en"  # the reset's patient when none is chosen (owner's direction, 2026-10-19; it was Mandarin)
+
+
+def patient(language: str | None = None) -> Patient:
+    """The storyline's patient in that language (none: the default story, English)."""
+    found = PATIENTS.get(language or DEFAULT)
+    if found is None:
+        raise ValueError(f"No storyline patient speaks {language!r}: choose one of {', '.join(LANGUAGES)}")
+    return found
+
 
 IMAGING_REQUEST = {
     REQUISITIONS[0]: ("XR_HIP", "X-ray left hip and pelvis"),
@@ -97,6 +182,15 @@ def birth_date(day: date) -> date:
 def birth_zh(day: date) -> str:
     b = birth_date(day)
     return f"{b.year}年{b.month}月{b.day}日"
+
+
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+          "November", "December")
+
+
+def birth_en(day: date) -> str:
+    b = birth_date(day)
+    return f"{MONTHS[b.month - 1]} {b.day}, {b.year}"
 
 
 @dataclass(frozen=True)
@@ -242,6 +336,38 @@ STEPS: tuple[Step, ...] = (
 BY_KEY = {s.key: s for s in STEPS}
 TOTAL_SECONDS = sum(s.seconds for s in STEPS)
 assert TOTAL_SECONDS <= 600, TOTAL_SECONDS
+
+# The English-speaking patient: the texts of the steps that name her language (`STEPS` has the Mandarin story's;
+# the rest of the story is the same)
+EN_STEPS: dict[str, dict] = {
+    "call": {
+        "title": "A daughter calls the hospital; the clerk confirms the ED registration",
+        "say": "Her daughter calls the hospital's line. The call centre checks name, birth date and the last four card "
+               "digits, and pre-fills the ED registration; the clerk confirms it and the EHR registers the visit.",
+        "expect": ("Transcript with 'Verified'", "Request card: ED registration, Margaret Ellis, MRN 40720001",
+                   "After Confirm: the visit ed-j0001 (EMER) is registered")},
+    "instructions": {
+        "title": "Patient instructions: warfarin diet and wound red flags",
+        "click_path": ("Documentation", "Her patient instructions (English)", "Check the medicines, diet and red flags",
+                       "Sign"),
+        "say": "From the signed summary: plain-language instructions in her language, English, with the Chinese versions "
+               "one click away; warfarin's steady greens and the wound red flags. The nurse signs.",
+        "expect": ("Instructions in English by default",
+                   "Warfarin: Eat about the same amount of green vegetables each week", "Wound red flags"),
+        "permission": "A nurse signs the patient instructions, not a physician; the default language follows her "
+                      "record (English)."},
+    "followup": {
+        "title": "48 hours later: the follow-up call escalates heavy wound drainage",
+        "say": "Two days after discharge the AI calls her with questions from her signed instructions. She says the "
+               "wound keeps leaking: the rule layer escalates at once, and the nurse calls her back."},
+}
+
+
+def steps(language: str | None = None) -> tuple[Step, ...]:
+    """The twelve steps as the page shows them for the patient who speaks `language`."""
+    if patient(language).language == "zh":
+        return STEPS
+    return tuple(replace(s, **EN_STEPS.get(s.key, {})) for s in STEPS)
 
 
 def day_of(now: datetime) -> date:

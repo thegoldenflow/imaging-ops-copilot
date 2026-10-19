@@ -344,7 +344,8 @@ def start_call(store: Store, call_id: str, user: StaffUser | None = None) -> tup
     patient = system_fhir().read("Patient", call.patient_id)
     first = patient_name(patient.to_fhir() if patient else None, call.language)
     reply = P.say(P.FU["intro"], call.language, first=first)
-    call.transcript.append(Turn(role="agent", text=reply, at=call.started_at, lang=call.language, question="identity"))
+    call.transcript.append(Turn(role="agent", text=reply, at=call.started_at, lang=call.language, question="identity",
+                                gloss=P.gloss(reply, call.language)))
     save(call, store)
     return reply, call
 
@@ -367,7 +368,8 @@ def answer(store: Store, call_id: str, text: str) -> tuple[str, FollowupCall, bo
         run.finish(outcome="completed")
     call.run_ids.append(run.run_id)
     asked = call.script[call.step]["key"] if not engine.ended and call.step < len(call.script) else None
-    call.transcript.append(Turn(role="agent", text=reply, at=now, lang=call.language, question=asked))
+    call.transcript.append(Turn(role="agent", text=reply, at=now, lang=call.language, question=asked,
+                                gloss=P.gloss(reply, call.language)))
     save(call, store)
     return reply, call, engine.ended
 
@@ -402,8 +404,9 @@ class _Call:
     def say(self, key: str, **values) -> str:
         return P.say(P.FU[key], self.call.language, **values)
 
-    def text_of(self, q: dict) -> str:
-        return (q.get("text") or {}).get(self.call.language) or (q.get("text") or {}).get("en", "")
+    def text_of(self, q: dict) -> P.Said:
+        texts = q.get("text") or {}
+        return P.Said(texts.get(self.call.language) or texts.get("en", ""), texts.get("en", ""))
 
     def first_name(self) -> str:
         found = system_fhir().read("Patient", self.call.patient_id)
@@ -439,7 +442,8 @@ class _Call:
                 return self.say("escalate_emergency")
             prefix.append(self.say("escalate_call", minutes=settings.followup_callback_minutes))
         elif q["kind"] == "followup" and said == "no":
-            prefix.append((q.get("tell") or {}).get(self.call.language, ""))
+            tell = q.get("tell") or {}
+            prefix.append(P.Said(tell.get(self.call.language, ""), tell.get("en", "")))
         if q["kind"] in ("other", "open") and followup_agent.CONCERNS[-1][1].search(text):
             prefix.append(self.say("no_advice"))
         if new and q["kind"] != "other":  # after an escalation: straight to "anything else", the nurse covers the rest
@@ -448,8 +452,8 @@ class _Call:
             self.call.step += 1
         sep = "" if self.call.language.startswith("zh") else " "  # Chinese sentences run on without a space
         if self.call.step >= len(self.call.script):
-            return sep.join(x for x in [*prefix, self._finish()] if x).strip()
-        return sep.join(x for x in [*prefix, self.text_of(self.call.script[self.call.step])] if x).strip()
+            return P.cat(*prefix, self._finish(), sep=sep)
+        return P.cat(*prefix, self.text_of(self.call.script[self.call.step]), sep=sep)
 
     def _identity(self, text: str) -> str:
         said = parse_dob(text)

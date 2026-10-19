@@ -4,6 +4,7 @@ walk through the HTTP API (offline: no Temporal; the journey from the ED is in t
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 
 import pytest
@@ -22,12 +23,23 @@ from app.modules.documentation import document as documents
 from app.modules.storyline import script as S
 from app.modules.storyline import service, stubs
 from app.modules.storyline.walk import SUMMARY_CALLS, Walk, WalkFailed, summary_draft_s
-from app.modules.voice_services import identity
+from app.modules.voice_services import callcenter, followup, identity
+from app.modules.voice_services import phrases as P
 from tests import storyline_harness as H
 
 
 @pytest.fixture
 def story(fresh_state):
+    """The story with the Mandarin-speaking patient, Wang Xiuying (the reset's language `zh`)."""
+    accepted.install()
+    service.install()
+    journey.plant(fresh_state, "U-ADMIN", "zh")
+    return fresh_state
+
+
+@pytest.fixture
+def story_en(fresh_state):
+    """The default story: the English-speaking patient, Margaret Ellis (no language chosen)."""
     accepted.install()
     service.install()
     journey.plant(fresh_state, "U-ADMIN")
@@ -124,6 +136,23 @@ def test_the_call_centre_proposes_the_registration_and_the_clerk_registers_her(s
     assert triage_card is not None and "CTAS 2" in triage_card["description"]
 
 
+def test_the_scripted_lines_come_with_english_translations(story, client, login):
+    """The subtitles for an English-speaking audience: each Chinese line of the caller has a fixed translation, which
+    says the same things (the identity check reads the same birth date and card digits from it)."""
+    patient = client.get("/api/storyline", headers=login(S.CAST["clerk"])).json()["patient"]
+    said = [*patient["call_lines"], *patient["followup_lines"], patient["followup_closing"]]
+    translations = patient["translations"]
+    assert set(translations) == set(said) and not any(P.CJK.search(t) for t in translations.values())
+    day = parse(story.modules["hospital_plan"]["generated_for"]).date()
+    who = patient["call_lines"][1]
+    assert translations[who] == (f"I'm her daughter. Her name is Wang Xiuying, born {S.birth_en(day)}, health card "
+                                 "ending in 4821.")
+    zh, en = identity.parse(who), identity.parse(translations[who])
+    assert (zh.birth_date, zh.card_last4, zh.relation) == (en.birth_date, en.card_last4, en.relation) == (
+        S.birth_date(day).isoformat(), "4821", "daughter")
+    assert translations[patient["followup_lines"][0]] == S.birth_en(day)
+
+
 def test_a_walk_in_registration_plans_a_visit(fresh_state):
     store = fresh_state
     plan = store.modules["hospital_plan"]
@@ -186,6 +215,64 @@ def test_block_overtime_counts_only_cases_booked_to_end_by_the_block():
 def test_the_whole_story_offline(story, client):
     """All twelve steps through the HTTP API as the cast, without Temporal: every card decided by its person, every
     EHR record written, every step with its audit events."""
+    view, runs = _the_whole_story(story, client)
+    # her calls in Mandarin, each agent turn with its English subtitle
+    call, follow = _her_calls(story, runs)
+    assert call.language == follow.language == "zh-Hans"
+    assert all(t.gloss and not P.CJK.search(t.gloss) for c in (call, follow) for t in c.transcript
+               if t.role == "agent" and t.lang != "en")
+    assert documents.read_data(story.fhir.read("DocumentReference", f"pinstr-{S.STAY}"))["default_language"] == "zh-Hans"
+
+
+def test_the_whole_story_offline_with_the_english_speaking_patient(story_en, client):
+    """The reset's other patient: Margaret Ellis, who speaks English. The same twelve steps and checks; her daughter's
+    call (the identity check on her English name, birth date and card digits), her instructions and her follow-up call
+    are in English, and no step's text speaks of Mandarin or Chinese."""
+    assert story_en.modules["storyline"]["language"] == "en"  # the default story
+    view, runs = _the_whole_story(story_en, client)
+    patient = view["patient"]
+    assert (patient["name"], patient["name_native"], patient["language"], patient["story_language"]) == (
+        "Margaret Ellis", None, "en", "en")
+    assert patient["translations"] == {}  # nothing to subtitle
+    names = story_en.fhir.read("Patient", S.PATIENT)["name"]
+    assert [n["text"] for n in names] == ["Margaret Ellis"]
+    steps = {s["key"]: s for s in view["steps"]}
+    for key in ("call", "instructions", "followup"):
+        texts = " ".join([steps[key]["title"], steps[key]["permission"], *steps[key]["expect"],
+                          *steps[key]["click_path"]])
+        assert not re.search(r"Mandarin|Chinese|中文|简体", texts), (key, texts)
+    assert "Margaret Ellis" in " ".join(steps["call"]["expect"])
+    call, follow = _her_calls(story_en, runs)
+    assert call.language == follow.language == "en" and call.caller_relation == "daughter"
+    assert not any(t.gloss for c in (call, follow) for t in c.transcript)
+    assert [h["code"] for h in follow.rule_hits] == ["wound_drainage"] and follow.priority == "urgent"
+    instructions = documents.read_data(story_en.fhir.read("DocumentReference", f"pinstr-{S.STAY}"))
+    assert instructions["default_language"] == "en"
+
+
+def test_the_two_patients_share_the_story_and_differ_in_language():
+    zh, en = S.steps("zh"), S.steps("en")
+    assert [(s.n, s.key, s.cast, s.route, s.beat, s.seconds, s.stub, s.ai) for s in zh] == \
+        [(s.n, s.key, s.cast, s.route, s.beat, s.seconds, s.stub, s.ai) for s in en]
+    assert [a.key for a, b in zip(zh, en) if a != b] == ["call", "instructions", "followup"]
+    assert S.steps("zh") is S.STEPS and S.steps() == en and S.patient().language == "en"  # no choice: English
+    with pytest.raises(ValueError, match="choose one of en, zh"):
+        S.patient("fr")
+
+
+def test_the_reset_refuses_a_language_no_patient_speaks(fresh_state, client, login):
+    r = client.post("/api/storyline/reset", headers=login("U-ADMIN"), json={"language": "fr"})
+    assert r.status_code == 422 and "en, zh" in r.json()["detail"]
+    assert "storyline" not in fresh_state.modules  # refused before anything was rebuilt
+
+
+def _her_calls(store, runs):
+    """Her daughter's call (step 1, the walk's) and her follow-up call (step 11)."""
+    call_id = re.search(r"call (VC-\d+)", runs[0].result).group(1)
+    return callcenter.get(call_id, store), followup.get(S.FOLLOWUP_CALL, store)
+
+
+def _the_whole_story(store, client):
     walk = Walk(client, pump=H.pump, advance=H.advance, timeout_s=60)
     runs = walk.run()
     assert [r.ok for r in runs] == [True] * 12, [(r.key, r.result) for r in runs]
@@ -200,7 +287,6 @@ def test_the_whole_story_offline(story, client):
     # the coordinator's adjustment at hospital time, after her admission and before her first night (it was the
     # audit event's time: the wall clock)
     assert parse(view["beats"]["admitted"]) <= parse(steps["or"]["signed"]["at"]) <= parse(view["beats"]["night"])
-    store = story
     summary = store.fhir.read("DocumentReference", f"dsum-{S.STAY}")
     assert summary["docStatus"] == "final"
     # the live walk's wait for this draft counts a call per chunk and the synthesis (summary_draft_s)
@@ -213,6 +299,7 @@ def test_the_whole_story_offline(story, client):
     assert reported and store.fhir.search("Task", patient=S.PATIENT, code="followup-escalation")
     # the nurse's call-back at hospital time, as every other step's signature (it was the wall clock: 03:39 live)
     assert parse(view["beats"]["followup"]) <= parse(steps["followup"]["signed"]["at"]) <= parse(view["now"])
+    return view, runs
 
 
 def _only_the_lisinopril_is_untraceable(data: dict) -> None:

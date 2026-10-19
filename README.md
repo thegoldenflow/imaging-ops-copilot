@@ -18,7 +18,7 @@ All docs: [docs/README.md](docs/README.md).
 
 | Area | What you can demo | Where |
 | --- | --- | --- |
-| Hospital storyline (spec 8.2) | One synthetic patient (72, Mandarin-speaking, on warfarin, hip fracture) from the phone call to the 48-hour follow-up and coding, in 12 steps and about 10 minutes; at every step the AI proposes, a person signs, the audit trail records it | **Hospital storyline** |
+| Hospital storyline (spec 8.2) | One synthetic patient (72, on warfarin, hip fracture) from the phone call to the 48-hour follow-up and coding, in 12 steps and about 10 minutes; at every step the AI proposes, a person signs, the audit trail records it. By default she speaks English; the Mandarin-speaking patient of spec 8.2 (with English subtitles in demo mode) is chosen at the reset | **Hospital storyline** |
 | Control Tower (7.1) | ED, bed and OR boards on a simulated hospital clock; four predictive models with their reasons; a rule engine raises exceptions, the AI narrates them from the engine's facts, a bed manager approves the actions | **Control Tower** |
 | Medication safety (7.2) | Rule layer (interactions, renal dosing, allergies, dose limits, duplicates) plus AI commentary with evidence; admission and discharge medication reconciliation, signed by a pharmacist and co-signed by a physician | **Medication safety** |
 | Documentation (7.3) | Discharge summary where every line cites a FHIR source and an untraceable medicine blocks the signature; patient instructions in English, Simplified and Traditional Chinese from one structure; nursing handoff (SBAR) | **Documentation** |

@@ -6,12 +6,14 @@ its own random stream (`hospital:<seed>:storyline:*`). Nothing here runs at the 
 demo, test and eval keeps the data it was built on; the storyline's reset (app/modules/storyline/service.py) is
 the demo reset followed by `plant`.
 
-1. The patient `pat-j0001`: Wang Xiuying, 72 (born on 8 March, so she is 72 on any hospital day), Mandarin,
-   atrial fibrillation on warfarin, hypertension on amlodipine, metoprolol, atorvastatin, osteoporosis; one
-   admission seven months ago; her daughter Li Chen as contact; consents to AI processing, follow-up calls and
-   SMS; a phone number. Her record at the imaging centre (`PT-J0001`, the imaging system's own patient table) and
-   the ED physician as an imaging referrer (`R-ED01`). Linking the two records is the MPI roadmap card (8.1): the
-   preset writes the link (matched on the health card number) instead of any matching logic.
+1. The patient `pat-j0001`, in the language the presenter chose at the reset (app/modules/storyline/script.py
+   `PATIENTS`): Margaret Ellis, English (the default), or Wang Xiuying, Mandarin (her usual name in Chinese too).
+   Either way 72 (born on 8 March, so she is 72 on any hospital day), atrial fibrillation on warfarin, hypertension
+   on amlodipine, metoprolol, atorvastatin, osteoporosis; one admission seven months ago; her daughter as contact;
+   consents to AI processing, follow-up calls and SMS; a phone number. Her record at the imaging centre
+   (`PT-J0001`, the imaging system's own patient table) and the ED physician as an imaging referrer (`R-ED01`).
+   Linking the two records is the MPI roadmap card (8.1): the preset writes the link (matched on the health card
+   number) instead of any matching logic.
 2. The hospital state step 5 needs, whatever the weekday's data: Orthopedics full, its overflow unit Surgery full
    with exactly two discharge-ready patients (the Control Tower's discharge model, P >= 0.7, at 07:00 and two hours
    later). Free and housekeeping beds on both units are filled with planted stays (recent admissions, so not ready
@@ -68,16 +70,18 @@ class _PresetBuilder(Builder):
         return f"{prefix}-jp{self._counters[prefix]:04d}"
 
 
-def plant(store: Store, operator: str | None) -> dict:
-    """Write the preset; returns the storyline's state (also stored as the `storyline` module blob)."""
+def plant(store: Store, operator: str | None, language: str | None = None) -> dict:
+    """Write the preset for the patient who speaks `language` (en, zh; none: the default, English); returns the
+    storyline's state (also stored as the `storyline` module blob)."""
+    who = S.patient(language)
     plan = store.modules["hospital_plan"]
     now = parse(plan["generated_for"])
     seed = plan.get("seed", 0)
     b = _PresetBuilder(store, seed, now)
     story_ctx = ctx(operator)
     birth = S.birth_date(now.date())
-    _patient(b, now, birth)
-    _imaging_records(store, birth)
+    _patient(b, now, birth, who)
+    _imaging_records(store, birth, who)
     capacity = _Capacity(store, b, plan, now, random.Random(f"hospital:{seed}:storyline:capacity"), story_ctx).run()
     _expected_visit(plan, now, story_ctx)
     plan["horizon"] = max(parse(plan["horizon"]), now + HORIZON).isoformat()
@@ -85,7 +89,7 @@ def plant(store: Store, operator: str | None) -> dict:
     store.modules["hospital_plan"] = plan
     state = {"version": 1, "prepared_at": now.isoformat(), "operator": operator, "ctx": story_ctx,
              "patient": S.PATIENT, "mrn": S.MRN, "visit": S.VISIT, "stay": S.STAY, "surgery": S.SURGERY,
-             "birth_date": birth.isoformat(),
+             "birth_date": birth.isoformat(), "language": who.language,
              "mpi": {"hospital": f"Patient/{S.PATIENT}", "imaging": S.IMAGING_PATIENT, "matched_on": "health card",
                      "note": "Preset link: master patient index is a roadmap card (8.1); no matching logic"},
              "capacity": capacity, "beats": {}, "marks": {}}
@@ -96,10 +100,14 @@ def plant(store: Store, operator: str | None) -> dict:
 # ---------- 1. the patient ----------
 
 
-def _patient(b: Builder, now: datetime, birth) -> None:
+def _patient(b: Builder, now: datetime, birth, who: S.Patient) -> None:
     pid = S.PATIENT
-    given, family, given_zh, family_zh = S.GIVEN, S.FAMILY, S.GIVEN_ZH, S.FAMILY_ZH
-    d_given, d_family, d_zh, d_phone = S.DAUGHTER
+    d_given, d_family = who.daughter
+    names = [{"use": "official", "family": who.family, "given": [who.given], "text": who.name}]
+    if who.native:  # her name in Chinese characters, as she and her family say it
+        given_native, family_native = who.native
+        names.append({"use": "usual", "family": family_native, "given": [given_native], "text": who.native_name,
+                      "extension": [ext("name-language", valueCode=who.code)]})
     b.add({
         "resourceType": "Patient", "id": pid, "active": True,
         "identifier": [
@@ -107,17 +115,15 @@ def _patient(b: Builder, now: datetime, birth) -> None:
             {"use": "official", "type": {"text": "Ontario health card (synthetic)"}, "system": C.HCN_SYSTEM,
              "value": S.HEALTH_CARD, "extension": [ext("synthetic", valueBoolean=True),
                                                    ext("hcn-version", valueString=S.HEALTH_CARD_VERSION)]}],
-        "name": [{"use": "official", "family": family, "given": [given], "text": f"{given} {family}"},
-                 {"use": "usual", "family": family_zh, "given": [given_zh], "text": family_zh + given_zh,
-                  "extension": [ext("name-language", valueCode=S.LANGUAGE)]}],
+        "name": names,
         "gender": "female", "birthDate": fhir_date(birth),
         "address": [{"use": "home", "line": ["88 Demo Cres"], "city": "Markham", "state": "ON",
                      "postalCode": "L3R 5X1", "country": "CA"}],
         "telecom": [{"system": "phone", "value": S.PHONE, "use": "home"}],
         "contact": [{"relationship": [{"text": "daughter"}], "name": {"text": f"{d_given} {d_family}"},
-                     "telecom": [{"system": "phone", "value": d_phone}]}],
-        "communication": [{"language": {"coding": [{"system": "urn:ietf:bcp:47", "code": S.LANGUAGE,
-                                                    "display": "Chinese (China)"}]}, "preferred": True}],
+                     "telecom": [{"system": "phone", "value": S.DAUGHTER_PHONE}]}],
+        "communication": [{"language": {"coding": [{"system": "urn:ietf:bcp:47", "code": who.code,
+                                                    "display": who.display}]}, "preferred": True}],
         "managingOrganization": ref("Organization", "org-demo-hospital")})
     visit = (now - timedelta(days=21)).replace(hour=10, minute=30)
     clinic = b.encounter(pid, "AMB", visit, end=visit + timedelta(minutes=30), service="outpatient-clinic",
@@ -147,12 +153,12 @@ def _patient(b: Builder, now: datetime, birth) -> None:
                "provision": {"type": "permit", "purpose": [C.coding(C.CONSENT_CATEGORY, category)]}})
 
 
-def _imaging_records(store: Store, birth) -> None:
+def _imaging_records(store: Store, birth, who: S.Patient) -> None:
     """Her record at the imaging centre (its own patient table) and the ED physician as a referrer there."""
     store.patients[S.IMAGING_PATIENT] = Patient(
-        id=S.IMAGING_PATIENT, given_name=S.GIVEN, family_name=S.FAMILY, dob=birth, sex="F", phone=S.PHONE,
-        email="xiuying.wang@example.com", address="88 Demo Cres, Markham, ON", health_card=S.HEALTH_CARD,
-        health_card_version=S.HEALTH_CARD_VERSION, preferred_language="zh")
+        id=S.IMAGING_PATIENT, given_name=who.given, family_name=who.family, dob=birth, sex="F", phone=S.PHONE,
+        email=who.email, address="88 Demo Cres, Markham, ON", health_card=S.HEALTH_CARD,
+        health_card_version=S.HEALTH_CARD_VERSION, preferred_language=who.language)
     ed_doctor = store.staff.get(S.CAST["ed_physician"])
     store.referrers[S.IMAGING_REFERRER] = Referrer(
         id=S.IMAGING_REFERRER, name=ed_doctor.name if ed_doctor else "Dr. ED Physician",

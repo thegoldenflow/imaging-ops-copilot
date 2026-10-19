@@ -8,6 +8,9 @@
         in this process, on the configured database, inside one transaction that is rolled back (the preset is
         planted on the data as it is; the background work is run between the steps: tests/storyline_harness.py).
         With --report, writes evals/storyline/report_in_process.json and .md.
+    --language zh walks the Mandarin-speaking patient's story (Wang Xiuying); the default is en, Margaret Ellis's.
+    The English story's reports get the suffix _en (the reports without one are Wang Xiuying's, the default until
+    2026-10-19).
 
 The walk (app/modules/storyline/walk.py) is the same one the backend test runs. Nothing here judges a model: the
 report shows that the story runs from start to finish, what each step proposed and wrote, and how long it took.
@@ -31,7 +34,7 @@ sys.path.insert(0, str(API))
 OUT = ROOT / "evals" / "storyline"
 
 
-def live(base_url: str, timeout_s: float):
+def live(base_url: str, timeout_s: float, language: str):
     import httpx
 
     from app.modules.storyline import script as S
@@ -51,8 +54,8 @@ def live(base_url: str, timeout_s: float):
     walk = Walk(client, pump=pump, advance=advance, log=print, timeout_s=timeout_s,
                 summary_timeout_s=timeout_s + draft_s)
     started = time.monotonic()
-    print("resetting the storyline (demo reset + preset) ...")
-    r = client.post("/api/storyline/reset", headers=walk.headers(walk_user))
+    print(f"resetting the storyline (demo reset + preset; patient language {language}) ...")
+    r = client.post("/api/storyline/reset", headers=walk.headers(walk_user), json={"language": language})
     if r.status_code >= 400:
         raise SystemExit(f"reset failed: {r.status_code} {r.text[:300]}")
     reset_s = round(time.monotonic() - started, 1)
@@ -60,7 +63,7 @@ def live(base_url: str, timeout_s: float):
     return walk, reset_s, status
 
 
-def in_process(timeout_s: float):
+def in_process(timeout_s: float, language: str):
     os.environ.setdefault("BACKGROUND_WORKERS", "0")
     os.environ["TEMPORAL_ADDRESS"] = ""
     from fastapi.testclient import TestClient
@@ -78,7 +81,7 @@ def in_process(timeout_s: float):
     set_ambient_store(store)
     set_gateway(LlmGateway(MockProvider(latency_s=0)))
     started = time.monotonic()
-    journey.plant(store, "U-ADMIN")
+    journey.plant(store, "U-ADMIN", language)
     reset_s = round(time.monotonic() - started, 1)
     from app.main import app
 
@@ -98,11 +101,11 @@ def in_process(timeout_s: float):
 
 def write(report: dict) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    name = f"report_{report['kind']}"
+    name = f"report_{report['kind']}" + ("" if report["language"] == "zh" else f"_{report['language']}")
     (OUT / f"{name}.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     lines = [f"# Storyline report ({report['mode']})", "",
              f"Run {report['run_at']} on {report['platform']}, git {report['git']}; LLM provider {report['llm']}; "
-             f"Temporal {'on' if report['temporal'] else 'off'}.", "",
+             f"Temporal {'on' if report['temporal'] else 'off'}; the patient speaks {report['language']}.", "",
              f"Result: **{'passed' if report['passed'] else 'FAILED'}**: {report['steps_ok']} of 12 steps; walk "
              f"{report['walk_seconds']} s (reset {report['reset_seconds']} s); the demo script budgets "
              f"{report['budget_seconds']} s of talking and clicking.", "",
@@ -125,6 +128,8 @@ def main() -> None:
     mode.add_argument("--api", help="base URL of a running API, e.g. http://127.0.0.1:9445")
     mode.add_argument("--in-process", action="store_true")
     parser.add_argument("--report", action="store_true", help="write evals/storyline/report_<mode>.json and .md")
+    parser.add_argument("--language", default="en", choices=["en", "zh"],
+                        help="the patient's language: en (Margaret Ellis, the default) or zh (Wang Xiuying)")
     parser.add_argument("--timeout", type=float, default=180,
                         help="seconds to wait for one step's background work (--api: the discharge summary step "
                              "waits this plus the longest a summary draft can take)")
@@ -134,9 +139,9 @@ def main() -> None:
 
     close = None
     if args.api:
-        walk, reset_s, status = live(args.api, args.timeout)
+        walk, reset_s, status = live(args.api, args.timeout, args.language)
     else:
-        walk, reset_s, status, close = in_process(args.timeout)
+        walk, reset_s, status, close = in_process(args.timeout, args.language)
     started = time.monotonic()
     error = None
     try:
@@ -155,7 +160,7 @@ def main() -> None:
               "mode": "running API " + args.api if args.api else "in process (rolled back)",
               "run_at": datetime.now().isoformat(timespec="seconds"), "platform": platform.platform(), "git": git,
               "llm": settings.llm_provider if args.api is None else "the API's",
-              "temporal": temporal,
+              "temporal": temporal, "language": args.language,
               "reset_seconds": reset_s, "walk_seconds": round(time.monotonic() - started, 1),
               "budget_seconds": S.TOTAL_SECONDS, "steps_ok": sum(1 for r in walk.runs if r.ok),
               "passed": error is None and len(walk.runs) == 12 and all(r.ok for r in walk.runs),

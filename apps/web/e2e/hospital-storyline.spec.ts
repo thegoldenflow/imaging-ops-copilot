@@ -147,6 +147,8 @@ test("hospital storyline: twelve steps, each proposed by the AI, signed by a per
   await page.getByTestId("login-admin").click();
   await expect(page.getByTestId("current-user")).toBeVisible();
   await page.getByRole("link", { name: "Hospital storyline" }).click();
+  // the Mandarin-speaking patient (the reset keeps the current story's patient unless another is picked)
+  await page.getByTestId("story-reset-language").selectOption("zh");
   page.once("dialog", (d) => void d.accept());
   await page.getByTestId("story-reset").click();
   await expect(page.getByTestId("story-step-1")).toHaveAttribute("data-status", "active", { timeout: 300_000 });

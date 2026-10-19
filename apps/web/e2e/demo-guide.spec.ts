@@ -11,13 +11,20 @@ const expect = baseExpect.configure({ timeout: 60_000 });
 test("demo mode: introduce the step, play it, ask the audience before the next one", async ({ page, request }) => {
   test.setTimeout(300_000);
   const { token } = await (await request.post("/api/auth/login", { data: { user_id: "U-ADMIN" } })).json();
-  const reset = await request.post("/api/storyline/reset", { headers: { Authorization: `Bearer ${token}` }, timeout: 180_000 });
+  // the Mandarin-speaking patient (the default is the English one): her call with its English subtitles
+  const reset = await request.post("/api/storyline/reset", { headers: { Authorization: `Bearer ${token}` }, data: { language: "zh" },
+    timeout: 180_000 });
   expect(reset.ok()).toBeTruthy();
   const story = await (await request.get("/api/storyline", { headers: { Authorization: `Bearer ${token}` } })).json();
   const lines: string[] = story.patient.call_lines;
+  const translations: Record<string, string> = story.patient.translations;
 
   await page.goto("/login");
-  await page.evaluate((t) => { localStorage.setItem("ioc.token", t); localStorage.removeItem("ioc.demo"); }, token);
+  await page.evaluate((t) => {
+    localStorage.setItem("ioc.token", t);
+    localStorage.removeItem("ioc.demo");
+    localStorage.removeItem("ioc.subtitles");
+  }, token);
   await page.goto("/storyline");
   await page.getByTestId("story-demo").click();
 
@@ -37,16 +44,26 @@ test("demo mode: introduce the step, play it, ask the audience before the next o
   const doing = page.getByTestId("demo-doing-1");
   await expect(doing).toContainText("Waiting for the registration clerk");
   await expect(page.getByTestId("demo-say-0")).toBeDisabled(); // no call open yet: a line would go nowhere
+  // English subtitles for an English-speaking audience: each Chinese line with its fixed translation
+  await expect(page.getByTestId("demo-say-translation-0")).toHaveText(`Translation: ${translations[lines[0]]}`);
+  await expect(page.getByTestId("demo-say-translation-1")).toContainText("Her name is Wang Xiuying, born");
   await expect(spot).toHaveText("Start the call");
   await expect(page.getByTestId("demo-next")).toContainText("Next: Start the call");
   await page.getByTestId("start-call").click();
   await expect(spot).toHaveText("Say the daughter's first line"); // a button of the guide panel
   await page.getByTestId("demo-say-0").click();
   await expect(page.getByTestId("call-transcript")).toContainText(lines[0]);
+  // and under the call's Chinese turns, while demo mode is on: hers (the script's) and the agent's (its hand-written
+  // English reply)
+  await expect(page.getByTestId("subtitles-toggle")).toBeChecked();
+  const glosses = page.getByTestId("call-transcript").getByTestId("turn-gloss");
+  await expect(glosses.nth(0)).toHaveText(`Translation: ${translations[lines[0]]}`);
+  await expect(glosses.nth(1)).toContainText("First I need to confirm who the patient is");
   await expect(spot).toHaveText("Say who the patient is (name, birth date, card)");
   await page.getByTestId("demo-say-1").click();
   await expect(page.getByTestId("call-transcript")).toContainText(lines[1]);
   await expect(page.getByTestId("call-details")).toContainText("Verified");
+  await expect(glosses.nth(3)).toContainText("Thank you, I've found the record for Xiuying.");
   await expect(spot).toHaveText("Confirm the registration the AI pre-filled");
   if (process.env.E2E_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.E2E_SCREENSHOT_DIR}/demo-spotlight.png` });
   // the guide never signs: the clerk confirms the AI's pre-filled registration on the screen

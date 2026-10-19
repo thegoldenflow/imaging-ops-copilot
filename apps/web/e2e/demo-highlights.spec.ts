@@ -1,7 +1,8 @@
 import { expect as baseExpect, test } from "@playwright/test";
 
 // Demo mode's highlights preset for the hospital storyline (spec 8.2, WP9): only steps 1, 5, 9 and 11 are presented.
-// The presenter plays step 1 (the Mandarin call) by hand; "Yes, continue" then has the demo's automation do steps 2-4
+// The default story (the reset without a choice: Margaret Ellis, who speaks English). The presenter plays step 1 (her
+// daughter's call) by hand; "Yes, continue" then has the demo's automation do steps 2-4
 // in the API's background, as the people who play them, and the guide introduces step 5. The steps it did are marked
 // on the storyline page, and so is what it signed ("Demo automation on behalf of ...").
 
@@ -13,6 +14,7 @@ test("highlights: play step 1, the automation does steps 2-4, the guide introduc
   const { token } = await (await request.post("/api/auth/login", { data: { user_id: "U-ADMIN" } })).json();
   const reset = await request.post("/api/storyline/reset", { headers: { Authorization: `Bearer ${token}` }, timeout: 180_000 });
   expect(reset.ok()).toBeTruthy();
+  expect((await reset.json()).language).toBe("en"); // no choice: the English story
 
   await page.goto("/login");
   await page.evaluate((t) => { localStorage.setItem("ioc.token", t); localStorage.removeItem("ioc.demo"); }, token);
@@ -21,7 +23,7 @@ test("highlights: play step 1, the automation does steps 2-4, the guide introduc
 
   // step 1, a highlight: introduced and played by hand
   const intro = page.getByTestId("demo-intro-1");
-  await expect(intro).toContainText("A daughter calls in Mandarin");
+  await expect(intro).toContainText("A daughter calls the hospital");
   await expect(intro).toContainText("Highlights");
   await expect(page.getByTestId("demo-highlights")).toBeChecked();
   await page.getByTestId("demo-start").click();

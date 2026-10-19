@@ -1,8 +1,9 @@
 """The hospital storyline (spec 8.2, WP9): reset to the start, the twelve steps' live status, the clock's beats,
 and the event subscriber that plays the story.
 
-- `reset(user)`: the demo reset followed by the preset (app/ehr/seed/journey.py), one click from the storyline
-  page. Workflows still running from before are terminated by the reset (6.5).
+- `reset(user, language)`: the demo reset followed by the preset (app/ehr/seed/journey.py), one click from the
+  storyline page, with the patient who speaks `language` (en: Margaret Ellis, the default; zh: Wang Xiuying).
+  Workflows still running from before are terminated by the reset (6.5).
 - `status(store, user)`: per step what the AI proposed, who signed or approved and when, what the EHR wrote and
   the audit events of those records, read through FhirGateway as the storyline (system actor, audited) plus the
   modules' own tables; the current step is the first one not done.
@@ -65,15 +66,17 @@ def state(store: Store) -> dict | None:
 # ---------- reset ----------
 
 
-def reset(user: StaffUser) -> dict:
-    """The demo reset, then the storyline's preset: the story starts at 07:00 on the hospital day."""
+def reset(user: StaffUser, language: str | None = None) -> dict:
+    """The demo reset, then the storyline's preset with the patient who speaks `language`: the story starts at 07:00
+    on the hospital day."""
     from app.workflows import bridge
 
+    who = S.patient(language)  # an unknown language fails before anything is rebuilt
     store = reset_store()
     store.audit.record(user_id=user.id, user_name=user.name, role=str(user.role), action="reset",
                        resource_type="demo_data", resource_id="storyline", reason="storyline reset (demo reset + "
-                       "preset)", event_type="simulator_event", module="storyline")
-    st = preset.plant(store, user.id)
+                       f"preset; the patient: {who.label})", event_type="simulator_event", module="storyline")
+    st = preset.plant(store, user.id, who.language)
     # until a step's button is pressed, the story's AI (the imaging requisitions after triage) is the presenter's
     st["driver"] = (causes.from_request("storyline") or causes.AiCause(trigger="storyline")).model_copy(
         update={"trigger": "storyline", "note": "Storyline"}).model_dump(exclude_none=True)
@@ -231,6 +234,11 @@ def beats(store: Store) -> dict[str, str | None]:
         if out[key]:
             out[key] += timedelta(minutes=1)
     return {k: v.isoformat() if v else None for k, v in out.items()}
+
+
+def patient_of(st: dict | None) -> S.Patient:
+    """The storyline's patient as the reset chose her (a story planted before the choice existed was Mandarin)."""
+    return S.patient((st or {}).get("language") or "zh")
 
 
 def advance(store: Store, user: StaffUser) -> dict:
@@ -569,7 +577,7 @@ def _audit(events: list, refs: list[str]) -> list[dict]:
     return out[:6]
 
 
-def _step_state(step: S.Step, f: dict, store: Store) -> dict:
+def _step_state(step: S.Step, f: dict, store: Store, who: S.Patient | None = None) -> dict:
     """proposal / signed / written / detail for one step, from the records; `ready`: what the step's beat waits for
     has happened (by default its proposal is there: the card, the review, the call come with that moment)."""
     c, out = f["cards"], {"proposal": None, "signed": None, "written": [], "detail": None, "done": False}
@@ -667,7 +675,9 @@ def _step_state(step: S.Step, f: dict, store: Store) -> dict:
         out["done"] = bool(doc and doc.get("docStatus") == "final")
     elif step.key == "instructions":
         doc = f["instructions"]
-        out.update(proposal={"label": "Bilingual patient instructions", "ref": f"DocumentReference/{doc['id']}",
+        label = ("Bilingual patient instructions" if (who or S.patient()).language == "zh"
+                 else "Patient instructions in her language (English)")
+        out.update(proposal={"label": label, "ref": f"DocumentReference/{doc['id']}",
                              "agent": "patient_instructions"} if doc else None, signed=_signature(doc),
                    written=[f"DocumentReference/{doc['id']}"] if doc else [])
         out["done"] = bool(doc and doc.get("docStatus") == "final")
@@ -719,24 +729,34 @@ def status(store: Store, user: StaffUser) -> dict:
         "temporal": {"configured": link is not None,
                      "status": (link.status() if link is not None else client.offline_status())},
         "patient": None, "steps": [], "current": None, "beats": {},
-        "autoplay": autoplay.current(st["prepared_at"]) if st is not None else None}
+        "autoplay": autoplay.current(st["prepared_at"]) if st is not None else None,
+        # the reset's choice of patient
+        "languages": [{"code": p.language, "label": p.label} for p in S.PATIENTS.values()]}
+    who = patient_of(st)
     automated = autoplay.marks(st["prepared_at"]) if st is not None else {}
     journey = progress.get(S.JOURNEY)
     view["journey"] = progress.summary(journey) if journey is not None else None
     facts, story_beats = _cached(store, st, view["job"]) if st is not None else (None, {})
     if st is not None:
         day = parse(st["prepared_at"]).date()
-        view["patient"] = {"id": S.PATIENT, "mrn": S.MRN, "name": f"{S.GIVEN} {S.FAMILY}", "name_zh": S.FAMILY_ZH + S.GIVEN_ZH,
-                           "birth_date": st["birth_date"], "age": S.AGE, "language": S.LANGUAGE,
-                           "call_lines": [line.format(birth_zh=S.birth_zh(day)) for line in S.CALL_LINES],
-                           "followup_lines": [line.format(birth_zh=S.birth_zh(day)) for line in S.FOLLOWUP_LINES],
+        call_lines, followup_lines = who.lines(who.call_lines, day), who.lines(who.followup_lines, day)
+        closing = who.followup_closing
+        view["patient"] = {"id": S.PATIENT, "mrn": S.MRN, "name": who.name, "name_native": who.native_name,
+                           "birth_date": st["birth_date"], "age": S.AGE, "language": who.code,
+                           "story_language": who.language, "call_language": who.call_language,
+                           "call_lines": [text for text, _ in call_lines],
+                           "followup_lines": [text for text, _ in followup_lines],
+                           "followup_closing": closing[0],
+                           # each scripted line in another language -> its English translation (the subtitles)
+                           "translations": {text: en for text, en in [*call_lines, *followup_lines, closing]
+                                            if text != en},
                            "imaging_record": S.IMAGING_PATIENT, "mpi": st.get("mpi")}
         view["beats"] = story_beats
         view["capacity"] = {"surgery_ready": (st.get("capacity") or {}).get("surgery_ready"),
                             "warnings": (st.get("capacity") or {}).get("warnings")}
     now = parse(view["now"])
     current_found = False
-    for step in S.STEPS:
+    for step in S.steps(who.language):
         item = {"n": step.n, "key": step.key, "title": step.title, "module": step.module, "route": step.route,
                 "click_path": list(step.click_path), "say": step.say, "expect": list(step.expect), "ai": step.ai,
                 "signoff": step.signoff, "writes": step.writes, "seconds": step.seconds, "stub": step.stub,
@@ -744,7 +764,7 @@ def status(store: Store, user: StaffUser) -> dict:
                 "cast": _user(store, S.CAST[step.cast]), "cast_key": step.cast}
         item["automated"] = automated.get(step.key)  # done by the demo's automation: who started it, as whom
         if facts is not None:
-            item.update(_step_state(step, facts, store))
+            item.update(_step_state(step, facts, store, who))
             if step.key in AI_TEXT:
                 item["step_ai"] = _step_ai(store, step.key, st)
         else:

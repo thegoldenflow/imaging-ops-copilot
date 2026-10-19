@@ -26,6 +26,7 @@ from app.fhir.dt import fhir_datetime, parse
 from app.llm.gateway import LlmGateway, set_gateway
 from app.llm.providers import MockProvider, ProviderUnavailable
 from app.modules.voice_services import followup, queue, redflags
+from app.modules.voice_services import phrases as P
 
 CLERK, NURSE, PHYSICIAN, OPS = "U-CLER-01", "U-NURS-05", "U-DOC-09", "U-OPS"
 
@@ -253,6 +254,19 @@ def test_a_relative_calls_in_mandarin_for_the_patient(fresh_state, client, login
                                 f"我妈妈叫{name}，{y}年{int(m)}月{int(d)}日出生，健康卡尾号{card[-4:]}")
     assert call["patient_id"] == caller["patient"] and call["caller_relation"] == "child"  # "my mother": her child
     assert call["language"] == "zh-Hans" and "预约" in replies[-1]
+    # every Chinese reply carries the same hand-written reply in English (the storyline's subtitles); the greeting is
+    # English already
+    agent = [t for t in call["transcript"] if t["role"] == "agent"]
+    assert agent[0]["lang"] == "en" and agent[0]["gloss"] is None
+    assert [t["lang"] for t in agent[1:]] == ["zh-Hans", "zh-Hans"]
+    assert agent[1]["gloss"].startswith("I can help with that. First I need to confirm who the patient is")
+    given = next(n["given"][0] for n in p["name"] if n.get("use") == "official")
+    assert agent[2]["gloss"].startswith(f"Thank you, I've found the record for {given}. {given} has ")
+    assert all(not P.CJK.search(t["gloss"]) for t in agent[1:])
+    # switching to Chinese later in a call: the subtitle says so (the English template says the opposite)
+    _, replies, call = converse(client, clerk, "What are the visiting hours?", "请问停车场在哪里？")
+    gloss = call["transcript"][-1]["gloss"]
+    assert replies[-1].startswith("好的，我们用中文继续。") and gloss.startswith("Sure, let's continue in Chinese. ")
 
 
 def test_the_call_centre_works_without_the_model(fresh_state, client, login):
@@ -387,6 +401,14 @@ def test_the_chinese_call_escalates_heavy_wound_drainage_at_once_without_the_mod
     reply, call, ended = followup.answer(store, call.id, "没有了")
     assert ended and call.status == "completed" and "再见" in reply
     assert call.classifier["status"] == "unavailable" and [h["code"] for h in call.rule_hits] == ["wound_drainage"]
+    # the subtitles: each of the agent's turns in English, the same questions and sentences
+    glosses = [t.gloss for t in call.transcript if t.role == "agent"]
+    assert glosses[0].startswith("Hello, this is the automated follow-up call") and \
+        glosses[0].endswith("please tell me your date of birth.")
+    assert glosses[1] == "Thank you. How have you been feeling since you went home?"
+    assert glosses[2].startswith("Thank you for telling me. A nurse will call you back within 30 minutes. Is there")
+    assert glosses[3].startswith("Thank you, ") and "A nurse will call you back within 30 minutes" in glosses[3]
+    assert not any(P.CJK.search(g) for g in glosses)
     set_gateway(LlmGateway(MockProvider(latency_s=0)))
 
 

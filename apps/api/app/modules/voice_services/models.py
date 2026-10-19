@@ -23,6 +23,7 @@ class Turn(BaseModel):
     intent: str | None = None  # call centre: what the caller's turn was recognised as
     source: str | None = None  # model / rules
     question: str | None = None  # follow-up: the question key an agent turn asked / a caller turn answered
+    gloss: str | None = None  # an agent turn in Chinese: the same hand-written reply in English (phrases.Said)
 
 
 class HospitalCall(BaseModel):

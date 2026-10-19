@@ -1,12 +1,18 @@
 # Hospital storyline (spec 8.2, WP9)
 
-One synthetic patient through the whole hospital in twelve steps, about ten minutes: Wang Xiuying (王秀英), 72,
-Mandarin-speaking, on warfarin for atrial fibrillation, falls at home and breaks her hip. Every step is "AI proposes
+One synthetic patient through the whole hospital in twelve steps, about ten minutes: a woman of 72 on warfarin for
+atrial fibrillation falls at home and breaks her hip. By default she is Margaret Ellis, who speaks English (the owner
+presents in English); the reset can start the same story with Wang Xiuying (王秀英), who speaks Mandarin, spec 8.2's
+case (`script.PATIENTS`, the reset's `language`: `en`, the default, or `zh`): the same course, ids, cast, steps and
+checks; her name, her record's language, her daughter's and her own lines and the step texts that name the language
+(steps 1, 10, 11: `script.steps(language)`) differ. Every step is "AI proposes
 → a person signs → audit trail". The guided page is `/storyline` (web `features/storyline/`); its **Demo mode** puts a presenter's guide
 on every page (each step's introduction, the clicks, then "Continue to the next step?"). For a live interview the
 guide can have the demo's automation do a step ("Do this step for me"), jump to a step, or present only the
-highlights (steps 1, 5, 9, 11) with the automation doing the steps in between (`autoplay.py`). The demo script is
-`demo/hospital_journey.md`.
+highlights (steps 1, 5, 9, 11) with the automation doing the steps in between (`autoplay.py`). For an
+English-speaking audience the Mandarin calls have English subtitles in demo mode: the caller's scripted lines have
+fixed translations (`script.py`), the agent's replies their hand-written English (`Turn.gloss`, voice services). The
+demo script is `demo/hospital_journey.md`.
 
 ## Input resources
 
@@ -27,8 +33,13 @@ highlights (steps 1, 5, 9, 11) with the automation doing the steps in between (`
 ## Output schema
 
 - `GET /api/storyline`: per step the AI proposal (a Task or an exception, its agent and run), the signature or
-  approval, the EHR records written and their audit events; the hospital clock, Temporal's state, the journey.
-- `POST /api/storyline/reset` (demo reset + preset), `POST /api/storyline/advance` (fast-forward to the step's beat).
+  approval, the EHR records written and their audit events; the hospital clock, Temporal's state, the journey; the
+  patient with the caller's scripted lines (`call_lines`, `followup_lines`, `followup_closing`) and each line's
+  English translation when it is not English (`translations`, fixed text: the subtitles).
+- `POST /api/storyline/reset` (demo reset + preset; body `{"language": "en" | "zh"}`, none: `en`; 422 for another
+  language, before anything is rebuilt), `POST /api/storyline/advance` (fast-forward to the step's beat). The status
+  gives the reset's choices (`languages`) and the story's patient (`patient.story_language`, `name_native`,
+  `call_language`: her calls' and instructions' language).
 - The demo's automation (`autoplay.py`): `POST /api/storyline/steps/{key}/autoplay` (the current step) and
   `POST /api/storyline/steps/{key}/jump` (every step from the current one up to the one before `key`), 409 when the
   storyline is not set up, a run is going or the step does not continue the story. A background job in the API

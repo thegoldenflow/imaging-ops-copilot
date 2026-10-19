@@ -3,7 +3,7 @@
 // only sees text. The server decides what a person may do; the UI shows it.
 
 import { useQuery } from "@tanstack/react-query";
-import { api, post } from "../../lib/api";
+import { api, ApiError, post } from "../../lib/api";
 
 export type CallLang = "en" | "zh-Hans" | "zh-Hant";
 
@@ -15,6 +15,7 @@ export interface Turn {
   intent?: string | null;
   source?: string | null;
   question?: string | null;
+  gloss?: string | null; // an agent turn in Chinese: the same hand-written reply in English (the subtitle)
 }
 
 export interface CallAction {
@@ -172,9 +173,15 @@ export function useFollowups(which: "open" | "calls" | "all") {
     queryFn: () => api<{ items: FollowupItem[] }>(`/api/voice/followups?which=${which}`) });
 }
 
+/** A call that is not there yet: linked before it was scheduled (the storyline's step 11 opens hers while its Advance
+ * moves the clock 48 hours on). */
+export const notScheduled = (error: unknown) => error instanceof ApiError && error.status === 404;
+
 export function useFollowup(id: string | null) {
   return useQuery({ queryKey: voiceKeys.followup(id ?? ""), enabled: !!id,
-    queryFn: () => api<FollowupItem>(`/api/voice/followups/${id}`) });
+    queryFn: () => api<FollowupItem>(`/api/voice/followups/${id}`),
+    // asked again until it is scheduled: a 404 left alone stayed on screen after the call existed
+    refetchInterval: (q) => (notScheduled(q.state.error) ? 3000 : false) });
 }
 
 export function useDemo() {

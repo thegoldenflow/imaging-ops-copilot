@@ -8,6 +8,7 @@ advance and the automation are demo controls like the header's Reset demo, audit
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 
 from app.agents import ondemand
 from app.core.auth import client_ip, current_user, deny
@@ -15,6 +16,7 @@ from app.core.models import StaffUser
 from app.core.store import get_store
 from app.ehr import simulator
 from app.modules.storyline import autoplay, service
+from app.modules.storyline import script as S
 
 router = APIRouter(prefix="/api/storyline")
 
@@ -24,11 +26,20 @@ def storyline(user: StaffUser = Depends(current_user)):
     return service.status(get_store(), user)
 
 
+class ResetIn(BaseModel):
+    language: str = S.DEFAULT  # the patient: en (Margaret Ellis, English-speaking) or zh (Wang Xiuying, Mandarin)
+
+
 @router.post("/reset")
-def reset(user: StaffUser = Depends(current_user)):
-    """The demo reset followed by the storyline's preset (about a minute)."""
-    state = service.reset(user)
-    return {"ok": True, "prepared_at": state["prepared_at"], "capacity": state.get("capacity")}
+def reset(body: ResetIn | None = None, user: StaffUser = Depends(current_user)):
+    """The demo reset followed by the storyline's preset (about a minute), with the patient who speaks the chosen
+    language (no body: English, the default story); 422 for a language no storyline patient speaks."""
+    try:
+        state = service.reset(user, (body or ResetIn()).language)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    return {"ok": True, "prepared_at": state["prepared_at"], "capacity": state.get("capacity"),
+            "language": state["language"]}
 
 
 @router.post("/steps/{key}/ai")

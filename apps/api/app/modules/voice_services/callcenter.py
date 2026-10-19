@@ -73,17 +73,19 @@ def acting_agent(agent_id: str) -> str:
     return agent_id if spec is not None and registry.gate(spec) is None else MODULE
 
 
-def patient_name(patient: dict | None, lang: str) -> str:
-    """How the agent addresses the patient: the Chinese name in Chinese when there is one, else the given name."""
+def patient_name(patient: dict | None, lang: str) -> P.Said:
+    """How the agent addresses the patient: the Chinese name in Chinese when there is one, else the given name (in
+    English, always the given name)."""
     if not patient:
-        return ""
+        return P.Said("")
     names = patient.get("name") or []
+    official = next((n for n in names if n.get("use") == "official"), names[0] if names else {})
+    given = (official.get("given") or [official.get("text") or ""])[0]
     if lang != "en":
         usual = next((n.get("text") for n in names if n.get("use") == "usual" and n.get("text")), None)
         if usual:
-            return usual
-    official = next((n for n in names if n.get("use") == "official"), names[0] if names else {})
-    return (official.get("given") or [official.get("text") or ""])[0]
+            return P.Said(usual, given)
+    return P.Said(given)
 
 
 def preferred_language(patient: dict | None) -> str:
@@ -118,11 +120,11 @@ def turn(store: Store, call_id: str, text: str) -> tuple[str, HospitalCall, bool
         dialog = Dialog(store, call, run)
         reply = dialog.handle(text)
         if switched and not dialog.ended:
-            reply = f"{P.say(P.CC['switched'], call.language)} {reply}"
+            reply = P.cat(P.switched(call.language), reply)
         run.finish(outcome="completed")
     call.run_ids.append(run.run_id)
     call.transcript.append(Turn(role="agent", text=reply, lang=call.language, intent=dialog.intent,
-                                source=dialog.source))
+                                source=dialog.source, gloss=P.gloss(reply, call.language)))
     if dialog.ended:
         _close(call)
     save(call, store)
@@ -333,7 +335,7 @@ class Dialog:
             if self.call.unrecognised >= MAX_UNRECOGNISED:
                 return self._transfer("two turns without a recognised request", key="transfer_unrecognised")
             again = self.st.get("prompt") if self.st.get("pending") in ("choose", "pick_slot", "confirm") else None
-            return f"{self.say('not_understood')} {again or self.say('options')}"
+            return P.cat(self.say("not_understood"), again or self.say("options"))
         for key in ("pending", "prompt", "choose_for", "options", "slots", "confirm", "appointment"):
             self.st.pop(key, None)
         return self._dispatch(rec, text)
@@ -392,9 +394,9 @@ class Dialog:
             after = self.st.pop("after", None)
             greeting = self.say("verified", first=patient_name(self.patient, self.lang))
             if after:
-                return f"{greeting} {self._personal(after['intent'], after['text'])}"
+                return P.cat(greeting, self._personal(after["intent"], after["text"]))
             self.st["pending"] = "anything_else"
-            return f"{greeting} {self.say('options')}"
+            return P.cat(greeting, self.say("options"))
         self.call.identity_failures += 1
         self._act("identity_failed", result, f"Identity check failed (attempt {self.call.identity_failures}).")
         if self.call.identity_failures >= MAX_IDENTITY_FAILURES:
@@ -430,8 +432,8 @@ class Dialog:
         self.st["pending"] = "anything_else"
         if not result.ok:
             return self.say("transfer")
-        return f"{self.say('arrival_registered', first=patient_name(self.patient, self.lang))} " \
-               f"{self.say('anything_else')}"
+        return P.cat(self.say("arrival_registered", first=patient_name(self.patient, self.lang)),
+                     self.say("anything_else"))
 
     # ----- personal intents -----
 
@@ -453,12 +455,13 @@ class Dialog:
         first = patient_name(self.patient, self.lang)
         if not appts:
             self.st["pending"] = "anything_else"
-            return f"{self.say('no_appointments', first=first)} {self.say('anything_else')}"
+            return P.cat(self.say("no_appointments", first=first), self.say("anything_else"))
         if intent == "lookup":
             self._act("lookup", summary=f"Read {len(appts)} upcoming appointment(s) to the caller.")
             self.st["pending"] = "anything_else"
             items = P.join([self._describe(a) for a in appts[:3]], self.lang)
-            return f"{self.say('appointments', first=first, count=len(appts), items=items)} {self.say('anything_else')}"
+            return P.cat(self.say("appointments", first=first, count=len(appts), items=items),
+                         self.say("anything_else"))
         chosen = self._match(appts, text)
         if chosen is None:
             self.st.update(pending="choose", choose_for=intent, options=[a.id for a in appts[:3]])
@@ -600,7 +603,8 @@ class Dialog:
         self._act("prep_given", record, f"Preparation instructions for the {a.display} read out ({self.lang}).",
                   appointment=a.id)
         self.st["pending"] = "anything_else"
-        return self.say("prep", service=self._service_name(a), when=P.when(a.start, self.lang), text=text)
+        return self.say("prep", service=self._service_name(a), when=P.when(a.start, self.lang),
+                        text=P.Said(text, english))
 
     def _clinical(self, text: str, *, urgent: bool = False) -> str:
         encounter = self._latest_encounter()
@@ -629,7 +633,8 @@ class Dialog:
             self._act("faq_unanswered", summary="General question not in the knowledge base.")
             return self.say("faq_none")
         self._act("faq", summary=f"Answered from the knowledge base ({section.id}).", section=section.id)
-        return self.say("faq", answer=section.answer.get(self.lang) or section.answer["en"])
+        return self.say("faq", answer=P.Said(section.answer.get(self.lang) or section.answer["en"],
+                                             section.answer["en"]))
 
     def _transfer(self, reason: str, *, urgent: bool = False, key: str = "transfer") -> str:
         args = {"code": "call-transfer", "performer_role": "clerk", "priority": "urgent" if urgent else "routine",

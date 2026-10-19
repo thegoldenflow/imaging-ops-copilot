@@ -159,7 +159,7 @@ def test_jump_leaves_step_n_current_with_the_earlier_steps_done(story, client, l
     call = hand.get(f"/api/voice/followups/{call_id}", nurse)
     caller = [t["text"] for t in call["transcript"] if t["role"] == "caller"]
     assert caller.count(hand.status()["patient"]["followup_lines"][0]) == 1  # her birth date only once
-    assert call["escalated"] and any("渗液" in t for t in caller)
+    assert call["escalated"] and hand.status()["patient"]["followup_lines"][1] in caller  # the wound keeps leaking
 
     job = play(client, presenter, f"/api/storyline/steps/{S.STEPS[-1].key}/autoplay")
     assert job["done"] == ["coding"] and story_view(client, presenter)["current"] is None

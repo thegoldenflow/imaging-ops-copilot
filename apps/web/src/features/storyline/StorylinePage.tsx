@@ -4,7 +4,8 @@
 // it and the audit events of those records. The clock moves only when a step needs time to pass (Advance).
 // "Do this step for me" and "Jump here" have the demo's automation walk steps through the API as the people who play
 // them (for an interview: the roadmap stubs, a step that failed live, or straight to the next highlight); the steps it
-// did are marked, and so is every record it signed.
+// did are marked, and so is every record it signed. The reset picks the patient: Margaret Ellis, who speaks English
+// (the default), or Wang Xiuying, who speaks Mandarin (English subtitles in demo mode); the story is the same.
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
@@ -19,8 +20,8 @@ import { causeText, clockTime, seconds, useElapsed, type AiBlock } from "../../l
 import { useAuth } from "../../lib/auth";
 import { ROLE_LABEL } from "../../lib/types";
 import {
-  advanceStoryline, askStepAi, autoplayStep, clock, hhmm, isAutomationNote, jumpToStep, resetStoryline, routePath, storylineKey, useStoryline,
-  type Storyline, type StoryStep,
+  advanceStoryline, askStepAi, autoplayStep, clock, hhmm, isAutomationNote, jumpToStep, LANGUAGES, resetStoryline, routePath, storylineKey,
+  useStoryline, type Storyline, type StoryStep,
 } from "./api";
 import { HIGHLIGHTS, setDemo, startDemo, useDemoMode } from "./demo";
 
@@ -35,15 +36,22 @@ export function StorylinePage() {
   const q = useStoryline();
   const queryClient = useQueryClient();
   const demo = useDemoMode();
+  // the patient the reset starts with: the current story's unless the presenter picks the other one
+  const [picked, setPicked] = useState<string | null>(null);
+  const languages = q.data?.languages ?? LANGUAGES;
+  const language = picked ?? q.data?.patient?.story_language ?? "en";
   const reset = useMutation({
-    mutationFn: resetStoryline,
+    mutationFn: () => resetStoryline(language),
     onSuccess: () => {
+      setPicked(null);
       if (demo.active) setDemo({ started: null, paused: false }); // the guide starts again from step 1
       return queryClient.invalidateQueries();
     },
   });
   const onReset = () => {
-    if (confirm("Reset the demo data and start the storyline at 07:00?")) reset.mutate();
+    const who = languages.find((l) => l.code === language)?.label ?? language;
+    if (confirm(`Reset the demo data and start the storyline at 07:00?
+The patient: ${who}`)) reset.mutate();
   };
   return (
     <div className="mx-auto max-w-5xl" data-testid="storyline">
@@ -51,6 +59,11 @@ export function StorylinePage() {
         title="Hospital storyline"
         subtitle="One synthetic patient through the hospital in twelve steps, about ten minutes. Each step: the AI proposes, a person signs, the audit trail records it."
         actions={<>
+          <select className="h-9 max-w-[16rem] rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-700" value={language}
+            onChange={(e) => setPicked(e.target.value)} disabled={reset.isPending} data-testid="story-reset-language"
+            aria-label="The patient the reset starts the story with" title="The patient the reset starts the story with: the same twelve steps">
+            {languages.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
+          </select>
           <Button variant="secondary" onClick={onReset} loading={reset.isPending} data-testid="story-reset"><RotateCcw className="size-4" />Reset to the start</Button>
           <Button variant="secondary" onClick={() => startDemo(true)} disabled={demo.active} data-testid="story-demo-highlights"
             title={`Demo mode with only steps ${HIGHLIGHTS.join(", ")}: the demo's automation does the steps in between`}>
@@ -101,8 +114,11 @@ function PatientCard({ data }: { data: Storyline }) {
   const p = data.patient!;
   return (
     <Card title="The patient">
-      <p className="text-sm font-semibold text-slate-900">{p.name_zh} {p.name} · {p.age} · MRN {p.mrn}</p>
-      <p className="mt-1 text-xs text-slate-600">Mandarin-speaking; atrial fibrillation on warfarin, hypertension. Falls at home: hip fracture.</p>
+      <p className="text-sm font-semibold text-slate-900" data-testid="story-patient">{p.name_native ? `${p.name_native} ` : ""}{p.name} · {p.age} · MRN {p.mrn}</p>
+      <p className="mt-1 text-xs text-slate-600">
+        {p.story_language === "zh" ? "Mandarin-speaking (English subtitles in demo mode)" : "English-speaking"}; atrial fibrillation on warfarin,
+        hypertension. Falls at home: hip fracture.
+      </p>
       <p className="mt-1 text-xs text-slate-500">
         Imaging-centre record {p.imaging_record} <Badge tone="slate"><Map className="size-3" />MPI link preset (8.1)</Badge>
       </p>
@@ -227,7 +243,8 @@ function StepBody({ step, data, current }: { step: StoryStep; data: Storyline; c
     if (step.cast && !isYou) await login(step.cast.id);
     navigate(step.route);
   };
-  const lines = step.key === "call" ? data.patient?.call_lines : step.key === "followup" ? data.patient?.followup_lines : undefined;
+  const lines = step.key === "call" ? data.patient?.call_lines
+    : step.key === "followup" ? [...(data.patient?.followup_lines ?? []), data.patient?.followup_closing ?? ""].filter(Boolean) : undefined;
   const jobRunning = data.job?.status === "running";
   return (
     <div className="space-y-3 border-t border-slate-100 p-3 pt-2.5 text-sm">
@@ -275,7 +292,7 @@ function StepBody({ step, data, current }: { step: StoryStep; data: Storyline; c
         <Quote className="mt-0.5 size-4 shrink-0 text-brand-600" />
         <span>{step.say}</span>
       </blockquote>
-      {lines && <Phrases lines={lines} />}
+      {lines && <Phrases lines={lines} lang={data.patient?.language} translations={data.patient?.translations ?? {}} />}
       <div className="grid gap-3 md:grid-cols-2">
         <div>
           <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">The screen should show</p>
@@ -291,14 +308,17 @@ function StepBody({ step, data, current }: { step: StoryStep; data: Storyline; c
   );
 }
 
-function Phrases({ lines }: { lines: string[] }) {
+function Phrases({ lines, lang, translations }: { lines: string[]; lang?: string; translations: Record<string, string> }) {
   return (
     <div className="rounded-lg border border-dashed border-slate-300 p-2 text-xs">
       <p className="mb-1 font-semibold text-slate-500">What the caller says (type or paste in the call):</p>
       <ul className="space-y-1">
         {lines.map((l) => (
           <li key={l} className="flex items-center justify-between gap-2">
-            <span className="text-slate-800" lang="zh-CN">{l}</span>
+            <span className="text-slate-800">
+              <span lang={lang}>{l}</span>
+              {translations[l] && <span className="block text-[11px] text-slate-500 italic" lang="en"><span className="font-medium not-italic">Translation: </span>{translations[l]}</span>}
+            </span>
             <button type="button" className="inline-flex items-center gap-1 text-brand-700 hover:underline" onClick={() => void navigator.clipboard?.writeText(l)}>
               <Copy className="size-3" />Copy
             </button>

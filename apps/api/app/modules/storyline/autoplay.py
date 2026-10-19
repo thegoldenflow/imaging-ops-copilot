@@ -134,6 +134,7 @@ def _start(store: Store, user: StaffUser, keys: list[str], view: dict, *, mode: 
     people = {uid: (u.name, _label(u.role)) for uid in {*S.CAST.values(), user.id}
               if (u := store.staff.get(uid)) is not None}
     steps = [S.BY_KEY[k] for k in keys]
+    titles = {s.key: s.title for s in S.steps(service.patient_of(st).language)}  # as the page shows them
     acting = ", ".join(dict.fromkeys(people[S.CAST[s.cast]][0] for s in steps if S.CAST[s.cast] in people))
     span = f"step {steps[0].n}" if len(steps) == 1 else f"steps {steps[0].n}-{steps[-1].n}"
     with _lock:
@@ -141,7 +142,7 @@ def _start(store: Store, user: StaffUser, keys: list[str], view: dict, *, mode: 
             raise Busy(f"The demo's automation is still doing step {_job.get('current_n') or _job['steps'][0]}")
         _job = {"id": uuid.uuid4().hex[:12], "status": "running", "mode": mode, "keys": keys,
                 "steps": [s.n for s in steps], "target": target, "done": [], "current": keys[0],
-                "current_n": steps[0].n, "current_title": steps[0].title,
+                "current_n": steps[0].n, "current_title": titles[keys[0]], "titles": titles,
                 "current_cast": people.get(S.CAST[steps[0].cast], ("?",))[0], "results": [],
                 "started_by": {"id": user.id, "name": user.name, "role": str(user.role)},
                 "started_at": datetime.now().isoformat(timespec="seconds"), "finished_at": None, "error": None,
@@ -203,7 +204,7 @@ def run(job_id: str, *, client: Any, pump: Callable[[], None], advance: Callable
             if (now := current()) is not None and now.get("cancelled"):
                 raise RuntimeError("the storyline was reset")
             step = S.BY_KEY[key]
-            _update(job_id, current=key, current_n=step.n, current_title=step.title,
+            _update(job_id, current=key, current_n=step.n, current_title=job["titles"][key],
                     current_cast=job["people"].get(S.CAST[step.cast], ("?",))[0])
             try:
                 walk.run([key])

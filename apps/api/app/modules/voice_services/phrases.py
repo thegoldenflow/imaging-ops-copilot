@@ -7,10 +7,16 @@ caller's first name, an appointment, a red flag of the patient's signed instruct
 
 Also here: the clinics and services a call-centre appointment can be for (where, how long, opening hours, and the
 preparation: a hand-written text, or the imaging module's approved prep instructions for imaging exams).
+
+What the agent says carries its English rendering (`Said.en`): the same templates filled with the same values in
+English. A Chinese call's transcript stores it with each agent turn (`Turn.gloss`), so an English-speaking audience
+can follow the call (the storyline's demo mode shows it as a subtitle). It is the hand-written English of the same
+sentence, not a model's translation.
 """
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
 from app.modules.documentation.phrases import MONTHS_EN, WEEKDAYS, Phrase, p
@@ -18,6 +24,23 @@ from app.modules.documentation.phrases import MONTHS_EN, WEEKDAYS, Phrase, p
 HOSPITAL = p("Lakeside General Hospital", "湖滨综合医院", "湖濱綜合醫院")
 LANG_FOR = {"en": "en", "zh-CN": "zh-Hans", "zh-TW": "zh-Hant", "zh": "zh-Hans", "zh-Hans": "zh-Hans",
             "zh-Hant": "zh-Hant"}
+CJK = re.compile(r"[　-鿿＀-￯]")
+
+
+class Said(str):
+    """A sentence in the caller's language that also knows its English rendering (`en`)."""
+
+    en: str
+
+    def __new__(cls, text: str, en: str | None = None) -> Said:
+        said = super().__new__(cls, text)
+        said.en = text if en is None else en
+        return said
+
+
+def english(value):
+    """A value's English rendering: a Said's `en`, anything else as it is."""
+    return value.en if isinstance(value, Said) else value
 
 
 def lang_of(code: str | None) -> str:
@@ -25,23 +48,42 @@ def lang_of(code: str | None) -> str:
     return LANG_FOR.get(code or "en", "en")
 
 
-def say(phrase: Phrase, lang: str, **values) -> str:
-    return phrase.get(lang, phrase["en"]).format(**values)
+def say(phrase: Phrase, lang: str, **values) -> Said:
+    return Said(phrase.get(lang, phrase["en"]).format(**values),
+                phrase["en"].format(**{k: english(v) for k, v in values.items()}))
 
 
-def when(dt: datetime, lang: str) -> str:
+def when(dt: datetime, lang: str) -> Said:
     """"Tuesday, October 14 at 10:30" / "10月14日（星期二）10:30"."""
+    en = f"{WEEKDAYS['en'][dt.weekday()]}, {MONTHS_EN[dt.month - 1]} {dt.day} at {dt:%H:%M}"
     if lang == "en":
-        return f"{WEEKDAYS['en'][dt.weekday()]}, {MONTHS_EN[dt.month - 1]} {dt.day} at {dt:%H:%M}"
-    return f"{dt.month}月{dt.day}日（{WEEKDAYS[lang][dt.weekday()]}）{dt:%H:%M}"
+        return Said(en)
+    return Said(f"{dt.month}月{dt.day}日（{WEEKDAYS[lang][dt.weekday()]}）{dt:%H:%M}", en)
 
 
-def join(items: list[str], lang: str) -> str:
+def _join_en(items: list[str]) -> str:
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def join(items: list[str], lang: str) -> Said:
     if not items:
-        return ""
-    if lang == "en":
-        return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
-    return "、".join(items)
+        return Said("")
+    en = _join_en([english(i) for i in items])
+    return Said(en if lang == "en" else "、".join(items), en)
+
+
+def cat(*parts: str, sep: str = " ") -> Said:
+    """Sentences one after the other (Chinese runs on without a space: `sep=""`); the English always with one."""
+    kept = [x for x in parts if x]
+    return Said(sep.join(kept).strip(), " ".join(str(english(x)) for x in kept).strip())
+
+
+def gloss(text: str, lang: str) -> str | None:
+    """The English subtitle of an agent turn in another language: its English rendering, when every piece of it had
+    one (a sentence kept from an earlier turn, such as a stored prompt, has none: then no subtitle)."""
+    if lang == "en" or not isinstance(text, Said) or text.en == text or CJK.search(text.en):
+        return None
+    return text.en
 
 
 # ---------- the call centre ----------
@@ -144,6 +186,14 @@ CC: dict[str, Phrase] = {
     "goodbye": p("Thank you for calling Lakeside General Hospital. Goodbye.", "感谢您致电湖滨综合医院，再见。",
                  "感謝您致電湖濱綜合醫院，再見。"),
 }
+# "switched" in Chinese says the call goes on in Chinese: its subtitle (the English template says the opposite)
+SWITCHED_TO_CHINESE = "Sure, let's continue in Chinese."
+
+
+def switched(lang: str) -> Said:
+    """The sentence that confirms the call's new language, with its subtitle."""
+    said = say(CC["switched"], lang)
+    return said if lang == "en" else Said(said, SWITCHED_TO_CHINESE)
 
 # ---------- the follow-up call ----------
 

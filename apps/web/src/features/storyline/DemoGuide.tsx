@@ -19,17 +19,17 @@ import {
   AlertTriangle, ArrowRight, Bot, CheckCircle2, ChevronDown, ChevronUp, Circle, FastForward, Loader2, Map, Mic, MousePointerClick,
   Pause, PenLine, Play, Presentation, Quote, RotateCcw, ShieldCheck, SkipForward, Sparkles, Star, UserRound, X,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AiBadge, Badge, Button } from "../../components/ui";
 import { useAuth } from "../../lib/auth";
 import { ROLE_LABEL } from "../../lib/types";
 import {
-  advanceStoryline, autoplayStep, hhmm, jumpToStep, resetStoryline, routePath, storylineKey, useStoryline, type AutoplayJob, type Storyline,
-  type StoryStep,
+  advanceStoryline, autoplayStep, hhmm, jumpToStep, LANGUAGES, resetStoryline, routePath, storylineKey, useStoryline, type AutoplayJob,
+  type Storyline, type StoryStep,
 } from "./api";
 import { exitDemo, HIGHLIGHTS, isHighlight, nextHighlight, sayAsCaller, setDemo, useCallerListening, useDemoMode } from "./demo";
-import { byText, Spotlight, stepTargets, useNextTarget, type Target } from "./Spotlight";
+import { byText, Spotlight, stepTargets, useNextTarget, type Hit, type Target } from "./Spotlight";
 
 export function DemoGuide() {
   const demo = useDemoMode();
@@ -40,7 +40,7 @@ export function DemoGuide() {
   if (!data) {
     return <Panel title="Demo mode"><p className="flex items-center gap-2 text-sm text-slate-600"><Loader2 className="size-4 animate-spin" />Loading the storyline…</p></Panel>;
   }
-  if (!data.prepared) return <NotSetUp />;
+  if (!data.prepared) return <NotSetUp data={data} />;
   if (data.autoplay?.status === "running") return <Automating job={data.autoplay} data={data} />;
 
   const started = demo.started ? data.steps[demo.started - 1] : undefined;
@@ -54,12 +54,16 @@ export function DemoGuide() {
   return <Intro step={current} data={data} />;
 }
 
-/** The floating panel, bottom right; it can be folded to its title bar so it never hides the button to press. */
-function Panel({ title, badges, children, testId }: { title: ReactNode; badges?: ReactNode; children: ReactNode; testId?: string }) {
+/** The floating panel, bottom right; it can be folded to its title bar. When the button the spotlight marks (`avoid`)
+ * is under it, it moves to the bottom left, so it never hides the button to press. */
+function Panel({ title, badges, children, testId, avoid }: { title: ReactNode; badges?: ReactNode; children: ReactNode; testId?: string; avoid?: Hit | null }) {
   const [folded, setFolded] = useState(false);
+  const ref = useRef<HTMLElement>(null);
+  const left = useDockAway(ref, avoid?.el);
   return (
-    <section className="fixed inset-x-2 bottom-2 z-40 flex max-h-[50vh] flex-col sm:max-h-[75vh] overflow-hidden rounded-xl border border-brand-200 bg-white shadow-2xl sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[24rem]"
-      data-testid="demo-guide" aria-label="Demo guide">
+    <section ref={ref} className={clsx("fixed inset-x-2 bottom-2 z-40 flex max-h-[50vh] flex-col sm:max-h-[75vh] overflow-hidden rounded-xl border border-brand-200 bg-white shadow-2xl sm:inset-x-auto sm:bottom-4 sm:w-[24rem]",
+      left ? "sm:left-4" : "sm:right-4")}
+      data-testid="demo-guide" data-dock={left ? "left" : "right"} aria-label="Demo guide">
       <header className="flex items-center gap-2 border-b border-slate-100 bg-brand-50/70 px-3 py-2">
         <Presentation className="size-4 shrink-0 text-brand-700" />
         <div className="min-w-0 flex-1">
@@ -77,6 +81,34 @@ function Panel({ title, badges, children, testId }: { title: ReactNode; badges?:
       {!folded && <div className="space-y-3 overflow-y-auto p-3 text-sm" data-testid={testId}>{children}</div>}
     </section>
   );
+}
+
+/** Whether the panel should sit bottom left: the target is outside the panel and under it where it sits on the right,
+ * but not where it would sit on the left (both places are computed, not the current one, so it does not flip back).
+ * Phone width: the panel spans the screen and stays where it is. */
+function useDockAway(panel: RefObject<HTMLElement | null>, target: HTMLElement | undefined): boolean {
+  const [left, setLeft] = useState(false);
+  useEffect(() => {
+    if (!target || panel.current?.contains(target)) {
+      setLeft(false);
+      return;
+    }
+    let frame = 0;
+    const check = () => { // the page scrolls and reflows under it: checked every frame, a state change only on a move
+      const box = panel.current?.getBoundingClientRect();
+      if (box && window.innerWidth >= 640) {
+        const t = target.getBoundingClientRect();
+        const bottom = window.innerHeight - 16;
+        const under = (x: number) => t.right > x && t.left < x + box.width && t.bottom > bottom - box.height && t.top < bottom;
+        const next = under(window.innerWidth - 16 - box.width) && !under(16);
+        setLeft((prev) => (prev === next ? prev : next));
+      }
+      frame = window.requestAnimationFrame(check);
+    };
+    check();
+    return () => window.cancelAnimationFrame(frame);
+  }, [panel, target]);
+  return left;
 }
 
 function StepBadges({ step, data }: { step: StoryStep; data: Storyline }) {
@@ -205,7 +237,7 @@ function Intro({ step, data }: { step: StoryStep; data: Storyline }) {
   const doIt = () => automation.mutate({ key: step.key }, { onSuccess: () => setDemo({ started: step.n, paused: false }) });
   const hit = useNextTarget([{ find: () => document.querySelector("[data-testid=demo-start]"), label: `Start step ${step.n} when you are ready` }]);
   return (
-    <Panel title={`Demo · step ${step.n} of ${data.steps.length}`} badges={<StepBadges step={step} data={data} />} testId={`demo-intro-${step.n}`}>
+    <Panel title={`Demo · step ${step.n} of ${data.steps.length}`} badges={<StepBadges step={step} data={data} />} testId={`demo-intro-${step.n}`} avoid={hit}>
       <Spotlight hit={hit} />
       <p className="text-base font-semibold text-slate-900">{step.title}</p>
       <Cast step={step} />
@@ -256,7 +288,8 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
   const job = data.job?.status === "running" ? data.job : null;
   // the follow-up call goes on with its questions (medicines, appointments, red flags): "nothing else" until it ends
   const lines = step.key === "call" ? data.patient?.call_lines
-    : step.key === "followup" ? [...(data.patient?.followup_lines ?? []), "没有了。"] : undefined;
+    : step.key === "followup" ? [...(data.patient?.followup_lines ?? []), data.patient?.followup_closing ?? ""].filter(Boolean) : undefined;
+  const translations = data.patient?.translations ?? {};
   // the admission reconciliation is co-signed by her surgeon (the summary's author) once the pharmacist has signed
   const cosigner = step.key === "medrec" && step.signed?.by && !step.done ? data.steps.find((s) => s.key === "summary")?.cast : undefined;
   const cosigning = !!cosigner && user?.id === cosigner.id;
@@ -270,7 +303,7 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
   ];
   const hit = useNextTarget(targets);
   return (
-    <Panel title={`Demo · step ${step.n} of ${data.steps.length} · your turn`} badges={<StepBadges step={step} data={data} />} testId={`demo-doing-${step.n}`}>
+    <Panel title={`Demo · step ${step.n} of ${data.steps.length} · your turn`} badges={<StepBadges step={step} data={data} />} testId={`demo-doing-${step.n}`} avoid={hit}>
       <Spotlight hit={hit} />
       <p className="font-semibold text-slate-900">{step.title}</p>
       <AutomationFailed data={data} step={step} />
@@ -310,7 +343,14 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
           <ul className="space-y-1.5">
             {lines.map((l, i) => (
               <li key={l} className="flex items-start gap-2">
-                <span className="flex-1 text-xs text-slate-800" lang="zh-CN">{l}</span>
+                <span className="flex-1 text-xs text-slate-800">
+                  <span lang={data.patient?.language}>{l}</span>
+                  {translations[l] && (
+                    <span className="mt-0.5 block text-[11px] text-slate-500 italic" lang="en" data-testid={`demo-say-translation-${i}`}>
+                      <span className="font-medium not-italic">Translation: </span>{translations[l]}
+                    </span>
+                  )}
+                </span>
                 <Button size="sm" variant="secondary" className="h-7 shrink-0 px-2" onClick={() => sayAsCaller(l)} disabled={!canSay} data-testid={`demo-say-${i}`}>
                   <Mic className="size-3" />Say it
                 </Button>
@@ -436,7 +476,7 @@ function AskNext({ step, data }: { step: StoryStep; data: Storyline }) {
     { find: () => document.querySelector("[data-testid=demo-continue]"), label: "Continue when the audience is ready" },
   ]);
   return (
-    <Panel title={`Demo · step ${step.n} of ${data.steps.length} done`} badges={<StepBadges step={step} data={data} />} testId={`demo-ask-${step.n}`}>
+    <Panel title={`Demo · step ${step.n} of ${data.steps.length} done`} badges={<StepBadges step={step} data={data} />} testId={`demo-ask-${step.n}`} avoid={hit}>
       <Spotlight hit={hit} />
       <p className="flex items-center gap-2 font-semibold text-slate-900"><CheckCircle2 className="size-5 shrink-0 text-emerald-600" />{step.title}</p>
       <div className="rounded-lg border border-slate-200 p-2.5"><Trail step={step} /></div>
@@ -506,11 +546,13 @@ function PausedPill({ step }: { step: StoryStep }) {
 
 // ----- before and after -----
 
-function NotSetUp() {
+function NotSetUp({ data }: { data: Storyline }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const languages = data.languages ?? LANGUAGES;
+  const [language, setLanguage] = useState("en");
   const reset = useMutation({
-    mutationFn: resetStoryline,
+    mutationFn: () => resetStoryline(language),
     onSuccess: async () => {
       setDemo({ started: null, paused: false });
       await queryClient.invalidateQueries();
@@ -520,6 +562,13 @@ function NotSetUp() {
   return (
     <Panel title="Demo mode" testId="demo-not-set-up">
       <p className="text-slate-700">The storyline is not set up. Reset it to the start: the demo data is rebuilt with her preset, the clock at 07:00 (about a minute).</p>
+      <label className="flex flex-col gap-1 text-xs text-slate-600">
+        The patient (the same twelve steps)
+        <select className="h-8 rounded-md border border-slate-300 bg-white px-1.5 text-sm text-slate-800" value={language}
+          onChange={(e) => setLanguage(e.target.value)} disabled={reset.isPending} data-testid="demo-reset-language">
+          {languages.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
+        </select>
+      </label>
       {reset.isPending && <p className="text-xs text-slate-500">Rebuilding the demo data…</p>}
       {reset.error && <p className="text-xs text-rose-600" role="alert">{(reset.error as Error).message}</p>}
       <div className="flex gap-2">
