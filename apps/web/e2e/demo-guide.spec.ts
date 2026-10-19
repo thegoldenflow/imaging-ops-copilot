@@ -20,12 +20,16 @@ test("demo mode: introduce the step, play it, ask the audience before the next o
   const translations: Record<string, string> = story.patient.translations;
 
   await page.goto("/login");
+  // the way in is marked too: the presenter's card on the sign-in page, then the storyline page's Demo mode button
+  const spot = page.getByTestId("demo-spotlight-label");
+  await expect(spot).toContainText("sign in as Casey Brooks");
   await page.evaluate((t) => {
     localStorage.setItem("ioc.token", t);
     localStorage.removeItem("ioc.demo");
     localStorage.removeItem("ioc.subtitles");
   }, token);
   await page.goto("/storyline");
+  await expect(spot).toContainText("Start the guided demo");
   await page.getByTestId("story-demo").click();
 
   // 1. the introduction: what the step shows, who plays it, what to say
@@ -33,8 +37,7 @@ test("demo mode: introduce the step, play it, ask the audience before the next o
   await expect(intro).toContainText("A daughter calls in Mandarin");
   await expect(intro).toContainText("Maya Nakamura");
   await expect(intro).toContainText("The audience will see");
-  // the spotlight: an amber ring and a label on the button to press next, for someone who has never seen the app
-  const spot = page.getByTestId("demo-spotlight-label");
+  // inside demo mode the spotlight marks the button to press next, for someone who has never seen the app
   await expect(spot).toContainText("Start step 1");
   await page.getByTestId("demo-start").click();
 

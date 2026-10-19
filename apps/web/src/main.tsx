@@ -45,6 +45,7 @@ import { BreakGlassReviewPage } from "./features/hospital/BreakGlassReviewPage";
 import { PatientChartPage } from "./features/hospital/PatientChartPage";
 import { PatientsPage } from "./features/hospital/PatientsPage";
 import { HomePage } from "./features/home/HomePage";
+import { DemoEntryHints } from "./features/storyline/EntryHints";
 import { StorylinePage } from "./features/storyline/StorylinePage";
 import { RoadmapPage } from "./features/roadmap/RoadmapPage";
 import { SafetyPage } from "./features/roadmap/SafetyPage";
@@ -139,6 +140,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="*" element={<EmptyState title="Page not found" />} />
             </Route>
           </Routes>
+          <DemoEntryHints />
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
