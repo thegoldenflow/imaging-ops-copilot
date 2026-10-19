@@ -1511,6 +1511,12 @@ After the four fixes above were merged to main (44f5799), the last two wall-cloc
 - [x] Cause: `status()` read the storyline state first and the cache key later; a bus handler's commit in between (the early-rounds mark: state and plan only) was counted by the key but not by the beats cached under it, and nothing changed the key again. Fix: on a cache miss the storyline state and the plan are read again (`ModuleSpace.refresh`, `app/core/db/repo.py`) before the facts and beats are computed. Casebook 10.10.
 - [x] Regression test `test_a_status_read_that_straddles_the_early_rounds_commit_does_not_freeze_the_bed_step` (fails without the fix on `assert None is not None`). An earlier fix idea (`module_state.updated_at` in the key) was dropped: its test passed without any fix.
 
+### Demo mode: the button to press next is marked on the screen (owner's direction, 2026-10-19) — done
+
+- [x] `features/storyline/Spotlight.tsx`: each step's targets in the order they are pressed (selectors of the modules' own screens: the call centre, the review queue's card, the Control Tower's exception and action drawer, the naproxen review and the reconciliation's items, the OR row, the documentation worklist and summary editor, the follow-up call and the nurse queue). The first target on screen, enabled and not yet done (a caller's line said, a reason written) gets an amber ring and a label, follows the page as it scrolls, and is scrolled into view; the panel says the same ("Next: …"). The guide's own buttons are targets too (Start step N, Advance the clock, End the call, Continue). It never clicks.
+- [x] Step 6's co-signature: once the pharmacist has signed, the guide offers "Switch to Dr. Victor Osei to co-sign" (it had no way to the second signature) and does not send the surgeon "back" to the pharmacist's screen. Step 11 adds "没有了。" as a third answer, for the call's remaining questions.
+- [x] `e2e/demo-guide.spec.ts` follows the spotlight through step 1 (Start step 1 → Start the call → the two lines → Confirm the registration → End the call → Continue) and onto step 2's card. Steps 5, 6, 9 and 11's targets are the selectors `hospital-storyline.spec.ts` presses; not yet walked in demo mode by a test.
+
 ## Environment notes
 
 - `ANTHROPIC_API_KEY` and `GOOGLE_AGENT_PLATFORM_API_KEY` are not configured in the cloud environment; everything runs in mock mode there.

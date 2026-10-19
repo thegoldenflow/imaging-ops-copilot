@@ -16,8 +16,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
-  AlertTriangle, ArrowRight, Bot, CheckCircle2, ChevronDown, ChevronUp, Circle, FastForward, Loader2, Map, Mic, Pause, Play,
-  Presentation, Quote, RotateCcw, ShieldCheck, SkipForward, Sparkles, Star, UserRound, X,
+  AlertTriangle, ArrowRight, Bot, CheckCircle2, ChevronDown, ChevronUp, Circle, FastForward, Loader2, Map, Mic, MousePointerClick,
+  Pause, PenLine, Play, Presentation, Quote, RotateCcw, ShieldCheck, SkipForward, Sparkles, Star, UserRound, X,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -29,6 +29,7 @@ import {
   type StoryStep,
 } from "./api";
 import { exitDemo, HIGHLIGHTS, isHighlight, nextHighlight, sayAsCaller, setDemo, useCallerListening, useDemoMode } from "./demo";
+import { byText, Spotlight, stepTargets, useNextTarget, type Target } from "./Spotlight";
 
 export function DemoGuide() {
   const demo = useDemoMode();
@@ -95,6 +96,16 @@ function Cast({ step }: { step: StoryStep }) {
   return (
     <p className="flex items-center gap-1.5 text-xs text-slate-600">
       <UserRound className="size-3.5" />Played by <span className="font-medium text-slate-800">{step.cast.name}</span> · {ROLE_LABEL[step.cast.role] ?? step.cast.role}
+    </p>
+  );
+}
+
+/** What to press next, in words (the spotlight shows it on the page). */
+function NextLine({ label }: { label: string | undefined }) {
+  if (!label) return null;
+  return (
+    <p className="flex items-center gap-1.5 rounded-lg bg-amber-50 p-2 text-xs font-medium text-amber-900" data-testid="demo-next">
+      <MousePointerClick className="size-3.5 shrink-0" />Next: {label} <span className="font-normal text-amber-700">(highlighted)</span>
     </p>
   );
 }
@@ -192,8 +203,10 @@ function Intro({ step, data }: { step: StoryStep; data: Storyline }) {
     }
   };
   const doIt = () => automation.mutate({ key: step.key }, { onSuccess: () => setDemo({ started: step.n, paused: false }) });
+  const hit = useNextTarget([{ find: () => document.querySelector("[data-testid=demo-start]"), label: `Start step ${step.n} when you are ready` }]);
   return (
     <Panel title={`Demo · step ${step.n} of ${data.steps.length}`} badges={<StepBadges step={step} data={data} />} testId={`demo-intro-${step.n}`}>
+      <Spotlight hit={hit} />
       <p className="text-base font-semibold text-slate-900">{step.title}</p>
       <Cast step={step} />
       <AutomationFailed data={data} step={step} />
@@ -238,15 +251,36 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
   const advance = useAdvance();
   const automation = useAutomation();
   const [showSay, setShowSay] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
   const job = data.job?.status === "running" ? data.job : null;
-  const lines = step.key === "call" ? data.patient?.call_lines : step.key === "followup" ? data.patient?.followup_lines : undefined;
-  const elsewhere = location.pathname !== routePath(step.route) || (step.cast && user?.id !== step.cast.id);
+  // the follow-up call goes on with its questions (medicines, appointments, red flags): "nothing else" until it ends
+  const lines = step.key === "call" ? data.patient?.call_lines
+    : step.key === "followup" ? [...(data.patient?.followup_lines ?? []), "没有了。"] : undefined;
+  // the admission reconciliation is co-signed by her surgeon (the summary's author) once the pharmacist has signed
+  const cosigner = step.key === "medrec" && step.signed?.by && !step.done ? data.steps.find((s) => s.key === "summary")?.cast : undefined;
+  const cosigning = !!cosigner && user?.id === cosigner.id;
+  const elsewhere = location.pathname !== routePath(step.route) || (step.cast && user?.id !== step.cast.id && !cosigning);
   const aiWorking = step.step_ai?.items.some((i) => i.ai.state === "running" || i.ai.state === "queued");
   const canSay = useCallerListening();
+  const targets: Target[] = [
+    { find: () => document.querySelector("[data-testid=demo-open]"), label: `Go back to ${step.cast?.name ?? "the step"}'s screen` },
+    { find: () => document.querySelector("[data-testid=demo-advance]"), label: "Advance the hospital clock" },
+    ...stepTargets(step, data),
+  ];
+  const hit = useNextTarget(targets);
   return (
     <Panel title={`Demo · step ${step.n} of ${data.steps.length} · your turn`} badges={<StepBadges step={step} data={data} />} testId={`demo-doing-${step.n}`}>
+      <Spotlight hit={hit} />
       <p className="font-semibold text-slate-900">{step.title}</p>
       <AutomationFailed data={data} step={step} />
+      <NextLine label={hit?.label} />
+      {cosigner && !cosigning && (
+        <Button size="sm" variant="secondary" onClick={() => void login(cosigner.id).then(() => navigate(location.pathname + location.search))}
+          data-testid="demo-cosign">
+          <PenLine className="size-3.5" />Switch to {cosigner.name} to co-sign
+        </Button>
+      )}
       {elsewhere && (
         <Button size="sm" variant="secondary" onClick={() => void open(step)} data-testid="demo-open">
           <ArrowRight className="size-3.5" />Back to {step.cast ? `${step.cast.name}'s ` : ""}{routePath(step.route)}
@@ -396,8 +430,14 @@ function AskNext({ step, data }: { step: StoryStep; data: Storyline }) {
     automation.mutate(highlight ? { key: data.steps[highlight - 1].key, jump: true } : { key: next.key },
       { onSuccess: () => setDemo({ started: null, paused: false }) });
   };
+  // a call still open (step 1 is done at the registration's Confirm) is ended first; then the question
+  const hit = useNextTarget([
+    { find: byText("button", "End call"), label: "End the call" },
+    { find: () => document.querySelector("[data-testid=demo-continue]"), label: "Continue when the audience is ready" },
+  ]);
   return (
     <Panel title={`Demo · step ${step.n} of ${data.steps.length} done`} badges={<StepBadges step={step} data={data} />} testId={`demo-ask-${step.n}`}>
+      <Spotlight hit={hit} />
       <p className="flex items-center gap-2 font-semibold text-slate-900"><CheckCircle2 className="size-5 shrink-0 text-emerald-600" />{step.title}</p>
       <div className="rounded-lg border border-slate-200 p-2.5"><Trail step={step} /></div>
       {shown && (

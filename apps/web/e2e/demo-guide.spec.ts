@@ -26,6 +26,9 @@ test("demo mode: introduce the step, play it, ask the audience before the next o
   await expect(intro).toContainText("A daughter calls in Mandarin");
   await expect(intro).toContainText("Maya Nakamura");
   await expect(intro).toContainText("The audience will see");
+  // the spotlight: an amber ring and a label on the button to press next, for someone who has never seen the app
+  const spot = page.getByTestId("demo-spotlight-label");
+  await expect(spot).toContainText("Start step 1");
   await page.getByTestId("demo-start").click();
 
   // 2. the presenter's turn: switched to the clerk on the call centre, the caller's lines as buttons
@@ -34,12 +37,18 @@ test("demo mode: introduce the step, play it, ask the audience before the next o
   const doing = page.getByTestId("demo-doing-1");
   await expect(doing).toContainText("Waiting for the registration clerk");
   await expect(page.getByTestId("demo-say-0")).toBeDisabled(); // no call open yet: a line would go nowhere
+  await expect(spot).toHaveText("Start the call");
+  await expect(page.getByTestId("demo-next")).toContainText("Next: Start the call");
   await page.getByTestId("start-call").click();
+  await expect(spot).toHaveText("Say the daughter's first line"); // a button of the guide panel
   await page.getByTestId("demo-say-0").click();
   await expect(page.getByTestId("call-transcript")).toContainText(lines[0]);
+  await expect(spot).toHaveText("Say who the patient is (name, birth date, card)");
   await page.getByTestId("demo-say-1").click();
   await expect(page.getByTestId("call-transcript")).toContainText(lines[1]);
   await expect(page.getByTestId("call-details")).toContainText("Verified");
+  await expect(spot).toHaveText("Confirm the registration the AI pre-filled");
+  if (process.env.E2E_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.E2E_SCREENSHOT_DIR}/demo-spotlight.png` });
   // the guide never signs: the clerk confirms the AI's pre-filled registration on the screen
   await page.getByRole("button", { name: "Confirm registration" }).click();
 
@@ -49,8 +58,10 @@ test("demo mode: introduce the step, play it, ask the audience before the next o
   await expect(ask).toContainText("AI proposed");
   await expect(ask).toContainText("by Maya Nakamura");
   await expect(ask).toContainText("Eun-ji Abernathy"); // who plays the next step
+  await expect(spot).toHaveText("End the call");
   await page.getByRole("button", { name: "End call" }).click();
   await expect(page.getByTestId("call-ended")).toBeVisible();
+  await expect(spot).toHaveText("Continue when the audience is ready");
 
   // Not yet: a pill, kept across a reload; Resume opens the next step's introduction
   await page.getByTestId("demo-not-yet").click();
@@ -63,6 +74,7 @@ test("demo mode: introduce the step, play it, ask the audience before the next o
   await expect(page).toHaveURL(/\/reviews/);
   await expect(page.getByTestId("current-user")).toHaveText("Eun-ji Abernathy");
   await expect(page.getByTestId("demo-doing-2")).toContainText("Accept");
+  await expect(spot).toHaveText("Accept the AI's CTAS 2 suggestion"); // on her card in the review queue
 
   await page.getByTestId("demo-exit").click();
   await expect(page.getByTestId("demo-guide")).toHaveCount(0);

@@ -40,7 +40,9 @@ every page. For each step it first shows the introduction (what the step shows, 
 what the audience will see); **Start** switches to that person and opens their screen (and starts the clock's
 fast-forward when the step waits for time). It then lists the clicks, gives the caller's lines as **Say it** buttons
 (no copy and paste) and says whose signature the step waits for; the guide never signs, the presenter clicks the
-real button. When the step is done it shows the trail and asks **Continue to the next step?** (**Not yet** pauses
+real button, which the guide marks on the screen with an amber ring and a label ("Start the call", "Confirm the
+registration the AI pre-filled", "Approve the actions the AI recommends"…): the first button of the step not yet pressed,
+so someone who has never seen the app knows where to click. When the step is done it shows the trail and asks **Continue to the next step?** (**Not yet** pauses
 it; **Resume** goes on). Fold the panel with its arrow when it covers a button. Exit with its cross.
 
 **Do this step for me, jump to a step, highlights (a live interview).** The demo's automation walks steps for you,
