@@ -213,7 +213,7 @@ The variables that matter:
 | `FHIR_BACKEND`, `FHIR_BASE_URL` | `local`; `http://localhost:8080/fhir` | The EHR's store: PostgreSQL or HAPI FHIR |
 | `FOLLOWUP_CALL_DELAY_H`, `FOLLOWUP_CALL_WINDOW_H`, `FOLLOWUP_CALLBACK_MINUTES` | 48, 72, 30 | Follow-up calls on the hospital clock |
 | `DEMO_PASSCODE` | none | Passcode on the login page (set it on a public server) |
-| `DEMO_DAILY_RESET_HOUR` | none | Regenerate the demo data once a day at this hour |
+| `DEMO_DAILY_RESET_HOUR` | none | Regenerate the demo data once a day at this hour, with the hospital storyline ready at step 1 (Margaret Ellis) |
 | `BACKGROUND_WORKERS` | 1 | 0 turns off the background loops (message dispatch, intake, simulator ticks) |
 | `IDLE_PAUSE_MINUTES` | 15 | After this many minutes without a signed-in person using the app, the background work that calls the model (the simulator clock, AI intake, narration, order-review commentary) pauses until the next request; rule-based work goes on. 0: never pause |
 | `BACKGROUND_AI` | `on_demand` | `on_demand`: no model call for work nobody asked for. The background runs the rules; an item's AI (an order review's commentary, a reconciliation's judgements, a Control Tower narrative, a requisition's extraction, triage and protocol, a feedback comment's labels) runs when a person opens it or presses Ask AI, and at once for new work their action created (a submitted requisition, a patient's survey answer, a storyline step). The header's "AI activity" lists every AI action of this browser. `eager`: the background writes the AI output of every new item before anyone looks (a real hospital, the evals) |

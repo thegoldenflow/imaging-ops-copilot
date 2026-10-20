@@ -145,6 +145,8 @@
 | 7.6 | 故事线走查太慢：测量推翻两个假设 | hospital | 性能 · 负载 |
 | 7.7 | COPY 后仍慢：Docker Desktop 端口转发 | 环境 | 性能 · 环境 |
 | 7.8 | 未查明：每次重置 API 内存多留约 400 MiB，先用内存上限兜底 | 平台 | 性能 · 内存 · 部署 |
+| 7.9 | 每日自动重置改成故事线重置：只生成一次；量内存时探针等的审计条数被重置清掉 | 平台 / hospital | 性能 · 内存 · 定时任务 · 测量 |
+| 7.10 | 失败的每日重置每 2 秒重来一次：每个进程每天只试一次；两种测试写法在没修时也通过 | 平台 / hospital | 定时任务 · 内存 · 测试 |
 | 8.1 | 生成器第一次校准：医院被挤爆 | hospital | 合成数据 |
 | 8.2 | ICU 太空，看到三次才修 | hospital | 合成数据 |
 | 8.3 | 术前 Task 指向错误的 id | hospital | 合成数据 · 引用 |
@@ -2708,6 +2710,124 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** 平台（演示重置），部署环境。
 - **来源：** 部署到服务器会话 2026-10-18 01:20–01:35 UTC；"OVH 服务器 51820 端口配置"会话的外部复核。
 - **代码与提交：** `docker-compose.prod.yml` 的 `mem_limit`；[DEPLOY.md](DEPLOY.md) "API 内存上限"。泄漏本身留给后续排查。
+
+---
+
+### 7.9 每日自动重置改成故事线重置：证明它只生成一次，量内存时探针自己卡住
+
+- **现象：** 2026-10-19 负责人定下：面试官自己打开线上 ops.jasonyao.dev，前门是录好的导览，最后一步"try it live"进真实应用。
+  可是每天 08:00（UTC）的自动重置之后，故事线是"未设置"（12.15）：第一个访客得先点 Reset to the start，等一分钟左右，
+  而每次重置在 1.5 GiB 的上限下多留约 400 MiB（7.8），大约每两次重置就 OOM 重启一次。要求：每日重置之后故事线已经准备好、停在第 1 步、
+  默认病人 Margaret Ellis，而且**只生成一次数据**（不是"普通重置一次 + 故事线重置一次"），并量一下内存是不是也只多一次。
+- **怎么查的：**
+  1. 先读要合并的两段代码。`app/modules/admin/service.py::maybe_daily_reset`：取锁、读标记、`reset_store()`、写标记、记审计、
+     `bridge.on_reset()`、`ondemand.reset()`。`app/modules/storyline/service.py::reset`：`reset_store()`、记审计、`preset.plant(...)`、
+     `bridge.on_reset()`、`ondemand.reset()`、`autoplay.on_reset()`。故事线重置**本来就是**普通重置加预设，善后也是调度器那一套的超集。
+     所以不用拼两个操作，调度器调用一次故事线重置就行。剩下要解决的只有"谁来做"：`reset(user, ...)` 要一个 `StaffUser`，调度器没有。
+  2. 假设：预设的 operator 可以随便填 `"system"`。读 `app/ehr/simulator.py` 第 993 行：
+     `actor=f"user:{self.ctx['operator']}" if self.ctx.get("operator") else SIM_ACTOR`。填 `"system"` 会让她的注入事件写成 `user:system`，冒充一个不存在的人。
+     假设不成立：调度器这次传 `None`，由模拟器自己的 actor 来写。审计照旧记 `system / Scheduler / system`（和以前的每日重置一样）。
+  3. 测试里怎么证明"只生成一次"？真的生成一套数据要 15–20 秒，而且预设需要医院数据（`hospital_plan`），不能像 12.15 的测试那样用空 store 代替。
+     办法：把 `store_module.build_store` 换成**计数**的替身（返回空 store，记一次 "generated"），`persist` 换成什么都不做，库里保留会话开始时种好的数据。
+     这样 `reset_store()` 自己的逻辑（锁、标记）照常跑，预设种在已有数据上，和种在新数据上一样（`story_en` fixture 就是这么做的）。
+     断言 `generated == ["generated"]`。
+  4. 测试能不能分辨新旧代码？把 `admin/service.py` 临时换回旧版本跑第一个测试：`assert view["prepared"] is True and view["current"] == 1` 失败，`E       assert (False is True)`（旧的每日重置不种预设）；换回新版本后 5/5 通过。
+  5. 量内存，用 7.8 的方法：v0.3.1 的 API 镜像，挂上本分支的 `app/`、`config/`、`prompts/`、`knowledge/`，临时库，mock 模型，
+     `DEMO_DAILY_RESET_HOUR=0`（钟点总是已过，只看标记），每次重置后 10 秒读容器 cgroup 的 `anon`。
+     每日重置由调度器自己触发：删掉库里的 `daily_reset` 标记，2 秒内它就会动手，走的是真实的后台循环。
+     一个细节：当时是 23:25 UTC，再过半小时日期一变，调度器会**自己**再重置一次，打乱测量。所以容器设 `TZ=CST-8`（POSIX 写法，不需要 tzdata），
+     本地时间变成第二天 07:25，离午夜很远。
+  6. 第一次测量卡住了：第一次每日重置 66 秒完成，第二次等了 10 分钟也没"完成"。假设一：调度器没跑。查审计表：
+     有一条 `07:30:53 | Scheduler | daily demo reset (...)`，第二次早就提交了，假设一不成立。假设二：探针判断"完成"的条件有问题。
+     探针等的是"审计表里 `action='reset'` 的条数变多"，可重置把审计表也整体换掉了（生成的数据替换所有表，PROGRESS 里写着 "a reset also clears the audit log"）。
+     所以每次重置之后条数都是 1，永远等不到"变多"。假设二成立。改成等 `app_meta.seeded_at` 变化：`persist()` 在重置的同一个事务里写它，提交了才看得见，
+     而且每次都不一样。另外先登录一次再读基线，让"有人登录后缓存变大"（7.8 里 680 → 860 MiB）算进基线，不算到第一次重置头上。
+  7. 重跑（同时还有 35 分钟的测试套件在用同一个 Postgres，所以每次重置要 103–161 秒，平时约 30–60 秒）：
+
+     | 步骤 | anon（MiB） | 增量 | 故事线 |
+     | --- | --- | --- | --- |
+     | 启动、已登录 | 654 | | 未设置 |
+     | 每日重置 A1 | 1096 | +442 | 第 1 步，Margaret Ellis |
+     | 每日重置 A2 | 1753 | +657 | 第 1 步，Margaret Ellis |
+     | 页头 Reset demo（旧的每日重置） | 2289 | +536 | 未设置 |
+     | 访客的故事线重置 | 2703 | +414 | 第 1 步，Margaret Ellis |
+     | 每日重置 A3 | 3271 | +568 | 第 1 步，Margaret Ellis |
+
+     手动重置之后再等 10 秒，`seeded_at` 没变：调度器把手动重置当成了今天的重置（12.15 的标记还在起作用）。API 日志里没有错误。
+  8. 解读：增量在 414–657 MiB 之间，比 7.8 的约 400 MiB 大，也不整齐。噪声来自全程登录（后台模拟器一直在跑），加上 Postgres 很忙。
+     但结论不依赖精确值：每日重置一次的增量，和一次普通重置、一次故事线重置是同一个量级，都是"一次重新生成"。旧的早晨要两次（+536 +414 = +950）。
+- **根因：** 不是 bug，是设计缺口。每日重置只调用 `reset_store()`，故事线预设只在有人点按钮时才种，所以每天早上都要有人用一次重置把故事线准备好。
+- **怎么修：** `storyline.service.reset(user, language, *, reason)` 允许 `user` 为 `None`（调度器）：审计记 `system / Scheduler / system`，
+  原因是 `daily demo reset (demo reset + preset; the patient: English-speaking: Margaret Ellis)`，预设的 operator 为 `None`。
+  `maybe_daily_reset` 取锁、读标记之后调用 `storyline.reset(None, reason="daily demo reset")`，再写当天的标记。手动重置不变：页头的 Reset demo 仍是普通重置，
+  故事线重置仍种所选的病人，两者都算当天的重置。没有加开关：故事线关不掉（每套数据都有医院），`DEMO_DAILY_RESET_HOUR` 只在公开部署上设，那里永远需要准备好的故事线。
+- **怎么证明：** `tests/test_daily_reset.py` 5/5：调度器重置之后 `GET /api/storyline` 是 prepared、current 1、Margaret Ellis，只生成一次；一天只跑一次；
+  页头重置和故事线重置不变、都算当天的。换回旧代码时第一个测试失败。`test_storyline.py`、`test_storyline_autoplay.py`、`test_reset_lock.py`、`test_spend_guard.py`
+  连同它一共 45 个通过。内存：上表（第 7 步）。
+- **经验：**
+  - 要"合并两个操作"之前，先读被调用的那个。故事线重置本来就包含普通重置和它的善后，调用一次就够；把两个拼起来反而多生成一次，内存多泄漏一份。
+  - 给"没有人"的操作找身份时，看这个身份会被写到哪里。随便填一个 `"system"` 用户 id，会让模拟器的事件冒充一个用户。
+  - 想在测试里断言"昂贵的一步只做了一次"，把那一步换成计数的替身，其余逻辑照常跑。
+  - 探针等不到结果时，先怀疑探针的判断条件：用来判断"完成"的数据，会不会被被测操作自己改掉？这里审计表被重置整体换掉了。
+    要选被测操作在同一个事务里写、每次都会变的值（`seeded_at`）。
+  - 测量窗口里有没有会自己触发的东西？这里是午夜（日期一变，调度器就自己重置）。用时区把它挪开。
+  - 内存增量要和对照组在同一次运行、同样的条件下比，别拿另一天量的数（7.8 的 400 MiB）来比。
+- **范围：** 平台（演示重置）、hospital（故事线），部署。
+- **来源：** 本会话 2026-10-19 23:00–00:30 UTC，自助导览"try it live"的准备工作。
+- **代码：** `apps/api/app/modules/admin/service.py`（`maybe_daily_reset`）、`apps/api/app/modules/storyline/service.py`（`reset`、`SCHEDULER`）、
+  `apps/api/tests/test_daily_reset.py`；分支 `claude/peaceful-jones-bac6f2`。
+
+### 7.10 失败的每日重置每 2 秒重来一次：每个进程每天只试一次；两种看似合理的测试写法在没修时也通过
+
+- **现象：** 没有真的发生过，是一道防护。`app/modules/admin/service.py::maybe_daily_reset` 在 `app/main.py::_step` 里跑，
+  intake 循环每 2 秒调用一次，不管有没有人在用。7.9 之后每日重置是故事线重置：`reset_store()` 重新生成数据，再 `preset.plant(...)` 种预设。
+  任何一步抛异常，`_step` 记一行 `daily demo reset failed` 并回滚事务，当天的 `daily_reset` 标记没写成，2 秒后下一轮又从头生成一次。
+  线上每次重新生成在 1.5 GiB 的上限下多留 400–650 MiB（7.8、7.9），所以一个持续的失败会变成"生成 → OOM → 重启 → 再生成"的循环，网站大部分时间是 502。
+  这在 7.9 之前就成立（普通重置的生成也可能失败），预设又多了一个可能失败的步骤。
+- **怎么查的：**
+  1. 先确认重试是确定的，不是猜的。读调用链：`_intake_loop` 每 2 秒 → `_step(name, fn)`：在 `unit_of_work()` 里先取
+     `pg_try_advisory_xact_lock_shared(REWRITE_LOCK)`，再 `fn(store)`；异常时 `log.exception("%s failed", name)`，事务回滚。
+     `maybe_daily_reset`：过了钟点 → `try_lock(_RESET_LOCK)` → 取锁之后读标记 → `storyline.reset(None, reason="daily demo reset")` → 写标记。
+     两处写标记（`reset_store()` 里一次，12.15；`maybe_daily_reset` 末尾一次）都在这个事务里，回滚时一起没了。所以失败之后，下一轮看到的还是昨天的标记，一定会再试。
+  2. 选方案："今天试过了"记在哪里？(a) 记在数据库里：失败的事务已经回滚，得另开一个事务写，多一个提交点，还要改 12.15 的标记逻辑（任务要求它不动）。
+     (b) 记在进程内存里：一个模块变量 `_attempted`，记上次尝试的日期。重启之后会再试一次，但重启只来自 OOM 或部署，一天最多"每次重启一次"，
+     代价有上限。选 (b)。在锁和标记检查都通过之后、重置开始之前记下（所以没取到锁、或别的进程已经重置过，都不算"试过"）；
+     检查放在最前面，钟点判断之后、取锁之前，当天之后的调用连锁都不用取。成功也记：同一天里标记本来就会挡住，两者一致。手动重置（页头 Reset demo、故事线重置）不经过这里。
+  3. 日志：异常的消息可能带病人数据（项目规则：日志里不放 payload），所以只记日期和异常的类型名：
+     `daily demo reset of 2026-10-19 failed (RuntimeError); not tried again today in this process`。然后 `raise`，让 `_step` 照旧回滚、记 traceback。
+  4. 测试怎么写？第一个想法：把 `journey.plant` 换成抛异常，连续调用两次 `maybe_daily_reset`，第二次应该返回 False，生成计数是 1。
+     假设：这个测试在没有防护时也会通过。理由：测试里的 `fresh_state` 是 ambient store，`unit_of_work()` 遇到 ambient store 直接把它交出去，抛异常时**不回滚**；
+     而 `reset_store()` 在预设之前已经写了今天的标记，所以第二次调用会被标记挡住，和防护无关。
+  5. 第二个想法：在测试里模拟 `_step` 的回滚：每次调用开一个 savepoint，失败时 `savepoint.rollback()`、`store.expunge()`、`clear_process_cache()`。
+     又一个假设：这样也会假绿。理由：测试自己先布置的"昨天的标记"（`fresh_state.modules["daily_reset"] = yesterday`）还只在 store 的内存里，没有 flush，
+     `expunge()` 会把它一起丢掉，之后读到的是库里的值：会话开始时 `conftest.py` 用 `reset_store()` 种数据，写的是今天的标记。
+     所以 helper `_step` 一开始先 `store.flush()`（布置的前提属于"之前已经提交的事务"）。
+  6. 实验，看测试能不能分辨有无防护：把防护临时关掉（`or (False and _attempted == today)`），跑两个新测试，外加一个临时探针文件里的两种写法
+     （第 4 步的不回滚、第 5 步的回滚但不先 flush），用 `-s` 打印失败之后读到的标记。结果：
+     - 两个新测试失败。`test_a_failing_daily_reset_is_tried_once_a_day_not_every_2_s`：`assert None is False`，第二次调用又试了一次、又抛错；
+       `test_a_daily_reset_that_failed_runs_the_next_day`：`assert True is False`，第二次调用重试成功，又生成了一次数据。
+     - 两种写法都通过，打印 `marker after the failed try, no rollback: 2026-10-19` 和 `marker after rollback + expunge, no flush first: 2026-10-19`。
+       两个假设都成立：它们挡住第二次调用的是今天的标记，不是防护。
+     恢复防护后 `tests/test_daily_reset.py` 7/7。
+- **根因：** 每日重置把"今天已经重置"的标记写在重置自己的事务里。失败时标记跟着回滚，而"试过一次"这件事没有任何记录，
+  所以失败等于"今天还没做"，按调用频率（2 秒）一直重试，和"一天一次"的本意差了四万多倍。每次重试都是一次昂贵的生成（泄漏几百 MiB）。
+- **怎么修：** `maybe_daily_reset` 加模块变量 `_attempted`（本进程上次尝试的日期）。`_attempted == today` 时直接返回 False；
+  锁和标记检查通过之后先记 `_attempted = today`，再调用 `storyline.reset`；失败时 `log.error(...)` 只记日期和异常类型，然后 `raise`。
+  锁、取锁后读标记、12.15 的标记逻辑都没动。
+- **怎么证明：** `tests/test_daily_reset.py` 新增两个测试，helper `_step` 先 flush，再用 savepoint 模拟 `_step` 的事务，失败时回滚并清缓存。
+  (1) 预设每次都抛异常：当天只试一次（9:00:00 试、9:00:02 和 15:00 不试），失败之后标记还是昨天的，日志一行；模拟重启（`_attempted` 清空）再试一次；
+  第二天 7 点不试（钟点之前），9 点再试一次。(2) 生成只在今天失败：今天 10 点不再试，第二天 9 点重置成功，故事线 prepared、第 1 步、Margaret Ellis，一共生成两次。
+  关掉防护时两个都失败（第 6 步）。`tests/test_daily_reset.py` 7/7；连同 `tests/test_storyline.py` 一共 27 个通过（自己的库 `ioc_test_resetguard`，39.7 分钟）。
+- **经验：**
+  - 定时任务的"做过了"标记写在任务自己的事务里时，失败会把标记一起回滚。"试过"和"做成"要分开记，否则失败就等于"没做过"，按循环频率无限重试；
+    任务越贵（这里一次泄漏几百 MiB），这个差别越要紧。
+  - 写"失败之后不再重试"的测试，先确认失败那一次之后的状态和生产一样：生产里事务回滚了，测试共享的 ambient store 却不回滚，要自己模拟。
+  - 模拟回滚时，测试自己布置的前提也会被卷进去：没 flush 的改动会被 `expunge()` 一起丢掉，之后读到的是库里的值（这里恰好是"今天"）。
+  - 新测试要在关掉修复的情况下跑一次，看它真的会失败。这次两种看似合理的写法都是假绿，只有打印出它们读到的标记才看得出原因。
+- **范围：** 平台（演示的每日重置、后台循环），hospital（故事线预设），部署（内存上限）。
+- **来源：** 本会话 2026-10-19，7.9 之后的防护（PROGRESS "The daily reset prepares the storyline" 里的待办）。
+- **代码：** `apps/api/app/modules/admin/service.py`（`maybe_daily_reset`、`_attempted`）、`apps/api/app/main.py`（`_step`、`_intake_loop`，未改）、
+  `apps/api/tests/test_daily_reset.py`（`_step`、两个新测试）；分支 `claude/exciting-moser-89432d`，提交 `56a0797`。
 
 ---
 

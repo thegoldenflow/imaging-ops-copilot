@@ -3,7 +3,8 @@ and the event subscriber that plays the story.
 
 - `reset(user, language)`: the demo reset followed by the preset (app/ehr/seed/journey.py), one click from the
   storyline page, with the patient who speaks `language` (en: Margaret Ellis, the default; zh: Wang Xiuying).
-  Workflows still running from before are terminated by the reset (6.5).
+  Workflows still running from before are terminated by the reset (6.5). The scheduler's daily demo reset is this
+  reset too (`user` None), with the default patient.
 - `status(store, user)`: per step what the AI proposed, who signed or approved and when, what the EHR wrote and
   the audit events of those records, read through FhirGateway as the storyline (system actor, audited) plus the
   modules' own tables; the current step is the first one not done.
@@ -66,17 +67,22 @@ def state(store: Store) -> dict | None:
 # ---------- reset ----------
 
 
-def reset(user: StaffUser, language: str | None = None) -> dict:
+SCHEDULER = {"user_id": "system", "user_name": "Scheduler", "role": "system"}  # the daily demo reset's actor
+
+
+def reset(user: StaffUser | None, language: str | None = None, *, reason: str = "storyline reset") -> dict:
     """The demo reset, then the storyline's preset with the patient who speaks `language`: the story starts at 07:00
-    on the hospital day."""
+    on the hospital day. `user` None: the scheduler's daily demo reset (app/modules/admin/service.py), audited as
+    the system, so the live story is at step 1 every morning without a visitor's reset."""
     from app.workflows import bridge
 
     who = S.patient(language)  # an unknown language fails before anything is rebuilt
     store = reset_store()
-    store.audit.record(user_id=user.id, user_name=user.name, role=str(user.role), action="reset",
-                       resource_type="demo_data", resource_id="storyline", reason="storyline reset (demo reset + "
-                       f"preset; the patient: {who.label})", event_type="simulator_event", module="storyline")
-    st = preset.plant(store, user.id, who.language)
+    actor = dict(user_id=user.id, user_name=user.name, role=str(user.role)) if user else SCHEDULER
+    store.audit.record(**actor, action="reset", resource_type="demo_data", resource_id="storyline",
+                       reason=f"{reason} (demo reset + preset; the patient: {who.label})",
+                       event_type="simulator_event", module="storyline")
+    st = preset.plant(store, user.id if user else None, who.language)  # no operator: the simulator's actor
     # until a step's button is pressed, the story's AI (the imaging requisitions after triage) is the presenter's
     st["driver"] = (causes.from_request("storyline") or causes.AiCause(trigger="storyline")).model_copy(
         update={"trigger": "storyline", "note": "Storyline"}).model_dump(exclude_none=True)

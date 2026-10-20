@@ -73,7 +73,8 @@ POSTGRES_PASSWORD=<随机长口令>
 PHI_ENCRYPTION_KEY=<base64>
 PHI_BLIND_INDEX_KEY=<base64>
 
-# 可选：每天几点（服务器时间，0–23）自动重新生成演示数据，防止访客的操作一直累积、时间线变旧
+# 可选：每天几点（服务器时间，0–23）自动重新生成演示数据，防止访客的操作一直累积、时间线变旧；
+# 重新生成后故事线已经准备好、停在第 1 步（默认病人 Margaret Ellis），访客不用再点 Reset to the start
 # DEMO_DAILY_RESET_HOUR=4
 
 # 可选：设置后登录页要先输入这个口令。不设则知道域名的人都能用（访问记录见 Caddy 日志）。
@@ -296,6 +297,9 @@ anon 从 869MiB 依次到 1047、1466、1814MiB，最后一次故事线重置后
 所以 `docker-compose.prod.yml` 给 API 设了 `mem_limit` 和 `memswap_limit`（同一个值，也就是不许用 swap），默认 1.5GiB：
 刚启动约 850MiB，一次重置的峰值约 1.2GiB，放得下；泄漏攒到上限时，内核杀掉 API，`restart: unless-stopped` 把它拉起来，内存回到起点。
 重置在一个数据库事务里写数据，中途被杀会回滚，旧数据完好；登录令牌存在库里，重启后不用重新登录。代价是被杀的那个请求失败，API 重启期间（约半分钟）页面报 502。
+
+每日自动重置（`DEMO_DAILY_RESET_HOUR`）就是一次故事线重置：只生成一次数据，重置后故事线停在第 1 步，访客不用再自己点 Reset to the start。
+所以一个早晨从“自动重置 + 第一个访客的故事线重置”两次变成一次。本机实测每次每日重置 anon 增加 440–660MiB，和一次普通重置同一量级（见调试手册 7.9）。
 
 ```bash
 docker stats --no-stream ioc_api                                   # MEM USAGE / LIMIT
