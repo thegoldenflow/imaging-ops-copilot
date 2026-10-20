@@ -111,6 +111,23 @@ def test_demo_data_plants_follow_ups_and_call_centre_appointments(fresh_state):
     assert callers["en_none"]["appointments"] == []
 
 
+def test_the_planted_callers_quick_phrases_say_who_is_calling_and_what_they_have_booked(fresh_state, client, login):
+    """The call centre's shortcut for a planted caller reads as a visitor understands it, in the caller's language,
+    not as the generator's key ("ID: en_fracture")."""
+    store = fresh_state
+    callers = client.get("/api/voice/demo", headers=login(CLERK)).json()["callers"]
+
+    def name(key: str, use: str) -> str:
+        patient = store.fhir.read("Patient", callers[key]["patient"])
+        return next(n["text"] for n in patient["name"] if n.get("use") == use)
+
+    assert callers["en_fracture"]["label"] == f"I'm {name('en_fracture', 'official')} (fracture clinic, CT scan)"
+    assert callers["en_none"]["label"] == f"I'm {name('en_none', 'official')} (no appointments)"
+    assert callers["zh_anticoag"]["label"] == f"我是{name('zh_anticoag', 'usual')}（抗凝血药物门诊、心功能门诊）"
+    assert callers["zh_tw_lung"]["label"] == f"我是{name('zh_tw_lung', 'usual')}（胸腔科門診）"
+    assert not any(c["label"].startswith("ID:") or "_" in c["label"] for c in callers.values())
+
+
 # ---------- the call centre: one test per intent ----------
 
 

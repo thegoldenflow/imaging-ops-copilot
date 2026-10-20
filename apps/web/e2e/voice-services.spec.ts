@@ -22,7 +22,8 @@ async function login(page: Page, role: string) {
 
 interface Demo {
   followups: Record<string, { stay: string; patient: string; language: string; unit: string }>;
-  callers: Record<string, { patient: string; appointments: string[]; identity_line?: string; identity_line_zh?: string }>;
+  callers: Record<string, { patient: string; appointments: string[]; identity_line?: string; identity_line_zh?: string;
+    label?: string }>;
 }
 let demo: Demo;
 
@@ -58,7 +59,15 @@ test("call centre: FAQ without identity, then a reschedule the clerk confirms in
 
   await say(page, "I need to reschedule my fracture clinic appointment.");
   await expect(transcript).toContainText("full name, date of birth");
-  await say(page, caller.identity_line!);
+  // the planted caller's shortcut reads as a visitor understands it (who is calling, what they have booked) and says
+  // the identity line
+  const quick = page.getByLabel("Quick phrases");
+  await expect(quick.getByRole("button", { name: /^ID:/ })).toHaveCount(0);
+  const shortcut = quick.getByRole("button", { name: caller.label!, exact: true });
+  await expect(shortcut).toHaveText(/^I'm .+ \(fracture clinic, CT scan\)$/);
+  await shortcut.click();
+  await expect(page.getByText("The agent is answering…")).toBeHidden({ timeout: 20_000 });
+  await expect(transcript).toContainText(caller.identity_line!);
   await expect(page.getByTestId("call-details")).toContainText("Verified");
   await expect(transcript).toContainText("I can offer");
   await say(page, "The second one");

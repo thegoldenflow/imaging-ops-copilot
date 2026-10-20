@@ -58,7 +58,8 @@ step's permission sentence ("The clerk sees who the patient is and that she is r
 demo mode switches person (**Start**, **Switch to Dr. Victor Osei to co-sign**, **Back to …**) the strip turns dark
 for five seconds and says who you were before ("switched from Casey Brooks · Administrator"): point at it. It is
 part of the page, under the header, so it never covers a button the spotlight marks. In demo mode the call centre's
-quick phrases leave out the developer's seeded-caller shortcuts ("ID: en_heart" and the like).
+quick phrases leave out the planted callers' shortcuts ("I'm George Gordon (fracture clinic, CT scan)" and the like):
+the guide's **Say it** buttons speak her daughter's lines.
 
 **English subtitles (the Mandarin-speaking patient).** While demo mode is on, every Chinese turn of the call centre's
 and the follow-up call's transcript has its English under it, marked "Translation". The caller's scripted lines have

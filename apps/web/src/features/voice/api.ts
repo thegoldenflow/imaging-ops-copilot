@@ -146,8 +146,8 @@ export interface FollowupItem {
 export interface DemoCases {
   followups?: Record<string, { stay: string; patient: string; language: string; unit: string; missing?: string;
     call: { id: string; status: string; review_status: string } | null; birth_date_line?: { en: string; zh: string } }>;
-  callers?: Record<string, { patient: string; language: string; appointments: string[]; mrn?: string;
-    identity_line?: string; identity_line_zh?: string }>;
+  callers?: Record<string, { patient: string; language: string; appointments: string[]; services?: string[]; mrn?: string;
+    identity_line?: string; identity_line_zh?: string; label?: string }>;
 }
 
 export const voiceKeys = {

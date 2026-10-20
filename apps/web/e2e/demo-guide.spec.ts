@@ -96,10 +96,11 @@ test("demo mode: introduce the step, play it, ask the audience before the next o
   await expect(page.getByTestId("demo-say-0")).toBeEnabled();
   await expect(page.getByTestId("demo-say-1")).toBeDisabled();
   await expect(page.getByTestId("demo-say-2")).toBeDisabled();
-  // the quick phrases under the call input, without the developer's seeded-caller shortcuts ("ID: en_heart")
+  // the quick phrases under the call input, without the planted callers' shortcuts ("I'm George Gordon (…)",
+  // "我是…"): the guide's Say it buttons speak her daughter's lines
   const quick = page.getByLabel("Quick phrases");
   await expect(quick.getByRole("button").first()).toBeVisible();
-  await expect(quick.getByRole("button", { name: /^ID:/ })).toHaveCount(0);
+  await expect(quick.getByRole("button", { name: /^(I'm |我是|ID:)/ })).toHaveCount(0);
   await page.getByTestId("demo-say-0").click();
   await expect(page.getByTestId("call-transcript")).toContainText(lines[0]);
   // and under the call's Chinese turns, while demo mode is on: hers (the script's) and the agent's (its hand-written

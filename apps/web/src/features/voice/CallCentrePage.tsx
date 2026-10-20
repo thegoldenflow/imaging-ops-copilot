@@ -81,11 +81,12 @@ export function CallCentrePage() {
   const active = !!call && !ended && !call.ended_at;
   const callers = Object.entries(demo.data?.callers ?? {}).filter(([, c]) => c.identity_line);
   const lang = call?.language ?? "en";
-  // the seeded callers' identity lines ("ID: en_heart") are a developer's shortcut: hidden while the storyline is
-  // presented in demo mode, where the guide's Say it buttons speak the caller's lines
+  // the seeded callers' identity lines, labelled by who is calling and what they have booked ("I'm George Gordon
+  // (fracture clinic, CT scan)"): hidden while the storyline is presented in demo mode, where the guide's Say it
+  // buttons speak the caller's lines
   const quick = [...(lang === "en" ? QUICK_EN : QUICK_ZH),
     ...(presenting ? [] : callers.filter(([, c]) => (lang === "en") === (c.language === "en"))
-      .map(([key, c]) => ({ label: `ID: ${key}`, text: (lang === "en" ? c.identity_line : c.identity_line_zh) ?? "" })))];
+      .map(([key, c]) => ({ label: c.label ?? key, text: (lang === "en" ? c.identity_line : c.identity_line_zh) ?? "" })))];
 
   return (
     <div>
