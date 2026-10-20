@@ -269,6 +269,16 @@ def test_a_relative_calls_in_mandarin_for_the_patient(fresh_state, client, login
     assert replies[-1].startswith("好的，我们用中文继续。") and gloss.startswith("Sure, let's continue in Chinese. ")
 
 
+@pytest.mark.parametrize("lang, thanks", [("en", "Thank you"), ("zh-Hans", "谢谢"), ("zh-Hant", "謝謝")])
+def test_the_ed_registration_reply_thanks_the_caller_once(lang, thanks):
+    """An ED arrival's reply after the identity check is "verified", "arrival_registered" and "anything_else" in one
+    turn: one thank-you, not "Thank you, I've found the record for Margaret. Thank you. I have prepared…"."""
+    reply = P.cat(P.say(P.CC["verified"], lang, first="Margaret"),
+                  P.say(P.CC["arrival_registered"], lang, first="Margaret"), P.say(P.CC["anything_else"], lang))
+    assert reply.count(thanks) == 1 and reply.en.count("Thank you") == 1
+    assert reply.en.startswith("Thank you, I've found the record for Margaret. I have prepared Margaret's registration")
+
+
 def test_the_call_centre_works_without_the_model(fresh_state, client, login):
     set_gateway(LlmGateway(Down()))
     clerk = login(CLERK)

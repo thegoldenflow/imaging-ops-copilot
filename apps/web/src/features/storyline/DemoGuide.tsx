@@ -13,7 +13,7 @@
 // walk the steps as the people who play them; every record it signs says so. Highlights only presents steps 1, 5, 9
 // and 11: "Yes, continue" then has the automation do the steps in between.
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useIsMutating, useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
   AlertTriangle, ArrowRight, Bot, CheckCircle2, ChevronDown, ChevronUp, Circle, FastForward, Loader2, Map, Mic, MousePointerClick,
@@ -142,6 +142,28 @@ function NextLine({ label }: { label: string | undefined }) {
   );
 }
 
+/** Which of the caller's lines is next: the one after the last line the call's transcript shows (one typed by hand
+ * counts too). Only that line's Say it is enabled, so the lines go in order and the spotlight can mark each one. The
+ * follow-up's closing line ("nothing else") is said until the call ends: once reached, it stays next. */
+function useNextLine(lines: string[] | undefined, transcript: string, repeatLast: boolean): number {
+  const [next, setNext] = useState(0);
+  const key = (lines ?? []).join("\n");
+  useEffect(() => {
+    const all = key ? key.split("\n") : [];
+    const tick = () => {
+      const text = document.querySelector(transcript)?.textContent ?? "";
+      let last = -1;
+      all.forEach((l, i) => { if (text.includes(l)) last = i; });
+      const i = last + 1 < all.length ? last + 1 : repeatLast ? all.length - 1 : all.length;
+      setNext((prev) => (prev === i ? prev : i));
+    };
+    tick();
+    const id = window.setInterval(tick, 300); // the transcript is another component's: read as the spotlight does
+    return () => window.clearInterval(id);
+  }, [key, transcript, repeatLast]);
+  return next;
+}
+
 /** Switch to the step's person (a demo login) and open their screen. */
 function useOpenStep() {
   const { user, login } = useAuth();
@@ -152,9 +174,14 @@ function useOpenStep() {
   };
 }
 
+// one key for every Advance the guide presses: Start's (in the introduction, which is gone once the presenter's turn
+// shows) and the turn's own button; pending until the storyline shows the clock's job
+const ADVANCE = ["storyline-advance"];
+
 function useAdvance() {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn: advanceStoryline, onSuccess: () => queryClient.invalidateQueries({ queryKey: storylineKey }) });
+  return useMutation({ mutationKey: ADVANCE, mutationFn: advanceStoryline,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: storylineKey }) });
 }
 
 /** The demo's automation: do the current step, or jump to a later one. Resolves once the job shows in the storyline. */
@@ -286,10 +313,14 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
   const { login } = useAuth();
   const navigate = useNavigate();
   const job = data.job?.status === "running" ? data.job : null;
+  // Start has just asked for the clock (its request is still on its way): no second Advance to press meanwhile
+  const advancing = useIsMutating({ mutationKey: ADVANCE }) > 0;
   // the follow-up call goes on with its questions (medicines, appointments, red flags): "nothing else" until it ends
   const lines = step.key === "call" ? data.patient?.call_lines
     : step.key === "followup" ? [...(data.patient?.followup_lines ?? []), data.patient?.followup_closing ?? ""].filter(Boolean) : undefined;
   const translations = data.patient?.translations ?? {};
+  const next = useNextLine(lines, step.key === "call" ? "[data-testid=call-transcript]"
+    : "[data-testid=followup-call-transcript], [data-testid=followup-transcript]", step.key === "followup");
   // the admission reconciliation is co-signed by her surgeon (the summary's author) once the pharmacist has signed
   const cosigner = step.key === "medrec" && step.signed?.by && !step.done ? data.steps.find((s) => s.key === "summary")?.cast : undefined;
   const cosigning = !!cosigner && user?.id === cosigner.id;
@@ -320,9 +351,12 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
         </Button>
       )}
       {job && <ClockBar job={job} />}
-      {!job && step.status === "waiting" && (
+      {!job && advancing && (
+        <p className="flex items-center gap-1.5 text-xs text-ai-700"><Loader2 className="size-3.5 animate-spin" />Moving the hospital clock…</p>
+      )}
+      {!job && !advancing && step.status === "waiting" && (
         <div className="space-y-1">
-          <Button size="sm" variant="ai" onClick={() => advance.mutate()} loading={advance.isPending} data-testid="demo-advance">
+          <Button size="sm" variant="ai" onClick={() => advance.mutate()} data-testid="demo-advance">
             <FastForward className="size-3.5" />Advance the clock: {step.beat_hint}
           </Button>
           {step.advance_ai && <p className="text-[11px] text-ai-700">Then {step.advance_ai}, as soon as the clock gets there.</p>}
@@ -338,24 +372,28 @@ function YourTurn({ step, data }: { step: StoryStep; data: Storyline }) {
       {lines && (
         <div className="rounded-lg border border-dashed border-slate-300 p-2">
           <p className="mb-1 text-[11px] font-semibold text-slate-500" data-testid="demo-say-hint">
-            The caller says{canSay ? "" : " (start the call first; wait while the agent answers)"}
+            The caller says, one line at a time{canSay ? "" : " (start the call first; wait while the agent answers)"}
           </p>
           <ul className="space-y-1.5">
-            {lines.map((l, i) => (
-              <li key={l} className="flex items-start gap-2">
-                <span className="flex-1 text-xs text-slate-800">
-                  <span lang={data.patient?.language}>{l}</span>
-                  {translations[l] && (
-                    <span className="mt-0.5 block text-[11px] text-slate-500 italic" lang="en" data-testid={`demo-say-translation-${i}`}>
-                      <span className="font-medium not-italic">Translation: </span>{translations[l]}
-                    </span>
-                  )}
-                </span>
-                <Button size="sm" variant="secondary" className="h-7 shrink-0 px-2" onClick={() => sayAsCaller(l)} disabled={!canSay} data-testid={`demo-say-${i}`}>
-                  <Mic className="size-3" />Say it
-                </Button>
-              </li>
-            ))}
+            {lines.map((l, i) => {
+              const said = i < next;
+              return (
+                <li key={l} className={clsx("flex items-start gap-2", said && "opacity-60")} data-state={said ? "said" : i === next ? "next" : "later"}>
+                  <span className="flex-1 text-xs text-slate-800">
+                    <span lang={data.patient?.language}>{l}</span>
+                    {translations[l] && (
+                      <span className="mt-0.5 block text-[11px] text-slate-500 italic" lang="en" data-testid={`demo-say-translation-${i}`}>
+                        <span className="font-medium not-italic">Translation: </span>{translations[l]}
+                      </span>
+                    )}
+                  </span>
+                  <Button size="sm" variant="secondary" className="h-7 shrink-0 px-2" onClick={() => sayAsCaller(l)} disabled={!canSay || i !== next}
+                    data-testid={`demo-say-${i}`}>
+                    {said ? <><CheckCircle2 className="size-3" />Said</> : <><Mic className="size-3" />Say it</>}
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

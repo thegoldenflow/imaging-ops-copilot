@@ -53,14 +53,17 @@ test("the English-speaking patient: steps 1 and 11 in demo mode with the spotlig
   await expect(spot).toHaveText("Say who the patient is (name, birth date, card)");
   await page.getByTestId("demo-say-1").click();
   await expect(page.getByTestId("call-details")).toContainText("Verified");
-  await expect(transcript).toContainText("Thank you, I've found the record for Margaret.");
+  // one reply, one thank-you (it read "…the record for Margaret. Thank you. I have prepared…")
+  await expect(transcript).toContainText("Thank you, I've found the record for Margaret. I have prepared Margaret's registration");
+  await expect(transcript).not.toContainText("Thank you. I have prepared");
   await expect(page.getByTestId("subtitles-toggle")).toHaveCount(0); // an English call has nothing to subtitle
+  // the agent asked "anything else?": her goodbye ends the call, then the clerk confirms
+  await expect(spot).toHaveText("Say the daughter's last line: the call ends");
+  await page.getByTestId("demo-say-2").click();
+  await expect(page.getByTestId("call-summary")).toContainText("Call from the patient's daughter");
   await expect(spot).toHaveText("Confirm the registration the AI pre-filled");
   await page.getByRole("button", { name: "Confirm registration" }).click();
   await expect(page.getByTestId("demo-ask-1")).toContainText("Continue to the next step?");
-  await expect(spot).toHaveText("End the call");
-  await page.getByRole("button", { name: "End call" }).click();
-  await expect(page.getByTestId("call-summary")).toContainText("Call from the patient's daughter");
   await expect(spot).toHaveText("Continue when the audience is ready");
   await page.getByTestId("demo-continue").click();
 

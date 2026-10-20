@@ -201,6 +201,8 @@ class Step:
     module: str  # spec section / module
     cast: str  # key in CAST: who does it
     route: str  # where to click (web path)
+    # the screens and buttons in the order demo mode's spotlight marks them (web Spotlight.tsx `stepTargets`), in the
+    # buttons' own words: change the two together
     click_path: tuple[str, ...]
     say: str
     expect: tuple[str, ...]
@@ -217,8 +219,8 @@ class Step:
 STEPS: tuple[Step, ...] = (
     Step(1, "call", "A daughter calls in Mandarin; the clerk confirms the ED registration", "7.4 call centre", "clerk",
          "/call-centre",
-         ("Call centre", "Start call", "Say the daughter's two lines (phrases below)", "End call",
-          "Requests: ED registration", "Confirm"),
+         ("Call centre", "Start a call", "Say the daughter's three lines, one at a time (her goodbye ends the call)",
+          "Requests to confirm: ED registration", "Confirm"),
          "Her daughter calls in Mandarin. The call centre answers in Chinese, checks name, birth date and the last "
          "four card digits, and pre-fills the ED registration; the clerk confirms it and the EHR registers the visit.",
          ("Transcript in Chinese with 'Verified'", "Request card: ED registration, Wang Xiuying, MRN 40720001",
@@ -228,7 +230,7 @@ STEPS: tuple[Step, ...] = (
          permission="The clerk sees who the patient is and that she is registered, never why: the chart shows the visit without its reason for the clerk's role."),
     Step(2, "triage", "Triage: CTAS 2 suggested, admission probability 0.82 with three reasons", "7.1 triage view",
          "triage_nurse", "/reviews",
-         ("Review queue", "Triage suggestion: CTAS 2", "Accept", "Control Tower: her ED row"),
+         ("Review queue", "Triage suggestion: CTAS 2", "Accept", "Optional, to show it: Control Tower, her ED row"),
          "The triage assist suggests CTAS 2 from the handover vital signs and the warfarin; the nurse accepts, the EHR "
          "records the triage, and the Control Tower predicts admission at 0.82 with its three main reasons.",
          ("Review card with the CTAS 2 reasons and 'Admission probability 0.82: CTAS 2, SpO₂ 91%, heart rate 112'",
@@ -247,7 +249,7 @@ STEPS: tuple[Step, ...] = (
          permission="Hospital physicians have no imaging-centre screens: the ED physician decides on the card; the requisitions also sit in the imaging centre's queue, confirmed."),
     Step(4, "inr", "INR 3.8: a critical value routed to the ED physician", "8.1 stub: critical results", "ed_physician",
          "/reviews",
-         ("Advance the clock to the INR result", "Review queue", "Critical value: INR 3.8", "Acknowledge"),
+         ("Advance the clock to the INR result", "Review queue", "Critical value: INR 3.8", "Accept (acknowledges it)"),
          "The INR comes back at 3.8 before surgery: the critical-value router, a roadmap stub on a preset threshold, "
          "sends it to the ED physician, who acknowledges it.",
          ("Card: 'Critical value: INR 3.8 (preset threshold ≥ 3.5)' with the Roadmap badge",),
@@ -257,7 +259,8 @@ STEPS: tuple[Step, ...] = (
     Step(5, "bed", "Orthopedics is full; Surgery has 2 discharge-ready patients; the bed manager approves", "7.1 Control Tower",
          "bed_manager", "/control-tower",
          ("Advance the clock to the admission decision", "Control Tower", "Exception: Orthopedics at 100% occupancy",
-          "Action drawer: early discharge rounds on Surgery", "Approve"),
+          "Action drawer: early discharge rounds on Surgery (ticked)", "Approve N actions → Tasks",
+          "Advance the clock until she has a bed (the first Surgery bed the early discharges free)"),
          "She needs an orthopaedic bed and there is none. The rule engine opens the exception, the AI writes the "
          "narrative from the engine's facts and recommends early rounds on Surgery's two discharge-ready patients; "
          "the bed manager approves, and the first bed they free is hers.",
@@ -268,9 +271,9 @@ STEPS: tuple[Step, ...] = (
          permission="The bed manager decides for the whole hospital but sees patients as MRN and bed only ('Hidden for your role'); the Surgery nurse sees the clinical card of the same bed."),
     Step(6, "medrec", "Admission MedRec: warfarin + naproxen (major), amlodipine left out", "7.2 medication safety",
          "pharmacist", "/med-safety",
-         ("Advance the clock until she has a bed (the Surgery bed the early discharges freed)", "Medication safety",
-          "Her naproxen order: major interaction with warfarin", "Request a change",
-          "Admission reconciliation", "Handle each discrepancy", "Sign", "As the surgeon: co-sign"),
+         ("Medication safety", "Her naproxen order: major interaction with warfarin", "Write why it should change",
+          "Ask the prescriber to change it", "Admission reconciliation: each discrepancy, a reason, Save",
+          "Sign as pharmacist", "Switch to the surgeon, Dr. Victor Osei", "Co-sign as physician"),
          "The rules catch the warfarin and naproxen interaction at once and the reconciliation finds her home "
          "amlodipine missing; the pharmacist decides each item, signs, and the surgeon co-signs.",
          ("Finding: warfarin + naproxen, major", "MedRec rows: warfarin held, amlodipine omission",
@@ -280,7 +283,7 @@ STEPS: tuple[Step, ...] = (
          permission="The pharmacist reads medications, allergies, laboratory results and diagnoses, not the notes; only the pharmacist handles discrepancies, and a physician of her care team co-signs."),
     Step(7, "or", "OR: predicted 115 min against 90 booked, past the block; the coordinator adjusts", "7.1 OR board",
          "bed_manager", "/control-tower",
-         ("Control Tower", "OR list: her case", "Adjust booking to the prediction"),
+         ("Control Tower", "OR list: her case", "Adjust booking to 115 min"),
          "The surgical-duration model predicts 115 minutes for her case, booked for 90: it would run past the 16:00 "
          "block end. The OR coordinator adjusts the booking.",
          ("OR row: booked 90, predicted 115, block overtime risk", "After Adjust: booked 115"),
@@ -288,7 +291,8 @@ STEPS: tuple[Step, ...] = (
          permission="Only the OR coordinator (operations manager) may change a booked case; the gateway refuses anyone else and audits it."),
     Step(8, "news2", "First night after surgery: NEWS2 7 raises a flag", "8.1 stub: deterioration alert",
          "ward_nurse", "/reviews",
-         ("Advance the clock to the first post-operative night", "Review queue", "NEWS2 7", "Record the response"),
+         ("Advance the clock to the first post-operative night", "Review queue", "NEWS2 7",
+          "Accept (records the response; Confirm when Temporal runs her journey)"),
          "At 02:00 her score is 7: the deterioration alert, a roadmap stub on the preset score, raises a NEWS2 flag "
          "and the ward nurse responds.",
          ("Flag NEWS2 on her stay", "Nurse task 'NEWS2 7' with the Roadmap badge"),
@@ -296,8 +300,8 @@ STEPS: tuple[Step, ...] = (
          permission="The Surgery ward nurse sees her because her bed is on the nurse's unit; a nurse of another unit would need break-glass."),
     Step(9, "summary", "Discharge summary: the validator blocks an untraceable medicine", "7.3 documentation",
          "surgeon", "/documentation",
-         ("Advance the clock to the discharge", "Documentation", "Her stay", "Draft with AI",
-          "Red item: lisinopril, no source", "Remove", "Sign"),
+         ("Advance the clock to the discharge", "Documentation", "Her stay", "Draft with AI", "Edit",
+          "Red item: lisinopril, no source: Remove", "Save and re-check", "Sign as physician"),
          "The draft cites a source for every line. One medicine came from a note, not from an order, so the "
          "validator marks it red and the signature is blocked until the surgeon removes it.",
          ("Red item 'lisinopril' with 'no matching source'", "Sign enabled after the removal", "dsum-stay-j0001 final"),
@@ -306,7 +310,8 @@ STEPS: tuple[Step, ...] = (
          permission="The surgeon may sign because he is her attending; another unit's physician would be asked for break-glass first."),
     Step(10, "instructions", "Bilingual instructions: warfarin diet and wound red flags", "7.3 documentation",
          "ward_nurse", "/documentation",
-         ("Documentation", "Her patient instructions (Chinese)", "Check the medicines, diet and red flags", "Sign"),
+         ("Documentation", "Her stay", "Draft now (unless the AI has drafted them already)",
+          "Her patient instructions (Chinese): check the medicines, diet and red flags", "Sign as nurse"),
          "From the signed summary: the same content in Chinese and English, with warfarin's steady greens and the "
          "wound red flags; the nurse signs.",
          ("Instructions in 简体中文 by default", "Warfarin: 每周吃的绿叶蔬菜量要大致相同", "Wound red flags"),
@@ -314,8 +319,9 @@ STEPS: tuple[Step, ...] = (
          permission="A nurse signs the patient instructions, not a physician; the default language follows her record (Simplified Chinese)."),
     Step(11, "followup", "48 hours later: a Chinese follow-up call escalates heavy wound drainage", "7.4 follow-up",
          "ward_nurse", f"/follow-up?call={FOLLOWUP_CALL}",  # her call, on the Calls tab (not yet in the Queue)
-         ("Advance the clock 48 hours", f"Follow-up calls, Calls tab: her call (MRN {MRN})", "Place call",
-          "Answer as the patient", "Queue tab: her escalation on top", "Call back"),
+         ("Advance the clock 48 hours", f"Follow-up calls, Calls tab: her call (MRN {MRN})", "Place the call",
+          "Answer as the patient, one line at a time ('nothing else' until the call ends)", "Queue tab: her escalation on top",
+          "Nurse note: what you did when you called back", "Save call-back note"),
          "Two days after discharge the AI calls her in Mandarin with questions from her signed instructions. She "
          "says the wound keeps leaking: the rule layer escalates at once, and the nurse calls her back.",
          ("Red flag: heavy wound drainage, with her words", "Task followup-escalation (urgent)",
@@ -348,8 +354,8 @@ EN_STEPS: dict[str, dict] = {
                    "After Confirm: the visit ed-j0001 (EMER) is registered")},
     "instructions": {
         "title": "Patient instructions: warfarin diet and wound red flags",
-        "click_path": ("Documentation", "Her patient instructions (English)", "Check the medicines, diet and red flags",
-                       "Sign"),
+        "click_path": ("Documentation", "Her stay", "Draft now (unless the AI has drafted them already)",
+                       "Her patient instructions (English): check the medicines, diet and red flags", "Sign as nurse"),
         "say": "From the signed summary: plain-language instructions in her language, English, with the Chinese versions "
                "one click away; warfarin's steady greens and the wound red flags. The nurse signs.",
         "expect": ("Instructions in English by default",
