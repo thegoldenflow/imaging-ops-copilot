@@ -11,7 +11,7 @@
   },
   "captured": {
     "at": "2026-10-19",
-    "version": "5e73b68+",
+    "version": "1d7d7b1",
     "model": "mock",
     "temporal": true,
     "story": "en"
@@ -80,7 +80,7 @@
       "image": "img/audit-approvals.webp",
       "box": {
         "x": 243,
-        "y": 394,
+        "y": 763,
         "width": 1178,
         "height": 112
       },
@@ -93,9 +93,9 @@
       "image": "img/agent-trace.webp",
       "box": {
         "x": 824,
-        "y": 124,
+        "y": 116,
         "width": 581,
-        "height": 652
+        "height": 668
       },
       "caption": "Every agent run leaves a trace: model and prompt version, on whose behalf it ran, inputs and outputs, its FHIR Provenance, and the human decision that followed."
     },
@@ -108,7 +108,7 @@
         "x": 824,
         "y": 66,
         "width": 269,
-        "height": 808
+        "height": 824
       },
       "caption": "Each tool call passes the gateway with a side-effect level. The gateway authorises from the registry and the signed-in caller, never from what the model claims."
     },
@@ -145,7 +145,7 @@
       "image": "img/summary-sources.webp",
       "box": {
         "x": 1068,
-        "y": 387,
+        "y": 355,
         "width": 337,
         "height": 54
       },

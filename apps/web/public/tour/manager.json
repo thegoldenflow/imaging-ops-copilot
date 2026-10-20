@@ -11,7 +11,7 @@
   },
   "captured": {
     "at": "2026-10-19",
-    "version": "5e73b68+",
+    "version": "1d7d7b1",
     "model": "mock",
     "temporal": true,
     "story": "en"
@@ -151,7 +151,7 @@
       "image": "img/summary-sources.webp",
       "box": {
         "x": 808,
-        "y": 449,
+        "y": 417,
         "width": 217,
         "height": 66
       },
@@ -164,7 +164,7 @@
       "image": "img/summary-blocked.webp",
       "box": {
         "x": 579,
-        "y": 605,
+        "y": 573,
         "width": 217,
         "height": 164
       },
@@ -190,7 +190,7 @@
       "image": "img/followup-call.webp",
       "box": {
         "x": 671,
-        "y": 782,
+        "y": 393,
         "width": 722,
         "height": 114
       },
