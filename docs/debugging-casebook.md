@@ -2824,7 +2824,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** 平台（演示的每日重置、后台循环），hospital（故事线预设），部署（内存上限）。
 - **来源：** 本会话 2026-10-19，7.9 之后的防护（PROGRESS "The daily reset prepares the storyline" 里的待办）。
 - **代码：** `apps/api/app/modules/admin/service.py`（`maybe_daily_reset`、`_attempted`）、`apps/api/app/main.py`（`_step`、`_intake_loop`，未改）、
-  `apps/api/tests/test_daily_reset.py`（`_step`、两个新测试）；分支 `claude/exciting-moser-89432d`。
+  `apps/api/tests/test_daily_reset.py`（`_step`、两个新测试）；分支 `claude/exciting-moser-89432d`，提交 `56a0797`。
 
 ---
 
