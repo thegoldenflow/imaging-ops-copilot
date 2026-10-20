@@ -11,7 +11,7 @@
   },
   "captured": {
     "at": "2026-10-19",
-    "version": "1d7d7b1",
+    "version": "42a814c",
     "model": "mock",
     "temporal": true,
     "story": "en"
@@ -151,7 +151,7 @@
       "image": "img/summary-sources.webp",
       "box": {
         "x": 808,
-        "y": 417,
+        "y": 449,
         "width": 217,
         "height": 66
       },
@@ -164,7 +164,7 @@
       "image": "img/summary-blocked.webp",
       "box": {
         "x": 579,
-        "y": 573,
+        "y": 605,
         "width": 217,
         "height": 164
       },
