@@ -1,0 +1,208 @@
+{
+  "track": "engineer",
+  "title": "Behind the same story",
+  "audience": "Engineer",
+  "intro": "The same patient and the same twelve steps, seen from underneath: the audit trail, the agent gateway, the validator, the evals and the workflow.",
+  "other": "manager",
+  "end": {
+    "title": "Every number here comes from the app's own trace store and eval files.",
+    "text": "Mock-model runs are baselines that prove the pipeline, not clinical performance. All data is synthetic.",
+    "otherLabel": "The patient's story"
+  },
+  "captured": {
+    "at": "2026-10-19",
+    "version": "5e73b68+",
+    "model": "mock",
+    "temporal": true,
+    "story": "en"
+  },
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "chapters": [
+    {
+      "id": "trail",
+      "title": "Every step leaves a trail",
+      "role": {
+        "name": "Casey Brooks",
+        "title": "administrator",
+        "text": "You see what the clinical roles cannot: each step's trail and the audit log behind it."
+      }
+    },
+    {
+      "id": "gateway",
+      "title": "Agents work through a gateway",
+      "role": {
+        "name": "Casey Brooks",
+        "title": "administrator",
+        "text": "You see every agent run: the tools it called, their side-effect levels, and the person who decided."
+      }
+    },
+    {
+      "id": "validator",
+      "title": "The validator is code",
+      "step": 9,
+      "role": {
+        "name": "Dr. Victor Osei",
+        "title": "orthopaedic surgeon",
+        "text": "The screen from the manager track. This time, look at the evidence behind each line."
+      }
+    },
+    {
+      "id": "evals",
+      "title": "Evals and the durable journey",
+      "role": {
+        "name": "Casey Brooks",
+        "title": "administrator",
+        "text": "On AI Ops and Workflows: how a change gets in, and how a stay of several days survives a restart."
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "trail",
+      "chapter": "trail",
+      "screen": "Hospital storyline · step 1",
+      "image": "img/story-trail.webp",
+      "box": {
+        "x": 327,
+        "y": 369,
+        "width": 1010,
+        "height": 161
+      },
+      "caption": "Each step records three things: what the AI proposed, who signed, and the audit events. Step 1: the registration the agent pre-filled, confirmed by Maya Nakamura."
+    },
+    {
+      "id": "audit",
+      "chapter": "trail",
+      "screen": "Audit log · approvals",
+      "image": "img/audit-approvals.webp",
+      "box": {
+        "x": 243,
+        "y": 394,
+        "width": 1178,
+        "height": 112
+      },
+      "caption": "The audit log is append-only and SHA-256 hash-chained. Each event says who, which role, when, which record and why; the patient appears only as a keyed hash."
+    },
+    {
+      "id": "trace",
+      "chapter": "gateway",
+      "screen": "AI Ops · an agent run's trace",
+      "image": "img/agent-trace.webp",
+      "box": {
+        "x": 824,
+        "y": 124,
+        "width": 581,
+        "height": 652
+      },
+      "caption": "Every agent run leaves a trace: model and prompt version, on whose behalf it ran, inputs and outputs, its FHIR Provenance, and the human decision that followed."
+    },
+    {
+      "id": "tools",
+      "chapter": "gateway",
+      "screen": "AI Ops · an agent run's trace",
+      "image": "img/agent-tools.webp",
+      "box": {
+        "x": 824,
+        "y": 66,
+        "width": 269,
+        "height": 808
+      },
+      "caption": "Each tool call passes the gateway with a side-effect level. The gateway authorises from the registry and the signed-in caller, never from what the model claims."
+    },
+    {
+      "id": "tiers",
+      "chapter": "gateway",
+      "screen": "Safety tiers",
+      "image": "img/safety-tiers.webp",
+      "box": {
+        "x": 250,
+        "y": 325,
+        "width": 1164,
+        "height": 521
+      },
+      "caption": "Every agent and module is registered with a risk tier (ops, documentation, clinical decision support) and the role that must sign. The registry decides, not the screen."
+    },
+    {
+      "id": "reach",
+      "chapter": "gateway",
+      "screen": "Safety tiers",
+      "image": "img/safety-reach.webp",
+      "box": {
+        "x": 267,
+        "y": 264,
+        "width": 1130,
+        "height": 372
+      },
+      "caption": "Second axis: tools by side effect (read, recommend, action, privileged). An ops agent can reach a privileged tool, like a bed move; that call still needs a recorded approval."
+    },
+    {
+      "id": "evidence",
+      "chapter": "validator",
+      "screen": "Documentation · discharge summary",
+      "image": "img/summary-sources.webp",
+      "box": {
+        "x": 1068,
+        "y": 387,
+        "width": 337,
+        "height": 54
+      },
+      "caption": "Each line carries references to FHIR resources. Select a line and the source panel highlights what it cites, here her home warfarin, so every claim can be checked."
+    },
+    {
+      "id": "refused",
+      "chapter": "validator",
+      "screen": "Documentation · discharge summary",
+      "image": "img/summary-why.webp",
+      "box": {
+        "x": 571,
+        "y": 772,
+        "width": 403,
+        "height": 68
+      },
+      "caption": "The validator is deterministic code, not another model. A medicine with no matching order turns red, and the signing service refuses the draft by any path, not just this button."
+    },
+    {
+      "id": "evalcenter",
+      "chapter": "evals",
+      "screen": "AI Ops · Eval Center",
+      "image": "img/evals-agents.webp",
+      "box": {
+        "x": 242,
+        "y": 195,
+        "width": 1180,
+        "height": 79
+      },
+      "caption": "One command runs every agent's eval set against its threshold. Mock-model runs are baselines: they prove the pipeline and never pass the release gate on their own."
+    },
+    {
+      "id": "gate",
+      "chapter": "evals",
+      "screen": "AI Ops · Registries",
+      "image": "img/evals-prompts.webp",
+      "box": {
+        "x": 243,
+        "y": 405,
+        "width": 1178,
+        "height": 89
+      },
+      "caption": "Prompts are versioned files. Change one without an eval run that meets the agent's threshold, and the prompt gate fails the test suite."
+    },
+    {
+      "id": "journey",
+      "chapter": "evals",
+      "screen": "Workflows · her journey",
+      "image": "img/journey.webp",
+      "box": {
+        "x": 243,
+        "y": 377,
+        "width": 874,
+        "height": 333
+      },
+      "caption": "Her stay is one durable Temporal workflow: sign-offs are signals, the 48-hour follow-up is a timer. Kill the worker mid-step and it resumes without repeating a side effect.",
+      "note": "Captured locally with Temporal on; the public demo runs without Temporal (offline mode)."
+    }
+  ]
+}

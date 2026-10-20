@@ -173,6 +173,7 @@
 | 10.8 | Playwright 小坑 | 平台 | 速查表 |
 | 10.9 | 改了前端后故事线 e2e 两次失败、位置不同：先排除自己的改动，再按 10.5 定性 | hospital | 端到端测试 · 偶发 · 未查明 |
 | 10.10 | 合并后故事线卡在第 5 步：状态缓存的内容比键旧，之后键不再变（死锁） | hospital / 平台 | 端到端测试 · 缓存 · 竞态 · 复现 |
+| 10.11 | 导览采集每拍一张图页面就丢状态：改写 `public/` 下的文件让 Vite 整页刷新 | 平台 + hospital | 端到端测试 · 开发服务器 · 对照实验 |
 | 10.12 | 演示模式两个 spec 在满载机器上超时：错误快照说明是慢不是错 | hospital | 端到端测试 · 负载 |
 | 11.1 | 电话组件崩溃：`useEffect` 返回了 Promise | imaging | 前端 |
 | 11.2 | `/api/auth/me` 被中断就登出 | 平台 | 前端 · 错误处理 |
@@ -3378,6 +3379,45 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **来源：** 本会话 10-18 合并后的测试与两轮复现。
 - **代码：** `apps/api/app/modules/storyline/service.py`（`_cached`、`_facts_key`）、`apps/api/app/core/db/repo.py`（`ModuleSpace.refresh`）、
   `apps/api/tests/test_storyline.py`；分支 `claude/storyline-facts-cache-key`。
+
+### 10.11 导览采集脚本每拍一张图，页面就丢一次状态：Vite 开发服务器在 `public/` 下的文件被改写时整页刷新
+
+- **现象：** 写自助导览的采集脚本（`apps/web/scripts/tour/capture.mjs`，用 Playwright 在真实应用里走故事线、每个热点截一张图）。
+  第一次完整运行顺利走过第 1、5 步。为了让中途失败的运行能续跑，我把脚本改成"每拍一张图就重写一次 `public/tour/<track>.json`"，之后连续三次失败，
+  每次挂的地方都不一样：
+  1. 第 9 步：`Error: nothing matches getByTestId('sign-summary')`，可上一张图刚刚在同一个页面上找到了它旁边的元素；
+  2. 第 11 步：`locator.click: Timeout 30000ms exceeded`，等的是随访通话的 Send 按钮，按钮一直 `disabled`，而脚本明明刚往输入框里填了字；
+  3. 第 1 步：点完 Confirm registration 之后 `getByRole('button', { name: 'End call' })` 30 秒找不到，而第一次运行同一行代码是好的。
+- **怎么查的：**
+  1. 先怀疑自己的定位器。第一个失败确实有一个真 bug：`filter({ has: details.getByText('Verified') })` 里的内层定位器是相对外层每个候选元素查的，
+     写成从 `details` 开始就永远匹配不到（改成页面根的定位器）。但另外两个失败的定位器之前都跑通过，这个解释不了。
+  2. 假设 A："页面在重新渲染，元素瞬间不在"。给每个目标加上"先等可见再量框"，第 9 步过了，但第 11 步照样挂：Send 一直是 disabled，等多久都没用。
+     Send 的禁用条件是 `disabled || !text.trim()`（`voice/Console.tsx`），说明输入框里的字没了。字会没，要么是组件重新挂载（状态清空），要么是提交了。
+  3. 第 1 步的失败最说明问题：通话的状态（`call`）只存在 `CallCentrePage` 的 `useState` 里。找不到 End call 说明页面又回到了"没有通话"，也就是组件被重新挂载了。
+     PROGRESS 里另一个会话记过一次同样的样子（demo-guide spec 里"呼叫中心丢了正在进行的通话，像是页面被重新挂载"，没复现）。
+  4. 对时间：三次失败都紧跟在"拍完一张图"之后；而第一次成功的运行里还没有"每张图后重写 manifest"，图片也都是新文件。差别指向一个假设 B：
+     **往 `public/` 写文件让 Vite 开发服务器刷新了整个页面。**
+  5. 实验一（`node_modules/.shift/reload-probe.mjs`）：打开一个页面，记 `load` 事件次数并在 `window` 上放一个标记，然后在 `public/tour/` 下**新建**一个文件。
+     结果：load 次数不变、标记还在。假设 B 的简单版本被否定。
+  6. 实验二（`reload-probe2.mjs`）：同样的做法，改成**用相同内容重写已有的** `public/tour/engineer.json`，分别在导览页（取过这个文件）和呼叫中心页（从没取过）各测一次。
+     两个页面都是 `loads before: 1 after: 2 marker survived: false`。**确认：改写 `public/` 下已有的文件，Vite 会让所有打开的页面整页刷新**，和页面用没用这个文件无关。
+     这也解释了为什么第一次运行是好的：那时图片都是新建的，manifest 只在最后写一次。
+- **根因：** 采集脚本把截图和 manifest 直接写进 Vite 正在服务的 `public/` 目录。改写已有文件触发整页刷新，页面里只存在组件状态中的东西
+  （正在进行的通话、正在填的回答、刚选中的条目）随之丢失，于是后面的步骤在随机的地方失败。
+- **怎么修：** 采集过程中图片和中间结果只写到 Vite 不监视的暂存目录 `apps/web/node_modules/.cache/tour-capture/`（`shots.json` 记下已拍的图，
+  供 `--from <stage>` 续跑），浏览器的活全部做完之后再一次性发布到 `public/tour/`（复制用到的图、删掉不再用的、写两个 manifest）。
+  另外两处顺手加固：`say()` 在输入框被重渲染清空时重新填写再点 Send；每个目标量框前先等它可见。
+- **怎么证明：** 两个探针实验给出了"新建不刷新、改写就刷新"的对照；改用暂存目录后，从重置开始的完整采集一次跑完（结果见 PROGRESS 的"Self-guided front door"一节）。
+- **经验：**
+  - 测试或脚本里"每次挂的地方不一样"，先找它们共同的前一个动作（这里是"刚拍完一张图"），而不是逐个修每个失败点。
+  - 页面状态只在组件里（`useState`）的地方，任何整页刷新都表现为"东西突然没了"。看到"输入框里的字没了""回到了初始界面"，先问页面是不是被重新加载了：
+    数 `load` 事件、在 `window` 上放标记，是最便宜的判定实验。
+  - 对照实验要分开变量：新建文件和改写文件结果不同，只做第一个就会得出错误的"不是这个原因"。
+  - 往开发服务器正在服务的目录里写东西（生成的资源、截图、报告），先确认开发服务器对它的反应；生成物放到被忽略的目录，最后再发布。
+  - **推测（未验证）：** PROGRESS 里 demo-guide spec 那次"呼叫中心丢了通话"，可能是同一类原因：同一个检出目录里有别的会话在改被 Vite 监视的文件，触发了刷新。
+- **范围：** 平台（Web 开发服务器）+ hospital（导览采集）。
+- **来源：** 本会话 2026-10-19 的三次失败运行和两个探针实验。
+- **代码：** `apps/web/scripts/tour/capture.mjs`（`STAGE`、`publish()`、`say()`、`union()`）；提交 bf5e767（分支 `claude/trusting-tereshkova-6d117b`）。
 
 ### 10.12 演示模式的两个 spec 在满载机器上超时：错误快照里的页面状态说明"慢，不是错"
 

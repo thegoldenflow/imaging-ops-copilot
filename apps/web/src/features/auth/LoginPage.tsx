@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ScanLine } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ErrorState, Loading } from "../../components/ui";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -54,9 +54,13 @@ export function LoginPage() {
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">Imaging Ops Copilot</h1>
-            <p className="text-sm text-slate-600">AI tools for an outpatient imaging centre · demo with synthetic data</p>
+            <p className="text-sm text-slate-600">AI tools for a hospital and its imaging centre · demo with synthetic data</p>
           </div>
         </div>
+        <p className="mb-5 text-sm text-slate-600">
+          New here? <Link to="/" className="font-medium text-brand-700 hover:underline" data-testid="login-tour">Take the
+          3-minute tour first</Link>: recorded from this app, no sign-in.
+        </p>
         <h2 className="mb-3 text-sm font-semibold text-slate-700">Sign in as</h2>
         {users.isLoading && <Loading />}
         {users.error && <ErrorState error={users.error} onRetry={() => users.refetch()} />}

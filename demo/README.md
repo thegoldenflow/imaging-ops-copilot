@@ -6,6 +6,7 @@ assume the hospital's demo data (press **Reset demo** after an upgrade); the sto
 
 | Script | What it shows | Spec | Time | Screen or terminal |
 | --- | --- | --- | --- | --- |
+| [tour.md](tour.md) | The self-guided front door: a recorded tour (screenshots, one hotspot and a caption per step) of storyline steps 1, 5, 9 and 11 for a hospital manager, and of what is behind them for an engineer; how to re-capture it | 8.2 | 3 min per track | `/` signed out, `/tour/manager`, `/tour/engineer` |
 | [hospital_journey.md](hospital_journey.md) | **Start here.** One synthetic patient through the whole hospital in 12 steps: AI proposes, a person signs, the audit trail records it; with or without Temporal | 8.2 | under 10 min | **Hospital storyline** |
 | [flow_control_tower.md](flow_control_tower.md) | ED, bed and OR boards on the simulated clock, an exception narrated by the AI, approved into Tasks | 7.1 | 5 min | **Control Tower** |
 | [med_safety.md](med_safety.md) | Rules first, AI commentary second; admission reconciliation signed by the pharmacist and co-signed | 7.2 | 3 min | **Medication safety** |
