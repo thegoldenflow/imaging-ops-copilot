@@ -42,12 +42,23 @@ person decides, and the audit trail records both. Three steps are roadmap items 
 every page. For each step it first shows the introduction (what the step shows, who plays it, the sentence to say,
 what the audience will see); **Start** switches to that person and opens their screen (and starts the clock's
 fast-forward when the step waits for time). It then lists the clicks, gives the caller's lines as **Say it** buttons
-(no copy and paste; a Chinese line has its English translation under it) and says whose signature the step waits for; the guide never signs, the presenter clicks the
+(no copy and paste; a Chinese line has its English translation under it; only the next line can be said, and a line
+said shows **Said**) and says whose signature the step waits for; the guide never signs, the presenter clicks the
 real button, which the guide marks on the screen with an amber ring and a label ("Start the call", "Confirm the
 registration the AI pre-filled", "Approve the actions the AI recommends"…): the first button of the step not yet pressed,
-so someone who has never seen the app knows where to click. When the step is done it shows the trail and asks **Continue to the next step?** (**Not yet** pauses
+so someone who has never seen the app knows where to click. The guide's list of clicks is the spotlight's order, in
+the buttons' own words. The label never covers what it points at: for a button of the guide it sits outside the
+panel, level with the button; for a button on the page it goes where it covers no text of the button's row or card
+and as little else as possible. When the step is done it shows the trail and asks **Continue to the next step?** (**Not yet** pauses
 it; **Resume** goes on). When the button to press is under the panel, the panel moves to the bottom left; fold it
 with its arrow if it still covers something. Exit with its cross.
+
+**Who you are now.** While demo mode is on, a strip under the header reads "You are now <name> · <role>" with the
+step's permission sentence ("The clerk sees who the patient is and that she is registered, never why…"). Each time
+demo mode switches person (**Start**, **Switch to Dr. Victor Osei to co-sign**, **Back to …**) the strip turns dark
+for five seconds and says who you were before ("switched from Casey Brooks · Administrator"): point at it. It is
+part of the page, under the header, so it never covers a button the spotlight marks. In demo mode the call centre's
+quick phrases leave out the developer's seeded-caller shortcuts ("ID: en_heart" and the like).
 
 **English subtitles (the Mandarin-speaking patient).** While demo mode is on, every Chinese turn of the call centre's
 and the follow-up call's transcript has its English under it, marked "Translation". The caller's scripted lines have
@@ -97,11 +108,12 @@ Each step card on the page has a **Switch to … and open …** button, the clic
 should show** list and a three-column trail: **AI proposed**, **Signed by**, **Audit**. The trail fills in as soon
 as the step is done, and the step's badge turns **Done**.
 
-1. **0:00 — The call (7.4 call centre, clerk).** **Switch to Maya Nakamura**, then on **Call centre** press **Start call**. Say the daughter's two lines (the guide's **Say it** buttons, or copy them from the storyline page and paste each one as a turn):
-   "Hello, my mother fell at home, and an ambulance is bringing her to your emergency department." and "I'm her daughter. Her name is Margaret Ellis, born …, health card ending in 4821."
-   - The screen shows the agent asking for her name, birth date and the last four digits of the card, then "Thank you, I've found the record for Margaret" and the identity check "Verified".
+1. **0:00 — The call (7.4 call centre, clerk).** **Switch to Maya Nakamura**, then on **Call centre** press **Start a call**. Say the daughter's three lines, one at a time (the guide's **Say it** buttons, or copy them from the storyline page and paste each one as a turn):
+   "Hello, my mother fell at home, and an ambulance is bringing her to your emergency department.", "I'm her daughter. Her name is Margaret Ellis, born …, health card ending in 4821." and "No, that's all, thank you."
+   - The screen shows the agent asking for her name, birth date and the last four digits of the card, then "Thank you, I've found the record for Margaret. I have prepared Margaret's registration for the emergency department; …" and the identity check "Verified".
    - Say: "Her daughter calls the hospital's line. The call centre checks who the patient is and pre-fills the ED registration. Nothing is recorded yet."
-   - Under **Requests**, the card **ED registration · pre-filled from the call** (AI) shows Margaret Ellis, MRN 40720001, complaint fall, arriving by ambulance. Press **Confirm**, then **End call**: the summary begins "Call from the patient's daughter".
+   - The agent asks "Is there anything else I can help with?": the third line answers it, and the call ends with its summary, "Call from the patient's daughter".
+   - Under **Requests to confirm**, the card **ED registration · pre-filled from the call** (AI) shows Margaret Ellis, MRN 40720001, complaint fall, arriving by ambulance. Press **Confirm**. (Confirmed before the third line, the call is still open: the guide then marks **End call**.)
    - The EHR registers the visit `ed-j0001` (EMER) with the clerk as the operator. Permissions: the clerk sees that she is registered, never why.
 
 2. **1:00 — Triage (7.1, triage nurse).** **Switch to Eun-ji Abernathy**, then **Review queue**, then **Triage suggestion: CTAS 2**.
@@ -116,19 +128,19 @@ as the step is done, and the step's badge turns **Done**.
 
 4. **2:35 — INR 3.8 (8.1 roadmap stub, ED physician).** **Advance the clock** (the INR result comes back about 45 minutes after the orders), then **Review queue**, then **Critical value: INR 3.8**.
    - The card carries the **Roadmap** badge: a preset threshold of INR ≥ 3.5 before surgery, no real routing logic.
-   - **Acknowledge.** Say: "This is a roadmap item: the routing runs on a preset rule, and the architecture for the real one is in the data model."
+   - **Accept** (it acknowledges the value). Say: "This is a roadmap item: the routing runs on a preset rule, and the architecture for the real one is in the data model."
 
 5. **3:10 — No orthopaedic bed (7.1 Control Tower, bed manager).** **Advance the clock** to the admission decision, then **Switch to Jordan Lee**, then **Control Tower**.
    - The Control Tower flags Orthopedics (medium) from 07:00, because the preset fills it. The step still waits for her admission decision, so **Advance the clock** (and the guide's **Start**, which presses it) is offered until then. At the decision she boards, and the exception turns high.
    - The exception card reads **Orthopedics at 100% occupancy** (high). Its narrative is written by the AI from the rule engine's facts as soon as the step's **Advance** brought the exception (the storyline page's step shows "AI working", then when it was generated), and its actions include **Early discharge rounds on Surgery (2 ready)**.
-   - Choose that action and press **Approve**. Tasks go to the owner roles, and the Surgery team discharges the two ready patients early (scripted).
+   - Keep that action ticked and press **Approve N actions → Tasks**. Tasks go to the owner roles, and the Surgery team discharges the two ready patients early (scripted).
    - **Advance the clock** until she has a bed: the first Surgery bed the discharges free, after housekeeping, is hers.
    - Permissions: the bed manager decides for the whole hospital but sees MRN and bed only ("Hidden for your role"). The Surgery nurse sees the clinical card for the same bed.
 
 6. **4:15 — Admission MedRec (7.2, pharmacist and surgeon).** **Switch to Rosa Pemberton**, then **Medication safety**.
-   - Her naproxen order shows a **major** interaction with warfarin. **Request a change.**
-   - In **Admission reconciliation**: warfarin is held, and the home amlodipine is missing from the admission orders (an omission). Handle each discrepancy and press **Sign**.
-   - **Switch to Dr. Victor Osei** and **Co-sign**. The record `medrec-stay-j0001-admission` is final.
+   - Her naproxen order shows a **major** interaction with warfarin. Write why it should change, then **Ask the prescriber to change it**.
+   - In **Admission reconciliation**: warfarin is held, and the home amlodipine is missing from the admission orders (an omission). Give each discrepancy a reason, **Save** it, and press **Sign as pharmacist**.
+   - **Switch to Dr. Victor Osei** (the guide's **Switch to Dr. Victor Osei to co-sign**) and **Co-sign as physician**. The record `medrec-stay-j0001-admission` is final.
 
 7. **5:20 — The OR case (7.1 OR board, OR coordinator).** As Jordan Lee, **Control Tower**, then the **OR list**, then her case.
    - It is booked for 90 minutes and predicted at **115**. The pill **block overtime +N min** shows that it would run past the 16:00 block end.
@@ -136,21 +148,21 @@ as the step is done, and the step's badge turns **Done**.
 
 8. **6:00 — The first night (8.1 roadmap stub, ward nurse).** **Advance the clock** to 02:00 after the surgery, then **Switch to Vera Uchida**, then **Review queue**.
    - The **NEWS2 7** card carries the **Roadmap** badge: the score is preset, not computed. A NEWS2 flag is on her stay.
-   - **Record the response.**
+   - **Accept** (it records the response; with Temporal on, the journey's own card reads **Confirm**).
 
 9. **6:35 — Discharge summary (7.3, surgeon).** **Advance the clock** to the discharge, then **Switch to Dr. Victor Osei**, then **Documentation**, then her stay, then **Draft with AI**.
    - Every line of the draft cites its source. One medicine, **lisinopril**, came from a note rather than an order: the validator marks it red ("no matching source") and **Sign** is blocked.
    - Her known conditions (atrial fibrillation, hypertension, osteoporosis) are diagnoses of her stay. A draft that says what her warfarin or metoprolol is for ("for atrial fibrillation") cites them, so the lisinopril is the only red item.
-   - **Remove** it, then **Sign**. `dsum-stay-j0001` is final.
+   - **Edit**, **Remove** it, **Save and re-check**, then **Sign as physician**. `dsum-stay-j0001` is final.
 
-10. **7:45 — Patient instructions (7.3, ward nurse).** **Switch to Vera Uchida**, then **Documentation**, then her patient instructions.
+10. **7:45 — Patient instructions (7.3, ward nurse).** **Switch to Vera Uchida**, then **Documentation**, then her stay. The AI drafts the instructions from the signed summary on its own; if they are not there yet, **Draft now**.
     - They are in English by default, from her record (the Chinese versions are one click away). The warfarin section says "Eat about the same amount of green vegetables each week", followed by the wound red flags.
-    - **Sign.**
+    - **Sign as nurse.**
 
-11. **8:30 — Follow-up call 48 hours later (7.4, ward nurse).** **Advance the clock** 48 hours (with Temporal on, the journey's timer schedules the call). Then **Follow-up calls**, the **Calls** tab, her call (MRN 40720001), **Place call**. The step's **Switch to Vera Uchida** (and the guide's **Start**) opens her call there (`/follow-up?call=FU-stay-j0001`). Opened before the clock gets there (the guide's Start opens it and then moves the clock), it says "This call is not scheduled yet" and shows the call by itself once it is. The page otherwise opens on its **Queue**, which lists only calls that need a nurse, and hers does not need one yet.
+11. **8:30 — Follow-up call 48 hours later (7.4, ward nurse).** **Advance the clock** 48 hours (with Temporal on, the journey's timer schedules the call). Then **Follow-up calls**, the **Calls** tab, her call (MRN 40720001), **Place the call**. The step's **Switch to Vera Uchida** (and the guide's **Start**) opens her call there (`/follow-up?call=FU-stay-j0001`). Opened before the clock gets there (the guide's Start opens it and then moves the clock), it says "This call is not scheduled yet" and shows the call by itself once it is. The page otherwise opens on its **Queue**, which lists only calls that need a nurse, and hers does not need one yet.
     - Answer as the patient with the phrases from the storyline page (the guide's **Say it**): her birth date, then "I'm all right, but the wound keeps leaking; the gauze is soaked through." Then "No, nothing else." to the remaining questions.
     - The rule layer escalates at once ("A nurse will call you back within 30 minutes"): a red flag for heavy wound drainage, quoting her words, and a Task `followup-escalation` (urgent) for the nurses of her last unit.
-    - On the **Queue** tab her escalation is on top. **Call back** (the note is recorded at hospital time, like every other step's signature). The call never gives medical advice.
+    - On the **Queue** tab her escalation is on top. Write in **Nurse note** what you did when you called back and **Save call-back note** (the note is recorded at hospital time, like every other step's signature). The call never gives medical advice.
 
 12. **9:30 — Coding (8.1 roadmap stub, coder).** **Switch to Maya Nakamura**, then **Review queue**, then **Coding suggestion**.
     - The card suggests S72.0 fracture of neck of femur (ICD-10-CA), with W19, I48 and Z92.1, and the CCI 1.VA.53 rubric. It carries the **Roadmap** badge.

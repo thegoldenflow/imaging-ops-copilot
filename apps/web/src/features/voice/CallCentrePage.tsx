@@ -10,6 +10,7 @@ import {
   decide, endCall, OUTCOME_TONE, sendTurn, startCall, useCalls, useDemo, useRequests, voiceKeys,
   type CallRequest, type HospitalCall,
 } from "./api";
+import { useDemoMode } from "../storyline/demo";
 import { CallerInput, NoCall, SpeakerToggle, Transcript, useSpeech } from "./Console";
 
 const QUICK_EN = [
@@ -56,6 +57,7 @@ export function CallCentrePage() {
   const [call, setCall] = useState<HospitalCall | null>(null);
   const [ended, setEnded] = useState(false);
   const demo = useDemo();
+  const presenting = useDemoMode().active;
 
   const start = useMutation({
     mutationFn: startCall,
@@ -79,9 +81,11 @@ export function CallCentrePage() {
   const active = !!call && !ended && !call.ended_at;
   const callers = Object.entries(demo.data?.callers ?? {}).filter(([, c]) => c.identity_line);
   const lang = call?.language ?? "en";
+  // the seeded callers' identity lines ("ID: en_heart") are a developer's shortcut: hidden while the storyline is
+  // presented in demo mode, where the guide's Say it buttons speak the caller's lines
   const quick = [...(lang === "en" ? QUICK_EN : QUICK_ZH),
-    ...callers.filter(([, c]) => (lang === "en") === (c.language === "en"))
-      .map(([key, c]) => ({ label: `ID: ${key}`, text: (lang === "en" ? c.identity_line : c.identity_line_zh) ?? "" }))];
+    ...(presenting ? [] : callers.filter(([, c]) => (lang === "en") === (c.language === "en"))
+      .map(([key, c]) => ({ label: `ID: ${key}`, text: (lang === "en" ? c.identity_line : c.identity_line_zh) ?? "" })))];
 
   return (
     <div>

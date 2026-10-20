@@ -116,6 +116,10 @@ def test_the_call_centre_proposes_the_registration_and_the_clerk_registers_her(s
     replies = [client.post(f"/api/voice/calls/{call['id']}/turn", headers=clerk, json={"text": t}).json()
                for t in lines[:2]]
     assert "急诊登记" in replies[-1]["reply"] and replies[-1]["call"]["language"] == "zh-Hans"
+    # found her and prepared the registration in one reply, thanking the caller once (it said "Thank you." twice)
+    assert replies[-1]["reply"].count("谢谢") == 1
+    assert replies[-1]["call"]["transcript"][-1]["gloss"].startswith(
+        "Thank you, I've found the record for Xiuying. I have prepared Xiuying's registration")
     request = next(r for r in client.get("/api/voice/requests", headers=clerk).json()["requests"]
                    if r["kind"] == "registration")
     assert request["mrn"] == S.MRN and request["args"]["complaint"] == "fall" and request["args"]["mode"] == "ambulance"

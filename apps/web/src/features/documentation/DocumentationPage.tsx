@@ -78,12 +78,15 @@ export function DocumentationPage() {
   const { user } = useAuth();
   const nurse = user?.role === "nurse";
   const [params, setParams] = useSearchParams();
-  const [view, setView] = useState<View>(nurse ? "instructions" : "summary");
+  const [chosen, setView] = useState<View>(nurse ? "instructions" : "summary");
   const selected = params.get("encounter");
   const { data, isLoading, error, refetch } = useWorklist();
   const tabs: { id: View; label: string }[] = nurse
     ? [{ id: "instructions", label: "Patient instructions" }, { id: "handoff", label: "Shift handoff" }]
     : [{ id: "summary", label: "Discharge summaries" }];
+  // a view of this person's tabs: demo mode switches from the surgeon to the nurse on this same page (no new mount),
+  // and the surgeon's "summary" stayed, with no tab for it and no instructions for the nurse
+  const view = tabs.some((t) => t.id === chosen) ? chosen : tabs[0].id;
   return (
     <div data-testid="documentation">
       <PageHeader

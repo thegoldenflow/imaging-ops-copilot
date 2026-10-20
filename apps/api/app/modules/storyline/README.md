@@ -7,7 +7,10 @@ case (`script.PATIENTS`, the reset's `language`: `en`, the default, or `zh`): th
 checks; her name, her record's language, her daughter's and her own lines and the step texts that name the language
 (steps 1, 10, 11: `script.steps(language)`) differ. Every step is "AI proposes
 → a person signs → audit trail". The guided page is `/storyline` (web `features/storyline/`); its **Demo mode** puts a presenter's guide
-on every page (each step's introduction, the clicks, then "Continue to the next step?"). For a live interview the
+on every page (each step's introduction, the clicks, then "Continue to the next step?") and a strip under the header
+with who is signed in now and the step's `permission` sentence. A step's `click_path` is the order in which the
+guide's spotlight marks the buttons (web `Spotlight.tsx`, `stepTargets`), in the buttons' own words: change both
+together. For a live interview the
 guide can have the demo's automation do a step ("Do this step for me"), jump to a step, or present only the
 highlights (steps 1, 5, 9, 11) with the automation doing the steps in between (`autoplay.py`). For an
 English-speaking audience the Mandarin calls have English subtitles in demo mode: the caller's scripted lines have

@@ -171,6 +171,7 @@
 | 10.8 | Playwright 小坑 | 平台 | 速查表 |
 | 10.9 | 改了前端后故事线 e2e 两次失败、位置不同：先排除自己的改动，再按 10.5 定性 | hospital | 端到端测试 · 偶发 · 未查明 |
 | 10.10 | 合并后故事线卡在第 5 步：状态缓存的内容比键旧，之后键不再变（死锁） | hospital / 平台 | 端到端测试 · 缓存 · 竞态 · 复现 |
+| 10.12 | 演示模式两个 spec 在满载机器上超时：错误快照说明是慢不是错 | hospital | 端到端测试 · 负载 |
 | 11.1 | 电话组件崩溃：`useEffect` 返回了 Promise | imaging | 前端 |
 | 11.2 | `/api/auth/me` 被中断就登出 | 平台 | 前端 · 错误处理 |
 | 11.3 | 刚提交的同行评审从列表消失 | imaging | 前端 · 排序截断 |
@@ -179,6 +180,8 @@
 | 11.6 | 随访页打开在 Queue 标签，她的电话在 Calls 下：步骤的路由只到页面 | hospital | 前端 · 演示 · 深链接 |
 | 11.7 | 演示模式第 11 步：随访页先打开、电话后排上，详情停在 404 不再请求 | hospital | 前端 · 时序 · 深链接 · 端到端 |
 | 11.8 | 聚光灯点亮的按钮被演示向导自己挡住 | hospital | 前端 · 演示 · 布局 |
+| 11.9 | 聚光灯的标签盖住它要指的东西：写死的几何规则不知道标签多大、周围有什么 | hospital | 前端 · 演示 · 布局 · 测量 |
+| 11.10 | 跟着聚光灯走完 12 步：第 10 步护士看不到患者指导（文书页沿用了上一个人的视图） | hospital | 前端 · 演示 · state |
 | 12.1 | MedRec 可以绕过工作台签终稿 | hospital | 设计 · 安全 |
 | 12.2 | 一条超出 72 小时权限的记录拖垮整个队列 | hospital | 设计 · 权限 |
 | 12.3 | 来电者亲属关系存反 | hospital | 设计 · 语义 |
@@ -3256,6 +3259,27 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **代码：** `apps/api/app/modules/storyline/service.py`（`_cached`、`_facts_key`）、`apps/api/app/core/db/repo.py`（`ModuleSpace.refresh`）、
   `apps/api/tests/test_storyline.py`；分支 `claude/storyline-facts-cache-key`。
 
+### 10.12 演示模式的两个 spec 在满载机器上超时：错误快照里的页面状态说明"慢，不是错"
+
+- **现象：** 改完演示模式（11.9、11.10），把 `demo-english`、`demo-highlights`、`hospital-storyline` 放在一起跑（自己的数据库 `ioc_fervent_e2e`，
+  mock 模型，API 9449，Vite 5209）：1 过 2 失败。`demo-english` 在 `getByTestId('demo-intro-11')` 等满 900 秒（自动化跳到第 11 步一直没到）；
+  `demo-highlights` 点了 Confirm registration 以后，`getByTestId('demo-ask-1')` 60 秒没出现。
+- **怎么查的：**
+  1. 先问"是不是我的改动"。读两个 `error-context.md`（失败时的无障碍树快照），看页面停在哪：`demo-english` 的第 1 步（我改过的部分）全部断言都过了，
+     向导停在 "Demo · getting to step 11"，自动化在第 9 步 "as Dr. Victor Osei"：15 分钟走了 8 步，在动，只是慢。`demo-highlights` 的快照里
+     "Requests to confirm" 已经是 "Nothing to confirm"（登记已经批准），但向导显示 "0 of 12 done"：第 1 步的"完成"要等 EHR 的事件循环把就诊写进去，
+     这一步不在我改的任何代码里（`service.py` 里 `out["done"] = bool(f["visit"])`）。
+  2. 再看机器：同一时间我还开着 pytest（故事线整条走查）、另一个 API 上的聚光灯走查脚本（它也在用自动化跳步），任务管理器里 CPU 100%，
+     另外两个会话的 API（9430、9441）各占 2.6–3.1 GB。和 10.5、10.9 一样是共享负载下的"慢"。
+  3. 实验：等 pytest 和走查脚本结束，两个失败的 spec 单独重跑：2 passed（16.3 分钟，`demo-english` 12.9 分钟）。
+- **根因：** 负载。整条故事线的自动化（第 2–10 步，含三次时钟快进）在满载时超过 15 分钟；EHR 写入就诊的事件循环在满载时超过 60 秒。不是本次改动造成的。
+- **怎么修：** 没有代码修复。把重的东西错开跑：pytest 和端到端测试不同时跑整条故事线。
+- **怎么证明：** 单独重跑 2/2 通过；同一轮里不依赖自动化的 `hospital-storyline` 也通过了（27.6 分钟，正常约 5 分钟）。
+- **经验：** 失败时先读 `error-context.md` 里的页面快照：它能直接回答"停在哪一步、是在动还是卡死、我的那部分过没过"，比只看断言消息有用得多。
+- **范围：** hospital（WP9 演示模式 e2e）。
+- **来源：** 本会话 10-19。
+- **代码：** 无改动（`apps/web/e2e/demo-english.spec.ts`、`demo-highlights.spec.ts`）。
+
 ---
 
 ## 十一、前端与多语言界面
@@ -3453,6 +3477,85 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** hospital（WP9 故事线演示模式）。
 - **来源：** 本会话 10-19，英语患者的演示模式 e2e 第二次运行。
 - **代码：** `apps/web/src/features/storyline/DemoGuide.tsx`（`Panel`、`useDockAway`）、`apps/web/e2e/demo-english.spec.ts`。提交：本案所在的提交。
+
+### 11.9 聚光灯的标签盖住了它要指的东西：写死的几何规则不知道标签多大、周围有什么
+
+- **现象：** 在 main 5e73b68 上以第一次用的演讲者身份走第 1 步（headless，1360×900），四处标签盖住了要看的内容：
+  登录页的 "Start here: sign in as Casey Brooks…" 压在上一张卡片 Jordan Lee 的文字上；向导面板里 **Say it** 的标签在按钮左边，仍在面板里，
+  正好盖住要说的那句话；**Confirm** 的标签盖住登记卡片的标题 "ED registration · MRN 40720001"；登录页和故事线页的标签还压住了目标本身。
+  `Spotlight.tsx` 的注释写着 "the label goes to its left, outside the panel"。
+- **怎么查的：**
+  1. **先量，不靠看。** 写了一个走查脚本（`node_modules/.shift/step1-shots.mjs`，git 忽略的目录，裸 import 才能解析），每个时刻截图并记下
+     标签、金框、向导面板的 `getBoundingClientRect()`，算两两是否相交。数据：登录页标签 y 336–376、金框顶 368，重叠 8 px；Say it 的标签
+     x 1039–1235，面板 x 960–1344，整个在面板里；Confirm 的标签 y 774–798，登记卡片那一行从 y 760 开始。
+  2. **假设 A：面板按钮的"旁边"算反了方向。** 读代码：`right: window.innerWidth - rect.left + pad + 8`，也就是"按钮左边"。按钮本身在面板
+     里，按钮左边仍是面板内部。注释说的"outside the panel"是把面板的边当成了参照物，代码用的却是按钮的边。量到的 x 1039 < 1344 证实了这一点。
+  3. **假设 B：标签高度是写死的。** `top: rect.top - pad - 32` 假定标签 32 px 高；可标签 `max-w-[18rem]`，长文字折成两行，量到 h = 40，
+     所以"上方 32 px"的标签往下压住目标 8 px。证实。
+  4. **假设 C：Confirm 的问题不在算法，在布局。** 同一份代码在别的步骤（Accept 按钮在卡片底部一行）没问题。看截图：1360 宽时
+     "Requests to confirm" 卡片只有半宽，`li` 里的文字和按钮是 `flex-wrap`，按钮掉到了文字下面一行，"按钮上方"正好是标题。证实：固定的
+     "上方/下方/左边"在一种布局下对，在另一种下错，规则得改成"不能盖什么"。
+  5. **第一版修复的实验。** 改成候选位置 + 采样：对每个候选框按网格取点，用 `caretPositionFromPoint` 找到点下的字符、再用这个字符的
+     `Range.getClientRects()` 确认点真的落在字形上（`caretPositionFromPoint` 在空白处也会返回最近的位置），`elementFromPoint` 落在按钮、
+     链接、输入框上也算"占用"；挑占用最少的候选。重跑后登录页、Confirm 都好了，可故事线页的标签仍压在副标题上。
+     - 假设 D：文字检测在这页不工作。写 `probe-text.mjs` 在副标题的几个坐标上跑同一段检测：每个点都找到了字形（矩形 y 108–125）。否定。
+     - 假设 E：采样太稀。原来的行距是 `max(6, (h - 7) / 2)`：标签三行高 56 px 时行距 24.5 px，采样行落在 y 101.5 和 126，正好跨过 108–125
+       那一行字。把行距改成固定 8 px（比一行字 17 px 小一半），重跑后标签移到了按钮下方的空白处。证实。
+- **根因：** 标签的位置是几条写死的几何规则（目标上方 32 px；面板按钮的左边），既不知道标签量出来有多大，也不知道周围是面板、是这个按钮
+  所在那一行的文字，还是空白。注释和代码对"旁边"的参照物理解不同，测试也只断言了标签的文字，没断言它的位置。
+- **怎么修：** `Spotlight.tsx` 的 `placeLabel`：标签先隐藏渲染、量出真实宽高（`w-max max-w-[15rem]`）。目标在向导面板里：放在面板外边缘
+  （左边，面板靠左时放右边），与按钮同高；手机宽度面板横跨屏幕时放在面板上方。目标在页面上：找它所属的行或卡片（`li, tr, [data-task],
+  [data-exception], or-row`，高度不超过窗口三分之一），候选是这一行的上方（左对齐、右对齐、居中）、下方、右边、左边；超出窗口、碰到金框、
+  碰到这一行、碰到向导面板的候选直接排除，剩下的按采样（每 8 px 一行、每 14 px 一列）算出的文字和控件占比取最小，同分取靠前的。只在目标或
+  面板移动时重新计算，不是每帧算（页面的文字不会因为标签移动而变）。金框也有了 `data-testid="demo-spotlight-ring"`。
+- **怎么证明：**
+  - 前后对比截图（第 1 步各时刻）和同一脚本量出的盒子：修复前 5 处相交（登录页、故事线页的标签与金框；Start step 1、Say it、Continue 的标签与
+    面板），外加 Confirm 的标签盖住卡片标题；修复后 0 处，Confirm 的标签移到这一行左侧的空白处，与按钮同高。
+  - `e2e/demo-guide.spec.ts` 用 `boundingBox()` 断言（`expect.poll`，因为放置发生在量出尺寸之后）：登录页标签不碰任何 `login-*` 卡片和金框；
+    Start step 1、Say it 的标签不碰向导面板；Confirm 的标签不碰登记卡片那一行和面板；Start the call 的标签不碰角色条。
+  - 跟着聚光灯走的脚本（`follow-spotlight.mjs`，见 11.10）对每个标签记录与目标、所属行、向导面板是否相交：三遍走查（第 1–10 步两遍，第 11 步一遍）共 113 个标签位置，相交 0 处。
+- **经验：**
+  - 布局问题先量盒子，把"看起来挡住了"变成数字（8 px、x 1039 < 1344），再对着代码找是哪条规则产生了这个数字。
+  - 注释和代码说的不一样时，常常是作者心里用的是另一个参照物（面板的边 vs 按钮的边）。
+  - 写死的尺寸（32 px）遇到折行就错：先渲染、再测量、再放置。
+  - 采样检测的间隔要小于要找的东西的最小尺寸：17 px 的一行字，24.5 px 的行距会漏掉它。第一版"修好了大部分"时，剩下那一处往往就是方法本身的漏洞。
+  - "不能盖什么"是约束，"盖得最少"是目标，分开写：约束排除候选，目标在剩下的里面挑，比一串 if/else 规则好维护。
+- **范围：** hospital（WP9 故事线演示模式）。
+- **来源：** 本会话 10-19，演示模式第 1 步走查（自助导览的截图也来自这个模式）。
+- **代码：** `apps/web/src/features/storyline/Spotlight.tsx`（`placeLabel`、`busyAt`、`cover`、`Spotlight`）、
+  `apps/web/e2e/demo-guide.spec.ts`（`labelClear`）。提交：本案所在的提交。
+
+### 11.10 跟着聚光灯走完 12 步：第 10 步护士看不到患者指导（文书页沿用了外科医生的视图）
+
+- **现象：** 为了核对每一步的 click path，写了一个脚本跟着聚光灯走完整个故事（按下被点亮的按钮，被点亮的输入框里打一句话，记下标签和按钮自己的
+  文字）。第 1–9 步都走通了，第 10 步的 "Open her stay" 一直亮着，脚本每 25 秒点一次也没用。截图：护士 Vera Uchida 的文书页，标签页是
+  Patient instructions / Shift handoff，两个都没选中；左边列表每一项都显示 "med table Signed"；右边是 "Pick a patient"。
+- **怎么查的：**
+  1. 列表项里的 "med table" 只在 `view === "summary"` 时渲染：页面处在出院小结视图，可护士根本没有这个标签页。
+  2. `DocumentationPage`：`useState<View>(nurse ? "instructions" : "summary")`，初值只在挂载时算一次。
+  3. 为什么没有重新挂载：第 9 步（外科医生）和第 10 步（护士）的路由都是 `/documentation`；演示模式的 Start 是 `login()` 加
+     `navigate("/documentation")`，同一个路由，React Router 不会重新挂载页面组件，state 里还是外科医生的 "summary"。`navigate` 清掉了
+     `?encounter=`，所以右边是 "Pick a patient"；点她的住院会打开出院小结面板，聚光灯要的是患者指导面板，于是永远完成不了。
+  4. 为什么测试没发现：`hospital-storyline.spec.ts` 每一步都先回 `/storyline` 再切换人（页面重新挂载）；`demo-english.spec.ts` 用自动化跳过了
+     第 2–10 步。从来没有测试在演示模式里从第 9 步直接走到第 10 步。
+- **根因：** 依赖于"当前用户"的初始 state 只在挂载时算一次；换人不换路由时，它留着上一个人的值。
+- **怎么修：** 页面显示的视图从当前这个人的标签页里取：`chosen` 不在 `tabs` 里就用 `tabs[0]`（不用 effect 去"同步" state）。
+- **同一次走查发现的另外三处（聚光灯，已修）：**
+  - 第 4、5 步：Start 已经发出推进时钟的请求，可它在介绍面板里，介绍面板一卸载，"你的回合"面板看不到这个请求，在它返回之前又点亮了
+    **Advance the clock**（脚本真的点了第二次）。两处用同一个 `mutationKey`，`useIsMutating` 期间只显示 "Moving the hospital clock…"。
+  - 第 6 步：切换到外科医生共同签名后，聚光灯点亮了药师的 "Search her MRN"：药师签过之后，搜索和打开萘普生医嘱这两个目标算完成。
+  - 第 9 步：点 Draft with AI 后右边面板在加载（时钟还在推进，API 慢），"Open her stay" 又亮了：改为以页头 `doc-patient` 显示她的住院为准。
+  - 第 11 步：时钟还在走向她的随访电话、还没有 Place the call 时，聚光灯点亮了 **Queue** 标签，接着点亮队列第一项（别人的 "Manual follow-up"）：
+    目标列表里排在后面的护士部分，在前面的目标还不存在时就成了"第一个可用的"。护士的部分（Queue、打开她的电话、回电记录）在她的电话结束之前
+    算作"还没到"，跳过。
+- **怎么证明：** 修复后重跑同一脚本：第 10 步 "Open her stay" 之后直接到 "Sign the instructions as nurse"（AI 已经起草好了）；第 4、5 步不再出现第二个 Advance the clock；第 6 步外科医生那里不再点亮 Search her MRN；第 9 步起草期间 "Open her stay" 不再重亮。第 11 步（从第 11 步开始的第三遍）先是 Place the call，答完、电话结束后才点亮 Queue，再到回电记录；脚本在回电记录处没打进字（机器满载），另用 `probe-note.mjs` 在同一个故事上确认：输入回电记录后，聚光灯移到 "Save the call-back note"。第 12 步没有被脚本走到：它的卡片和第 4 步一样由 `submitForReview` 生成，按钮是 Accept，与 click path 一致。
+- **经验：**
+  - 演示模式会把"同一页面、换一个人"这种平时少见的路径变成常态：用户相关的初始 state 要么从用户派生，要么以用户为 key 重新挂载。
+  - 让脚本像第一次用的人一样"跟着提示点"，比按选择器写死的端到端测试更容易发现引导本身的问题：它只看提示，不知道正确答案。
+- **范围：** hospital（WP7 文书页、WP9 故事线演示模式）。
+- **来源：** 本会话 10-19，第 1 步修复后核对 12 步的 click path。
+- **代码：** `apps/web/src/features/documentation/DocumentationPage.tsx`、`apps/web/src/features/storyline/DemoGuide.tsx`（`ADVANCE`、
+  `useIsMutating`）、`apps/web/src/features/storyline/Spotlight.tsx`（`stayOpen`、medrec 的 `opened`）。提交：本案所在的提交。
 
 ---
 
