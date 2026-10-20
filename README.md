@@ -9,6 +9,10 @@ and a required signer, runs through one tool gateway and leaves an audit trail.
 > that a person confirms. Eval numbers come from synthetic cases and show that the pipeline works, not clinical
 > performance. Nothing in this repository is a medical device or gives medical advice.
 
+**Just looking?** Open the app signed out: its first page offers a three-minute recorded tour of the hospital storyline
+(hospital manager or engineer track; screens captured from this app, no sign-in, [demo/tour.md](demo/tour.md)) before
+the live app.
+
 **New here?** Follow [Run it](#run-it) (about 25 minutes the first time, most of it downloads and data generation),
 sign in as one of the [demo people](#demo-logins), and walk the [hospital storyline](#the-two-storylines). The
 architecture in two pages: **Safety tiers** and **Roadmap** in the app, or [docs/safety-tiers.md](docs/safety-tiers.md).
@@ -152,6 +156,10 @@ from there.
 
 ## The two storylines
 
+The recorded tour (`/`, signed out; `/tour/manager`, `/tour/engineer`) shows four of the hospital storyline's steps and
+what is behind them, from screenshots of this app; `npm run tour:capture` in `apps/web` re-captures it
+([demo/tour.md](demo/tour.md)).
+
 - **Hospital** (`/storyline`, about 10 minutes): press **Reset to the start** (1–3 minutes: the demo data is rebuilt
   with the storyline's patient and a full Orthopedics ward), then follow the 12 steps; each step names who plays
   it, where to click, the sentence to say and what the screen should show. Script with timings:
@@ -190,6 +198,8 @@ cd apps/web && npx playwright test                 # end to end: starts the API 
 - For Playwright set `LLM_PROVIDER=mock` when `.env` has a real key (the specs expect mock outputs), and
   `PW_API_PORT` / `PW_WEB_PORT` to move the API and Vite ports. On a slow machine start the API yourself first:
   Playwright waits only 60 s for it.
+- `e2e/tour.spec.ts` walks both tracks of the recorded tour at 375 and 1440 px and checks that it makes no `/api`
+  request (it needs only Vite).
 - `e2e/hospital-storyline.spec.ts` walks the whole storyline (15–30 minutes); set `STORY_TEMPORAL=1` when the API
   runs with Temporal. The online workflow specs skip themselves without Temporal.
 - Some backend tests depend on the weekday the data is generated for (the hospital day follows it); the known cases
