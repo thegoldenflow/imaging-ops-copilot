@@ -146,6 +146,7 @@
 | 7.7 | COPY 后仍慢：Docker Desktop 端口转发 | 环境 | 性能 · 环境 |
 | 7.8 | 未查明：每次重置 API 内存多留约 400 MiB，先用内存上限兜底 | 平台 | 性能 · 内存 · 部署 |
 | 7.9 | 每日自动重置改成故事线重置：只生成一次；量内存时探针等的审计条数被重置清掉 | 平台 / hospital | 性能 · 内存 · 定时任务 · 测量 |
+| 7.10 | 失败的每日重置每 2 秒重来一次：每个进程每天只试一次；两种测试写法在没修时也通过 | 平台 / hospital | 定时任务 · 内存 · 测试 |
 | 8.1 | 生成器第一次校准：医院被挤爆 | hospital | 合成数据 |
 | 8.2 | ICU 太空，看到三次才修 | hospital | 合成数据 |
 | 8.3 | 术前 Task 指向错误的 id | hospital | 合成数据 · 引用 |
@@ -2772,6 +2773,58 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **来源：** 本会话 2026-10-19 23:00–00:30 UTC，自助导览"try it live"的准备工作。
 - **代码：** `apps/api/app/modules/admin/service.py`（`maybe_daily_reset`）、`apps/api/app/modules/storyline/service.py`（`reset`、`SCHEDULER`）、
   `apps/api/tests/test_daily_reset.py`；分支 `claude/peaceful-jones-bac6f2`。
+
+### 7.10 失败的每日重置每 2 秒重来一次：每个进程每天只试一次；两种看似合理的测试写法在没修时也通过
+
+- **现象：** 没有真的发生过，是一道防护。`app/modules/admin/service.py::maybe_daily_reset` 在 `app/main.py::_step` 里跑，
+  intake 循环每 2 秒调用一次，不管有没有人在用。7.9 之后每日重置是故事线重置：`reset_store()` 重新生成数据，再 `preset.plant(...)` 种预设。
+  任何一步抛异常，`_step` 记一行 `daily demo reset failed` 并回滚事务，当天的 `daily_reset` 标记没写成，2 秒后下一轮又从头生成一次。
+  线上每次重新生成在 1.5 GiB 的上限下多留 400–650 MiB（7.8、7.9），所以一个持续的失败会变成"生成 → OOM → 重启 → 再生成"的循环，网站大部分时间是 502。
+  这在 7.9 之前就成立（普通重置的生成也可能失败），预设又多了一个可能失败的步骤。
+- **怎么查的：**
+  1. 先确认重试是确定的，不是猜的。读调用链：`_intake_loop` 每 2 秒 → `_step(name, fn)`：在 `unit_of_work()` 里先取
+     `pg_try_advisory_xact_lock_shared(REWRITE_LOCK)`，再 `fn(store)`；异常时 `log.exception("%s failed", name)`，事务回滚。
+     `maybe_daily_reset`：过了钟点 → `try_lock(_RESET_LOCK)` → 取锁之后读标记 → `storyline.reset(None, reason="daily demo reset")` → 写标记。
+     两处写标记（`reset_store()` 里一次，12.15；`maybe_daily_reset` 末尾一次）都在这个事务里，回滚时一起没了。所以失败之后，下一轮看到的还是昨天的标记，一定会再试。
+  2. 选方案："今天试过了"记在哪里？(a) 记在数据库里：失败的事务已经回滚，得另开一个事务写，多一个提交点，还要改 12.15 的标记逻辑（任务要求它不动）。
+     (b) 记在进程内存里：一个模块变量 `_attempted`，记上次尝试的日期。重启之后会再试一次，但重启只来自 OOM 或部署，一天最多"每次重启一次"，
+     代价有上限。选 (b)。在锁和标记检查都通过之后、重置开始之前记下（所以没取到锁、或别的进程已经重置过，都不算"试过"）；
+     检查放在最前面，钟点判断之后、取锁之前，当天之后的调用连锁都不用取。成功也记：同一天里标记本来就会挡住，两者一致。手动重置（页头 Reset demo、故事线重置）不经过这里。
+  3. 日志：异常的消息可能带病人数据（项目规则：日志里不放 payload），所以只记日期和异常的类型名：
+     `daily demo reset of 2026-10-19 failed (RuntimeError); not tried again today in this process`。然后 `raise`，让 `_step` 照旧回滚、记 traceback。
+  4. 测试怎么写？第一个想法：把 `journey.plant` 换成抛异常，连续调用两次 `maybe_daily_reset`，第二次应该返回 False，生成计数是 1。
+     假设：这个测试在没有防护时也会通过。理由：测试里的 `fresh_state` 是 ambient store，`unit_of_work()` 遇到 ambient store 直接把它交出去，抛异常时**不回滚**；
+     而 `reset_store()` 在预设之前已经写了今天的标记，所以第二次调用会被标记挡住，和防护无关。
+  5. 第二个想法：在测试里模拟 `_step` 的回滚：每次调用开一个 savepoint，失败时 `savepoint.rollback()`、`store.expunge()`、`clear_process_cache()`。
+     又一个假设：这样也会假绿。理由：测试自己先布置的"昨天的标记"（`fresh_state.modules["daily_reset"] = yesterday`）还只在 store 的内存里，没有 flush，
+     `expunge()` 会把它一起丢掉，之后读到的是库里的值：会话开始时 `conftest.py` 用 `reset_store()` 种数据，写的是今天的标记。
+     所以 helper `_step` 一开始先 `store.flush()`（布置的前提属于"之前已经提交的事务"）。
+  6. 实验，看测试能不能分辨有无防护：把防护临时关掉（`or (False and _attempted == today)`），跑两个新测试，外加一个临时探针文件里的两种写法
+     （第 4 步的不回滚、第 5 步的回滚但不先 flush），用 `-s` 打印失败之后读到的标记。结果：
+     - 两个新测试失败。`test_a_failing_daily_reset_is_tried_once_a_day_not_every_2_s`：`assert None is False`，第二次调用又试了一次、又抛错；
+       `test_a_daily_reset_that_failed_runs_the_next_day`：`assert True is False`，第二次调用重试成功，又生成了一次数据。
+     - 两种写法都通过，打印 `marker after the failed try, no rollback: 2026-10-19` 和 `marker after rollback + expunge, no flush first: 2026-10-19`。
+       两个假设都成立：它们挡住第二次调用的是今天的标记，不是防护。
+     恢复防护后 `tests/test_daily_reset.py` 7/7。
+- **根因：** 每日重置把"今天已经重置"的标记写在重置自己的事务里。失败时标记跟着回滚，而"试过一次"这件事没有任何记录，
+  所以失败等于"今天还没做"，按调用频率（2 秒）一直重试，和"一天一次"的本意差了四万多倍。每次重试都是一次昂贵的生成（泄漏几百 MiB）。
+- **怎么修：** `maybe_daily_reset` 加模块变量 `_attempted`（本进程上次尝试的日期）。`_attempted == today` 时直接返回 False；
+  锁和标记检查通过之后先记 `_attempted = today`，再调用 `storyline.reset`；失败时 `log.error(...)` 只记日期和异常类型，然后 `raise`。
+  锁、取锁后读标记、12.15 的标记逻辑都没动。
+- **怎么证明：** `tests/test_daily_reset.py` 新增两个测试，helper `_step` 先 flush，再用 savepoint 模拟 `_step` 的事务，失败时回滚并清缓存。
+  (1) 预设每次都抛异常：当天只试一次（9:00:00 试、9:00:02 和 15:00 不试），失败之后标记还是昨天的，日志一行；模拟重启（`_attempted` 清空）再试一次；
+  第二天 7 点不试（钟点之前），9 点再试一次。(2) 生成只在今天失败：今天 10 点不再试，第二天 9 点重置成功，故事线 prepared、第 1 步、Margaret Ellis，一共生成两次。
+  关掉防护时两个都失败（第 6 步）。`tests/test_daily_reset.py` 7/7；连同 `tests/test_storyline.py` 一共 27 个通过（自己的库 `ioc_test_resetguard`，39.7 分钟）。
+- **经验：**
+  - 定时任务的"做过了"标记写在任务自己的事务里时，失败会把标记一起回滚。"试过"和"做成"要分开记，否则失败就等于"没做过"，按循环频率无限重试；
+    任务越贵（这里一次泄漏几百 MiB），这个差别越要紧。
+  - 写"失败之后不再重试"的测试，先确认失败那一次之后的状态和生产一样：生产里事务回滚了，测试共享的 ambient store 却不回滚，要自己模拟。
+  - 模拟回滚时，测试自己布置的前提也会被卷进去：没 flush 的改动会被 `expunge()` 一起丢掉，之后读到的是库里的值（这里恰好是"今天"）。
+  - 新测试要在关掉修复的情况下跑一次，看它真的会失败。这次两种看似合理的写法都是假绿，只有打印出它们读到的标记才看得出原因。
+- **范围：** 平台（演示的每日重置、后台循环），hospital（故事线预设），部署（内存上限）。
+- **来源：** 本会话 2026-10-19，7.9 之后的防护（PROGRESS "The daily reset prepares the storyline" 里的待办）。
+- **代码：** `apps/api/app/modules/admin/service.py`（`maybe_daily_reset`、`_attempted`）、`apps/api/app/main.py`（`_step`、`_intake_loop`，未改）、
+  `apps/api/tests/test_daily_reset.py`（`_step`、两个新测试）；分支 `claude/exciting-moser-89432d`。
 
 ---
 
