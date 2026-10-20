@@ -9,6 +9,10 @@ and a required signer, runs through one tool gateway and leaves an audit trail.
 > that a person confirms. Eval numbers come from synthetic cases and show that the pipeline works, not clinical
 > performance. Nothing in this repository is a medical device or gives medical advice.
 
+**Just looking?** Open the app signed out: its first page offers a three-minute recorded tour of the hospital storyline
+(hospital manager or engineer track; screens captured from this app, no sign-in, [demo/tour.md](demo/tour.md)) before
+the live app.
+
 **New here?** Follow [Run it](#run-it) (about 25 minutes the first time, most of it downloads and data generation),
 sign in as one of the [demo people](#demo-logins), and walk the [hospital storyline](#the-two-storylines). The
 architecture in two pages: **Safety tiers** and **Roadmap** in the app, or [docs/safety-tiers.md](docs/safety-tiers.md).
@@ -152,6 +156,10 @@ from there.
 
 ## The two storylines
 
+The recorded tour (`/`, signed out; `/tour/manager`, `/tour/engineer`) shows four of the hospital storyline's steps and
+what is behind them, from screenshots of this app; `npm run tour:capture` in `apps/web` re-captures it
+([demo/tour.md](demo/tour.md)).
+
 - **Hospital** (`/storyline`, about 10 minutes): press **Reset to the start** (1–3 minutes: the demo data is rebuilt
   with the storyline's patient and a full Orthopedics ward), then follow the 12 steps; each step names who plays
   it, where to click, the sentence to say and what the screen should show. Script with timings:
@@ -190,6 +198,8 @@ cd apps/web && npx playwright test                 # end to end: starts the API 
 - For Playwright set `LLM_PROVIDER=mock` when `.env` has a real key (the specs expect mock outputs), and
   `PW_API_PORT` / `PW_WEB_PORT` to move the API and Vite ports. On a slow machine start the API yourself first:
   Playwright waits only 60 s for it.
+- `e2e/tour.spec.ts` walks both tracks of the recorded tour at 375 and 1440 px and checks that it makes no `/api`
+  request (it needs only Vite).
 - `e2e/hospital-storyline.spec.ts` walks the whole storyline (15–30 minutes); set `STORY_TEMPORAL=1` when the API
   runs with Temporal. The online workflow specs skip themselves without Temporal.
 - Some backend tests depend on the weekday the data is generated for (the hospital day follows it); the known cases
@@ -213,7 +223,7 @@ The variables that matter:
 | `FHIR_BACKEND`, `FHIR_BASE_URL` | `local`; `http://localhost:8080/fhir` | The EHR's store: PostgreSQL or HAPI FHIR |
 | `FOLLOWUP_CALL_DELAY_H`, `FOLLOWUP_CALL_WINDOW_H`, `FOLLOWUP_CALLBACK_MINUTES` | 48, 72, 30 | Follow-up calls on the hospital clock |
 | `DEMO_PASSCODE` | none | Passcode on the login page (set it on a public server) |
-| `DEMO_DAILY_RESET_HOUR` | none | Regenerate the demo data once a day at this hour |
+| `DEMO_DAILY_RESET_HOUR` | none | Regenerate the demo data once a day at this hour, with the hospital storyline ready at step 1 (Margaret Ellis) |
 | `BACKGROUND_WORKERS` | 1 | 0 turns off the background loops (message dispatch, intake, simulator ticks) |
 | `IDLE_PAUSE_MINUTES` | 15 | After this many minutes without a signed-in person using the app, the background work that calls the model (the simulator clock, AI intake, narration, order-review commentary) pauses until the next request; rule-based work goes on. 0: never pause |
 | `BACKGROUND_AI` | `on_demand` | `on_demand`: no model call for work nobody asked for. The background runs the rules; an item's AI (an order review's commentary, a reconciliation's judgements, a Control Tower narrative, a requisition's extraction, triage and protocol, a feedback comment's labels) runs when a person opens it or presses Ask AI, and at once for new work their action created (a submitted requisition, a patient's survey answer, a storyline step). The header's "AI activity" lists every AI action of this browser. `eager`: the background writes the AI output of every new item before anyone looks (a real hospital, the evals) |

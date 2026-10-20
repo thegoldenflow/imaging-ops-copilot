@@ -17,7 +17,9 @@ demo**. No API key needed: the mock models run. Logins: Maya Nakamura (clerk), J
 The planted cases (app/ehr/seed/voice.py; `GET /api/voice/demo` lists them with the lines to say) on the Saturday
 2026-10-10 data: caller **George Gordon** (MRN 40000059, two fracture-clinic visits), follow-up patient **郭明 Ming
 Guo** (MRN 40000116, Simplified Chinese, discharged from Medicine A on Tuesday after a coronary stent, signed
-instructions). The call centre's **ID: en_fracture** (and other **ID:** …) quick phrases say the caller's identity line for you; the follow-up
+instructions). The call centre's quick phrases for the planted callers say who is calling and what they have booked
+(**I'm George Gordon (fracture clinic, CT scan)**, **我是…（抗凝血药物门诊、心功能门诊）** in a Chinese call) and say the
+caller's identity line for you (outside the storyline's demo mode); the follow-up
 console has a **出生日期** quick answer with the patient's birth date.
 
 Say once, at the start: "Everything is synthetic. The calls are typed, not recorded. The agent proposes; a clerk or a
@@ -32,7 +34,7 @@ nurse confirms. It never gives medical advice."
 
 2. **0:20 — Reschedule after the identity check.** *I need to reschedule my fracture clinic appointment.* The agent
    asks for the patient's full name, date of birth and last four card digits before anything personal. Pick
-   **ID: en_fracture** (George Gordon; or type the line): **Verified**. The agent offers three open times; *The second
+   **I'm George Gordon (fracture clinic, CT scan)** (or type the line): **Verified**. The agent offers three open times; *The second
    one* → "To confirm: move your fracture clinic visit from … to …?" → *Yes, please*. "I've asked our booking clerk
    to move your appointment." The action says **Reschedule requested (clerk confirms)**: a proposed Appointment and an approval Task,
    nothing booked yet. "Two wrong identity answers and the caller goes to a person; the agent never guesses."

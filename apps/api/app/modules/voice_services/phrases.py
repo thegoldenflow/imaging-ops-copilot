@@ -177,11 +177,11 @@ CC: dict[str, Phrase] = {
     "faq": p("{answer} Is there anything else I can help with?", "{answer}还有其他需要帮忙的吗？", "{answer}還有其他需要幫忙的嗎？"),
     "faq_none": p("I don't have that information. I can put you through to a person if you like.",
                   "我这里没有这方面的信息。需要的话我可以为您转接工作人员。", "我這裡沒有這方面的資訊。需要的話我可以為您轉接工作人員。"),
-    "arrival_registered": p("Thank you. I have prepared {first}'s registration for the emergency department; the "
-                            "registration desk will confirm it right away, so the triage nurse can see her as soon as "
-                            "she arrives.",
-                            "谢谢。我已经为{first}准备好急诊登记，登记处会马上确认，她一到急诊，分诊护士就能马上接诊。",
-                            "謝謝。我已經為{first}準備好急診登記，登記處會馬上確認，她一到急診，分診護士就能馬上接診。"),
+    # no thanks of its own: it follows "verified" ("Thank you, I've found the record for ...") in the same reply
+    "arrival_registered": p("I have prepared {first}'s registration for the emergency department; the registration "
+                            "desk will confirm it right away, so the triage nurse can see her as soon as she arrives.",
+                            "我已经为{first}准备好急诊登记，登记处会马上确认，她一到急诊，分诊护士就能马上接诊。",
+                            "我已經為{first}準備好急診登記，登記處會馬上確認，她一到急診，分診護士就能馬上接診。"),
     "anything_else": p("Is there anything else I can help with?", "还有其他需要帮忙的吗？", "還有其他需要幫忙的嗎？"),
     "goodbye": p("Thank you for calling Lakeside General Hospital. Goodbye.", "感谢您致电湖滨综合医院，再见。",
                  "感謝您致電湖濱綜合醫院，再見。"),

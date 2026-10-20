@@ -1,0 +1,213 @@
+{
+  "track": "manager",
+  "title": "One patient, four decisions",
+  "audience": "Hospital manager",
+  "intro": "Margaret Ellis, 72, takes warfarin. She falls at home and breaks her hip. Follow four of the twelve moments of her stay. In each one the AI suggests and a named person decides.",
+  "other": "engineer",
+  "end": {
+    "title": "Twelve suggestions, twelve people's decisions.",
+    "text": "The eight steps not shown work the same way: triage, imaging orders, a critical INR, medication reconciliation, the OR booking, a night-time alert, patient instructions and coding.",
+    "otherLabel": "See how it works"
+  },
+  "captured": {
+    "at": "2026-10-19",
+    "version": "42a814c",
+    "model": "mock",
+    "temporal": true,
+    "story": "en"
+  },
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "chapters": [
+    {
+      "id": "call",
+      "title": "The call",
+      "step": 1,
+      "role": {
+        "name": "Maya Nakamura",
+        "title": "registration clerk",
+        "text": "You register patients. You see who they are and that they are registered, never why."
+      }
+    },
+    {
+      "id": "bed",
+      "title": "No orthopaedic bed",
+      "step": 5,
+      "meanwhile": "Since the call (steps 2–4): triage suggested CTAS 2, her hip X-ray and CT were ordered, and an INR of 3.8 was flagged. Each was suggested by the AI and decided by a nurse or physician.",
+      "role": {
+        "name": "Jordan Lee",
+        "title": "bed manager",
+        "text": "You decide for the whole hospital, but you see patients only as MRN and bed."
+      }
+    },
+    {
+      "id": "summary",
+      "title": "The discharge summary",
+      "step": 9,
+      "meanwhile": "Steps 6–8: the pharmacist caught warfarin with naproxen and a missing home medicine, the OR booking was stretched to the predicted 115 minutes, and a NEWS2 alert fired on her first night.",
+      "role": {
+        "name": "Dr. Victor Osei",
+        "title": "orthopaedic surgeon, her attending",
+        "text": "Only your signature makes the discharge summary part of her record."
+      }
+    },
+    {
+      "id": "followup",
+      "title": "48 hours later",
+      "step": 11,
+      "meanwhile": "Step 10: the ward nurse signed her plain-language instructions: the warfarin diet and the wound red flags.",
+      "role": {
+        "name": "Vera Uchida",
+        "title": "Surgery ward nurse",
+        "text": "Escalations from her follow-up call come to you; the call itself never gives medical advice."
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "verified",
+      "chapter": "call",
+      "screen": "Call centre",
+      "image": "img/call-verified.webp",
+      "box": {
+        "x": 1075,
+        "y": 223,
+        "width": 330,
+        "height": 65
+      },
+      "caption": "You don't take this call; the AI agent does. It checks her name, birth date and the last four health-card digits before it discusses anything."
+    },
+    {
+      "id": "registration",
+      "chapter": "call",
+      "screen": "Call centre",
+      "image": "img/call-registration.webp",
+      "box": {
+        "x": 259,
+        "y": 749,
+        "width": 554,
+        "height": 109
+      },
+      "caption": "The agent pre-fills her ED registration from the call, marked AI. Nothing is recorded until you press Confirm: one click instead of retyping, with your name on it."
+    },
+    {
+      "id": "exception",
+      "chapter": "bed",
+      "screen": "Control Tower",
+      "image": "img/bed-exception.webp",
+      "box": {
+        "x": 241,
+        "y": 661,
+        "width": 300,
+        "height": 166
+      },
+      "caption": "She needs an orthopaedic bed and Orthopedics is full. The rule engine raises this exception from live bed data; no model decides that there is a problem."
+    },
+    {
+      "id": "narrative",
+      "chapter": "bed",
+      "screen": "Control Tower · action drawer",
+      "image": "img/bed-drawer.webp",
+      "box": {
+        "x": 1011,
+        "y": 75,
+        "width": 419,
+        "height": 129
+      },
+      "caption": "The AI writes the briefing from the engine's facts only: occupancy, who is boarding, who is ready to leave. It explains the problem; it moves no bed."
+    },
+    {
+      "id": "approve",
+      "chapter": "bed",
+      "screen": "Control Tower · action drawer",
+      "image": "img/bed-action.webp",
+      "box": {
+        "x": 1011,
+        "y": 422,
+        "width": 419,
+        "height": 137
+      },
+      "caption": "Your decision: early discharge rounds on Surgery, where two patients are ready to go. Tasks go to their teams, and the first bed they free is hers."
+    },
+    {
+      "id": "hidden",
+      "chapter": "bed",
+      "screen": "Control Tower · Surgery beds",
+      "image": "img/bed-hidden.webp",
+      "box": {
+        "x": 922,
+        "y": 245,
+        "width": 299,
+        "height": 141
+      },
+      "caption": "You see her only as MRN 40720001 in a Surgery bed. Her name, reason for admission, vital signs and orders are hidden: a bed decision doesn't need them."
+    },
+    {
+      "id": "sources",
+      "chapter": "summary",
+      "screen": "Documentation · discharge summary",
+      "image": "img/summary-sources.webp",
+      "box": {
+        "x": 808,
+        "y": 449,
+        "width": 217,
+        "height": 66
+      },
+      "caption": "The AI drafted her discharge summary. Every line names the record it came from (an order, a result, a note), so you check sources rather than memory."
+    },
+    {
+      "id": "blocked",
+      "chapter": "summary",
+      "screen": "Documentation · discharge summary",
+      "image": "img/summary-blocked.webp",
+      "box": {
+        "x": 579,
+        "y": 605,
+        "width": 217,
+        "height": 164
+      },
+      "caption": "Lisinopril appears in a note but in no order. The validator marks it red and blocks your signature: the AI cannot slip an unsupported medicine into her record."
+    },
+    {
+      "id": "signed",
+      "chapter": "summary",
+      "screen": "Documentation · discharge summary",
+      "image": "img/summary-signed.webp",
+      "box": {
+        "x": 571,
+        "y": 780,
+        "width": 463,
+        "height": 61
+      },
+      "caption": "You remove it, the validator checks again, and you sign. The summary is final under your name; the draft never was part of her record."
+    },
+    {
+      "id": "escalation",
+      "chapter": "followup",
+      "screen": "Follow-up calls · her call",
+      "image": "img/followup-call.webp",
+      "box": {
+        "x": 671,
+        "y": 393,
+        "width": 722,
+        "height": 114
+      },
+      "caption": "Two days home, the AI calls her with questions from her signed instructions. \"The gauze is soaked through\": a rule, not the model, escalates at once."
+    },
+    {
+      "id": "queue",
+      "chapter": "followup",
+      "screen": "Follow-up calls · queue",
+      "image": "img/followup-queue.webp",
+      "box": {
+        "x": 243,
+        "y": 379,
+        "width": 394,
+        "height": 95
+      },
+      "caption": "Her escalation tops your queue, in her own words. You call her back and record it. By design the call would rather over-escalate than miss a wound problem."
+    }
+  ]
+}

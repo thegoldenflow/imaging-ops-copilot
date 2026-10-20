@@ -50,6 +50,7 @@ import { useAuth } from "../lib/auth";
 import { isLiveLlm, llmVendor } from "../lib/llm";
 import { BreakGlassBanner } from "../features/hospital/BreakGlass";
 import { DemoGuide } from "../features/storyline/DemoGuide";
+import { DemoRoleStrip } from "../features/storyline/RoleStrip";
 import { EscalationCount } from "../features/voice/FollowUpPage";
 import { HOSPITAL_CLINICAL, ROLE_LABEL, type Meta, type Role } from "../lib/types";
 import { AiActivityButton } from "./AiActivity";
@@ -208,6 +209,7 @@ export function Layout() {
             </Button>
           </div>
         </header>
+        <DemoRoleStrip />
         <BreakGlassBanner />
         <main className="flex-1 px-4 py-5 md:px-6">
           <Outlet />

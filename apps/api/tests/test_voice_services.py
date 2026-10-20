@@ -111,6 +111,23 @@ def test_demo_data_plants_follow_ups_and_call_centre_appointments(fresh_state):
     assert callers["en_none"]["appointments"] == []
 
 
+def test_the_planted_callers_quick_phrases_say_who_is_calling_and_what_they_have_booked(fresh_state, client, login):
+    """The call centre's shortcut for a planted caller reads as a visitor understands it, in the caller's language,
+    not as the generator's key ("ID: en_fracture")."""
+    store = fresh_state
+    callers = client.get("/api/voice/demo", headers=login(CLERK)).json()["callers"]
+
+    def name(key: str, use: str) -> str:
+        patient = store.fhir.read("Patient", callers[key]["patient"])
+        return next(n["text"] for n in patient["name"] if n.get("use") == use)
+
+    assert callers["en_fracture"]["label"] == f"I'm {name('en_fracture', 'official')} (fracture clinic, CT scan)"
+    assert callers["en_none"]["label"] == f"I'm {name('en_none', 'official')} (no appointments)"
+    assert callers["zh_anticoag"]["label"] == f"我是{name('zh_anticoag', 'usual')}（抗凝血药物门诊、心功能门诊）"
+    assert callers["zh_tw_lung"]["label"] == f"我是{name('zh_tw_lung', 'usual')}（胸腔科門診）"
+    assert not any(c["label"].startswith("ID:") or "_" in c["label"] for c in callers.values())
+
+
 # ---------- the call centre: one test per intent ----------
 
 
@@ -267,6 +284,16 @@ def test_a_relative_calls_in_mandarin_for_the_patient(fresh_state, client, login
     _, replies, call = converse(client, clerk, "What are the visiting hours?", "请问停车场在哪里？")
     gloss = call["transcript"][-1]["gloss"]
     assert replies[-1].startswith("好的，我们用中文继续。") and gloss.startswith("Sure, let's continue in Chinese. ")
+
+
+@pytest.mark.parametrize("lang, thanks", [("en", "Thank you"), ("zh-Hans", "谢谢"), ("zh-Hant", "謝謝")])
+def test_the_ed_registration_reply_thanks_the_caller_once(lang, thanks):
+    """An ED arrival's reply after the identity check is "verified", "arrival_registered" and "anything_else" in one
+    turn: one thank-you, not "Thank you, I've found the record for Margaret. Thank you. I have prepared…"."""
+    reply = P.cat(P.say(P.CC["verified"], lang, first="Margaret"),
+                  P.say(P.CC["arrival_registered"], lang, first="Margaret"), P.say(P.CC["anything_else"], lang))
+    assert reply.count(thanks) == 1 and reply.en.count("Thank you") == 1
+    assert reply.en.startswith("Thank you, I've found the record for Margaret. I have prepared Margaret's registration")
 
 
 def test_the_call_centre_works_without_the_model(fresh_state, client, login):

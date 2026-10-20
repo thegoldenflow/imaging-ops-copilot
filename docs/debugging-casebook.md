@@ -145,6 +145,8 @@
 | 7.6 | 故事线走查太慢：测量推翻两个假设 | hospital | 性能 · 负载 |
 | 7.7 | COPY 后仍慢：Docker Desktop 端口转发 | 环境 | 性能 · 环境 |
 | 7.8 | 未查明：每次重置 API 内存多留约 400 MiB，先用内存上限兜底 | 平台 | 性能 · 内存 · 部署 |
+| 7.9 | 每日自动重置改成故事线重置：只生成一次；量内存时探针等的审计条数被重置清掉 | 平台 / hospital | 性能 · 内存 · 定时任务 · 测量 |
+| 7.10 | 失败的每日重置每 2 秒重来一次：每个进程每天只试一次；两种测试写法在没修时也通过 | 平台 / hospital | 定时任务 · 内存 · 测试 |
 | 8.1 | 生成器第一次校准：医院被挤爆 | hospital | 合成数据 |
 | 8.2 | ICU 太空，看到三次才修 | hospital | 合成数据 |
 | 8.3 | 术前 Task 指向错误的 id | hospital | 合成数据 · 引用 |
@@ -171,6 +173,8 @@
 | 10.8 | Playwright 小坑 | 平台 | 速查表 |
 | 10.9 | 改了前端后故事线 e2e 两次失败、位置不同：先排除自己的改动，再按 10.5 定性 | hospital | 端到端测试 · 偶发 · 未查明 |
 | 10.10 | 合并后故事线卡在第 5 步：状态缓存的内容比键旧，之后键不再变（死锁） | hospital / 平台 | 端到端测试 · 缓存 · 竞态 · 复现 |
+| 10.11 | 导览采集每拍一张图页面就丢状态：改写 `public/` 下的文件让 Vite 整页刷新 | 平台 + hospital | 端到端测试 · 开发服务器 · 对照实验 |
+| 10.12 | 演示模式两个 spec 在满载机器上超时：错误快照说明是慢不是错 | hospital | 端到端测试 · 负载 |
 | 11.1 | 电话组件崩溃：`useEffect` 返回了 Promise | imaging | 前端 |
 | 11.2 | `/api/auth/me` 被中断就登出 | 平台 | 前端 · 错误处理 |
 | 11.3 | 刚提交的同行评审从列表消失 | imaging | 前端 · 排序截断 |
@@ -179,6 +183,8 @@
 | 11.6 | 随访页打开在 Queue 标签，她的电话在 Calls 下：步骤的路由只到页面 | hospital | 前端 · 演示 · 深链接 |
 | 11.7 | 演示模式第 11 步：随访页先打开、电话后排上，详情停在 404 不再请求 | hospital | 前端 · 时序 · 深链接 · 端到端 |
 | 11.8 | 聚光灯点亮的按钮被演示向导自己挡住 | hospital | 前端 · 演示 · 布局 |
+| 11.9 | 聚光灯的标签盖住它要指的东西：写死的几何规则不知道标签多大、周围有什么 | hospital | 前端 · 演示 · 布局 · 测量 |
+| 11.10 | 跟着聚光灯走完 12 步：第 10 步护士看不到患者指导（文书页沿用了上一个人的视图） | hospital | 前端 · 演示 · state |
 | 12.1 | MedRec 可以绕过工作台签终稿 | hospital | 设计 · 安全 |
 | 12.2 | 一条超出 72 小时权限的记录拖垮整个队列 | hospital | 设计 · 权限 |
 | 12.3 | 来电者亲属关系存反 | hospital | 设计 · 语义 |
@@ -2708,6 +2714,124 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 
 ---
 
+### 7.9 每日自动重置改成故事线重置：证明它只生成一次，量内存时探针自己卡住
+
+- **现象：** 2026-10-19 负责人定下：面试官自己打开线上 ops.jasonyao.dev，前门是录好的导览，最后一步"try it live"进真实应用。
+  可是每天 08:00（UTC）的自动重置之后，故事线是"未设置"（12.15）：第一个访客得先点 Reset to the start，等一分钟左右，
+  而每次重置在 1.5 GiB 的上限下多留约 400 MiB（7.8），大约每两次重置就 OOM 重启一次。要求：每日重置之后故事线已经准备好、停在第 1 步、
+  默认病人 Margaret Ellis，而且**只生成一次数据**（不是"普通重置一次 + 故事线重置一次"），并量一下内存是不是也只多一次。
+- **怎么查的：**
+  1. 先读要合并的两段代码。`app/modules/admin/service.py::maybe_daily_reset`：取锁、读标记、`reset_store()`、写标记、记审计、
+     `bridge.on_reset()`、`ondemand.reset()`。`app/modules/storyline/service.py::reset`：`reset_store()`、记审计、`preset.plant(...)`、
+     `bridge.on_reset()`、`ondemand.reset()`、`autoplay.on_reset()`。故事线重置**本来就是**普通重置加预设，善后也是调度器那一套的超集。
+     所以不用拼两个操作，调度器调用一次故事线重置就行。剩下要解决的只有"谁来做"：`reset(user, ...)` 要一个 `StaffUser`，调度器没有。
+  2. 假设：预设的 operator 可以随便填 `"system"`。读 `app/ehr/simulator.py` 第 993 行：
+     `actor=f"user:{self.ctx['operator']}" if self.ctx.get("operator") else SIM_ACTOR`。填 `"system"` 会让她的注入事件写成 `user:system`，冒充一个不存在的人。
+     假设不成立：调度器这次传 `None`，由模拟器自己的 actor 来写。审计照旧记 `system / Scheduler / system`（和以前的每日重置一样）。
+  3. 测试里怎么证明"只生成一次"？真的生成一套数据要 15–20 秒，而且预设需要医院数据（`hospital_plan`），不能像 12.15 的测试那样用空 store 代替。
+     办法：把 `store_module.build_store` 换成**计数**的替身（返回空 store，记一次 "generated"），`persist` 换成什么都不做，库里保留会话开始时种好的数据。
+     这样 `reset_store()` 自己的逻辑（锁、标记）照常跑，预设种在已有数据上，和种在新数据上一样（`story_en` fixture 就是这么做的）。
+     断言 `generated == ["generated"]`。
+  4. 测试能不能分辨新旧代码？把 `admin/service.py` 临时换回旧版本跑第一个测试：`assert view["prepared"] is True and view["current"] == 1` 失败，`E       assert (False is True)`（旧的每日重置不种预设）；换回新版本后 5/5 通过。
+  5. 量内存，用 7.8 的方法：v0.3.1 的 API 镜像，挂上本分支的 `app/`、`config/`、`prompts/`、`knowledge/`，临时库，mock 模型，
+     `DEMO_DAILY_RESET_HOUR=0`（钟点总是已过，只看标记），每次重置后 10 秒读容器 cgroup 的 `anon`。
+     每日重置由调度器自己触发：删掉库里的 `daily_reset` 标记，2 秒内它就会动手，走的是真实的后台循环。
+     一个细节：当时是 23:25 UTC，再过半小时日期一变，调度器会**自己**再重置一次，打乱测量。所以容器设 `TZ=CST-8`（POSIX 写法，不需要 tzdata），
+     本地时间变成第二天 07:25，离午夜很远。
+  6. 第一次测量卡住了：第一次每日重置 66 秒完成，第二次等了 10 分钟也没"完成"。假设一：调度器没跑。查审计表：
+     有一条 `07:30:53 | Scheduler | daily demo reset (...)`，第二次早就提交了，假设一不成立。假设二：探针判断"完成"的条件有问题。
+     探针等的是"审计表里 `action='reset'` 的条数变多"，可重置把审计表也整体换掉了（生成的数据替换所有表，PROGRESS 里写着 "a reset also clears the audit log"）。
+     所以每次重置之后条数都是 1，永远等不到"变多"。假设二成立。改成等 `app_meta.seeded_at` 变化：`persist()` 在重置的同一个事务里写它，提交了才看得见，
+     而且每次都不一样。另外先登录一次再读基线，让"有人登录后缓存变大"（7.8 里 680 → 860 MiB）算进基线，不算到第一次重置头上。
+  7. 重跑（同时还有 35 分钟的测试套件在用同一个 Postgres，所以每次重置要 103–161 秒，平时约 30–60 秒）：
+
+     | 步骤 | anon（MiB） | 增量 | 故事线 |
+     | --- | --- | --- | --- |
+     | 启动、已登录 | 654 | | 未设置 |
+     | 每日重置 A1 | 1096 | +442 | 第 1 步，Margaret Ellis |
+     | 每日重置 A2 | 1753 | +657 | 第 1 步，Margaret Ellis |
+     | 页头 Reset demo（旧的每日重置） | 2289 | +536 | 未设置 |
+     | 访客的故事线重置 | 2703 | +414 | 第 1 步，Margaret Ellis |
+     | 每日重置 A3 | 3271 | +568 | 第 1 步，Margaret Ellis |
+
+     手动重置之后再等 10 秒，`seeded_at` 没变：调度器把手动重置当成了今天的重置（12.15 的标记还在起作用）。API 日志里没有错误。
+  8. 解读：增量在 414–657 MiB 之间，比 7.8 的约 400 MiB 大，也不整齐。噪声来自全程登录（后台模拟器一直在跑），加上 Postgres 很忙。
+     但结论不依赖精确值：每日重置一次的增量，和一次普通重置、一次故事线重置是同一个量级，都是"一次重新生成"。旧的早晨要两次（+536 +414 = +950）。
+- **根因：** 不是 bug，是设计缺口。每日重置只调用 `reset_store()`，故事线预设只在有人点按钮时才种，所以每天早上都要有人用一次重置把故事线准备好。
+- **怎么修：** `storyline.service.reset(user, language, *, reason)` 允许 `user` 为 `None`（调度器）：审计记 `system / Scheduler / system`，
+  原因是 `daily demo reset (demo reset + preset; the patient: English-speaking: Margaret Ellis)`，预设的 operator 为 `None`。
+  `maybe_daily_reset` 取锁、读标记之后调用 `storyline.reset(None, reason="daily demo reset")`，再写当天的标记。手动重置不变：页头的 Reset demo 仍是普通重置，
+  故事线重置仍种所选的病人，两者都算当天的重置。没有加开关：故事线关不掉（每套数据都有医院），`DEMO_DAILY_RESET_HOUR` 只在公开部署上设，那里永远需要准备好的故事线。
+- **怎么证明：** `tests/test_daily_reset.py` 5/5：调度器重置之后 `GET /api/storyline` 是 prepared、current 1、Margaret Ellis，只生成一次；一天只跑一次；
+  页头重置和故事线重置不变、都算当天的。换回旧代码时第一个测试失败。`test_storyline.py`、`test_storyline_autoplay.py`、`test_reset_lock.py`、`test_spend_guard.py`
+  连同它一共 45 个通过。内存：上表（第 7 步）。
+- **经验：**
+  - 要"合并两个操作"之前，先读被调用的那个。故事线重置本来就包含普通重置和它的善后，调用一次就够；把两个拼起来反而多生成一次，内存多泄漏一份。
+  - 给"没有人"的操作找身份时，看这个身份会被写到哪里。随便填一个 `"system"` 用户 id，会让模拟器的事件冒充一个用户。
+  - 想在测试里断言"昂贵的一步只做了一次"，把那一步换成计数的替身，其余逻辑照常跑。
+  - 探针等不到结果时，先怀疑探针的判断条件：用来判断"完成"的数据，会不会被被测操作自己改掉？这里审计表被重置整体换掉了。
+    要选被测操作在同一个事务里写、每次都会变的值（`seeded_at`）。
+  - 测量窗口里有没有会自己触发的东西？这里是午夜（日期一变，调度器就自己重置）。用时区把它挪开。
+  - 内存增量要和对照组在同一次运行、同样的条件下比，别拿另一天量的数（7.8 的 400 MiB）来比。
+- **范围：** 平台（演示重置）、hospital（故事线），部署。
+- **来源：** 本会话 2026-10-19 23:00–00:30 UTC，自助导览"try it live"的准备工作。
+- **代码：** `apps/api/app/modules/admin/service.py`（`maybe_daily_reset`）、`apps/api/app/modules/storyline/service.py`（`reset`、`SCHEDULER`）、
+  `apps/api/tests/test_daily_reset.py`；分支 `claude/peaceful-jones-bac6f2`。
+
+### 7.10 失败的每日重置每 2 秒重来一次：每个进程每天只试一次；两种看似合理的测试写法在没修时也通过
+
+- **现象：** 没有真的发生过，是一道防护。`app/modules/admin/service.py::maybe_daily_reset` 在 `app/main.py::_step` 里跑，
+  intake 循环每 2 秒调用一次，不管有没有人在用。7.9 之后每日重置是故事线重置：`reset_store()` 重新生成数据，再 `preset.plant(...)` 种预设。
+  任何一步抛异常，`_step` 记一行 `daily demo reset failed` 并回滚事务，当天的 `daily_reset` 标记没写成，2 秒后下一轮又从头生成一次。
+  线上每次重新生成在 1.5 GiB 的上限下多留 400–650 MiB（7.8、7.9），所以一个持续的失败会变成"生成 → OOM → 重启 → 再生成"的循环，网站大部分时间是 502。
+  这在 7.9 之前就成立（普通重置的生成也可能失败），预设又多了一个可能失败的步骤。
+- **怎么查的：**
+  1. 先确认重试是确定的，不是猜的。读调用链：`_intake_loop` 每 2 秒 → `_step(name, fn)`：在 `unit_of_work()` 里先取
+     `pg_try_advisory_xact_lock_shared(REWRITE_LOCK)`，再 `fn(store)`；异常时 `log.exception("%s failed", name)`，事务回滚。
+     `maybe_daily_reset`：过了钟点 → `try_lock(_RESET_LOCK)` → 取锁之后读标记 → `storyline.reset(None, reason="daily demo reset")` → 写标记。
+     两处写标记（`reset_store()` 里一次，12.15；`maybe_daily_reset` 末尾一次）都在这个事务里，回滚时一起没了。所以失败之后，下一轮看到的还是昨天的标记，一定会再试。
+  2. 选方案："今天试过了"记在哪里？(a) 记在数据库里：失败的事务已经回滚，得另开一个事务写，多一个提交点，还要改 12.15 的标记逻辑（任务要求它不动）。
+     (b) 记在进程内存里：一个模块变量 `_attempted`，记上次尝试的日期。重启之后会再试一次，但重启只来自 OOM 或部署，一天最多"每次重启一次"，
+     代价有上限。选 (b)。在锁和标记检查都通过之后、重置开始之前记下（所以没取到锁、或别的进程已经重置过，都不算"试过"）；
+     检查放在最前面，钟点判断之后、取锁之前，当天之后的调用连锁都不用取。成功也记：同一天里标记本来就会挡住，两者一致。手动重置（页头 Reset demo、故事线重置）不经过这里。
+  3. 日志：异常的消息可能带病人数据（项目规则：日志里不放 payload），所以只记日期和异常的类型名：
+     `daily demo reset of 2026-10-19 failed (RuntimeError); not tried again today in this process`。然后 `raise`，让 `_step` 照旧回滚、记 traceback。
+  4. 测试怎么写？第一个想法：把 `journey.plant` 换成抛异常，连续调用两次 `maybe_daily_reset`，第二次应该返回 False，生成计数是 1。
+     假设：这个测试在没有防护时也会通过。理由：测试里的 `fresh_state` 是 ambient store，`unit_of_work()` 遇到 ambient store 直接把它交出去，抛异常时**不回滚**；
+     而 `reset_store()` 在预设之前已经写了今天的标记，所以第二次调用会被标记挡住，和防护无关。
+  5. 第二个想法：在测试里模拟 `_step` 的回滚：每次调用开一个 savepoint，失败时 `savepoint.rollback()`、`store.expunge()`、`clear_process_cache()`。
+     又一个假设：这样也会假绿。理由：测试自己先布置的"昨天的标记"（`fresh_state.modules["daily_reset"] = yesterday`）还只在 store 的内存里，没有 flush，
+     `expunge()` 会把它一起丢掉，之后读到的是库里的值：会话开始时 `conftest.py` 用 `reset_store()` 种数据，写的是今天的标记。
+     所以 helper `_step` 一开始先 `store.flush()`（布置的前提属于"之前已经提交的事务"）。
+  6. 实验，看测试能不能分辨有无防护：把防护临时关掉（`or (False and _attempted == today)`），跑两个新测试，外加一个临时探针文件里的两种写法
+     （第 4 步的不回滚、第 5 步的回滚但不先 flush），用 `-s` 打印失败之后读到的标记。结果：
+     - 两个新测试失败。`test_a_failing_daily_reset_is_tried_once_a_day_not_every_2_s`：`assert None is False`，第二次调用又试了一次、又抛错；
+       `test_a_daily_reset_that_failed_runs_the_next_day`：`assert True is False`，第二次调用重试成功，又生成了一次数据。
+     - 两种写法都通过，打印 `marker after the failed try, no rollback: 2026-10-19` 和 `marker after rollback + expunge, no flush first: 2026-10-19`。
+       两个假设都成立：它们挡住第二次调用的是今天的标记，不是防护。
+     恢复防护后 `tests/test_daily_reset.py` 7/7。
+- **根因：** 每日重置把"今天已经重置"的标记写在重置自己的事务里。失败时标记跟着回滚，而"试过一次"这件事没有任何记录，
+  所以失败等于"今天还没做"，按调用频率（2 秒）一直重试，和"一天一次"的本意差了四万多倍。每次重试都是一次昂贵的生成（泄漏几百 MiB）。
+- **怎么修：** `maybe_daily_reset` 加模块变量 `_attempted`（本进程上次尝试的日期）。`_attempted == today` 时直接返回 False；
+  锁和标记检查通过之后先记 `_attempted = today`，再调用 `storyline.reset`；失败时 `log.error(...)` 只记日期和异常类型，然后 `raise`。
+  锁、取锁后读标记、12.15 的标记逻辑都没动。
+- **怎么证明：** `tests/test_daily_reset.py` 新增两个测试，helper `_step` 先 flush，再用 savepoint 模拟 `_step` 的事务，失败时回滚并清缓存。
+  (1) 预设每次都抛异常：当天只试一次（9:00:00 试、9:00:02 和 15:00 不试），失败之后标记还是昨天的，日志一行；模拟重启（`_attempted` 清空）再试一次；
+  第二天 7 点不试（钟点之前），9 点再试一次。(2) 生成只在今天失败：今天 10 点不再试，第二天 9 点重置成功，故事线 prepared、第 1 步、Margaret Ellis，一共生成两次。
+  关掉防护时两个都失败（第 6 步）。`tests/test_daily_reset.py` 7/7；连同 `tests/test_storyline.py` 一共 27 个通过（自己的库 `ioc_test_resetguard`，39.7 分钟）。
+- **经验：**
+  - 定时任务的"做过了"标记写在任务自己的事务里时，失败会把标记一起回滚。"试过"和"做成"要分开记，否则失败就等于"没做过"，按循环频率无限重试；
+    任务越贵（这里一次泄漏几百 MiB），这个差别越要紧。
+  - 写"失败之后不再重试"的测试，先确认失败那一次之后的状态和生产一样：生产里事务回滚了，测试共享的 ambient store 却不回滚，要自己模拟。
+  - 模拟回滚时，测试自己布置的前提也会被卷进去：没 flush 的改动会被 `expunge()` 一起丢掉，之后读到的是库里的值（这里恰好是"今天"）。
+  - 新测试要在关掉修复的情况下跑一次，看它真的会失败。这次两种看似合理的写法都是假绿，只有打印出它们读到的标记才看得出原因。
+- **范围：** 平台（演示的每日重置、后台循环），hospital（故事线预设），部署（内存上限）。
+- **来源：** 本会话 2026-10-19，7.9 之后的防护（PROGRESS "The daily reset prepares the storyline" 里的待办）。
+- **代码：** `apps/api/app/modules/admin/service.py`（`maybe_daily_reset`、`_attempted`）、`apps/api/app/main.py`（`_step`、`_intake_loop`，未改）、
+  `apps/api/tests/test_daily_reset.py`（`_step`、两个新测试）；分支 `claude/exciting-moser-89432d`，提交 `56a0797`。
+
+---
+
 ## 八、合成数据与种子校准
 
 合成数据既是演示的道具，也是测试的输入。这一章的共同点：数据"不像真的"或"不满足故事需要"时，先把关键指标量出来，再动参数；
@@ -3256,6 +3380,66 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **代码：** `apps/api/app/modules/storyline/service.py`（`_cached`、`_facts_key`）、`apps/api/app/core/db/repo.py`（`ModuleSpace.refresh`）、
   `apps/api/tests/test_storyline.py`；分支 `claude/storyline-facts-cache-key`。
 
+### 10.11 导览采集脚本每拍一张图，页面就丢一次状态：Vite 开发服务器在 `public/` 下的文件被改写时整页刷新
+
+- **现象：** 写自助导览的采集脚本（`apps/web/scripts/tour/capture.mjs`，用 Playwright 在真实应用里走故事线、每个热点截一张图）。
+  第一次完整运行顺利走过第 1、5 步。为了让中途失败的运行能续跑，我把脚本改成"每拍一张图就重写一次 `public/tour/<track>.json`"，之后连续三次失败，
+  每次挂的地方都不一样：
+  1. 第 9 步：`Error: nothing matches getByTestId('sign-summary')`，可上一张图刚刚在同一个页面上找到了它旁边的元素；
+  2. 第 11 步：`locator.click: Timeout 30000ms exceeded`，等的是随访通话的 Send 按钮，按钮一直 `disabled`，而脚本明明刚往输入框里填了字；
+  3. 第 1 步：点完 Confirm registration 之后 `getByRole('button', { name: 'End call' })` 30 秒找不到，而第一次运行同一行代码是好的。
+- **怎么查的：**
+  1. 先怀疑自己的定位器。第一个失败确实有一个真 bug：`filter({ has: details.getByText('Verified') })` 里的内层定位器是相对外层每个候选元素查的，
+     写成从 `details` 开始就永远匹配不到（改成页面根的定位器）。但另外两个失败的定位器之前都跑通过，这个解释不了。
+  2. 假设 A："页面在重新渲染，元素瞬间不在"。给每个目标加上"先等可见再量框"，第 9 步过了，但第 11 步照样挂：Send 一直是 disabled，等多久都没用。
+     Send 的禁用条件是 `disabled || !text.trim()`（`voice/Console.tsx`），说明输入框里的字没了。字会没，要么是组件重新挂载（状态清空），要么是提交了。
+  3. 第 1 步的失败最说明问题：通话的状态（`call`）只存在 `CallCentrePage` 的 `useState` 里。找不到 End call 说明页面又回到了"没有通话"，也就是组件被重新挂载了。
+     PROGRESS 里另一个会话记过一次同样的样子（demo-guide spec 里"呼叫中心丢了正在进行的通话，像是页面被重新挂载"，没复现）。
+  4. 对时间：三次失败都紧跟在"拍完一张图"之后；而第一次成功的运行里还没有"每张图后重写 manifest"，图片也都是新文件。差别指向一个假设 B：
+     **往 `public/` 写文件让 Vite 开发服务器刷新了整个页面。**
+  5. 实验一（`node_modules/.shift/reload-probe.mjs`）：打开一个页面，记 `load` 事件次数并在 `window` 上放一个标记，然后在 `public/tour/` 下**新建**一个文件。
+     结果：load 次数不变、标记还在。假设 B 的简单版本被否定。
+  6. 实验二（`reload-probe2.mjs`）：同样的做法，改成**用相同内容重写已有的** `public/tour/engineer.json`，分别在导览页（取过这个文件）和呼叫中心页（从没取过）各测一次。
+     两个页面都是 `loads before: 1 after: 2 marker survived: false`。**确认：改写 `public/` 下已有的文件，Vite 会让所有打开的页面整页刷新**，和页面用没用这个文件无关。
+     这也解释了为什么第一次运行是好的：那时图片都是新建的，manifest 只在最后写一次。
+- **根因：** 采集脚本把截图和 manifest 直接写进 Vite 正在服务的 `public/` 目录。改写已有文件触发整页刷新，页面里只存在组件状态中的东西
+  （正在进行的通话、正在填的回答、刚选中的条目）随之丢失，于是后面的步骤在随机的地方失败。
+- **怎么修：** 采集过程中图片和中间结果只写到 Vite 不监视的暂存目录 `apps/web/node_modules/.cache/tour-capture/`（`shots.json` 记下已拍的图，
+  供 `--from <stage>` 续跑），浏览器的活全部做完之后再一次性发布到 `public/tour/`（复制用到的图、删掉不再用的、写两个 manifest）。
+  另外两处顺手加固：`say()` 在输入框被重渲染清空时重新填写再点 Send；每个目标量框前先等它可见。
+- **怎么证明：** 两个探针实验给出了"新建不刷新、改写就刷新"的对照；改用暂存目录后，从重置开始的完整采集一次跑完（结果见 PROGRESS 的"Self-guided front door"一节）。
+- **经验：**
+  - 测试或脚本里"每次挂的地方不一样"，先找它们共同的前一个动作（这里是"刚拍完一张图"），而不是逐个修每个失败点。
+  - 页面状态只在组件里（`useState`）的地方，任何整页刷新都表现为"东西突然没了"。看到"输入框里的字没了""回到了初始界面"，先问页面是不是被重新加载了：
+    数 `load` 事件、在 `window` 上放标记，是最便宜的判定实验。
+  - 对照实验要分开变量：新建文件和改写文件结果不同，只做第一个就会得出错误的"不是这个原因"。
+  - 往开发服务器正在服务的目录里写东西（生成的资源、截图、报告），先确认开发服务器对它的反应；生成物放到被忽略的目录，最后再发布。
+  - **推测（未验证）：** PROGRESS 里 demo-guide spec 那次"呼叫中心丢了通话"，可能是同一类原因：同一个检出目录里有别的会话在改被 Vite 监视的文件，触发了刷新。
+- **范围：** 平台（Web 开发服务器）+ hospital（导览采集）。
+- **来源：** 本会话 2026-10-19 的三次失败运行和两个探针实验。
+- **代码：** `apps/web/scripts/tour/capture.mjs`（`STAGE`、`publish()`、`say()`、`union()`）；提交 bf5e767（分支 `claude/trusting-tereshkova-6d117b`）。
+
+### 10.12 演示模式的两个 spec 在满载机器上超时：错误快照里的页面状态说明"慢，不是错"
+
+- **现象：** 改完演示模式（11.9、11.10），把 `demo-english`、`demo-highlights`、`hospital-storyline` 放在一起跑（自己的数据库 `ioc_fervent_e2e`，
+  mock 模型，API 9449，Vite 5209）：1 过 2 失败。`demo-english` 在 `getByTestId('demo-intro-11')` 等满 900 秒（自动化跳到第 11 步一直没到）；
+  `demo-highlights` 点了 Confirm registration 以后，`getByTestId('demo-ask-1')` 60 秒没出现。
+- **怎么查的：**
+  1. 先问"是不是我的改动"。读两个 `error-context.md`（失败时的无障碍树快照），看页面停在哪：`demo-english` 的第 1 步（我改过的部分）全部断言都过了，
+     向导停在 "Demo · getting to step 11"，自动化在第 9 步 "as Dr. Victor Osei"：15 分钟走了 8 步，在动，只是慢。`demo-highlights` 的快照里
+     "Requests to confirm" 已经是 "Nothing to confirm"（登记已经批准），但向导显示 "0 of 12 done"：第 1 步的"完成"要等 EHR 的事件循环把就诊写进去，
+     这一步不在我改的任何代码里（`service.py` 里 `out["done"] = bool(f["visit"])`）。
+  2. 再看机器：同一时间我还开着 pytest（故事线整条走查）、另一个 API 上的聚光灯走查脚本（它也在用自动化跳步），任务管理器里 CPU 100%，
+     另外两个会话的 API（9430、9441）各占 2.6–3.1 GB。和 10.5、10.9 一样是共享负载下的"慢"。
+  3. 实验：等 pytest 和走查脚本结束，两个失败的 spec 单独重跑：2 passed（16.3 分钟，`demo-english` 12.9 分钟）。
+- **根因：** 负载。整条故事线的自动化（第 2–10 步，含三次时钟快进）在满载时超过 15 分钟；EHR 写入就诊的事件循环在满载时超过 60 秒。不是本次改动造成的。
+- **怎么修：** 没有代码修复。把重的东西错开跑：pytest 和端到端测试不同时跑整条故事线。
+- **怎么证明：** 单独重跑 2/2 通过；同一轮里不依赖自动化的 `hospital-storyline` 也通过了（27.6 分钟，正常约 5 分钟）。
+- **经验：** 失败时先读 `error-context.md` 里的页面快照：它能直接回答"停在哪一步、是在动还是卡死、我的那部分过没过"，比只看断言消息有用得多。
+- **范围：** hospital（WP9 演示模式 e2e）。
+- **来源：** 本会话 10-19。
+- **代码：** 无改动（`apps/web/e2e/demo-english.spec.ts`、`demo-highlights.spec.ts`）。
+
 ---
 
 ## 十一、前端与多语言界面
@@ -3453,6 +3637,85 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
 - **范围：** hospital（WP9 故事线演示模式）。
 - **来源：** 本会话 10-19，英语患者的演示模式 e2e 第二次运行。
 - **代码：** `apps/web/src/features/storyline/DemoGuide.tsx`（`Panel`、`useDockAway`）、`apps/web/e2e/demo-english.spec.ts`。提交：本案所在的提交。
+
+### 11.9 聚光灯的标签盖住了它要指的东西：写死的几何规则不知道标签多大、周围有什么
+
+- **现象：** 在 main 5e73b68 上以第一次用的演讲者身份走第 1 步（headless，1360×900），四处标签盖住了要看的内容：
+  登录页的 "Start here: sign in as Casey Brooks…" 压在上一张卡片 Jordan Lee 的文字上；向导面板里 **Say it** 的标签在按钮左边，仍在面板里，
+  正好盖住要说的那句话；**Confirm** 的标签盖住登记卡片的标题 "ED registration · MRN 40720001"；登录页和故事线页的标签还压住了目标本身。
+  `Spotlight.tsx` 的注释写着 "the label goes to its left, outside the panel"。
+- **怎么查的：**
+  1. **先量，不靠看。** 写了一个走查脚本（`node_modules/.shift/step1-shots.mjs`，git 忽略的目录，裸 import 才能解析），每个时刻截图并记下
+     标签、金框、向导面板的 `getBoundingClientRect()`，算两两是否相交。数据：登录页标签 y 336–376、金框顶 368，重叠 8 px；Say it 的标签
+     x 1039–1235，面板 x 960–1344，整个在面板里；Confirm 的标签 y 774–798，登记卡片那一行从 y 760 开始。
+  2. **假设 A：面板按钮的"旁边"算反了方向。** 读代码：`right: window.innerWidth - rect.left + pad + 8`，也就是"按钮左边"。按钮本身在面板
+     里，按钮左边仍是面板内部。注释说的"outside the panel"是把面板的边当成了参照物，代码用的却是按钮的边。量到的 x 1039 < 1344 证实了这一点。
+  3. **假设 B：标签高度是写死的。** `top: rect.top - pad - 32` 假定标签 32 px 高；可标签 `max-w-[18rem]`，长文字折成两行，量到 h = 40，
+     所以"上方 32 px"的标签往下压住目标 8 px。证实。
+  4. **假设 C：Confirm 的问题不在算法，在布局。** 同一份代码在别的步骤（Accept 按钮在卡片底部一行）没问题。看截图：1360 宽时
+     "Requests to confirm" 卡片只有半宽，`li` 里的文字和按钮是 `flex-wrap`，按钮掉到了文字下面一行，"按钮上方"正好是标题。证实：固定的
+     "上方/下方/左边"在一种布局下对，在另一种下错，规则得改成"不能盖什么"。
+  5. **第一版修复的实验。** 改成候选位置 + 采样：对每个候选框按网格取点，用 `caretPositionFromPoint` 找到点下的字符、再用这个字符的
+     `Range.getClientRects()` 确认点真的落在字形上（`caretPositionFromPoint` 在空白处也会返回最近的位置），`elementFromPoint` 落在按钮、
+     链接、输入框上也算"占用"；挑占用最少的候选。重跑后登录页、Confirm 都好了，可故事线页的标签仍压在副标题上。
+     - 假设 D：文字检测在这页不工作。写 `probe-text.mjs` 在副标题的几个坐标上跑同一段检测：每个点都找到了字形（矩形 y 108–125）。否定。
+     - 假设 E：采样太稀。原来的行距是 `max(6, (h - 7) / 2)`：标签三行高 56 px 时行距 24.5 px，采样行落在 y 101.5 和 126，正好跨过 108–125
+       那一行字。把行距改成固定 8 px（比一行字 17 px 小一半），重跑后标签移到了按钮下方的空白处。证实。
+- **根因：** 标签的位置是几条写死的几何规则（目标上方 32 px；面板按钮的左边），既不知道标签量出来有多大，也不知道周围是面板、是这个按钮
+  所在那一行的文字，还是空白。注释和代码对"旁边"的参照物理解不同，测试也只断言了标签的文字，没断言它的位置。
+- **怎么修：** `Spotlight.tsx` 的 `placeLabel`：标签先隐藏渲染、量出真实宽高（`w-max max-w-[15rem]`）。目标在向导面板里：放在面板外边缘
+  （左边，面板靠左时放右边），与按钮同高；手机宽度面板横跨屏幕时放在面板上方。目标在页面上：找它所属的行或卡片（`li, tr, [data-task],
+  [data-exception], or-row`，高度不超过窗口三分之一），候选是这一行的上方（左对齐、右对齐、居中）、下方、右边、左边；超出窗口、碰到金框、
+  碰到这一行、碰到向导面板的候选直接排除，剩下的按采样（每 8 px 一行、每 14 px 一列）算出的文字和控件占比取最小，同分取靠前的。只在目标或
+  面板移动时重新计算，不是每帧算（页面的文字不会因为标签移动而变）。金框也有了 `data-testid="demo-spotlight-ring"`。
+- **怎么证明：**
+  - 前后对比截图（第 1 步各时刻）和同一脚本量出的盒子：修复前 5 处相交（登录页、故事线页的标签与金框；Start step 1、Say it、Continue 的标签与
+    面板），外加 Confirm 的标签盖住卡片标题；修复后 0 处，Confirm 的标签移到这一行左侧的空白处，与按钮同高。
+  - `e2e/demo-guide.spec.ts` 用 `boundingBox()` 断言（`expect.poll`，因为放置发生在量出尺寸之后）：登录页标签不碰任何 `login-*` 卡片和金框；
+    Start step 1、Say it 的标签不碰向导面板；Confirm 的标签不碰登记卡片那一行和面板；Start the call 的标签不碰角色条。
+  - 跟着聚光灯走的脚本（`follow-spotlight.mjs`，见 11.10）对每个标签记录与目标、所属行、向导面板是否相交：三遍走查（第 1–10 步两遍，第 11 步一遍）共 113 个标签位置，相交 0 处。
+- **经验：**
+  - 布局问题先量盒子，把"看起来挡住了"变成数字（8 px、x 1039 < 1344），再对着代码找是哪条规则产生了这个数字。
+  - 注释和代码说的不一样时，常常是作者心里用的是另一个参照物（面板的边 vs 按钮的边）。
+  - 写死的尺寸（32 px）遇到折行就错：先渲染、再测量、再放置。
+  - 采样检测的间隔要小于要找的东西的最小尺寸：17 px 的一行字，24.5 px 的行距会漏掉它。第一版"修好了大部分"时，剩下那一处往往就是方法本身的漏洞。
+  - "不能盖什么"是约束，"盖得最少"是目标，分开写：约束排除候选，目标在剩下的里面挑，比一串 if/else 规则好维护。
+- **范围：** hospital（WP9 故事线演示模式）。
+- **来源：** 本会话 10-19，演示模式第 1 步走查（自助导览的截图也来自这个模式）。
+- **代码：** `apps/web/src/features/storyline/Spotlight.tsx`（`placeLabel`、`busyAt`、`cover`、`Spotlight`）、
+  `apps/web/e2e/demo-guide.spec.ts`（`labelClear`）。提交：本案所在的提交。
+
+### 11.10 跟着聚光灯走完 12 步：第 10 步护士看不到患者指导（文书页沿用了外科医生的视图）
+
+- **现象：** 为了核对每一步的 click path，写了一个脚本跟着聚光灯走完整个故事（按下被点亮的按钮，被点亮的输入框里打一句话，记下标签和按钮自己的
+  文字）。第 1–9 步都走通了，第 10 步的 "Open her stay" 一直亮着，脚本每 25 秒点一次也没用。截图：护士 Vera Uchida 的文书页，标签页是
+  Patient instructions / Shift handoff，两个都没选中；左边列表每一项都显示 "med table Signed"；右边是 "Pick a patient"。
+- **怎么查的：**
+  1. 列表项里的 "med table" 只在 `view === "summary"` 时渲染：页面处在出院小结视图，可护士根本没有这个标签页。
+  2. `DocumentationPage`：`useState<View>(nurse ? "instructions" : "summary")`，初值只在挂载时算一次。
+  3. 为什么没有重新挂载：第 9 步（外科医生）和第 10 步（护士）的路由都是 `/documentation`；演示模式的 Start 是 `login()` 加
+     `navigate("/documentation")`，同一个路由，React Router 不会重新挂载页面组件，state 里还是外科医生的 "summary"。`navigate` 清掉了
+     `?encounter=`，所以右边是 "Pick a patient"；点她的住院会打开出院小结面板，聚光灯要的是患者指导面板，于是永远完成不了。
+  4. 为什么测试没发现：`hospital-storyline.spec.ts` 每一步都先回 `/storyline` 再切换人（页面重新挂载）；`demo-english.spec.ts` 用自动化跳过了
+     第 2–10 步。从来没有测试在演示模式里从第 9 步直接走到第 10 步。
+- **根因：** 依赖于"当前用户"的初始 state 只在挂载时算一次；换人不换路由时，它留着上一个人的值。
+- **怎么修：** 页面显示的视图从当前这个人的标签页里取：`chosen` 不在 `tabs` 里就用 `tabs[0]`（不用 effect 去"同步" state）。
+- **同一次走查发现的另外三处（聚光灯，已修）：**
+  - 第 4、5 步：Start 已经发出推进时钟的请求，可它在介绍面板里，介绍面板一卸载，"你的回合"面板看不到这个请求，在它返回之前又点亮了
+    **Advance the clock**（脚本真的点了第二次）。两处用同一个 `mutationKey`，`useIsMutating` 期间只显示 "Moving the hospital clock…"。
+  - 第 6 步：切换到外科医生共同签名后，聚光灯点亮了药师的 "Search her MRN"：药师签过之后，搜索和打开萘普生医嘱这两个目标算完成。
+  - 第 9 步：点 Draft with AI 后右边面板在加载（时钟还在推进，API 慢），"Open her stay" 又亮了：改为以页头 `doc-patient` 显示她的住院为准。
+  - 第 11 步：时钟还在走向她的随访电话、还没有 Place the call 时，聚光灯点亮了 **Queue** 标签，接着点亮队列第一项（别人的 "Manual follow-up"）：
+    目标列表里排在后面的护士部分，在前面的目标还不存在时就成了"第一个可用的"。护士的部分（Queue、打开她的电话、回电记录）在她的电话结束之前
+    算作"还没到"，跳过。
+- **怎么证明：** 修复后重跑同一脚本：第 10 步 "Open her stay" 之后直接到 "Sign the instructions as nurse"（AI 已经起草好了）；第 4、5 步不再出现第二个 Advance the clock；第 6 步外科医生那里不再点亮 Search her MRN；第 9 步起草期间 "Open her stay" 不再重亮。第 11 步（从第 11 步开始的第三遍）先是 Place the call，答完、电话结束后才点亮 Queue，再到回电记录；脚本在回电记录处没打进字（机器满载），另用 `probe-note.mjs` 在同一个故事上确认：输入回电记录后，聚光灯移到 "Save the call-back note"。第 12 步没有被脚本走到：它的卡片和第 4 步一样由 `submitForReview` 生成，按钮是 Accept，与 click path 一致。
+- **经验：**
+  - 演示模式会把"同一页面、换一个人"这种平时少见的路径变成常态：用户相关的初始 state 要么从用户派生，要么以用户为 key 重新挂载。
+  - 让脚本像第一次用的人一样"跟着提示点"，比按选择器写死的端到端测试更容易发现引导本身的问题：它只看提示，不知道正确答案。
+- **范围：** hospital（WP7 文书页、WP9 故事线演示模式）。
+- **来源：** 本会话 10-19，第 1 步修复后核对 12 步的 click path。
+- **代码：** `apps/web/src/features/documentation/DocumentationPage.tsx`、`apps/web/src/features/storyline/DemoGuide.tsx`（`ADVANCE`、
+  `useIsMutating`）、`apps/web/src/features/storyline/Spotlight.tsx`（`stayOpen`、medrec 的 `opened`）。提交：本案所在的提交。
 
 ---
 

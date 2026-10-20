@@ -111,3 +111,18 @@ body {
   background-size: 400px 100%;
   animation: ct-shimmer 1.4s linear infinite;
 }
+
+/* The recorded tour's hotspot (features/tour): a soft amber pulse, still for reduced motion. */
+@keyframes tour-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(251 191 36 / 0.75); }
+  70% { box-shadow: 0 0 0 12px rgb(251 191 36 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(251 191 36 / 0); }
+}
+.tour-pulse {
+  animation: tour-pulse 1.8s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-pulse {
+    animation: none;
+  }
+}

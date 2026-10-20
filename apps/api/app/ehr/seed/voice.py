@@ -341,7 +341,8 @@ def generate(b: Builder, tl: Timeline, patients: dict[str, PatientInfo], now: da
 
             start = _slot(_rng(b, key, service), now, days, SERVICES[service]["hours"])
             appts.append(_appointment(b, f"appt-vc-{n:02d}{i}", p, service, start, encounter)["id"])
-        out["callers"][key] = {"patient": p.id, "language": lang, "appointments": appts, "encounter": encounter}
+        out["callers"][key] = {"patient": p.id, "language": lang, "appointments": appts, "encounter": encounter,
+                               "services": [service for service, _ in booked]}
     b.store.modules["voice_demo"] = out
     return out
 

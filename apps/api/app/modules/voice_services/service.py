@@ -87,8 +87,9 @@ def faq() -> list[dict]:
 
 def demo_cases(store: Store, user: StaffUser | None = None) -> dict:
     """The planted demo patients (app/ehr/seed/voice.py, ids only), plus what the presenter says to play them: the
-    caller's identity line (name, birth date, last four card digits) and the follow-up patient's birth date, read
-    through the user's own FhirGateway (audited; nothing the user may not read)."""
+    caller's identity line (name, birth date, last four card digits) with the call centre's quick phrase for it
+    (`label`), and the follow-up patient's birth date, read through the user's own FhirGateway (audited; nothing the
+    user may not read)."""
     cases = json.loads(json.dumps(store.modules.get("voice_demo") or {}))
     fhir = FhirGateway(Actor.of(user), MODULE) if user is not None else None
     for case in (cases.get("followups") or {}).values():
@@ -102,6 +103,7 @@ def demo_cases(store: Store, user: StaffUser | None = None) -> dict:
             lines = identity_lines(patient)
             case["identity_line"], case["mrn"] = lines["en"], lines["mrn"]
             case["identity_line_zh"] = lines["zh"]
+            case["label"] = caller_label(patient, case)
     return cases
 
 
@@ -128,6 +130,24 @@ def identity_lines(patient: dict) -> dict:
     mrn = next((i.get("value") for i in patient.get("identifier") or [] if i.get("system") == MRN_SYSTEM), None)
     return {"en": f"This is {official}, born {patient.get('birthDate')}, card ending {card[-4:]}.",
             "zh": f"我叫{usual}，{y}年{int(m)}月{int(d)}日出生，健康卡尾号{card[-4:]}。", "mrn": mrn}
+
+
+def caller_label(patient: dict, case: dict) -> str:
+    """The quick phrase that plays a planted caller, as a visitor reads it: who is calling and what they have booked,
+    in the caller's language ("I'm George Gordon (fracture clinic, CT scan)", "我是王芳（抗凝血药物门诊、心功能门诊）").
+    Picking it says the identity line. A case planted before its services were recorded shows the name only."""
+    lang = P.lang_of(case.get("language"))
+    names = patient.get("name") or []
+    official = next((n.get("text") for n in names if n.get("use") == "official"), "")
+    usual = next((n.get("text") for n in names if n.get("use") == "usual"), official)
+    services = case.get("services")
+    booked = [P.SERVICES[s]["name"][lang].removesuffix(" visit") for s in services or [] if s in P.SERVICES]
+    if lang == "en":
+        what = f" ({', '.join(booked)})" if booked else " (no appointments)" if services == [] else ""
+        return f"I'm {official}{what}"
+    none = "没有预约" if lang == "zh-Hans" else "沒有預約"
+    what = f"（{'、'.join(booked)}）" if booked else f"（{none}）" if services == [] else ""
+    return f"我是{usual}{what}"
 
 
 def when_text(iso: str | None, lang: str = "en") -> str | None:
