@@ -3294,7 +3294,7 @@ mock 的输出是作者写的，永远符合 schema、永远秒回。所以下�
   - **推测（未验证）：** PROGRESS 里 demo-guide spec 那次"呼叫中心丢了通话"，可能是同一类原因：同一个检出目录里有别的会话在改被 Vite 监视的文件，触发了刷新。
 - **范围：** 平台（Web 开发服务器）+ hospital（导览采集）。
 - **来源：** 本会话 2026-10-19 的三次失败运行和两个探针实验。
-- **代码：** `apps/web/scripts/tour/capture.mjs`（`STAGE`、`publish()`、`say()`、`union()`）；分支 `claude/trusting-tereshkova-6d117b`。
+- **代码：** `apps/web/scripts/tour/capture.mjs`（`STAGE`、`publish()`、`say()`、`union()`）；提交 bf5e767（分支 `claude/trusting-tereshkova-6d117b`）。
 
 ---
 
